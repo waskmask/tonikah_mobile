@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-text-heading: #000000;
+    --brand-text-body: #0A0D14;
+    --brand-text-subtitle: #6B7280;
+    --brand-text-muted: #9CA3AF;
+    --brand-bg-primary: #FFFFFF;
+    --brand-bg-surface: #F8FAFC;
+    --brand-bg-border: #E2E8F0;
+    --brand-pagination-active: #00163F;
+    --brand-pagination-inactive: #CFD2D9;
+  }
+
+  .dark {
+    --brand-text-heading: #F1F5F9;
+    --brand-text-body: #E2E8F0;
+    --brand-text-subtitle: #94A3B8;
+    --brand-text-muted: #64748B;
+    --brand-bg-primary: #0F172A;
+    --brand-bg-surface: #1E293B;
+    --brand-bg-border: #334155;
+    --brand-pagination-active: #F1F5F9;
+    --brand-pagination-inactive: #334155;
+  }
+}

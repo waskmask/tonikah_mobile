@@ -1,0 +1,29 @@
+Android Credentials     
+Project                 tonikah
+Application Identifier  com.tonikah.app
+
+Push Notifications (FCM Legacy)
+  None assigned yet
+
+Push Notifications (FCM V1): Google Service Account Key For FCM V1
+  None assigned yet
+
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+
+Configuration:  android-ios-sha1 (Default)
+Keystore
+Type                JKS
+Key Alias           bb9d6d578a6c7e0b7c1b0b642a333086
+MD5 Fingerprint     90:05:47:B3:05:91:DB:F1:DF:4A:D4:C5:8B:D5:23:06
+SHA1 Fingerprint    75:6A:7F:B5:28:7A:2D:EF:1E:7D:0E:A7:21:AB:6D:99:DF:F4:55:EF
+SHA256 Fingerprint  B1:0C:8A:3B:2A:C8:B7:2A:17:19:3B:DC:AF:F2:36:8F:23:C4:F8:30:32:05:A3:ED:BB:2D:36:2E:D8:39:68:23
+ 
+
+ Google console Android OAuth ID Client
+ Client ID=349696991792-vkqhircnv35aqfrvmnq77go08qtcntkk.apps.googleusercontent.com
+
+ Google console iOS OAuth ID Client
+ Client ID=349696991792-vkr3uaifi2i7ot8v39bjh79sf304f90f.apps.googleusercontent.com 
+
+ 

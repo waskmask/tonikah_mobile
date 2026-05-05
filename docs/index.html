@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>toNikah Mobile App — Developer Documentation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html">
+                <span class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link active" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link" href="state-management.html">State Management</a></li>
+                    <li class="nav-item"><a class="nav-link" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="hero-section text-center py-5">
+        <div class="container">
+            <div class="badge bg-accent-subtle text-accent mb-3 px-3 py-2"><i class="bi bi-stars me-1"></i> v1.0.0 — March 2026</div>
+            <h1 class="display-4 fw-bold mb-3">toNikah Mobile App</h1>
+            <p class="lead text-body-secondary mx-auto" style="max-width:640px;">Enterprise-grade developer documentation for the React Native (Expo) mobile application. Everything a developer needs to understand, build, and maintain the app.</p>
+        </div>
+    </header>
+
+    <!-- Quick Links Grid -->
+    <section class="container py-5">
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <a href="architecture.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-primary-subtle text-primary mb-3"><i class="bi bi-diagram-3-fill"></i></div>
+                        <h5 class="card-title">Architecture</h5>
+                        <p class="card-text text-body-secondary small">Project structure, navigation routing, folder conventions, and dependency graph.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <a href="api-reference.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-success-subtle text-success mb-3"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+                        <h5 class="card-title">API Reference</h5>
+                        <p class="card-text text-body-secondary small">HTTP client, endpoints, token refresh, request/response interfaces, and error handling.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <a href="components.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-warning-subtle text-warning mb-3"><i class="bi bi-grid-fill"></i></div>
+                        <h5 class="card-title">UI Components</h5>
+                        <p class="card-text text-body-secondary small">15 reusable components — Input, Button, SelectSheet, Toast, ProgressBar, and more.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <a href="state-management.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-info-subtle text-info mb-3"><i class="bi bi-database-fill"></i></div>
+                        <h5 class="card-title">State Management</h5>
+                        <p class="card-text text-body-secondary small">Zustand stores — auth, theme, language, and profile setup state with persistence.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <a href="auth-flow.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-danger-subtle text-danger mb-3"><i class="bi bi-shield-lock-fill"></i></div>
+                        <h5 class="card-title">Authentication Flow</h5>
+                        <p class="card-text text-body-secondary small">Email &amp; Google login, signup, token refresh, email verification, and session restoration.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <a href="profile-setup.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-accent-subtle text-accent mb-3"><i class="bi bi-person-lines-fill"></i></div>
+                        <h5 class="card-title">Profile Setup</h5>
+                        <p class="card-text text-body-secondary small">9-step profile wizard — form validation, masterdata fetching, step detection, and data payloads.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <a href="i18n-theming.html" class="card card-link h-100">
+                    <div class="card-body">
+                        <div class="icon-box bg-secondary-subtle text-secondary mb-3"><i class="bi bi-translate"></i></div>
+                        <h5 class="card-title">i18n &amp; Theming</h5>
+                        <p class="card-text text-body-secondary small">Internationalization (LTR/RTL), language store, dark mode, responsive scaling.</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Table -->
+    <section class="container pb-5">
+        <h2 class="h4 fw-bold mb-4"><i class="bi bi-stack me-2"></i>Technology Stack</h2>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead class="table-dark">
+                    <tr><th>Category</th><th>Technology</th><th>Version</th><th>Purpose</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Framework</strong></td><td>Expo (Managed)</td><td>54.0</td><td>Build toolchain, OTA updates, native module bridging</td></tr>
+                    <tr><td><strong>Runtime</strong></td><td>React Native</td><td>0.81.5</td><td>Cross-platform UI rendering (iOS &amp; Android)</td></tr>
+                    <tr><td><strong>Language</strong></td><td>TypeScript</td><td>5.9</td><td>Type-safe development</td></tr>
+                    <tr><td><strong>Routing</strong></td><td>Expo Router</td><td>6.0</td><td>File-based routing with Stack &amp; Tab navigators</td></tr>
+                    <tr><td><strong>State</strong></td><td>Zustand</td><td>5.0</td><td>Lightweight global state — auth, theme, language, profile</td></tr>
+                    <tr><td><strong>Server State</strong></td><td>TanStack React Query</td><td>5.90</td><td>Data fetching, caching, and synchronization</td></tr>
+                    <tr><td><strong>Forms</strong></td><td>React Hook Form + Zod</td><td>7.71 / 4.3</td><td>Form validation with schema-based rules</td></tr>
+                    <tr><td><strong>Styling</strong></td><td>NativeWind (Tailwind)</td><td>4.2</td><td>Utility-first CSS-in-JS with dark mode support</td></tr>
+                    <tr><td><strong>Icons</strong></td><td>Lucide React Native</td><td>0.575</td><td>500+ tree-shakeable SVG icons</td></tr>
+                    <tr><td><strong>i18n</strong></td><td>i18next + react-i18next</td><td>25.8 / 16.5</td><td>Multi-language with RTL support (en, ar, ur, fr, de, tr)</td></tr>
+                    <tr><td><strong>Auth</strong></td><td>Google Sign-In</td><td>16.1</td><td>OAuth2 Google authentication</td></tr>
+                    <tr><td><strong>Storage</strong></td><td>Expo SecureStore + AsyncStorage</td><td>15.0 / 2.2</td><td>JWT tokens (secure) &amp; preferences (async)</td></tr>
+                    <tr><td><strong>Animations</strong></td><td>React Native Reanimated</td><td>4.1</td><td>High-performance worklet-based animations</td></tr>
+                    <tr><td><strong>UI Extras</strong></td><td>Expo LinearGradient, expo-image</td><td>15.0 / 3.0</td><td>Gradient backgrounds, optimised image loading</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Package List -->
+    <section class="container pb-5">
+        <h2 class="h4 fw-bold mb-4"><i class="bi bi-box-seam me-2"></i>All Dependencies</h2>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <h6 class="text-body-secondary text-uppercase small mb-3">Production Dependencies</h6>
+                <div class="list-group list-group-flush small">
+                    <div class="list-group-item d-flex justify-content-between"><code>@expo-google-fonts/inter</code><span class="badge bg-secondary">0.4.2</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@expo-google-fonts/manrope</code><span class="badge bg-secondary">0.4.2</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@expo-google-fonts/noto-sans-arabic</code><span class="badge bg-secondary">0.4.3</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@hookform/resolvers</code><span class="badge bg-secondary">5.2.2</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@react-native-async-storage/async-storage</code><span class="badge bg-secondary">2.2.0</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@react-native-community/datetimepicker</code><span class="badge bg-secondary">8.4.4</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@react-native-google-signin/google-signin</code><span class="badge bg-secondary">16.1.2</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>@tanstack/react-query</code><span class="badge bg-secondary">5.90.21</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>expo</code><span class="badge bg-secondary">54.0.33</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>expo-router</code><span class="badge bg-secondary">6.0.23</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>expo-secure-store</code><span class="badge bg-secondary">15.0.8</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>i18next</code><span class="badge bg-secondary">25.8.13</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>lucide-react-native</code><span class="badge bg-secondary">0.575.0</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>nativewind</code><span class="badge bg-secondary">4.2.2</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>react</code><span class="badge bg-secondary">19.1.0</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>react-native</code><span class="badge bg-secondary">0.81.5</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>react-hook-form</code><span class="badge bg-secondary">7.71.2</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>react-i18next</code><span class="badge bg-secondary">16.5.4</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>react-native-reanimated</code><span class="badge bg-secondary">4.1.1</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>react-native-gesture-handler</code><span class="badge bg-secondary">2.28.0</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>tailwindcss</code><span class="badge bg-secondary">3.4.19</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>zod</code><span class="badge bg-secondary">4.3.6</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>zustand</code><span class="badge bg-secondary">5.0.11</span></div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <h6 class="text-body-secondary text-uppercase small mb-3">Dev Dependencies</h6>
+                <div class="list-group list-group-flush small">
+                    <div class="list-group-item d-flex justify-content-between"><code>@types/react</code><span class="badge bg-secondary">19.1.10</span></div>
+                    <div class="list-group-item d-flex justify-content-between"><code>typescript</code><span class="badge bg-secondary">5.9.2</span></div>
+                </div>
+                <h6 class="text-body-secondary text-uppercase small mb-3 mt-4">Key Scripts</h6>
+                <div class="list-group list-group-flush small">
+                    <div class="list-group-item"><code>npm start</code> — <span class="text-body-secondary">expo start --port 8082</span></div>
+                    <div class="list-group-item"><code>npm run android</code> — <span class="text-body-secondary">expo start --android --port 8082</span></div>
+                    <div class="list-group-item"><code>npm run ios</code> — <span class="text-body-secondary">expo start --ios --port 8082</span></div>
+                    <div class="list-group-item"><code>npm run web</code> — <span class="text-body-secondary">expo start --web --port 8082</span></div>
+                </div>
+                <h6 class="text-body-secondary text-uppercase small mb-3 mt-4">Environment Configuration</h6>
+                <div class="list-group list-group-flush small">
+                    <div class="list-group-item">
+                        <code>EXPO_PUBLIC_APP_ENV</code> — <span class="text-body-secondary">Controls environment: <code>dev</code> | <code>staging</code> | <code>prod</code></span>
+                        <div class="mt-2">
+                            <span class="badge bg-success me-1">dev</span> devapi.tonikah.com<br>
+                            <span class="badge bg-warning text-dark me-1">staging</span> devapi.tonikah.com<br>
+                            <span class="badge bg-danger me-1">prod</span> api.tonikah.com
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">
+            <p class="mb-1">toNikah Mobile App Documentation — Generated March 2026</p>
+            <p class="mb-0">Built with Bootstrap 5.3 • Maintained by the Development Team</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

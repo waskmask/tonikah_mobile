@@ -1,0 +1,28 @@
+{
+    "onboarding": {
+        "start": "Commencer",
+        "next": "Suivant",
+        "bismillah": "Bismillah",
+        "screen2_subtitle": "UNE PLATEFORME",
+        "screen2_title": "Uniquement pour le mariage",
+        "screen2_body1": "Nous avons créé toNikah pour une seule raison : aider les musulmans sincères à trouver leur partenaire de vie par un chemin halal et significatif.",
+        "screen2_body2": "Pas de balayage. Pas de connexions occasionnelles. Chaque fonctionnalité est conçue pour respecter votre intention, votre famille et votre religion.",
+        "screen3_subtitle": "MON INTENTION",
+        "screen3_title": "Avant de commencer",
+        "screen3_body1": "Je suis ici pour trouver mon partenaire de vie pour l'amour d'Allah, par un chemin halal et significatif.",
+        "screen3_body2": "Je m'engage à traiter chaque personne sur toNikah avec honnêteté, dignité et respect.",
+        "screen3_terms_prefix": "En continuant, j'accepte les",
+        "screen3_terms_link": "Conditions d'utilisation"
+    },
+    "common": {
+        "continue": "Continuer",
+        "back": "Retour",
+        "skip": "Passer",
+        "done": "Terminé",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "loading": "Chargement...",
+        "error": "Quelque chose s'est mal passé",
+        "retry": "Réessayer"
+    }
+}

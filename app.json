@@ -1,30 +1,73 @@
 {
   "expo": {
-    "name": "React-Native-APP",
-    "slug": "React-Native-APP",
+    "name": "toNikah",
+    "slug": "tonikah",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/icon/adaptive-icon.png",
+    "scheme": "tonikah",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon/adaptive-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tonikah.app",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icon/adaptive-icon.png",
+        "backgroundColor": "#FE8A7B"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.tonikah.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon/adaptive-icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "ar": "./locales/ar.json",
+      "de": "./locales/de.json",
+      "es": "./locales/es.json",
+      "fr": "./locales/fr.json",
+      "id": "./locales/id.json",
+      "it": "./locales/it.json",
+      "pl": "./locales/pl.json",
+      "pt": "./locales/pt.json",
+      "ru": "./locales/ru.json",
+      "tr": "./locales/tr.json"
+    },
+    "extra": {
+      "APP_ENV": "dev",
+      "router": {},
+      "eas": {
+        "projectId": "731d412f-a6af-4208-a2e3-78da74e0ea97"
+      }
     }
   }
 }

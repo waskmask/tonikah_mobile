@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Flow — toNikah Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html"><span
+                    class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link" href="state-management.html">State Management</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-lg-2 docs-sidebar d-none d-lg-block border-end">
+                <nav class="nav flex-column">
+                    <div class="section-title">Auth Flow</div>
+                    <a class="nav-link" href="#overview">Overview</a>
+                    <a class="nav-link" href="#email-login">Email Login</a>
+                    <a class="nav-link" href="#email-signup">Email Signup</a>
+                    <a class="nav-link" href="#google-auth">Google Auth</a>
+                    <a class="nav-link" href="#email-verification">Email Verification</a>
+                    <a class="nav-link" href="#session-restore">Session Restoration</a>
+                    <a class="nav-link" href="#logout-flow">Logout</a>
+                    <a class="nav-link" href="#validation-rules">Validation Rules</a>
+                    <a class="nav-link" href="#security">Security</a>
+                </nav>
+            </aside>
+
+            <main class="col-lg-10 py-4 px-4 px-lg-5">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="index.html">Docs</a></li>
+                        <li class="breadcrumb-item active">Auth Flow</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 fw-bold mb-4"><i class="bi bi-shield-lock-fill me-2 text-accent"></i>Authentication Flow
+                </h1>
+
+                <section id="overview" class="mb-5">
+                    <h2 class="h4 fw-bold">Overview</h2>
+                    <p>The app supports two auth methods: <strong>Email/Password</strong> and <strong>Google
+                            OAuth2</strong>. Both methods result in JWT tokens stored in <code>SecureStore</code>. The
+                        architecture:</p>
+                    <div class="code-block">
+                        ┌──────────────┐ ┌─────────────┐ ┌──────────────┐ ┌────────────┐
+                        │ login.tsx │─────▶│ authStore │─────▶│ authService │─────▶│ api.ts │
+                        │ signup.tsx │ │ (Zustand) │ │ (Service) │ │ (HTTP) │
+                        └──────────────┘ └──────┬──────┘ └──────────────┘ └────────────┘
+                        │
+                        ┌────────▼────────┐
+                        │ SecureStore │ ← JWT tokens
+                        │ (Encrypted) │
+                        └─────────────────┘
+                    </div>
+
+                    <h5 class="mt-4">Files Involved</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>File</th>
+                                    <th>Role</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>app/(auth)/login.tsx</code></td>
+                                    <td>Login screen with React Hook Form + Zod validation</td>
+                                </tr>
+                                <tr>
+                                    <td><code>app/(auth)/signup.tsx</code></td>
+                                    <td>Signup screen with password strength rules</td>
+                                </tr>
+                                <tr>
+                                    <td><code>app/(auth)/verify-email.tsx</code></td>
+                                    <td>Email verification prompt with resend</td>
+                                </tr>
+                                <tr>
+                                    <td><code>store/authStore.ts</code></td>
+                                    <td>Global auth state + async actions</td>
+                                </tr>
+                                <tr>
+                                    <td><code>lib/authService.ts</code></td>
+                                    <td>API endpoint wrappers</td>
+                                </tr>
+                                <tr>
+                                    <td><code>lib/googleSignIn.ts</code></td>
+                                    <td>Google Sign-In native module integration</td>
+                                </tr>
+                                <tr>
+                                    <td><code>lib/api.ts</code></td>
+                                    <td>HTTP client with token management</td>
+                                </tr>
+                                <tr>
+                                    <td><code>lib/apiErrorTranslator.ts</code></td>
+                                    <td>Maps API error codes to i18n translation keys</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Email Login -->
+                <section id="email-login" class="mb-5">
+                    <h2 class="h4 fw-bold">Email Login Flow</h2>
+                    <div class="flow-step">
+                        <div class="flow-number">1</div>
+                        <div>User enters <strong>email</strong> and <strong>password</strong> in <code>login.tsx</code>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">2</div>
+                        <div>Button enables after user types ≥3 characters (no blur required)</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">3</div>
+                        <div>On submit: <code>authStore.login(email, password)</code> called</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">4</div>
+                        <div>Store calls <code>authService.login()</code> → <code>POST /app-user/mobile/login</code>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">5</div>
+                        <div>On success: <code>api.setTokens(accessToken, refreshToken)</code> → stored in
+                            <code>SecureStore</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">6</div>
+                        <div>Store sets <code>user</code> and <code>isAuthenticated = true</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">7</div>
+                        <div>Router navigates to <code>/</code> → <code>index.tsx</code> decision tree runs (checks
+                            verification, profile completeness)</div>
+                    </div>
+
+                    <div class="alert alert-warning d-flex gap-2 small mt-3">
+                        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                        <div><strong>Email not verified:</strong> If <code>user.email_verified === false</code>, the
+                            user is redirected to <code>verify-email.tsx</code> before they can access root index.</div>
+                    </div>
+                </section>
+
+                <!-- Email Signup -->
+                <section id="email-signup" class="mb-5">
+                    <h2 class="h4 fw-bold">Email Signup Flow</h2>
+                    <div class="flow-step">
+                        <div class="flow-number">1</div>
+                        <div>User fills: <strong>email, password, confirm password</strong></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">2</div>
+                        <div>User checks <strong>Terms &amp; Conditions</strong> checkbox (required) and optionally
+                            marketing opt-in</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">3</div>
+                        <div>Zod validates password strength (8+ chars, uppercase, lowercase, number, special char)
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">4</div>
+                        <div><code>authStore.signup()</code> → <code>POST /app-user/mobile/signup</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">5</div>
+                        <div>On success: tokens stored, but <code>email_verified: false</code>. Shows success toast.
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">6</div>
+                        <div>Redirect to <code>verify-email.tsx</code> with <code>email</code> param</div>
+                    </div>
+                </section>
+
+                <!-- Google Auth -->
+                <section id="google-auth" class="mb-5">
+                    <h2 class="h4 fw-bold">Google Auth Flow</h2>
+                    <div class="flow-step">
+                        <div class="flow-number">1</div>
+                        <div>User taps "Sign in with Google" button</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">2</div>
+                        <div><code>authStore.googleAuth()</code> calls <code>signInWithGoogle()</code> from
+                            <code>lib/googleSignIn.ts</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">3</div>
+                        <div>Google native module shows account picker → returns <code>idToken</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">4</div>
+                        <div>If user cancels → returns <code>{ cancelled: true }</code>, no error shown</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">5</div>
+                        <div><code>authService.googleAuth({ credential: idToken })</code> →
+                            <code>POST /auth/google</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">6</div>
+                        <div>Backend verifies token, creates/finds user, returns JWT tokens +
+                            <code>email_verified: true</code></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">7</div>
+                        <div>Tokens stored, user set, navigates to <code>/</code> (skips email verification)</div>
+                    </div>
+
+                    <h5 class="mt-3">Google Client IDs</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Platform</th>
+                                    <th>Config Key</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Web / Android</td>
+                                    <td><code>GOOGLE_WEB_CLIENT_ID</code></td>
+                                </tr>
+                                <tr>
+                                    <td>iOS</td>
+                                    <td><code>GOOGLE_IOS_CLIENT_ID</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Email Verification -->
+                <section id="email-verification" class="mb-5">
+                    <h2 class="h4 fw-bold">Email Verification</h2>
+                    <p>Email-registered users must verify before accessing the main app:</p>
+                    <ul>
+                        <li><code>verify-email.tsx</code> shows "Check your inbox" with the user's email</li>
+                        <li><strong>Resend:</strong> <code>authService.resendVerification(email)</code> →
+                            <code>POST /app-user/resend-verification</code></li>
+                        <li><strong>Go to Login:</strong> Button navigates back to login (user can log in after
+                            verifying via email link)</li>
+                        <li>On next login: <code>index.tsx</code> checks <code>user.email_verified</code> — if still
+                            false, redirects back to verify-email</li>
+                    </ul>
+                </section>
+
+                <!-- Session Restore -->
+                <section id="session-restore" class="mb-5">
+                    <h2 class="h4 fw-bold">Session Restoration</h2>
+                    <p>On app launch, <code>_layout.tsx</code> calls <code>authStore.restoreSession()</code>:</p>
+                    <div class="code-block">
+                        1. Check SecureStore for access token
+                        2. If no token → set isAuthenticated=false, isRestoringSession=false → done
+                        3. If token exists → call authService.me() (GET /app-user/mobile/me)
+                        • Success → set user + isAuthenticated=true
+                        • 401 → api.ts auto-refreshes token → retry /me
+                        • Fail → clearTokens() → set isAuthenticated=false
+                        4. Set isRestoringSession=false → index.tsx decision tree runs
+                    </div>
+                </section>
+
+                <!-- Logout -->
+                <section id="logout-flow" class="mb-5">
+                    <h2 class="h4 fw-bold">Logout</h2>
+                    <div class="code-block">
+                        1. authStore.logout() called
+                        2. Get refresh token from SecureStore
+                        3. Fire-and-forget: POST /app-user/mobile/logout { refreshToken }
+                        4. Clear both tokens from SecureStore
+                        5. Set user=null, isAuthenticated=false
+                        6. Router redirects to /(auth)/login
+                    </div>
+                </section>
+
+                <!-- Validation -->
+                <section id="validation-rules" class="mb-5">
+                    <h2 class="h4 fw-bold">Validation Rules (Zod)</h2>
+                    <h5>Login Schema</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Rules</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>email</code></td>
+                                    <td>Required, valid email format</td>
+                                </tr>
+                                <tr>
+                                    <td><code>password</code></td>
+                                    <td>Required, min 1 char (just presence check for login)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5 class="mt-3">Signup Schema</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Rules</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>email</code></td>
+                                    <td>Required, valid email</td>
+                                </tr>
+                                <tr>
+                                    <td><code>password</code></td>
+                                    <td>Min 8 chars + uppercase + lowercase + number + special character</td>
+                                </tr>
+                                <tr>
+                                    <td><code>confirmPassword</code></td>
+                                    <td>Must match <code>password</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>agreed</code></td>
+                                    <td>Must be <code>true</code> (Terms checkbox)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>marketingOptIn</code></td>
+                                    <td>Optional boolean</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Security -->
+                <section id="security" class="mb-5">
+                    <h2 class="h4 fw-bold">Security Considerations</h2>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-shield-check text-success me-2"></i>Token Storage</h6>
+                                    <p class="small mb-0">JWT tokens stored in <strong>Expo SecureStore</strong> (iOS
+                                        Keychain / Android EncryptedSharedPreferences). Never in AsyncStorage or local
+                                        state.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-arrow-repeat text-info me-2"></i>Automatic Refresh</h6>
+                                    <p class="small mb-0">401 responses trigger transparent token refresh. Concurrent
+                                        requests queue behind a single refresh. Failed refresh clears all tokens.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-clock text-warning me-2"></i>Request Timeout</h6>
+                                    <p class="small mb-0">All API requests abort after <strong>15 seconds</strong> via
+                                        <code>AbortController</code>. Returns <code>network_error</code>.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-key text-accent me-2"></i>Google OAuth</h6>
+                                    <p class="small mb-0">Only the <code>idToken</code> is sent to the backend. The
+                                        backend verifies it independently with Google. No user credentials are stored
+                                        client-side.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">toNikah Docs — Auth Flow</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

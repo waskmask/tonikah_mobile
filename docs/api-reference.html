@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Reference — toNikah Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html"><span
+                    class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link" href="state-management.html">State Management</a></li>
+                    <li class="nav-item"><a class="nav-link" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-lg-2 docs-sidebar d-none d-lg-block border-end">
+                <nav class="nav flex-column">
+                    <div class="section-title">API Layer</div>
+                    <a class="nav-link" href="#http-client">HTTP Client</a>
+                    <a class="nav-link" href="#token-management">Token Management</a>
+                    <a class="nav-link" href="#token-refresh">Token Refresh Flow</a>
+                    <a class="nav-link" href="#error-handling">Error Handling</a>
+                    <div class="section-title">Auth Endpoints</div>
+                    <a class="nav-link" href="#login">POST /login</a>
+                    <a class="nav-link" href="#signup">POST /signup</a>
+                    <a class="nav-link" href="#google-auth">POST /auth/google</a>
+                    <a class="nav-link" href="#me">GET /me</a>
+                    <a class="nav-link" href="#refresh">POST /refresh</a>
+                    <a class="nav-link" href="#logout">POST /logout</a>
+                    <a class="nav-link" href="#resend-verification">POST /resend-verification</a>
+                    <div class="section-title">Profile Endpoints</div>
+                    <a class="nav-link" href="#create-profile">POST /profile/new</a>
+                    <a class="nav-link" href="#update-profile">PATCH /profile/update</a>
+                    <a class="nav-link" href="#masterdata">GET /masterdata/:type</a>
+                    <a class="nav-link" href="#places">GET /profile/places/details</a>
+                </nav>
+            </aside>
+
+            <main class="col-lg-10 py-4 px-4 px-lg-5">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="index.html">Docs</a></li>
+                        <li class="breadcrumb-item active">API Reference</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 fw-bold mb-4"><i class="bi bi-cloud-arrow-up-fill me-2 text-accent"></i>API Reference</h1>
+
+                <!-- HTTP Client -->
+                <section id="http-client" class="mb-5">
+                    <h2 class="h4 fw-bold">HTTP Client <small class="text-body-secondary fw-normal">— lib/api.ts</small>
+                    </h2>
+                    <p>A custom fetch-based HTTP client with automatic JWT token injection, 15-second timeout, and
+                        transparent token refresh.</p>
+
+                    <h5>Exported Interface</h5>
+                    <div class="code-block">export const api = {
+                        get: (endpoint: string) => Promise&lt;ApiResponse&gt;
+                        post: (endpoint: string, body: object) => Promise&lt;ApiResponse&gt;
+                        patch:(endpoint: string, body: object) => Promise&lt;ApiResponse&gt;
+                        setTokens: (access: string, refresh: string) => Promise&lt;void&gt;
+                        getTokens: () => Promise&lt;{ accessToken, refreshToken }&gt;
+                        clearTokens: () => Promise&lt;void&gt;
+                        }</div>
+
+                    <h5 class="mt-4">ApiResponse Interface</h5>
+                    <div class="code-block">interface ApiResponse&lt;T = any&gt; {
+                        success: boolean;
+                        message?: string;
+                        data?: T;
+                        status?: number;
+                        [key: string]: any; // Extra fields like `user`, `accessToken`
+                        }</div>
+
+                    <h5 class="mt-4">Request Headers</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Header</th>
+                                    <th>Value</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>Content-Type</code></td>
+                                    <td><code>application/json</code></td>
+                                    <td>Always set</td>
+                                </tr>
+                                <tr>
+                                    <td><code>Accept-Language</code></td>
+                                    <td><code>i18n.language</code></td>
+                                    <td>Current locale (en, ar, ur, etc.)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>Authorization</code></td>
+                                    <td><code>Bearer {token}</code></td>
+                                    <td>Only when token exists in SecureStore</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Token Management -->
+                <section id="token-management" class="mb-5">
+                    <h2 class="h4 fw-bold">Token Management</h2>
+                    <p>Tokens are stored in <strong>Expo SecureStore</strong> (encrypted keychain on iOS, encrypted
+                        SharedPreferences on Android):</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Purpose</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>tn_access_token</code></td>
+                                    <td>Short-lived JWT for API authentication</td>
+                                </tr>
+                                <tr>
+                                    <td><code>tn_refresh_token</code></td>
+                                    <td>Long-lived token for obtaining new access tokens</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Token Refresh -->
+                <section id="token-refresh" class="mb-5">
+                    <h2 class="h4 fw-bold">Token Refresh Flow</h2>
+                    <p>When a request returns <strong>401 Unauthorized</strong>, the client automatically attempts a
+                        token refresh:</p>
+                    <div class="code-block">
+                        401 Received (not /refresh or /login)
+                        │
+                        ├── Has refresh token?
+                        │ ├── NO → clearTokens() → return { success: false, message: 'unauthorized' }
+                        │ └── YES
+                        │ ├── Already refreshing? (isRefreshing flag)
+                        │ │ ├── YES → Queue request via addRefreshSubscriber() → wait
+                        │ │ └── NO → Set isRefreshing = true
+                        │ │ ├── POST /app-user/mobile/refresh { refreshToken }
+                        │ │ ├── Success? → setTokens(new) → onRefreshed(token) → retry original request
+                        │ │ └── Fail? → clearTokens() → return unauthorized
+                        │ └── When refresh completes → all queued subscribers retry their original requests
+                    </div>
+                    <div class="alert alert-warning d-flex gap-2 align-items-start mt-3">
+                        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                        <div><strong>Concurrent Requests:</strong> If multiple requests fail with 401 simultaneously,
+                            only <em>one</em> refresh is sent. Others are queued via the subscriber pattern and retried
+                            after the refresh completes.</div>
+                    </div>
+                </section>
+
+                <!-- Error Handling -->
+                <section id="error-handling" class="mb-5">
+                    <h2 class="h4 fw-bold">Error Handling</h2>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Scenario</th>
+                                    <th>Response</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Request timeout (15s)</td>
+                                    <td><code>{ success: false, message: 'network_error', error: 'timeout' }</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Network failure</td>
+                                    <td><code>{ success: false, message: 'network_error' }</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Invalid JSON response</td>
+                                    <td><code>{ success: false, message: 'invalid_json', status: N }</code></td>
+                                </tr>
+                                <tr>
+                                    <td>401 with no refresh token</td>
+                                    <td><code>{ success: false, message: 'unauthorized', status: 401 }</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Refresh token expired</td>
+                                    <td><code>{ success: false, message: 'unauthorized', status: 401 }</code> + tokens
+                                        cleared</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <hr class="my-5">
+                <h2 class="h3 fw-bold mb-4"><i class="bi bi-shield-lock me-2"></i>Auth Endpoints</h2>
+
+                <!-- Login -->
+                <section id="login" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="method-badge method-post">POST</span>
+                            <code class="fs-6">/app-user/mobile/login</code>
+                        </div>
+                        <p class="text-body-secondary small mb-2">Authenticate with email and password.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <h6 class="small text-body-secondary">Request Body</h6>
+                                <div class="code-block">{ "email": "string", "password": "string" }</div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="small text-body-secondary">Success Response</h6>
+                                <div class="code-block">{
+                                    "success": true,
+                                    "accessToken": "jwt...",
+                                    "refreshToken": "jwt...",
+                                    "user": { "_id", "email", "username", "profile": {...} }
+                                    }</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Signup -->
+                <section id="signup" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-post">POST</span><code
+                                class="fs-6">/app-user/mobile/signup</code></div>
+                        <p class="text-body-secondary small mb-2">Register a new user with email.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <h6 class="small text-body-secondary">Request Body</h6>
+                                <div class="code-block">{
+                                    "email": "string",
+                                    "password": "string",
+                                    "agreed": true,
+                                    "marketing_opt_in": false
+                                    }</div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="small text-body-secondary">Success Response</h6>
+                                <div class="code-block">{
+                                    "success": true,
+                                    "accessToken": "jwt...",
+                                    "refreshToken": "jwt...",
+                                    "user": { ... , "email_verified": false }
+                                    }</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Google Auth -->
+                <section id="google-auth" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-post">POST</span><code
+                                class="fs-6">/app-user/mobile/auth/google</code></div>
+                        <p class="text-body-secondary small mb-2">Authenticate with Google OAuth2 ID token.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <h6 class="small text-body-secondary">Request Body</h6>
+                                <div class="code-block">{ "credential": "google-id-token" }</div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="small text-body-secondary">Notes</h6>
+                                <p class="small">Google users are auto-verified (<code>email_verified: true</code>).
+                                    Creates account if new.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Me -->
+                <section id="me" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-get">GET</span><code class="fs-6">/app-user/mobile/me</code>
+                        </div>
+                        <p class="text-body-secondary small mb-2">Fetch current authenticated user with full profile.
+                            Used on app launch and after login.</p>
+                        <h6 class="small text-body-secondary">Success Response</h6>
+                        <div class="code-block">{
+                            "success": true,
+                            "user": {
+                            "_id", "email", "username", "email_verified",
+                            "status", "visible", "status_online",
+                            "profile": {
+                            "profileName", "gender", "dob", "nationality",
+                            "mother_tongue", "marital_status", "height",
+                            "education", "sect", "smoking", "alcohol",
+                            "current_location": { "city", "country" },
+                            "profile_manager", ...
+                            }
+                            }
+                            }</div>
+                    </div>
+                </section>
+
+                <!-- Refresh -->
+                <section id="refresh" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-post">POST</span><code
+                                class="fs-6">/app-user/mobile/refresh</code></div>
+                        <p class="text-body-secondary small mb-2">Exchange refresh token for new access token. Called
+                            automatically by the HTTP client.</p>
+                        <div class="code-block">Request: { "refreshToken": "string" }
+                            Response: { "success": true, "accessToken": "new-jwt", "refreshToken": "new-or-same" }</div>
+                    </div>
+                </section>
+
+                <!-- Logout -->
+                <section id="logout" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-post">POST</span><code
+                                class="fs-6">/app-user/mobile/logout</code></div>
+                        <p class="text-body-secondary small mb-2">Invalidate refresh token server-side. Client fires and
+                            forgets, then clears local tokens.</p>
+                        <div class="code-block">Request: { "refreshToken": "string" }</div>
+                    </div>
+                </section>
+
+                <!-- Resend Verification -->
+                <section id="resend-verification" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-post">POST</span><code
+                                class="fs-6">/app-user/resend-verification</code></div>
+                        <p class="text-body-secondary small mb-2">Resend email verification link.</p>
+                        <div class="code-block">Request: { "email": "string" }</div>
+                    </div>
+                </section>
+
+                <hr class="my-5">
+                <h2 class="h3 fw-bold mb-4"><i class="bi bi-person-lines-fill me-2"></i>Profile Endpoints</h2>
+
+                <!-- Create Profile -->
+                <section id="create-profile" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-post">POST</span><code class="fs-6">/profile/new</code></div>
+                        <p class="text-body-secondary small mb-2">Create initial profile (Step 1 only). Sets immutable
+                            fields.</p>
+                        <div class="code-block">{
+                            "religion": "islam",
+                            "profileName": "string (max 15, alphanumeric)",
+                            "gender": "male" | "female",
+                            "dob": "YYYY-MM-DD",
+                            "nationality": ["string", "string"],
+                            "grew_up_in": "country_code"
+                            }</div>
+                    </div>
+                </section>
+
+                <!-- Update Profile -->
+                <section id="update-profile" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-patch">PATCH</span><code class="fs-6">/profile/update</code>
+                        </div>
+                        <p class="text-body-secondary small mb-2">Update profile fields (Steps 2–9). Accepts partial
+                            data.</p>
+                        <p class="small">See <a href="profile-setup.html">Profile Setup</a> for per-step payloads.</p>
+                    </div>
+                </section>
+
+                <!-- Masterdata -->
+                <section id="masterdata" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-get">GET</span><code class="fs-6">/masterdata/:type</code>
+                        </div>
+                        <p class="text-body-secondary small mb-2">Fetch master list values for select fields.</p>
+                        <div class="table-responsive">
+                            <table class="table table-bordered prop-table small">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Used In</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>height</code></td>
+                                        <td>Step 4</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>complexion</code></td>
+                                        <td>Step 4</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>ethnic_group</code></td>
+                                        <td>Step 4</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>education</code></td>
+                                        <td>Step 5</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>occupation</code></td>
+                                        <td>Step 5</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>designation</code></td>
+                                        <td>Step 5</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>income</code></td>
+                                        <td>Step 5</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>sect</code></td>
+                                        <td>Step 6</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>sect_type</code></td>
+                                        <td>Step 6</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>caste</code></td>
+                                        <td>Step 6</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <h6 class="small text-body-secondary mt-2">Response Shape</h6>
+                        <div class="code-block">{ "success": true, "data": [{ "_id": "...", "name": "...",
+                            "description": "..." }, ...] }</div>
+                    </div>
+                </section>
+
+                <!-- Places -->
+                <section id="places" class="mb-4">
+                    <div class="endpoint-card">
+                        <div class="d-flex align-items-center gap-2 mb-2"><span
+                                class="method-badge method-get">GET</span><code
+                                class="fs-6">/profile/places/details?place_id=...&amp;language=en</code></div>
+                        <p class="text-body-secondary small mb-2">Google Places backend proxy (Step 8). Also uses direct
+                            Google Places Autocomplete API on client.</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">toNikah Docs — API Reference</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

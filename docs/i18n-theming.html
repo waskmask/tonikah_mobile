@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>i18n &amp; Theming — toNikah Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html"><span
+                    class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link" href="state-management.html">State Management</a></li>
+                    <li class="nav-item"><a class="nav-link" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-lg-2 docs-sidebar d-none d-lg-block border-end">
+                <nav class="nav flex-column">
+                    <div class="section-title">Internationalization</div>
+                    <a class="nav-link" href="#i18n-setup">i18n Setup</a>
+                    <a class="nav-link" href="#languages">Supported Languages</a>
+                    <a class="nav-link" href="#namespaces">Translation Namespaces</a>
+                    <a class="nav-link" href="#rtl">RTL Support</a>
+                    <a class="nav-link" href="#usage">Usage in Components</a>
+                    <div class="section-title">Theming</div>
+                    <a class="nav-link" href="#dark-mode">Dark Mode System</a>
+                    <a class="nav-link" href="#color-palette">Color Palette</a>
+                    <a class="nav-link" href="#typography">Typography</a>
+                    <a class="nav-link" href="#responsive">Responsive Scaling</a>
+                </nav>
+            </aside>
+
+            <main class="col-lg-10 py-4 px-4 px-lg-5">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="index.html">Docs</a></li>
+                        <li class="breadcrumb-item active">i18n &amp; Theming</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 fw-bold mb-4"><i class="bi bi-translate me-2 text-accent"></i>Internationalization &amp;
+                    Theming</h1>
+
+                <!-- i18n Setup -->
+                <section id="i18n-setup" class="mb-5">
+                    <h2 class="h4 fw-bold">i18n Setup <small class="text-body-secondary fw-normal">— lib/i18n.ts</small>
+                    </h2>
+                    <p>The app uses <strong>i18next</strong> + <strong>react-i18next</strong> for translations.
+                        Configuration:</p>
+                    <div class="code-block">import i18n from 'i18next';
+                        import { initReactI18next } from 'react-i18next';
+
+                        i18n.use(initReactI18next).init({
+                        fallbackLng: 'en',
+                        defaultNS: 'common',
+                        ns: ['common', 'countries', 'nationalities', 'languages', 'ethnic_groups', 'designations'],
+                        interpolation: { escapeValue: false },
+                        resources: {
+                        en: { common: require('@/locales/en/common.json'), ... },
+                        ar: { common: require('@/locales/ar/common.json'), ... },
+                        // ... ur, fr, de, tr
+                        }
+                        });</div>
+                </section>
+
+                <!-- Languages -->
+                <section id="languages" class="mb-5">
+                    <h2 class="h4 fw-bold">Supported Languages</h2>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Language</th>
+                                    <th>Direction</th>
+                                    <th>Font</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>en</code></td>
+                                    <td>English</td>
+                                    <td>LTR</td>
+                                    <td>Inter</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ar</code></td>
+                                    <td>العربية (Arabic)</td>
+                                    <td><strong>RTL</strong></td>
+                                    <td>Noto Sans Arabic</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ur</code></td>
+                                    <td>اردو (Urdu)</td>
+                                    <td><strong>RTL</strong></td>
+                                    <td>Noto Sans Arabic</td>
+                                </tr>
+                                <tr>
+                                    <td><code>fr</code></td>
+                                    <td>Français</td>
+                                    <td>LTR</td>
+                                    <td>Inter</td>
+                                </tr>
+                                <tr>
+                                    <td><code>de</code></td>
+                                    <td>Deutsch</td>
+                                    <td>LTR</td>
+                                    <td>Inter</td>
+                                </tr>
+                                <tr>
+                                    <td><code>tr</code></td>
+                                    <td>Türkçe</td>
+                                    <td>LTR</td>
+                                    <td>Inter</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Namespaces -->
+                <section id="namespaces" class="mb-5">
+                    <h2 class="h4 fw-bold">Translation Namespaces</h2>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Namespace</th>
+                                    <th>File</th>
+                                    <th>Content</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>common</code></td>
+                                    <td>common.json</td>
+                                    <td>Auth strings, onboarding, profile setup labels, step headings, validation
+                                        messages, UI strings</td>
+                                </tr>
+                                <tr>
+                                    <td><code>countries</code></td>
+                                    <td>countries.json</td>
+                                    <td>Country names (for grew_up_in and location)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>nationalities</code></td>
+                                    <td>nationalities.json</td>
+                                    <td>Nationality labels</td>
+                                </tr>
+                                <tr>
+                                    <td><code>languages</code></td>
+                                    <td>languages.json</td>
+                                    <td>Language names (for mother tongue / spoken)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ethnic_groups</code></td>
+                                    <td>ethnic_groups.json</td>
+                                    <td>Ethnic group labels</td>
+                                </tr>
+                                <tr>
+                                    <td><code>designations</code></td>
+                                    <td>designations.json</td>
+                                    <td>Designation labels</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <h5 class="mt-3">Key Structure in common.json</h5>
+                    <div class="code-block">{
+                        "onboarding": { "start", "next", "bismillah", "screen2_*", "screen3_*" },
+                        "auth": { "login_title", "signup_title", "email_placeholder", "password_placeholder",
+                        "forgot_password", "google_signin", "google_terms_prefix", "terms_of_use",
+                        "privacy_policy", "and", "verify_*", "resend_*" },
+                        "step_1": { "title", "subtitle", "profile_name", "gender", "dob", ... },
+                        "step_2..9": { ... },
+                        "validation": { "email_required", "password_min_length", "password_uppercase", ... },
+                        "common": { "continue", "finish", "loading", "or" }
+                        }</div>
+                </section>
+
+                <!-- RTL -->
+                <section id="rtl" class="mb-5">
+                    <h2 class="h4 fw-bold">RTL Support</h2>
+                    <p>RTL is a first-class concern. The <code>useLanguage()</code> hook exposes <code>isRTL</code>
+                        which is true for <code>ar</code> and <code>ur</code>.</p>
+
+                    <h5>Where RTL is Applied</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Component</th>
+                                    <th>RTL Behavior</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>Input.tsx</code></td>
+                                    <td><code>flexDirection: 'row-reverse'</code>, icon margins swap,
+                                        <code>textAlign: 'right'</code>, <code>writingDirection: 'rtl'</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>SelectField</code></td>
+                                    <td><code>flexDirection: 'row-reverse'</code>, <code>textAlign: 'right'</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>FieldLabel</code></td>
+                                    <td>Row reverse for label + asterisk</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ErrorText</code></td>
+                                    <td><code>textAlign: 'right'</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Auth pages</td>
+                                    <td>Header row, forgot password, footer, Google terms — all flip direction</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5 class="mt-3">How to Add RTL to a New Component</h5>
+                    <div class="code-block">import { useLanguage } from '@/hooks/useLanguage';
+
+                        const { isRTL } = useLanguage();
+
+                        // Flip flex direction
+                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}
+
+                        // Flip text alignment
+                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+
+                        // Swap icon margins
+                        style={{ [isRTL ? 'marginLeft' : 'marginRight']: scale(10) }}
+
+                        // Text writing direction
+                        style={{ writingDirection: isRTL ? 'rtl' : 'ltr' }}</div>
+                </section>
+
+                <!-- Usage -->
+                <section id="usage" class="mb-5">
+                    <h2 class="h4 fw-bold">Usage in Components</h2>
+                    <div class="code-block">import { useLanguage } from '@/hooks/useLanguage';
+
+                        function MyScreen() {
+                        const { t, isRTL, language, changeLanguage } = useLanguage();
+
+                        return (
+                        &lt;View&gt;
+                        {/* Simple translation */}
+                        &lt;Text&gt;{t('auth.login_title')}&lt;/Text&gt;
+
+                        {/* With namespace */}
+                        &lt;Text&gt;{t('countries:united_states')}&lt;/Text&gt;
+
+                        {/* With default fallback */}
+                        &lt;Text&gt;{t('step_1.dob', { defaultValue: 'Date of Birth' })}&lt;/Text&gt;
+
+                        {/* Change language */}
+                        &lt;Button onPress={() =&gt; changeLanguage('ar')} title="Switch to Arabic" /&gt;
+                        &lt;/View&gt;
+                        );
+                        }</div>
+                </section>
+
+                <hr class="my-5">
+                <h2 class="h3 fw-bold mb-4"><i class="bi bi-moon-stars-fill me-2"></i>Theming</h2>
+
+                <!-- Dark Mode -->
+                <section id="dark-mode" class="mb-5">
+                    <h2 class="h4 fw-bold">Dark Mode System</h2>
+                    <p>Three-layer architecture for dark mode:</p>
+                    <div class="code-block">
+                        ┌────────────────────────────────────────────────────────────────┐
+                        │ themeStore.ts (Zustand + persist) │
+                        │ Stores: mode = "light" | "dark" | "system" │
+                        │ Persisted to: AsyncStorage ("tonikah-theme-preference") │
+                        ├────────────────────────────────────────────────────────────────┤
+                        │ useTheme.ts (Custom Hook) │
+                        │ Reads: mode from store + useColorScheme() from React Native │
+                        │ Computes: isDark = mode==="dark" ? true │
+                        │ : mode==="light" ? false │
+                        │ : systemColorScheme === "dark" │
+                        │ Returns: { theme, isDark, toggleTheme, setTheme } │
+                        ├────────────────────────────────────────────────────────────────┤
+                        │ ThemeProvider.tsx (NativeWind) │
+                        │ Sets NativeWind's colorScheme based on computed dark mode │
+                        │ Enables className dark: variants (dark:bg-slate-900 etc.) │
+                        └────────────────────────────────────────────────────────────────┘
+                    </div>
+                    <div class="alert alert-warning d-flex gap-2 small mt-3">
+                        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                        <div><strong>Critical:</strong> For form inputs (<code>Input.tsx</code>,
+                            <code>SelectField</code>), we use <strong>explicit style objects</strong> with
+                            <code>isDark</code> checks rather than NativeWind classes. This ensures dark mode colors
+                            work reliably in TextInput components where NativeWind dark: variants can be inconsistent.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Color Palette -->
+                <section id="color-palette" class="mb-5">
+                    <h2 class="h4 fw-bold">Color Palette</h2>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <h6>Brand / Accent</h6>
+                            <div class="d-flex flex-wrap gap-3 small">
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#FE8A7B"></span> Primary <code>#FE8A7B</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#F34B6F"></span> Secondary <code>#F34B6F</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#4B68C4"></span> Link <code>#4B68C4</code></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Dark Mode UI</h6>
+                            <div class="d-flex flex-wrap gap-3 small">
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#0F172A"></span> Background <code>#0F172A</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#1E293B"></span> Surface <code>#1E293B</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#334155"></span> Border <code>#334155</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#E2E8F0; color:#000"></span> Text <code>#E2E8F0</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#64748B"></span> Placeholder <code>#64748B</code></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Light Mode UI</h6>
+                            <div class="d-flex flex-wrap gap-3 small">
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3 border"
+                                        style="background:#FFFFFF"></span> Background <code>#FFFFFF</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3 border"
+                                        style="background:#E2E8F0"></span> Border <code>#E2E8F0</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#0A0D14"></span> Text <code>#0A0D14</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#9CA3AF"></span> Placeholder <code>#9CA3AF</code></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Semantic Colors</h6>
+                            <div class="d-flex flex-wrap gap-3 small">
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#EF4444"></span> Error <code>#EF4444</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#22C55E"></span> Success <code>#22C55E</code></div>
+                                <div class="d-flex align-items-center gap-2"><span class="badge p-3"
+                                        style="background:#F59E0B"></span> Warning <code>#F59E0B</code></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Typography -->
+                <section id="typography" class="mb-5">
+                    <h2 class="h4 fw-bold">Typography</h2>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Font Family</th>
+                                    <th>Package</th>
+                                    <th>Use</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Inter</strong> (400, 500, 600, 700)</td>
+                                    <td><code>@expo-google-fonts/inter</code></td>
+                                    <td>Body text, labels, inputs (LTR languages)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Manrope</strong> (600, 700, 800)</td>
+                                    <td><code>@expo-google-fonts/manrope</code></td>
+                                    <td>Headings, page titles</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Noto Sans Arabic</strong></td>
+                                    <td><code>@expo-google-fonts/noto-sans-arabic</code></td>
+                                    <td>Arabic and Urdu text</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small text-body-secondary">Fonts are loaded in <code>_layout.tsx</code> using
+                        <code>expo-font</code>. The <code>Text</code> component applies the correct font family based on
+                        the <code>variant</code> prop and active language.</p>
+                </section>
+
+                <!-- Responsive -->
+                <section id="responsive" class="mb-5">
+                    <h2 class="h4 fw-bold">Responsive Scaling <small class="text-body-secondary fw-normal">—
+                            hooks/useResponsive.ts</small></h2>
+                    <p>The <code>scale()</code> function scales pixel values based on screen width relative to 375px
+                        (iPhone SE baseline):</p>
+                    <div class="code-block">import { Dimensions } from 'react-native';
+                        const { width } = Dimensions.get('window');
+                        const BASE = 375;
+                        export const scale = (size: number): number => (width / BASE) * size;
+
+                        // Usage:
+                        style={{ fontSize: scale(14), padding: scale(16), borderRadius: scale(12) }}
+
+                        // Examples:
+                        // iPhone SE (375px): scale(14) → 14
+                        // iPhone 15 (393px): scale(14) → 14.7
+                        // iPad (768px): scale(14) → 28.7</div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">toNikah Docs — i18n &amp; Theming</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

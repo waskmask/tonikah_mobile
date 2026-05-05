@@ -1,0 +1,28 @@
+{
+    "onboarding": {
+        "start": "Mulai",
+        "next": "Berikutnya",
+        "bismillah": "Bismillah",
+        "screen2_subtitle": "SEBUAH PLATFORM",
+        "screen2_title": "Hanya untuk Pernikahan",
+        "screen2_body1": "Kami menciptakan toNikah karena satu alasan — untuk membantu umat Islam yang tulus menemukan pasangan hidup mereka melalui jalan yang halal dan bermakna.",
+        "screen2_body2": "Tanpa geser-memilih. Tanpa hubungan biasa. Setiap fitur dirancang untuk menghormati niat Anda, keluarga Anda, dan agama Anda.",
+        "screen3_subtitle": "NIAT SAYA",
+        "screen3_title": "Sebelum Saya Mulai",
+        "screen3_body1": "Saya di sini untuk menemukan pasangan hidup saya karena Allah, melalui jalan yang halal dan bermakna.",
+        "screen3_body2": "Saya berkomitmen untuk memperlakukan setiap orang di toNikah dengan kejujuran, martabat, dan rasa hormat.",
+        "screen3_terms_prefix": "Dengan melanjutkan, saya setuju dengan",
+        "screen3_terms_link": "Ketentuan Penggunaan"
+    },
+    "common": {
+        "continue": "Lanjutkan",
+        "back": "Kembali",
+        "skip": "Lewati",
+        "done": "Selesai",
+        "cancel": "Batal",
+        "save": "Simpan",
+        "loading": "Memuat...",
+        "error": "Ada yang salah",
+        "retry": "Coba lagi"
+    }
+}

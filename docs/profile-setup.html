@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile Setup — toNikah Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html"><span
+                    class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link" href="state-management.html">State Management</a></li>
+                    <li class="nav-item"><a class="nav-link" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-lg-2 docs-sidebar d-none d-lg-block border-end">
+                <nav class="nav flex-column">
+                    <div class="section-title">Profile Setup</div>
+                    <a class="nav-link" href="#overview">Overview</a>
+                    <a class="nav-link" href="#step-detection">Step Detection</a>
+                    <a class="nav-link" href="#step-1">Step 1 — Basics</a>
+                    <a class="nav-link" href="#step-2">Step 2 — Language</a>
+                    <a class="nav-link" href="#step-3">Step 3 — Marital</a>
+                    <a class="nav-link" href="#step-4">Step 4 — Physical</a>
+                    <a class="nav-link" href="#step-5">Step 5 — Education</a>
+                    <a class="nav-link" href="#step-6">Step 6 — Religion</a>
+                    <a class="nav-link" href="#step-7">Step 7 — Lifestyle</a>
+                    <a class="nav-link" href="#step-8">Step 8 — Location</a>
+                    <a class="nav-link" href="#step-9">Step 9 — Manager</a>
+                    <a class="nav-link" href="#shared-patterns">Shared Patterns</a>
+                </nav>
+            </aside>
+
+            <main class="col-lg-10 py-4 px-4 px-lg-5">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="index.html">Docs</a></li>
+                        <li class="breadcrumb-item active">Profile Setup</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 fw-bold mb-4"><i class="bi bi-person-lines-fill me-2 text-accent"></i>Profile Setup
+                    (9-Step Wizard)</h1>
+
+                <section id="overview" class="mb-5">
+                    <h2 class="h4 fw-bold">Overview</h2>
+                    <p>After auth + email verification, new users complete a <strong>9-step profile wizard</strong>.
+                        Each step is a separate route under <code>(profile-setup)/</code>. Step 1 creates the profile
+                        via <code>POST /profile/new</code>; steps 2–9 update it via <code>PATCH /profile/update</code>.
+                    </p>
+                    <div class="alert alert-info d-flex gap-2 small">
+                        <i class="bi bi-info-circle-fill mt-1"></i>
+                        <div>The app does <strong>not</strong> require completing all steps in a single session. On
+                            re-login, <code>getIncompleteStep(profile)</code> detects the first incomplete step and
+                            redirects there.</div>
+                    </div>
+                </section>
+
+                <!-- Step Detection -->
+                <section id="step-detection" class="mb-5">
+                    <h2 class="h4 fw-bold">Step Detection Logic</h2>
+                    <p>The <code>profileSetupStore.getIncompleteStep(profile)</code> function checks fields in order:
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Step</th>
+                                    <th>Required Field</th>
+                                    <th>Check</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td><code>profileName</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td><code>mother_tongue</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td><code>marital_status</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                                <tr>
+                                    <td>4</td>
+                                    <td><code>height</code></td>
+                                    <td>Non-empty string/number</td>
+                                </tr>
+                                <tr>
+                                    <td>5</td>
+                                    <td><code>education</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                                <tr>
+                                    <td>6</td>
+                                    <td><code>sect</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                                <tr>
+                                    <td>7</td>
+                                    <td><code>smoking</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                                <tr>
+                                    <td>8</td>
+                                    <td><code>current_location.city</code></td>
+                                    <td>Nested city field exists</td>
+                                </tr>
+                                <tr>
+                                    <td>9</td>
+                                    <td><code>profile_manager</code></td>
+                                    <td>Non-empty string</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Step 1 -->
+                <section id="step-1" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    1</span>Profile Basics</h2>
+                            <p class="small text-body-secondary">Route: <code>step1.tsx</code> • API:
+                                <code>POST /profile/new</code></p>
+
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <h6>Fields</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered prop-table small">
+                                            <tbody>
+                                                <tr>
+                                                    <td><code>profileName</code></td>
+                                                    <td>Text input, max 15 chars, alphanumeric only</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>gender</code></td>
+                                                    <td>SingleSelectSheet: "male" | "female"</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>dob</code></td>
+                                                    <td>DateTimePicker (spinner), max 18 years back, format DD.MM.YYYY
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>nationality</code></td>
+                                                    <td>MultiSelectSheet, max 2, title-cased labels</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>grew_up_in</code></td>
+                                                    <td>SingleSelectSheet, country list</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>API Payload</h6>
+                                    <div class="code-block">{
+                                        "religion": "islam",
+                                        "profileName": "string",
+                                        "gender": "male" | "female",
+                                        "dob": "YYYY-MM-DD",
+                                        "nationality": ["string", "string?"],
+                                        "grew_up_in": "country_code"
+                                        }</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 2 -->
+                <section id="step-2" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    2</span>Language &amp; Culture</h2>
+                            <p class="small text-body-secondary">Route: <code>step2.tsx</code> • API:
+                                <code>PATCH /profile/update</code></p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>mother_tongue</code></td>
+                                            <td>SingleSelectSheet, title-cased language names</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>spoken_languages</code></td>
+                                            <td>MultiSelectSheet, multiple selection allowed</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 3 -->
+                <section id="step-3" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    3</span>Marital &amp; Family</h2>
+                            <p class="small text-body-secondary">Route: <code>step3.tsx</code> • API:
+                                <code>PATCH /profile/update</code></p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>marital_status</code></td>
+                                            <td>"never_married" | "divorced" | "widowed" | "annulled" | "separated"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>children</code></td>
+                                            <td>"no_children" | "1" | "2" | "3" | "4_plus"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>family_type</code></td>
+                                            <td>"nuclear" | "joint" | "other"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>family_values</code></td>
+                                            <td>"traditional" | "moderate" | "liberal"</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 4 -->
+                <section id="step-4" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    4</span>Physical Attributes</h2>
+                            <p class="small text-body-secondary">Route: <code>step4.tsx</code> • API:
+                                <code>PATCH /profile/update</code> • Masterdata: height, complexion, ethnic_group</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>height</code></td>
+                                            <td>Masterdata select (e.g., "5ft 4in / 163cm")</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>complexion</code></td>
+                                            <td>Masterdata select (e.g., "fair", "medium", "dark")</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>body_type</code></td>
+                                            <td>"slim" | "average" | "athletic" | "heavy"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>ethnic_group</code></td>
+                                            <td>Masterdata select</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 5 -->
+                <section id="step-5" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    5</span>Education &amp; Career</h2>
+                            <p class="small text-body-secondary">Route: <code>step5.tsx</code> • API:
+                                <code>PATCH /profile/update</code> • Masterdata: education, occupation, designation,
+                                income</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>education</code></td>
+                                            <td>Masterdata select</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>occupation</code></td>
+                                            <td>Masterdata select</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>designation</code></td>
+                                            <td>Masterdata select</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>annual_income</code></td>
+                                            <td>Masterdata select</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 6 -->
+                <section id="step-6" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    6</span>Religious Details</h2>
+                            <p class="small text-body-secondary">Route: <code>step6.tsx</code> • API:
+                                <code>PATCH /profile/update</code> • Masterdata: sect, sect_type, caste</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>sect</code></td>
+                                            <td>Masterdata select (e.g., "sunni", "shia", "ibadi")</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>sect_type</code></td>
+                                            <td>Masterdata select (e.g., "hanafi", "shafi", "maliki", "hanbali")</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>born_muslim</code></td>
+                                            <td>"yes" | "no"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>prayer_frequency</code></td>
+                                            <td>"always" | "mostly" | "sometimes" | "rarely" | "never"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>caste</code></td>
+                                            <td>Masterdata select (optional)</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 7 -->
+                <section id="step-7" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    7</span>Lifestyle</h2>
+                            <p class="small text-body-secondary">Route: <code>step7.tsx</code> • API:
+                                <code>PATCH /profile/update</code></p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>smoking</code></td>
+                                            <td>"never_smoke" | "quit_smoking" | "occasionally_smokes" |
+                                                "smokes_regularly" | "trying_to_quit"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>alcohol</code></td>
+                                            <td>"never" | "occasionally" | "regularly" | "quit"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>diet</code></td>
+                                            <td>"halal_only" | "vegetarian" | "vegan" | "no_restriction"</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 8 -->
+                <section id="step-8" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    8</span>Location</h2>
+                            <p class="small text-body-secondary">Route: <code>step8.tsx</code> • API:
+                                <code>PATCH /profile/update</code> • Google Places Autocomplete</p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>current_location.city</code></td>
+                                            <td>Google Places autocomplete search</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>current_location.country</code></td>
+                                            <td>Auto-populated from city selection</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>current_location.lat</code></td>
+                                            <td>Auto-populated latitude</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>current_location.lng</code></td>
+                                            <td>Auto-populated longitude</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="alert alert-info d-flex gap-2 small mt-2">
+                                <i class="bi bi-info-circle-fill mt-1"></i>
+                                <div>Uses <code>GOOGLE_MAPS_API_KEY</code> from <code>config.ts</code> for the Places
+                                    Autocomplete API. A backend proxy at <code>/profile/places/details</code> is also
+                                    available.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 9 -->
+                <section id="step-9" class="mb-5">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3"><span class="badge bg-accent-subtle text-accent me-2">Step
+                                    9</span>Profile Manager</h2>
+                            <p class="small text-body-secondary">Route: <code>step9.tsx</code> • API:
+                                <code>PATCH /profile/update</code></p>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered prop-table small">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>profile_manager</code></td>
+                                            <td>"self" | "parent" | "sibling" | "relative" | "friend" | "other"</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="small mt-2">After step 9, <code>getIncompleteStep()</code> returns <code>0</code>
+                                → user is redirected to <code>/(tabs)/home</code>.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Shared Patterns -->
+                <section id="shared-patterns" class="mb-5">
+                    <h2 class="h4 fw-bold">Shared Patterns Across Steps</h2>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-layout-text-sidebar me-2 text-accent"></i>UI Components</h6>
+                                    <ul class="small mb-0">
+                                        <li><code>ProgressBar</code> at top (current step highlighted)</li>
+                                        <li><code>FieldLabel</code> + <code>SelectField</code> from
+                                            <code>FormField.tsx</code></li>
+                                        <li><code>SingleSelectSheet</code> / <code>MultiSelectSheet</code> bottom sheets
+                                        </li>
+                                        <li><code>GradientButton</code> Continue/Finish CTA</li>
+                                        <li>All support dark mode + RTL</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-arrow-repeat me-2 text-info"></i>Data Flow</h6>
+                                    <ul class="small mb-0">
+                                        <li>Masterdata fetched from <code>/masterdata/:type</code> → cached in
+                                            <code>profileSetupStore</code></li>
+                                        <li>Enum options built from hard-coded constants per step</li>
+                                        <li>Fallback labels use <code>.replace(/_/g, ' ')</code> + title-case</li>
+                                        <li>On success → navigate to <code>step{N+1}</code></li>
+                                        <li>On final step → navigate to <code>/(tabs)/home</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">toNikah Docs — Profile Setup</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

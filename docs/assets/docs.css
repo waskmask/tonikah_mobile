@@ -1,0 +1,229 @@
+/* toNikah Documentation — Custom Styles */
+:root {
+    --accent: #FE8A7B;
+    --accent-dark: #F34B6F;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    scroll-behavior: smooth;
+}
+
+/* Accent utilities */
+.text-accent {
+    color: var(--accent) !important;
+}
+
+.bg-accent-subtle {
+    background-color: rgba(254, 138, 123, 0.12) !important;
+}
+
+.border-accent {
+    border-color: var(--accent) !important;
+}
+
+/* Hero */
+.hero-section {
+    background: linear-gradient(135deg, rgba(254, 138, 123, 0.08) 0%, rgba(243, 75, 111, 0.06) 100%);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+/* Card Links */
+.card-link {
+    text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--bs-border-color);
+}
+
+.card-link:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-color: var(--accent);
+}
+
+/* Icon Box */
+.icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+/* Badge Icon in Navbar */
+.badge-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    color: #fff;
+    font-size: 1rem;
+}
+
+/* Sidebar Navigation */
+.docs-sidebar {
+    position: sticky;
+    top: 72px;
+    height: calc(100vh - 72px);
+    overflow-y: auto;
+    padding-top: 1.5rem;
+}
+
+.docs-sidebar .nav-link {
+    color: var(--bs-body-color);
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: background 0.15s;
+}
+
+.docs-sidebar .nav-link:hover,
+.docs-sidebar .nav-link.active {
+    background: rgba(254, 138, 123, 0.1);
+    color: var(--accent);
+}
+
+.docs-sidebar .nav-link.active {
+    font-weight: 600;
+}
+
+.docs-sidebar .section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    padding: 0.6rem 1rem 0.3rem;
+    margin-top: 0.5rem;
+}
+
+/* Code blocks */
+.code-block {
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* Flowchart */
+.flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.flow-step .flow-number {
+    min-width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Property Tables */
+.prop-table th {
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.prop-table td {
+    font-size: 0.85rem;
+}
+
+.prop-table code {
+    font-size: 0.78rem;
+}
+
+/* Method badge */
+.method-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 52px;
+    text-align: center;
+}
+
+.method-get {
+    background: #198754;
+    color: #fff;
+}
+
+.method-post {
+    background: #0d6efd;
+    color: #fff;
+}
+
+.method-patch {
+    background: #ffc107;
+    color: #000;
+}
+
+.method-delete {
+    background: #dc3545;
+    color: #fff;
+}
+
+/* Endpoint card */
+.endpoint-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s;
+}
+
+.endpoint-card:hover {
+    border-color: var(--accent);
+}
+
+/* Tree View */
+.tree-view {
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+}
+
+.tree-view .folder {
+    color: #ffc107;
+}
+
+.tree-view .file {
+    color: var(--bs-body-color);
+}
+
+.tree-view .comment {
+    color: var(--bs-secondary-color);
+}
+
+/* Anchor offset for sticky nav */
+[id] {
+    scroll-margin-top: 80px;
+}
+
+/* Responsive */
+@media (max-width: 991.98px) {
+    .docs-sidebar {
+        position: static;
+        height: auto;
+        padding-top: 0;
+    }
+}

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Management — toNikah Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html"><span
+                    class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="state-management.html">State Management</a>
+                    </li>
+                    <li class="nav-item"><a class="nav-link" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-lg-2 docs-sidebar d-none d-lg-block border-end">
+                <nav class="nav flex-column">
+                    <div class="section-title">Stores</div>
+                    <a class="nav-link" href="#overview">Overview</a>
+                    <a class="nav-link" href="#auth-store">authStore</a>
+                    <a class="nav-link" href="#theme-store">themeStore</a>
+                    <a class="nav-link" href="#language-store">languageStore</a>
+                    <a class="nav-link" href="#profile-setup-store">profileSetupStore</a>
+                    <div class="section-title">Hooks</div>
+                    <a class="nav-link" href="#hooks">Custom Hooks</a>
+                </nav>
+            </aside>
+
+            <main class="col-lg-10 py-4 px-4 px-lg-5">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="index.html">Docs</a></li>
+                        <li class="breadcrumb-item active">State Management</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 fw-bold mb-4"><i class="bi bi-database-fill me-2 text-accent"></i>State Management</h1>
+
+                <section id="overview" class="mb-5">
+                    <h2 class="h4 fw-bold">Overview</h2>
+                    <p>The app uses <strong>Zustand v5</strong> for global state. Each store is a standalone module in
+                        <code>store/</code>. Zustand was chosen over Redux for its minimal boilerplate and hook-first
+                        API.</p>
+                    <div class="alert alert-info d-flex gap-2 small">
+                        <i class="bi bi-info-circle-fill mt-1"></i>
+                        <div><strong>Persistence:</strong> <code>themeStore</code> and <code>languageStore</code> use
+                            Zustand's <code>persist</code> middleware with <code>AsyncStorage</code>. Auth tokens are
+                            stored separately in <code>SecureStore</code>.</div>
+                    </div>
+                </section>
+
+                <!-- Auth Store -->
+                <section id="auth-store" class="mb-5">
+                    <h2 class="h4 fw-bold">authStore <small class="text-body-secondary fw-normal">—
+                            store/authStore.ts</small></h2>
+                    <p>Manages authentication lifecycle: login, signup, Google auth, session restoration, and logout.
+                    </p>
+
+                    <h5>State</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Default</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>user</code></td>
+                                    <td>User | null</td>
+                                    <td>null</td>
+                                    <td>Current user object from <code>/me</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>isAuthenticated</code></td>
+                                    <td>boolean</td>
+                                    <td>false</td>
+                                    <td>True after successful login/signup</td>
+                                </tr>
+                                <tr>
+                                    <td><code>isLoading</code></td>
+                                    <td>boolean</td>
+                                    <td>false</td>
+                                    <td>True during async operations</td>
+                                </tr>
+                                <tr>
+                                    <td><code>isRestoringSession</code></td>
+                                    <td>boolean</td>
+                                    <td>true</td>
+                                    <td>True until <code>restoreSession</code> completes on app launch</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5 class="mt-3">Actions</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Params</th>
+                                    <th>Returns</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>login</code></td>
+                                    <td>email, password</td>
+                                    <td>AuthResponse</td>
+                                    <td>Calls <code>/login</code>, stores tokens, sets user</td>
+                                </tr>
+                                <tr>
+                                    <td><code>signup</code></td>
+                                    <td>SignupRequest</td>
+                                    <td>AuthResponse</td>
+                                    <td>Calls <code>/signup</code>, stores tokens, sets user</td>
+                                </tr>
+                                <tr>
+                                    <td><code>googleAuth</code></td>
+                                    <td>—</td>
+                                    <td>AuthResponse</td>
+                                    <td>Google Sign-In → <code>/auth/google</code> → stores tokens</td>
+                                </tr>
+                                <tr>
+                                    <td><code>logout</code></td>
+                                    <td>—</td>
+                                    <td>void</td>
+                                    <td>Fire-and-forget <code>/logout</code>, clears tokens + state</td>
+                                </tr>
+                                <tr>
+                                    <td><code>restoreSession</code></td>
+                                    <td>—</td>
+                                    <td>void</td>
+                                    <td>On launch: checks stored access token → calls <code>/me</code> → restores state
+                                        or clears</td>
+                                </tr>
+                                <tr>
+                                    <td><code>setUser</code></td>
+                                    <td>User</td>
+                                    <td>void</td>
+                                    <td>Direct user setter (for profile updates)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Theme Store -->
+                <section id="theme-store" class="mb-5">
+                    <h2 class="h4 fw-bold">themeStore <small class="text-body-secondary fw-normal">—
+                            store/themeStore.ts</small></h2>
+                    <p>Persists user's theme preference. The <code>useTheme()</code> hook reads this store and computes
+                        <code>isDark</code> using the system color scheme.</p>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Field / Action</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>mode</code></td>
+                                    <td>"light" | "dark" | "system"</td>
+                                    <td>User preference (default: "system")</td>
+                                </tr>
+                                <tr>
+                                    <td><code>setMode(mode)</code></td>
+                                    <td>Function</td>
+                                    <td>Set explicit mode</td>
+                                </tr>
+                                <tr>
+                                    <td><code>toggleMode()</code></td>
+                                    <td>Function</td>
+                                    <td>Cycle: light → dark → system</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="alert alert-warning d-flex gap-2 small mt-3">
+                        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                        <div><strong>Important:</strong> The store does NOT export <code>isDark</code> directly. The
+                            <code>useTheme()</code> hook computes it:
+                            <code>isDark = mode === "dark" ? true : mode === "light" ? false : systemColorScheme === "dark"</code>.
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Language Store -->
+                <section id="language-store" class="mb-5">
+                    <h2 class="h4 fw-bold">languageStore <small class="text-body-secondary fw-normal">—
+                            store/languageStore.ts</small></h2>
+                    <p>Persists selected language and provides it to the i18n system on app launch.</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Field / Action</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>language</code></td>
+                                    <td>string</td>
+                                    <td>Language code: "en" | "ar" | "ur" | "fr" | "de" | "tr"</td>
+                                </tr>
+                                <tr>
+                                    <td><code>setLanguage(lang)</code></td>
+                                    <td>Function</td>
+                                    <td>Change language, updates i18n and persists to AsyncStorage</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Profile Setup Store -->
+                <section id="profile-setup-store" class="mb-5">
+                    <h2 class="h4 fw-bold">profileSetupStore <small class="text-body-secondary fw-normal">—
+                            store/profileSetupStore.ts</small></h2>
+                    <p>Manages the 9-step profile wizard: accumulated profile data, masterdata cache, and step
+                        detection.</p>
+
+                    <h5>State</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>gender</code></td>
+                                    <td>string</td>
+                                    <td>Selected gender (used for gender-specific options)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>profileData</code></td>
+                                    <td>Record&lt;string, any&gt;</td>
+                                    <td>Accumulated fields from all completed steps</td>
+                                </tr>
+                                <tr>
+                                    <td><code>masterdata</code></td>
+                                    <td>Record&lt;string, MasterdataItem[]&gt;</td>
+                                    <td>Cached masterdata (height, complexion, etc.)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h5 class="mt-3">Step Detection — <code>getIncompleteStep(profile)</code></h5>
+                    <p>Returns the first incomplete step number (1–9), or 0 if all fields are filled:</p>
+                    <div class="code-block">if (!profile.profileName) → return 1 // Basics
+                        if (!profile.mother_tongue) → return 2 // Language
+                        if (!profile.marital_status) → return 3 // Marital
+                        if (!profile.height) → return 4 // Physical
+                        if (!profile.education) → return 5 // Education
+                        if (!profile.sect) → return 6 // Religion
+                        if (!profile.smoking) → return 7 // Lifestyle
+                        if (!profile.current_location.city)→ return 8 // Location
+                        if (!profile.profile_manager) → return 9 // Manager
+                        return 0 // All complete → go to main app</div>
+                </section>
+
+                <!-- Custom Hooks -->
+                <section id="hooks" class="mb-5">
+                    <h2 class="h4 fw-bold">Custom Hooks <small class="text-body-secondary fw-normal">— hooks/</small>
+                    </h2>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Hook</th>
+                                    <th>File</th>
+                                    <th>Returns</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>useTheme()</code></td>
+                                    <td>useTheme.ts</td>
+                                    <td><code>{ theme, isDark, toggleTheme, setTheme }</code></td>
+                                    <td>Computes <code>isDark</code> from mode + system color scheme</td>
+                                </tr>
+                                <tr>
+                                    <td><code>useLanguage()</code></td>
+                                    <td>useLanguage.ts</td>
+                                    <td><code>{ t, isRTL, language, changeLanguage }</code></td>
+                                    <td>i18next translation function + RTL flag</td>
+                                </tr>
+                                <tr>
+                                    <td><code>useAuth()</code></td>
+                                    <td>useAuth.ts</td>
+                                    <td><code>{ user, isAuthenticated, ... }</code></td>
+                                    <td>Convenience wrapper for authStore</td>
+                                </tr>
+                                <tr>
+                                    <td><code>useFirstLaunch()</code></td>
+                                    <td>useFirstLaunch.ts</td>
+                                    <td><code>{ isFirstLaunch }</code></td>
+                                    <td>AsyncStorage flag for onboarding</td>
+                                </tr>
+                                <tr>
+                                    <td><code>useResponsive()</code></td>
+                                    <td>useResponsive.ts</td>
+                                    <td><code>scale(size)</code></td>
+                                    <td>Scale sizes based on screen width</td>
+                                </tr>
+                                <tr>
+                                    <td><code>useToast()</code></td>
+                                    <td>useToast.tsx</td>
+                                    <td><code>{ show(type, msg) }</code></td>
+                                    <td>Toast notification system</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">toNikah Docs — State Management</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

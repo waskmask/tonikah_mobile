@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UI Components — toNikah Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/docs.css">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg border-bottom sticky-top bg-body">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.html"><span
+                    class="badge-icon"><i class="bi bi-phone"></i></span> toNikah Docs</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"><span
+                    class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="architecture.html">Architecture</a></li>
+                    <li class="nav-item"><a class="nav-link" href="api-reference.html">API Reference</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="components.html">UI Components</a></li>
+                    <li class="nav-item"><a class="nav-link" href="state-management.html">State Management</a></li>
+                    <li class="nav-item"><a class="nav-link" href="auth-flow.html">Auth Flow</a></li>
+                    <li class="nav-item"><a class="nav-link" href="profile-setup.html">Profile Setup</a></li>
+                    <li class="nav-item"><a class="nav-link" href="i18n-theming.html">i18n &amp; Theming</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-lg-2 docs-sidebar d-none d-lg-block border-end">
+                <nav class="nav flex-column">
+                    <div class="section-title">Form Components</div>
+                    <a class="nav-link" href="#input">Input</a>
+                    <a class="nav-link" href="#form-field">FormField</a>
+                    <a class="nav-link" href="#checkbox">Checkbox</a>
+                    <div class="section-title">Buttons</div>
+                    <a class="nav-link" href="#gradient-button">GradientButton</a>
+                    <a class="nav-link" href="#button">Button</a>
+                    <div class="section-title">Selection Sheets</div>
+                    <a class="nav-link" href="#single-select-sheet">SingleSelectSheet</a>
+                    <a class="nav-link" href="#multi-select-sheet">MultiSelectSheet</a>
+                    <div class="section-title">Layout &amp; Display</div>
+                    <a class="nav-link" href="#text">Text</a>
+                    <a class="nav-link" href="#badge">Badge</a>
+                    <a class="nav-link" href="#card">Card</a>
+                    <a class="nav-link" href="#modal">Modal</a>
+                    <a class="nav-link" href="#toast">Toast</a>
+                    <a class="nav-link" href="#progress-bar">ProgressBar</a>
+                    <a class="nav-link" href="#pagination-dots">PaginationDots</a>
+                    <a class="nav-link" href="#language-picker">LanguagePicker</a>
+                </nav>
+            </aside>
+
+            <main class="col-lg-10 py-4 px-4 px-lg-5">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item"><a href="index.html">Docs</a></li>
+                        <li class="breadcrumb-item active">UI Components</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 fw-bold mb-2"><i class="bi bi-grid-fill me-2 text-accent"></i>UI Components</h1>
+                <p class="text-body-secondary mb-4">15 reusable components in <code>components/ui/</code>. All support
+                    <strong>dark mode</strong> (via <code>useTheme()</code>) and <strong>RTL</strong> (via
+                    <code>useLanguage()</code>).</p>
+
+                <!-- Input -->
+                <section id="input" class="mb-5">
+                    <h2 class="h4 fw-bold">Input <small class="text-body-secondary fw-normal">— Input.tsx</small></h2>
+                    <p>Full-width text input with left/right icon slots, dark mode support, RTL-aware layout, focus
+                        state ring, and error display.</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Prop</th>
+                                    <th>Type</th>
+                                    <th>Default</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>label</code></td>
+                                    <td>string</td>
+                                    <td>—</td>
+                                    <td>Optional label above the input</td>
+                                </tr>
+                                <tr>
+                                    <td><code>error</code></td>
+                                    <td>string</td>
+                                    <td>—</td>
+                                    <td>Error message (red border + text below)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>leftIcon</code></td>
+                                    <td>ReactNode</td>
+                                    <td>—</td>
+                                    <td>Icon on the left (right in RTL)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>rightIcon</code></td>
+                                    <td>ReactNode</td>
+                                    <td>—</td>
+                                    <td>Icon on the right (left in RTL)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>containerStyle</code></td>
+                                    <td>string</td>
+                                    <td>""</td>
+                                    <td>Extra NativeWind classes on wrapper</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-body-secondary">…plus all <code>TextInputProps</code>
+                                        from React Native</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <h6 class="mt-3">Dark Mode Colors</h6>
+                    <div class="d-flex gap-3 flex-wrap small">
+                        <span><span class="badge" style="background:#1E293B">&nbsp;&nbsp;</span> Background
+                            <code>#1E293B</code></span>
+                        <span><span class="badge" style="background:#E2E8F0">&nbsp;&nbsp;</span> Text
+                            <code>#E2E8F0</code></span>
+                        <span><span class="badge" style="background:#64748B">&nbsp;&nbsp;</span> Placeholder
+                            <code>#64748B</code></span>
+                        <span><span class="badge" style="background:#334155">&nbsp;&nbsp;</span> Border
+                            <code>#334155</code></span>
+                        <span><span class="badge" style="background:#FE8A7B">&nbsp;&nbsp;</span> Focus
+                            <code>#FE8A7B</code></span>
+                    </div>
+                </section>
+
+                <!-- FormField -->
+                <section id="form-field" class="mb-5">
+                    <h2 class="h4 fw-bold">FormField <small class="text-body-secondary fw-normal">—
+                            FormField.tsx</small></h2>
+                    <p>Exports three sub-components used across all profile setup steps:</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Export</th>
+                                    <th>Props</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>FieldLabel</code></td>
+                                    <td><code>text: string, required?: boolean</code></td>
+                                    <td>Label with optional red <code>*</code> asterisk. RTL-aware row direction.</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ErrorText</code></td>
+                                    <td><code>text: string</code></td>
+                                    <td>Red error message below field. RTL text-align.</td>
+                                </tr>
+                                <tr>
+                                    <td><code>SelectField</code></td>
+                                    <td><code>value, placeholder, onPress, icon, hasError?</code></td>
+                                    <td>Pressable that looks like a text input with value/placeholder + icon.
+                                        Full-width, dark mode bg/border, RTL row-reverse.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- GradientButton -->
+                <section id="gradient-button" class="mb-5">
+                    <h2 class="h4 fw-bold">GradientButton <small class="text-body-secondary fw-normal">—
+                            GradientButton.tsx</small></h2>
+                    <p>Primary CTA button with a coral-to-pink gradient (<code>#FE8A7B → #F34B6F</code>). Supports
+                        loading spinner, disabled state, and outline variant.</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Prop</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>title</code></td>
+                                    <td>string</td>
+                                    <td>Button label text</td>
+                                </tr>
+                                <tr>
+                                    <td><code>onPress</code></td>
+                                    <td>() => void</td>
+                                    <td>Press handler</td>
+                                </tr>
+                                <tr>
+                                    <td><code>loading</code></td>
+                                    <td>boolean</td>
+                                    <td>Shows ActivityIndicator, hides title</td>
+                                </tr>
+                                <tr>
+                                    <td><code>disabled</code></td>
+                                    <td>boolean</td>
+                                    <td>50% opacity + press disabled</td>
+                                </tr>
+                                <tr>
+                                    <td><code>variant</code></td>
+                                    <td>"solid" | "outline"</td>
+                                    <td>Solid gradient or bordered outline (auto full-width)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>widthMode</code></td>
+                                    <td>"auto" | "full"</td>
+                                    <td>Controls button width</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- SingleSelectSheet -->
+                <section id="single-select-sheet" class="mb-5">
+                    <h2 class="h4 fw-bold">SingleSelectSheet <small class="text-body-secondary fw-normal">—
+                            SingleSelectSheet.tsx</small></h2>
+                    <p>Bottom sheet modal for selecting a single option. Animated slide-up with handle bar, search, and
+                        gradient checkmark.</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Prop</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>visible</code></td>
+                                    <td>boolean</td>
+                                    <td>Controls visibility</td>
+                                </tr>
+                                <tr>
+                                    <td><code>onClose</code></td>
+                                    <td>() => void</td>
+                                    <td>Dismiss handler</td>
+                                </tr>
+                                <tr>
+                                    <td><code>onSelect</code></td>
+                                    <td>(value: string) => void</td>
+                                    <td>Called on option tap, auto-closes</td>
+                                </tr>
+                                <tr>
+                                    <td><code>options</code></td>
+                                    <td>SelectOption[]</td>
+                                    <td><code>{ value, label, description? }</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>selected</code></td>
+                                    <td>string</td>
+                                    <td>Currently selected value</td>
+                                </tr>
+                                <tr>
+                                    <td><code>title</code></td>
+                                    <td>string</td>
+                                    <td>Sheet header title</td>
+                                </tr>
+                                <tr>
+                                    <td><code>searchEnabled</code></td>
+                                    <td>boolean</td>
+                                    <td>Shows search bar</td>
+                                </tr>
+                                <tr>
+                                    <td><code>minHeight</code></td>
+                                    <td>number</td>
+                                    <td>Minimum sheet height (default: 40% screen)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- MultiSelectSheet -->
+                <section id="multi-select-sheet" class="mb-5">
+                    <h2 class="h4 fw-bold">MultiSelectSheet <small class="text-body-secondary fw-normal">—
+                            MultiSelectSheet.tsx</small></h2>
+                    <p>Like SingleSelectSheet but allows multiple selections with a Confirm button. Supports
+                        <code>maxSelections</code> limit.</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Prop</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>onConfirm</code></td>
+                                    <td>(values: string[]) => void</td>
+                                    <td>Called on Confirm tap with all selected values</td>
+                                </tr>
+                                <tr>
+                                    <td><code>selected</code></td>
+                                    <td>string[]</td>
+                                    <td>Currently selected values array</td>
+                                </tr>
+                                <tr>
+                                    <td><code>maxSelections</code></td>
+                                    <td>number</td>
+                                    <td>Max items allowed (e.g. 2 for nationality)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>searchEnabled</code></td>
+                                    <td>boolean</td>
+                                    <td>Shows search bar</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Text -->
+                <section id="text" class="mb-5">
+                    <h2 class="h4 fw-bold">Text <small class="text-body-secondary fw-normal">— Text.tsx</small></h2>
+                    <p>Custom Text component with variant system for consistent typography. Supports RTL text alignment.
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered prop-table small">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Variant</th>
+                                    <th>Font</th>
+                                    <th>Size</th>
+                                    <th>Use</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>h1</code></td>
+                                    <td>Manrope 700</td>
+                                    <td>28</td>
+                                    <td>Page headlines</td>
+                                </tr>
+                                <tr>
+                                    <td><code>h2</code></td>
+                                    <td>Manrope 700</td>
+                                    <td>24</td>
+                                    <td>Section headings</td>
+                                </tr>
+                                <tr>
+                                    <td><code>heading</code></td>
+                                    <td>Manrope 700</td>
+                                    <td>22</td>
+                                    <td>Sub-headings</td>
+                                </tr>
+                                <tr>
+                                    <td><code>heading-sm</code></td>
+                                    <td>Manrope 600</td>
+                                    <td>18</td>
+                                    <td>Card titles, sheet headers</td>
+                                </tr>
+                                <tr>
+                                    <td><code>body</code></td>
+                                    <td>Inter 400</td>
+                                    <td>15</td>
+                                    <td>Default body text</td>
+                                </tr>
+                                <tr>
+                                    <td><code>body-sm</code></td>
+                                    <td>Inter 400</td>
+                                    <td>13</td>
+                                    <td>Labels, helper text</td>
+                                </tr>
+                                <tr>
+                                    <td><code>caption</code></td>
+                                    <td>Inter 400</td>
+                                    <td>11</td>
+                                    <td>Error text, timestamps</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Other components -->
+                <section id="checkbox" class="mb-5">
+                    <h2 class="h4 fw-bold">Checkbox <small class="text-body-secondary fw-normal">— Checkbox.tsx</small>
+                    </h2>
+                    <p>Animated checkbox with gradient fill when checked. Props: <code>checked: boolean</code>,
+                        <code>onToggle: () => void</code>, <code>label?: string</code>, <code>error?: string</code>.</p>
+                </section>
+
+                <section id="button" class="mb-5">
+                    <h2 class="h4 fw-bold">Button <small class="text-body-secondary fw-normal">— Button.tsx</small></h2>
+                    <p>Basic button with variants: <code>primary</code>, <code>secondary</code>, <code>outline</code>,
+                        <code>ghost</code>. Props: <code>title</code>, <code>onPress</code>, <code>variant</code>,
+                        <code>size</code>, <code>disabled</code>.</p>
+                </section>
+
+                <section id="badge" class="mb-5">
+                    <h2 class="h4 fw-bold">Badge <small class="text-body-secondary fw-normal">— Badge.tsx</small></h2>
+                    <p>Colored badge pill. Props: <code>text: string</code>,
+                        <code>variant: "success" | "warning" | "error" | "info"</code>.</p>
+                </section>
+
+                <section id="card" class="mb-5">
+                    <h2 class="h4 fw-bold">Card <small class="text-body-secondary fw-normal">— Card.tsx</small></h2>
+                    <p>Rounded card container with dark mode border/background. Props: <code>children</code>,
+                        <code>style?</code>.</p>
+                </section>
+
+                <section id="modal" class="mb-5">
+                    <h2 class="h4 fw-bold">Modal <small class="text-body-secondary fw-normal">— Modal.tsx</small></h2>
+                    <p>Centered modal overlay. Props: <code>visible: boolean</code>, <code>onClose: () => void</code>,
+                        <code>children</code>.</p>
+                </section>
+
+                <section id="toast" class="mb-5">
+                    <h2 class="h4 fw-bold">Toast <small class="text-body-secondary fw-normal">— Toast.tsx</small></h2>
+                    <p>Animated top-slide notification. Types: <code>success</code>, <code>error</code>,
+                        <code>info</code>, <code>warning</code>. Auto-dismisses after 3 seconds. Managed via
+                        <code>useToast()</code> hook.</p>
+                </section>
+
+                <section id="progress-bar" class="mb-5">
+                    <h2 class="h4 fw-bold">ProgressBar <small class="text-body-secondary fw-normal">—
+                            ProgressBar.tsx</small></h2>
+                    <p>9-segment progress indicator for profile setup. Props: <code>currentStep: number</code> (1–9).
+                        Highlights completed steps with gradient.</p>
+                </section>
+
+                <section id="pagination-dots" class="mb-5">
+                    <h2 class="h4 fw-bold">PaginationDots <small class="text-body-secondary fw-normal">—
+                            PaginationDots.tsx</small></h2>
+                    <p>Horizontal dot indicators for onboarding carousel. Props: <code>count: number</code>,
+                        <code>activeIndex: number</code>.</p>
+                </section>
+
+                <section id="language-picker" class="mb-5">
+                    <h2 class="h4 fw-bold">LanguagePicker <small class="text-body-secondary fw-normal">—
+                            LanguagePicker.tsx</small></h2>
+                    <p>Bottom sheet language selector with 6 languages (English, Arabic, Urdu, French, German, Turkish).
+                        Updates i18n locale, persists to <code>languageStore</code>, and triggers app re-render. Shown
+                        in auth header.</p>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top py-4">
+        <div class="container text-center text-body-secondary small">toNikah Docs — UI Components</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
