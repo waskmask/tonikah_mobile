@@ -41,7 +41,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
         variant === "outline"
             ? (["transparent", "transparent"] as [string, string])
             : variant === "primary"
-                ? (["#FE8A7B", "#F34B6F"] as [string, string])
+                ? (["#F34B6F", "#E8447A"] as [string, string])
                 : (["#1E293B", "#334155"] as [string, string]);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -97,7 +97,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                         }}
                     >
                         {loading ? (
-                            <ActivityIndicator color={variant === 'outline' ? '#FE8A7B' : '#FFFFFF'} />
+                            <ActivityIndicator color={variant === 'outline' ? '#F34B6F' : '#FFFFFF'} />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: variant === 'outline' ? 'space-between' : 'center', width: '100%', paddingHorizontal: variant === 'outline' ? 4 : 0 }}>
                                 <Text variant={variant === 'outline' ? 'body-sm' : 'button'} className={variant === 'outline' ? 'font-body text-brand-text-body' : 'text-white font-body-semi text-center'} numberOfLines={1} style={variant === 'outline' ? { flex: 1 } : undefined}>

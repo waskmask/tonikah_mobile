@@ -13,7 +13,9 @@ interface AuthState {
     signup: (data: SignupRequest) => Promise<AuthResponse>;
     googleAuth: () => Promise<AuthResponse>;
     logout: () => Promise<void>;
+    logoutAllDevices: () => Promise<AuthResponse>;
     restoreSession: () => Promise<void>;
+    refreshUser: () => Promise<AuthResponse>;
     setUser: (user: User) => void;
 }
 
@@ -92,6 +94,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             await api.clearTokens();
             set({ user: null, isAuthenticated: false, isLoading: false });
         }
+    },
+
+    logoutAllDevices: async () => {
+        set({ isLoading: true });
+        try {
+            const result = await authService.revokeAllSessions();
+            await api.clearTokens();
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return result;
+        } catch {
+            await api.clearTokens();
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return { success: false, message: 'logout_failed' };
+        }
+    },
+
+    refreshUser: async () => {
+        const result = await authService.me();
+        if (result.success && result.user) {
+            set({ user: result.user, isAuthenticated: true });
+        }
+        return result;
     },
 
     restoreSession: async () => {

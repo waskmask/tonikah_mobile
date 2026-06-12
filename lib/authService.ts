@@ -1,7 +1,7 @@
 import { api, ApiResponse } from './api';
 
 export interface LoginRequest { email: string; password: string }
-export interface SignupRequest { email: string; password: string; agreed: boolean; marketing_opt_in: boolean }
+export interface SignupRequest { email: string; password: string; agreed: boolean; marketing_opt_in: boolean; lang?: string }
 export interface GoogleAuthRequest { credential: string }
 export interface RefreshRequest { refreshToken: string }
 
@@ -42,6 +42,12 @@ export const authService = {
     logout: (data: RefreshRequest): Promise<AuthResponse> =>
         api.post('/app-user/mobile/logout', data),
 
+    revokeAllSessions: (): Promise<AuthResponse> =>
+        api.post('/app-user/token/revoke-all', {}),
+
     resendVerification: (email: string): Promise<AuthResponse> =>
         api.post('/app-user/resend-verification', { email }),
+
+    requestPasswordReset: (email: string): Promise<AuthResponse> =>
+        api.post('/app-user/password/request-reset', { email }),
 };

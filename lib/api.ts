@@ -1,6 +1,7 @@
 import { Config } from '@/constants/config';
 import * as SecureStore from 'expo-secure-store';
 import i18n from '@/lib/i18n';
+import { Platform } from 'react-native';
 
 const TOKEN_KEYS = {
     ACCESS: 'tn_access_token',
@@ -27,6 +28,15 @@ const addRefreshSubscriber = (cb: (accessToken: string) => void) => {
     refreshSubscribers.push(cb);
 };
 
+const getClientHeaders = () => {
+    const clientPlatform = Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'web';
+
+    return {
+        'X-Client-Type': clientPlatform === 'web' ? 'web' : 'native',
+        'X-Client-Platform': clientPlatform,
+    };
+};
+
 // Extends RequestInit with our custom options
 interface FetchOptions extends RequestInit {
     timeout?: number;
@@ -40,11 +50,18 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
 
     const accessToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
 
+    const isFormDataBody =
+        typeof FormData !== 'undefined' && restOptions.body instanceof FormData;
+
     const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
         'Accept-Language': i18n.language,
+        ...getClientHeaders(),
         ...(customHeaders as Record<string, string>),
     };
+
+    if (!isFormDataBody && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+    }
 
     if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
@@ -81,7 +98,10 @@ const handleResponse = async (response: Response, endpoint: string, options: Fet
                 try {
                     const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...getClientHeaders(),
+                        },
                         body: JSON.stringify({ refreshToken }),
                     });
 
@@ -141,11 +161,67 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}): Promise
     }
 };
 
+const parseApiResponseText = (text: string, status: number): ApiResponse => {
+    try {
+        const data = text ? JSON.parse(text) : {};
+        return { ...data, status };
+    } catch {
+        return { success: false, message: 'invalid_json', status, raw: text };
+    }
+};
+
+const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000): Promise<ApiResponse> => {
+    const accessToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
+    const url = `${Config.API_URL}${endpoint}`;
+
+    return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.timeout = timeout;
+
+        xhr.setRequestHeader('Accept-Language', i18n.language);
+        const clientHeaders = getClientHeaders();
+        Object.entries(clientHeaders).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+        });
+
+        if (accessToken) {
+            xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        }
+
+        xhr.onload = () => {
+            resolve(parseApiResponseText(xhr.responseText, xhr.status));
+        };
+
+        xhr.onerror = () => {
+            resolve({
+                success: false,
+                message: 'network_error',
+                error: 'upload_network_error',
+                status: xhr.status || 0,
+            });
+        };
+
+        xhr.ontimeout = () => {
+            resolve({
+                success: false,
+                message: 'network_error',
+                error: 'upload_timeout',
+                status: 0,
+            });
+        };
+
+        xhr.send(body);
+    });
+};
+
 
 export const api = {
     get: (endpoint: string) => apiRequest(endpoint, { method: 'GET' }),
     post: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+    postFormData: (endpoint: string, body: FormData) => formDataRequest(endpoint, body),
     patch: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
+    delete: (endpoint: string) => apiRequest(endpoint, { method: 'DELETE' }),
     setTokens: async (access: string, refresh: string) => {
         await SecureStore.setItemAsync(TOKEN_KEYS.ACCESS, access);
         await SecureStore.setItemAsync(TOKEN_KEYS.REFRESH, refresh);

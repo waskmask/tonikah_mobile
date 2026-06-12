@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { I18nManager } from "react-native";
+import { DevSettings, I18nManager } from "react-native";
 import i18n from "i18next";
 import * as Updates from "expo-updates";
 
@@ -13,10 +13,13 @@ interface LanguageState {
 
 export const useLanguageStore = create<LanguageState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             currentLanguage: i18n.language || "en",
             isRTL: I18nManager.isRTL,
             setLanguage: async (lng: string) => {
+                const previousLanguage = get().currentLanguage;
+                if (lng === previousLanguage) return;
+
                 await i18n.changeLanguage(lng);
                 await AsyncStorage.setItem("user-language", lng);
 
@@ -26,16 +29,14 @@ export const useLanguageStore = create<LanguageState>()(
                     I18nManager.allowRTL(isRTL);
                     I18nManager.forceRTL(isRTL);
 
-                    // Force reload to apply RTL changes
-                    setTimeout(() => {
-                        Updates.reloadAsync().catch(() => {
-                            // Fallback if Updates is not available in dev
-                            console.warn("RTL change manual reload required");
-                        });
-                    }, 100);
                 }
 
                 set({ currentLanguage: lng, isRTL });
+                setTimeout(() => {
+                    Updates.reloadAsync().catch(() => {
+                        DevSettings.reload();
+                    });
+                }, 120);
             },
         }),
         {

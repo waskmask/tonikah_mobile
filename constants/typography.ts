@@ -1,4 +1,19 @@
-import { scale } from "@/hooks/useResponsive";
+import { Platform } from "react-native";
+
+const iosSystemFont = undefined;
+const androidBody = {
+    regular: "Inter_400Regular",
+    medium: "Inter_500Medium",
+    semi: "Inter_600SemiBold",
+};
+const androidHeading = {
+    extra: "Manrope_800ExtraBold",
+    bold: "Manrope_700Bold",
+    semi: "Manrope_600SemiBold",
+    medium: "Manrope_500Medium",
+};
+
+const platformFont = (androidFont: string) => (Platform.OS === "ios" ? iosSystemFont : androidFont);
 
 export const Typography = {
     size: {
@@ -11,18 +26,19 @@ export const Typography = {
         "3xl": 30,
         "4xl": 36,
     },
-    // Font names as configured in tailwind.config.js / Root Layout
+    // iOS uses the native SF Pro system font by leaving fontFamily unset.
+    // Android uses bundled Inter/Manrope. Arabic always uses Noto Sans Arabic.
     font: {
         heading: {
-            extra: "Manrope_800ExtraBold",
-            bold: "Manrope_700Bold",
-            semi: "Manrope_600SemiBold",
-            medium: "Manrope_500Medium",
+            extra: platformFont(androidHeading.extra),
+            bold: platformFont(androidHeading.bold),
+            semi: platformFont(androidHeading.semi),
+            medium: platformFont(androidHeading.medium),
         },
         body: {
-            regular: "Inter_400Regular",
-            medium: "Inter_500Medium",
-            semi: "Inter_600SemiBold",
+            regular: platformFont(androidBody.regular),
+            medium: platformFont(androidBody.medium),
+            semi: platformFont(androidBody.semi),
         },
         arabic: {
             regular: "NotoSansArabic_400Regular",

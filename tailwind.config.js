@@ -7,9 +7,9 @@ module.exports = {
       colors: {
         brand: {
           gradient: {
-            start: "#FE8A7B",
-            end: "#F34B6F",
-            center: "#F86774",
+            start: "#F34B6F",
+            end: "#E8447A",
+            center: "#EE4976",
           },
           text: {
             heading: "var(--brand-text-heading)",
@@ -34,8 +34,8 @@ module.exports = {
           },
         },
         // Mapped for developer convenience
-        primary: "#FE8A7B",
-        secondary: "#F34B6F",
+        primary: "#F34B6F",
+        secondary: "#E8447A",
       },
       fontFamily: {
         heading: ["Manrope_700Bold"],

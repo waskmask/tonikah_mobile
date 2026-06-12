@@ -3,9 +3,9 @@ import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectSheet';
 import { MultiSelectSheet } from '@/components/ui/MultiSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
@@ -14,9 +14,11 @@ import { scale } from '@/hooks/useResponsive';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { Languages, BookOpenCheck, MessageCircle, Shirt } from 'lucide-react-native';
+import { LANGUAGE_OPTIONS } from '@/constants/profileOptions';
+import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 
 export default function Step2() {
-    const { t } = useTranslation(['common', 'languages']);
+    const { t, i18n } = useTranslation(['common', 'languages']);
     const { isDark } = useTheme();
     const { gender, setProfileData } = useProfileSetupStore();
 
@@ -36,27 +38,14 @@ export default function Step2() {
     const iconColor = isDark ? '#94A3B8' : '#6B7280';
 
     const languageOptions = useMemo(() => {
-        const keys = [
-            'arabic', 'english', 'french', 'german', 'spanish', 'portuguese', 'russian', 'turkish',
-            'hindi', 'urdu', 'bengali', 'punjabi', 'gujarati', 'tamil', 'telugu', 'kannada', 'malayalam',
-            'marathi', 'nepali', 'assamese', 'oriya', 'sindhi', 'pashto', 'dari', 'farsi_persian',
-            'kurdish', 'azerbaijani', 'kazakh', 'kyrgyz', 'tajik', 'turkmen', 'uzbek', 'uyghur',
-            'indonesian', 'malay', 'javanese', 'tagalog', 'cebuano', 'ilocano', 'vietnamese', 'thai',
-            'burmese', 'khmer', 'lao', 'japanese', 'korean', 'mandarin', 'cantonese', 'chinese_simplified',
-            'amharic', 'tigrinya', 'somali', 'swahili', 'hausa', 'igbo', 'yoruba', 'shona', 'zulu',
-            'xhosa', 'afrikaans', 'tsonga', 'lingala', 'luganda', 'bambara', 'fula', 'akan',
-            'albanian', 'bosnian', 'bulgarian', 'croatian', 'czech', 'danish', 'dutch', 'estonian',
-            'finnish', 'georgian', 'greek', 'hebrew', 'hungarian', 'icelandic', 'irish', 'italian',
-            'latvian', 'lithuanian', 'macedonian', 'maltese', 'norwegian', 'polish', 'romanian',
-            'samoan', 'serbian', 'slovakian', 'swedish', 'welsh', 'catalan', 'basque', 'gaelic_scottish',
-            'belarusian', 'mongolian', 'maori', 'quechua', 'aymara', 'bislama', 'fijian', 'hiri_motu',
-            'tongan', 'chechen',
-        ];
-        return keys.map((key) => ({
+        return LANGUAGE_OPTIONS.map((key) => ({
             value: key,
-            label: t(`languages:${key}`, { defaultValue: key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }),
+            label: formatProfileOptionLabel(
+                t(`languages:${key}`, { defaultValue: key.replace(/_/g, ' ') }),
+                i18n.language
+            ),
         })).sort((a, b) => a.label.localeCompare(b.label));
-    }, [t]);
+    }, [t, i18n.language]);
 
     const bornMuslimOptions: SelectOption[] = [
         { value: 'muslim_by_birth', label: t('common:step_2.muslim_by_birth') },
@@ -87,11 +76,11 @@ export default function Step2() {
         setLoading(true);
         try {
             const payload: any = {
-                motherTongue,
-                bornMuslim: bornMuslim === 'muslim_by_birth' ? 'yes' : 'no',
-                languagesSpoken,
+                mother_tongue: motherTongue,
+                born_muslim: bornMuslim,
+                languages_spoken: languagesSpoken,
             };
-            if (isFemale) payload.dress = dress;
+            if (isFemale && dress) payload.i_usually_dress = dress;
 
             const res = await profileService.updateProfile(payload);
             if (res.success) {
@@ -114,8 +103,10 @@ export default function Step2() {
             <ProgressBar currentStep={2} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('common:step_2.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('common:step_2.subtitle')}</Text>
+                    <ProfileSetupHeader
+                        title={t('profile_personal_cultural', { defaultValue: 'Personal and Cultural Background' })}
+                        subtitle={t('profile_personal_cultural_desc', { defaultValue: 'Tell us more about your cultural identity, language skills, and preferences for relocation or dress.' })}
+                    />
 
                     <FieldLabel text={t('common:step_2.mother_tongue')} required />
                     <SelectField value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder="Select language" onPress={() => setShowMotherTongueSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
@@ -139,7 +130,7 @@ export default function Step2() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <View style={styles.footer}><GradientButton title={t('common:common.continue')} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
             <SingleSelectSheet visible={showMotherTongueSheet} onClose={() => setShowMotherTongueSheet(false)} onSelect={(v) => { setMotherTongue(v); setErrors((e) => ({ ...e, motherTongue: '' })); }} options={languageOptions} selected={motherTongue} title="Mother Tongue" searchEnabled />
             <SingleSelectSheet visible={showBornMuslimSheet} onClose={() => setShowBornMuslimSheet(false)} onSelect={(v) => { setBornMuslim(v); setErrors((e) => ({ ...e, bornMuslim: '' })); }} options={bornMuslimOptions} selected={bornMuslim} title="Born Muslim?" />

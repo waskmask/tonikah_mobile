@@ -71,12 +71,12 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
                     style={[boxStyle, { marginTop: scale(2) }]}
                 >
                     {checked && (
-                        <Animated.View style={[StyleSheet.absoluteFillObject, checkStyle]}>
+                        <Animated.View style={[StyleSheet.absoluteFill, checkStyle]}>
                             <LinearGradient
-                                colors={['#FE8A7B', '#F34B6F']}
+                                colors={['#F34B6F', '#E8447A']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
-                                style={StyleSheet.absoluteFillObject}
+                                style={StyleSheet.absoluteFill}
                             />
                         </Animated.View>
                     )}

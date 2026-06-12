@@ -117,8 +117,8 @@ export function LanguagePicker() {
                                             styles.option,
                                             isActive && {
                                                 backgroundColor: isDark
-                                                    ? 'rgba(254,138,123,0.1)'
-                                                    : 'rgba(254,138,123,0.08)',
+                                                    ? 'rgba(243,75,111,0.1)'
+                                                    : 'rgba(243,75,111,0.08)',
                                             },
                                         ]}
                                     >
@@ -130,7 +130,7 @@ export function LanguagePicker() {
                                             className={isActive ? 'font-body-semi' : ''}
                                             style={[
                                                 { flex: 1, marginLeft: scale(12) },
-                                                isActive && { color: '#FE8A7B' },
+                                                isActive && { color: '#F34B6F' },
                                             ]}
                                         >
                                             {item.name}
@@ -138,10 +138,10 @@ export function LanguagePicker() {
                                         {isActive && (
                                             <View style={styles.checkCircle}>
                                                 <LinearGradient
-                                                    colors={['#FE8A7B', '#F34B6F']}
+                                                    colors={['#F34B6F', '#E8447A']}
                                                     start={{ x: 0, y: 0 }}
                                                     end={{ x: 1, y: 1 }}
-                                                    style={StyleSheet.absoluteFillObject}
+                                                    style={StyleSheet.absoluteFill}
                                                 />
                                                 <Check
                                                     size={scale(12)}

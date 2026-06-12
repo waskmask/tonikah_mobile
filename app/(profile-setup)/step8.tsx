@@ -1,95 +1,214 @@
-import React, { useState, useCallback } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/Text';
-import { Input } from '@/components/ui/Input';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
+import { FieldLabel } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
-import { Config } from '@/constants/config';
-import { MapPin, Search, Globe } from 'lucide-react-native';
+import { LocateFixed } from 'lucide-react-native';
 
-let searchTimeout: ReturnType<typeof setTimeout>;
+type PlaceDetails = {
+    place_id?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    countryCode?: string;
+    lat?: number;
+    lng?: number;
+};
+
+function normalizeLanguage(language: string) {
+    return language.split('-')[0]?.trim() || 'en';
+}
+
+function formatCountryForLocale(
+    countryCode: string,
+    fallback: string,
+    locale: string,
+    t: (key: string, options?: Record<string, unknown>) => string,
+) {
+    const normalizedCode = countryCode.trim().toUpperCase();
+    const countryKey = /^[A-Z]{2}$/.test(normalizedCode) ? `countries:c_${normalizedCode.toLowerCase()}` : '';
+
+    if (countryKey) {
+        const translated = t(countryKey, { defaultValue: '' });
+        if (translated && translated !== countryKey) return translated;
+    }
+
+    if (/^[A-Z]{2}$/.test(normalizedCode)) {
+        try {
+            const displayNames = new (Intl as any).DisplayNames([locale], { type: 'region' });
+            return displayNames.of(normalizedCode) || fallback || normalizedCode;
+        } catch {
+            return fallback || normalizedCode;
+        }
+    }
+
+    return fallback || countryCode;
+}
+
+function buildLocationLabel(city: string, state: string, country: string) {
+    return [city, state, country].filter(Boolean).join(', ');
+}
+
+function hasResolvedLocation(details: PlaceDetails | undefined) {
+    if (!details) return false;
+    const lat = Number(details.lat);
+    const lng = Number(details.lng);
+
+    return Boolean(
+        details.place_id &&
+        details.city?.trim() &&
+        details.countryCode?.trim().match(/^[A-Z]{2}$/i) &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lng),
+    );
+}
+
+async function withLocationTimeout<T>(promise: Promise<T>, timeoutMs = 12000): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('location_timeout')), timeoutMs);
+    });
+
+    try {
+        return await Promise.race([promise, timeout]);
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
+}
 
 export default function Step8() {
-    const { t } = useTranslation('common');
+    const { t, i18n } = useTranslation(['common', 'countries']);
     const { isDark } = useTheme();
     const { setProfileData } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const placesSearchLanguage = useMemo(() => normalizeLanguage(i18n.language), [i18n.language]);
+    const displayLocale = placesSearchLanguage;
 
     const [city, setCity] = useState('');
-    const [country, setCountry] = useState('');
+    const [countryCode, setCountryCode] = useState('');
+    const [countryDisplay, setCountryDisplay] = useState('');
+    const [stateName, setStateName] = useState('');
     const [placeId, setPlaceId] = useState('');
     const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [predictions, setPredictions] = useState<any[]>([]);
-    const [searchLoading, setSearchLoading] = useState(false);
+    const [detectingLocation, setDetectingLocation] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const searchCities = useCallback((query: string) => {
-        setSearchQuery(query);
-        clearTimeout(searchTimeout);
+    const selectedCountryDisplay = countryDisplay || formatCountryForLocale(countryCode, countryCode, displayLocale, t);
+    const currentLocationValue = city
+        ? buildLocationLabel(city, '', selectedCountryDisplay)
+        : t('current_location', { defaultValue: 'Current location' });
 
-        if (query.length < 3) {
-            setPredictions([]);
-            return;
-        }
+    const applyLocationDetails = useCallback((details: PlaceDetails) => {
+        const nextCountryCode = (details.countryCode || '').trim().toUpperCase();
+        const nextCity = (details.city || '').trim();
+        const nextState = (details.state || '').trim();
+        const nextCountryDisplay = formatCountryForLocale(nextCountryCode, details.country || '', displayLocale, t);
+        const nextLat = Number(details.lat);
+        const nextLng = Number(details.lng);
 
-        searchTimeout = setTimeout(async () => {
-            setSearchLoading(true);
-            try {
-                const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&types=(cities)&key=${Config.GOOGLE_MAPS_API_KEY}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                setPredictions(data.predictions || []);
-            } catch {
-                setPredictions([]);
-            } finally {
-                setSearchLoading(false);
-            }
-        }, 400);
-    }, []);
+        setCity(nextCity);
+        setStateName(nextState);
+        setCountryCode(nextCountryCode);
+        setCountryDisplay(nextCountryDisplay);
+        setPlaceId(details.place_id || '');
+        setGeo(Number.isFinite(nextLat) && Number.isFinite(nextLng) ? { lat: nextLat, lng: nextLng } : null);
+        setErrors((current) => ({ ...current, city: '' }));
+    }, [displayLocale, t]);
 
-    const selectPlace = async (prediction: any) => {
-        setPredictions([]);
-        setSearchQuery(prediction.description);
-        setPlaceId(prediction.place_id);
-        setSearchLoading(true);
-
+    const detectCurrentLocation = async () => {
+        setDetectingLocation(true);
         try {
-            const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=address_components,geometry&key=${Config.GOOGLE_MAPS_API_KEY}`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.result) {
-                const components = data.result.address_components || [];
-                const cityComp = components.find((c: any) => c.types.includes('locality'));
-                const countryComp = components.find((c: any) => c.types.includes('country'));
-                const stateComp = components.find((c: any) => c.types.includes('administrative_area_level_1'));
-
-                setCity(cityComp?.long_name || prediction.structured_formatting?.main_text || '');
-                setCountry(countryComp?.short_name || '');
-                if (data.result.geometry?.location) {
-                    setGeo({ lat: data.result.geometry.location.lat, lng: data.result.geometry.location.lng });
-                }
-                if (errors.city) setErrors((e) => ({ ...e, city: '' }));
+            const permission = await Location.requestForegroundPermissionsAsync();
+            if (permission.status !== Location.PermissionStatus.GRANTED) {
+                Alert.alert(
+                    t('common:error', { defaultValue: 'Error' }),
+                    t('common:location_permission_required', { defaultValue: 'Location permission is required to fill your current city.' }),
+                );
+                return;
             }
-        } catch { } finally {
-            setSearchLoading(false);
+
+            const servicesEnabled = await Location.hasServicesEnabledAsync();
+            if (!servicesEnabled) {
+                Alert.alert(
+                    t('common:error', { defaultValue: 'Error' }),
+                    t('common:device_location_services_disabled', { defaultValue: 'Please turn on device location services and try again.' }),
+                );
+                return;
+            }
+
+            let position: Location.LocationObject | null = null;
+            try {
+                position = await withLocationTimeout(
+                    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+                );
+            } catch {
+                position = await Location.getLastKnownPositionAsync({
+                    maxAge: 5 * 60 * 1000,
+                    requiredAccuracy: 5000,
+                });
+            }
+
+            if (!position) {
+                Alert.alert(
+                    t('common:error', { defaultValue: 'Error' }),
+                    t('common:device_location_unavailable', { defaultValue: 'Could not get your device location. Please enable location services and try again.' }),
+                );
+                return;
+            }
+
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const res = await profileService.fetchPlaceReverse(lat, lng, 'en');
+
+            if (res.success && hasResolvedLocation(res.data)) {
+                applyLocationDetails(res.data);
+                return;
+            }
+
+            const messageKey =
+                res.message === 'network_error'
+                    ? 'common:location_backend_network_error'
+                    : res.status === 404 || res.message === 'invalid_json'
+                        ? 'common:location_backend_unavailable'
+                        : 'common:location_resolve_failed';
+
+            Alert.alert(
+                t('common:error', { defaultValue: 'Error' }),
+                t(messageKey, { defaultValue: 'Could not resolve your city from this location. Please try again.' }),
+            );
+        } catch {
+            Alert.alert(
+                t('common:error', { defaultValue: 'Error' }),
+                t('common:device_location_unavailable', { defaultValue: 'Could not get your device location. Please enable location services and try again.' }),
+            );
+        } finally {
+            setDetectingLocation(false);
         }
     };
 
     const validate = (): boolean => {
         const e: Record<string, string> = {};
-        if (!city) e.city = 'Please search and select your city';
+        const hasValidGeo = Boolean(
+            geo &&
+            Number.isFinite(geo.lng) &&
+            Number.isFinite(geo.lat),
+        );
+
+        if (!placeId || !city || !/^[A-Z]{2}$/.test(countryCode) || !hasValidGeo) {
+            e.city = t('current_location_required', { defaultValue: 'Please use current location to fill your city, state, and country.' });
+        }
+
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -101,9 +220,16 @@ export default function Step8() {
             const payload = {
                 current_location: {
                     place_id: placeId,
+                    country: countryCode.toUpperCase(),
+                    ...(stateName ? { state: stateName } : {}),
                     city,
-                    country,
-                    geo: geo ? { type: 'Point', coordinates: [geo.lng, geo.lat] } : undefined,
+                    geo: {
+                        type: 'Point',
+                        coordinates: [
+                            Number.isFinite(geo?.lng) ? geo?.lng : 0,
+                            Number.isFinite(geo?.lat) ? geo?.lat : 0,
+                        ],
+                    },
                 },
             };
             const res = await profileService.updateProfile(payload);
@@ -111,10 +237,10 @@ export default function Step8() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step9');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update');
+                Alert.alert(t('common:error', { defaultValue: 'Error' }), res.message || t('common:server_error_default', { defaultValue: 'Failed to update' }));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('common:error', { defaultValue: 'Error' }), t('common:network_error', { defaultValue: 'Network error' }));
         } finally {
             setLoading(false);
         }
@@ -125,51 +251,63 @@ export default function Step8() {
             <ProgressBar currentStep={8} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('step_8.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('step_8.subtitle')}</Text>
-
-                    <FieldLabel text={t('step_8.city')} required />
-                    <Input
-                        placeholder={t('step_8.search_city')}
-                        value={searchQuery}
-                        onChangeText={searchCities}
-                        leftIcon={<Search size={scale(18)} color={iconColor} />}
-                        error={errors.city}
+                    <ProfileSetupHeader
+                        title={t('location_title', { defaultValue: 'Current location' })}
+                        subtitle={t('location_desc', { defaultValue: 'Enter your present residing city and country.' })}
                     />
 
-                    {/* Predictions list */}
-                    {searchLoading && <ActivityIndicator style={{ marginVertical: scale(8) }} color="#FE8A7B" />}
-                    {predictions.length > 0 && (
-                        <View style={[styles.predictionsContainer, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
-                            {predictions.map((item) => (
-                                <Pressable key={item.place_id} onPress={() => selectPlace(item)} style={[styles.predictionItem, { borderBottomColor: isDark ? '#334155' : '#F1F5F9' }]}>
-                                    <MapPin size={scale(16)} color={iconColor} />
-                                    <Text variant="body-sm" style={{ flex: 1, marginLeft: scale(8) }} numberOfLines={1}>{item.description}</Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    )}
-
-                    {/* Selected city & country display */}
-                    {city ? (
-                        <View style={{ marginTop: scale(12) }}>
-                            <FieldLabel text={t('step_8.city')} />
-                            <SelectField value={city} placeholder="" onPress={() => { }} icon={<MapPin size={scale(18)} color={iconColor} />} />
-
-                            <FieldLabel text={t('step_8.country')} />
-                            <SelectField value={country} placeholder="" onPress={() => { }} icon={<Globe size={scale(18)} color={iconColor} />} />
-                        </View>
+                    <FieldLabel text={t('current_location', { defaultValue: 'Current location' })} required />
+                    <Pressable
+                        onPress={detectCurrentLocation}
+                        disabled={detectingLocation}
+                        style={[
+                            styles.locationButton,
+                            {
+                                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                                borderColor: errors.city ? '#EF4444' : isDark ? '#334155' : '#E2E8F0',
+                                opacity: detectingLocation ? 0.65 : 1,
+                            },
+                        ]}
+                    >
+                        <Text
+                            variant="body-sm"
+                            numberOfLines={2}
+                            style={{
+                                color: city ? (isDark ? '#E2E8F0' : '#0A0D14') : (isDark ? '#64748B' : '#9CA3AF'),
+                                flex: 1,
+                            }}
+                        >
+                            {currentLocationValue}
+                        </Text>
+                        {detectingLocation ? (
+                            <ActivityIndicator color="#F34B6F" />
+                        ) : (
+                            <LocateFixed size={scale(18)} color="#F34B6F" />
+                        )}
+                    </Pressable>
+                    {errors.city ? (
+                        <Text variant="caption" style={{ color: '#EF4444', marginTop: scale(-8), marginLeft: scale(4) }}>
+                            {errors.city}
+                        </Text>
                     ) : null}
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <View style={styles.footer}><GradientButton title={t('common.continue')} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     footer: { padding: scale(20), paddingBottom: scale(10) },
-    predictionsContainer: { borderWidth: 1, borderRadius: scale(12), overflow: 'hidden', marginTop: scale(4) },
-    predictionItem: { flexDirection: 'row', alignItems: 'center', padding: scale(14), borderBottomWidth: 1 },
+    locationButton: {
+        minHeight: scale(54),
+        borderWidth: 1,
+        borderRadius: scale(12),
+        paddingHorizontal: scale(16),
+        marginBottom: scale(16),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(10),
+    },
 });

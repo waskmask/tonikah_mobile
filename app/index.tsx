@@ -7,13 +7,12 @@ import { useProfileSetupStore } from "@/store/profileSetupStore";
 import { profileService } from "@/lib/profileService";
 
 export default function Index() {
-    const { isAuthenticated, user, isRestoringSession } = useAuthStore();
+    const { isAuthenticated, isRestoringSession, setUser } = useAuthStore();
     const { isFirstLaunch } = useFirstLaunch();
     const { getIncompleteStep, setGender } = useProfileSetupStore();
 
     const [profileChecked, setProfileChecked] = useState(false);
     const [incompleteStep, setIncompleteStep] = useState(0);
-    const [needsVerification, setNeedsVerification] = useState(false);
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -26,15 +25,10 @@ export default function Index() {
             try {
                 const res = await profileService.fetchMe();
                 if (res.success && res.user) {
-                    // Check email verification first
-                    if (res.user.email_verified === false) {
-                        setNeedsVerification(true);
-                        setProfileChecked(true);
-                        return;
-                    }
+                    setUser(res.user);
 
                     const profile = res.user.profile;
-                    if (!profile || profile.newProfile === true) {
+                    if (!profile) {
                         setIncompleteStep(1);
                     } else {
                         const step = getIncompleteStep(profile);
@@ -57,7 +51,7 @@ export default function Index() {
     if (isRestoringSession || !profileChecked) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
-                <ActivityIndicator size="large" color="#FE8A7B" />
+                <ActivityIndicator size="large" color="#F34B6F" />
             </View>
         );
     }
@@ -67,15 +61,10 @@ export default function Index() {
     }
 
     if (isAuthenticated) {
-        // Email not verified → send to verify-email (NOT back to login)
-        if (needsVerification) {
-            return <Redirect href={{ pathname: "/(auth)/verify-email", params: { email: user?.email || '' } }} />;
-        }
-
         if (incompleteStep > 0) {
             return <Redirect href={`/(profile-setup)/step${incompleteStep}` as any} />;
         }
-        return <Redirect href="/(tabs)/home" />;
+        return <Redirect href="/(tabs)/search" />;
     }
 
     return <Redirect href="/(auth)/login" />;

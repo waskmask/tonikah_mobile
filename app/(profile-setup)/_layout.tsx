@@ -24,6 +24,7 @@ export default function ProfileSetupLayout() {
             <Stack.Screen name="step7" />
             <Stack.Screen name="step8" />
             <Stack.Screen name="step9" />
+            <Stack.Screen name="step10" />
         </Stack>
     );
 }

@@ -1,49 +1,64 @@
 import { Tabs } from "expo-router";
-import { Home, Search, MessageSquare, User } from "lucide-react-native";
-import { useTheme } from "@/hooks/useTheme";
-import { scale } from "@/hooks/useResponsive";
+import { AppTopBar } from "@/components/app/AppTopBar";
+import { BottomTabBar } from "@/components/app/BottomTabBar";
+import { usePeriodicLocationRefresh } from "@/hooks/usePeriodicLocationRefresh";
 
 export default function TabsLayout() {
-    const { isDark } = useTheme();
+    usePeriodicLocationRefresh();
 
     return (
         <Tabs
             screenOptions={{
-                headerShown: false,
-                tabBarStyle: {
-                    backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
-                    borderTopColor: isDark ? "#334155" : "#E2E8F0",
-                    height: scale(80),
-                    paddingBottom: scale(20),
-                },
-                tabBarActiveTintColor: "#FE8A7B",
-                tabBarInactiveTintColor: isDark ? "#94A3B8" : "#6B7280",
+                headerShown: true,
+                header: () => <AppTopBar />,
             }}
+            tabBar={(props) => <BottomTabBar {...props} />}
         >
             <Tabs.Screen
                 name="home"
                 options={{
-                    tabBarIcon: ({ color }) => <Home color={color} size={scale(24)} />,
+                    href: null,
                 }}
             />
             <Tabs.Screen
                 name="search"
                 options={{
-                    tabBarIcon: ({ color }) => <Search color={color} size={scale(24)} />,
+                    title: "Explore",
+                    headerShown: false,
                 }}
             />
             <Tabs.Screen
                 name="messages"
                 options={{
-                    tabBarIcon: ({ color }) => <MessageSquare color={color} size={scale(24)} />,
+                    title: "Messages",
+                }}
+            />
+            <Tabs.Screen
+                name="favourited"
+                options={{
+                    title: "Saved",
+                }}
+            />
+            <Tabs.Screen
+                name="activities"
+                options={{
+                    title: "Activities",
                 }}
             />
             <Tabs.Screen
                 name="profile"
                 options={{
-                    tabBarIcon: ({ color }) => <User color={color} size={scale(24)} />,
+                    title: "Profile",
                 }}
             />
+            <Tabs.Screen name="edit-profile" options={{ href: null }} />
+            <Tabs.Screen name="memberships" options={{ href: null }} />
+            <Tabs.Screen name="blocked-users" options={{ href: null }} />
+            <Tabs.Screen name="settings" options={{ href: null }} />
+            <Tabs.Screen name="language" options={{ href: null, headerShown: false }} />
+            <Tabs.Screen name="my-hobbies" options={{ href: null }} />
+            <Tabs.Screen name="faith" options={{ href: null }} />
+            <Tabs.Screen name="partner-preference" options={{ href: null }} />
         </Tabs>
     );
 }

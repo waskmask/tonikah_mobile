@@ -2,9 +2,9 @@ export const Colors = {
     light: {
         brand: {
             gradient: {
-                start: "#FE8A7B",
-                end: "#F34B6F",
-                center: "#F86774",
+                start: "#F34B6F",
+                end: "#E8447A",
+                center: "#EE4976",
             },
             text: {
                 heading: "#000000",
@@ -32,9 +32,9 @@ export const Colors = {
     dark: {
         brand: {
             gradient: {
-                start: "#FE8A7B",
-                end: "#F34B6F",
-                center: "#F86774",
+                start: "#F34B6F",
+                end: "#E8447A",
+                center: "#EE4976",
             },
             text: {
                 heading: "#F1F5F9",

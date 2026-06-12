@@ -3,9 +3,9 @@ import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
@@ -28,23 +28,23 @@ export default function Step7() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const smokingOptions: SelectOption[] = [
-        { value: 'never_smoke', label: t('step_7.never_smoke') },
-        { value: 'quit_smoking', label: t('step_7.quit_smoking') },
-        { value: 'occasionally_smokes', label: t('step_7.occasionally_smokes') },
-        { value: 'smokes_regularly', label: t('step_7.smokes_regularly') },
-        { value: 'trying_to_quit', label: t('step_7.trying_to_quit') },
+        { value: 'never_smoke', label: t('never_smoke', { defaultValue: 'Never smoke' }) },
+        { value: 'quit_smoking', label: t('quit_smoking', { defaultValue: 'Quit smoking' }) },
+        { value: 'occasionally_smokes', label: t('occasionally_smokes', { defaultValue: 'Occasionally smokes' }) },
+        { value: 'smokes_regularly', label: t('smokes_regularly', { defaultValue: 'Smokes regularly' }) },
+        { value: 'trying_to_quit', label: t('trying_to_quit', { defaultValue: 'Trying to quit' }) },
     ];
 
     const alcoholOptions: SelectOption[] = [
-        { value: 'never_drinks', label: t('step_7.never_drinks') },
-        { value: 'drinks_alcohol', label: t('step_7.drinks_alcohol') },
-        { value: 'quit_alcohol', label: t('step_7.quit_alcohol') },
+        { value: 'never_drinks', label: t('never_drinks', { defaultValue: 'Never drinks alcohol' }) },
+        { value: 'drinks_alcohol', label: t('drinks_alcohol', { defaultValue: 'Drinks alcohol' }) },
+        { value: 'quit_alcohol', label: t('quit_alcohol', { defaultValue: 'Quit drinking' }) },
     ];
 
     const validate = (): boolean => {
         const e: Record<string, string> = {};
-        if (!smoking) e.smoking = 'Required';
-        if (!alcohol) e.alcohol = 'Required';
+        if (!smoking) e.smoking = t('smoking_required');
+        if (!alcohol) e.alcohol = t('alcohol_required');
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -75,23 +75,25 @@ export default function Step7() {
             <ProgressBar currentStep={7} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('step_7.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('step_7.subtitle')}</Text>
+                    <ProfileSetupHeader
+                        title={t('lifestyle_title', { defaultValue: 'Lifestyle & Habits' })}
+                        subtitle={t('lifestyle_desc', { defaultValue: 'Help others understand your day-to-day habits and choices.' })}
+                    />
 
-                    <FieldLabel text="Smoking" required />
-                    <SelectField value={smoking ? getLabel(smoking, smokingOptions) : ''} placeholder="Select" onPress={() => setActiveSheet('smoking')} icon={<Cigarette size={scale(18)} color={iconColor} />} hasError={!!errors.smoking} />
+                    <FieldLabel text={t('smoking')} required />
+                    <SelectField value={smoking ? getLabel(smoking, smokingOptions) : ''} placeholder={t('select')} onPress={() => setActiveSheet('smoking')} icon={<Cigarette size={scale(18)} color={iconColor} />} hasError={!!errors.smoking} />
                     {errors.smoking && <ErrorText text={errors.smoking} />}
 
-                    <FieldLabel text="Alcohol" required />
-                    <SelectField value={alcohol ? getLabel(alcohol, alcoholOptions) : ''} placeholder="Select" onPress={() => setActiveSheet('alcohol')} icon={<Wine size={scale(18)} color={iconColor} />} hasError={!!errors.alcohol} />
+                    <FieldLabel text={t('alcohol')} required />
+                    <SelectField value={alcohol ? getLabel(alcohol, alcoholOptions) : ''} placeholder={t('select')} onPress={() => setActiveSheet('alcohol')} icon={<Wine size={scale(18)} color={iconColor} />} hasError={!!errors.alcohol} />
                     {errors.alcohol && <ErrorText text={errors.alcohol} />}
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <View style={styles.footer}><GradientButton title={t('common.continue')} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
-            <SingleSelectSheet visible={activeSheet === 'smoking'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSmoking(v); setErrors((e) => ({ ...e, smoking: '' })); }} options={smokingOptions} selected={smoking} title="Smoking" />
-            <SingleSelectSheet visible={activeSheet === 'alcohol'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setAlcohol(v); setErrors((e) => ({ ...e, alcohol: '' })); }} options={alcoholOptions} selected={alcohol} title="Alcohol" />
+            <SingleSelectSheet visible={activeSheet === 'smoking'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSmoking(v); setErrors((e) => ({ ...e, smoking: '' })); }} options={smokingOptions} selected={smoking} title={t('smoking')} />
+            <SingleSelectSheet visible={activeSheet === 'alcohol'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setAlcohol(v); setErrors((e) => ({ ...e, alcohol: '' })); }} options={alcoholOptions} selected={alcohol} title={t('alcohol')} />
         </SafeAreaView>
     );
 }

@@ -56,7 +56,7 @@ export const Button: React.FC<ButtonProps> = ({
             className={`rounded-full flex-row items-center justify-center ${getVariantStyles()} ${getPadding()} ${disabled ? "opacity-50" : ""} ${className}`}
         >
             {loading ? (
-                <ActivityIndicator color={variant === "primary" ? "#FFFFFF" : "#FE8A7B"} />
+                <ActivityIndicator color={variant === "primary" ? "#FFFFFF" : "#F34B6F"} />
             ) : (
                 <Text variant={getTextVariant()} className={`${getTextColor()} font-bold`}>
                     {title}

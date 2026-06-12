@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
@@ -13,9 +13,40 @@ import { scale } from '@/hooks/useResponsive';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { BookOpen, Landmark, Star, Sparkles, HandHeart } from 'lucide-react-native';
+import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
+
+const SECT_FILTERS: Record<string, { maslak: string[]; following: string[] }> = {
+    sunni: {
+        maslak: ['hanafi', 'shafi', 'maliki', 'hanbali', 'not_applicable'],
+        following: [
+            'ahle_hadith',
+            'ahle_sunnat',
+            'deobandi',
+            'barelvi',
+            'sufi',
+            'tabligi',
+            'salafi',
+            'just_muslim',
+            'other_sunni',
+        ],
+    },
+    shia: {
+        maslak: ['jafari', 'zaydi', 'ismaili', 'other'],
+        following: ['ithna_ashari', 'bohra', 'ismaili', 'zaidi', 'just_shia', 'other_shia'],
+    },
+    ibadi: {
+        maslak: ['not_applicable', 'other'],
+        following: ['ahle_hadith', 'ahle_sunnat', 'salafi', 'just_muslim', 'other_sunni'],
+    },
+};
+
+const normalizeMasterKey = (value?: string) =>
+    String(value || '')
+        .trim()
+        .toLowerCase();
 
 export default function Step6() {
-    const { t } = useTranslation('common');
+    const { t, i18n } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
     const iconColor = isDark ? '#94A3B8' : '#6B7280';
@@ -49,7 +80,8 @@ export default function Step6() {
     const toOpts = (key: string): SelectOption[] =>
         (masterdata[key] || []).map((item: any) => ({
             value: item._id || item.value_id,
-            label: item.label || item.name || item._id,
+            label: formatProfileOptionLabel(item.label || item.name || item._id, i18n.language),
+            key: item.label || item.name,
         }));
 
     const getLabel = (v: string, opts: SelectOption[]) => opts.find((o) => o.value === v)?.label || '';
@@ -71,9 +103,36 @@ export default function Step6() {
         { value: 'never_prays', label: t('step_6.never_prays') },
     ];
 
+    const sectOpts = useMemo(() => toOpts('sect'), [masterdata.sect, i18n.language]);
+    const maslakOptsRaw = useMemo(() => toOpts('maslak'), [masterdata.maslak, i18n.language]);
+    const followingOptsRaw = useMemo(() => toOpts('following'), [masterdata.following, i18n.language]);
+    const selectedSectKey = normalizeMasterKey(sectOpts.find((item) => item.value === sect)?.key);
+
+    const maslakOpts = useMemo(() => {
+        const filters = SECT_FILTERS[selectedSectKey];
+        if (!filters) return maslakOptsRaw;
+        return maslakOptsRaw.filter((item) => !item.key || filters.maslak.includes(normalizeMasterKey(item.key)));
+    }, [maslakOptsRaw, selectedSectKey]);
+
+    const followingOpts = useMemo(() => {
+        const filters = SECT_FILTERS[selectedSectKey];
+        if (!filters) return followingOptsRaw;
+        return followingOptsRaw.filter((item) => !item.key || filters.following.includes(normalizeMasterKey(item.key)));
+    }, [followingOptsRaw, selectedSectKey]);
+
+    useEffect(() => {
+        if (maslak && !maslakOpts.some((item) => item.value === maslak)) {
+            setMaslak('');
+        }
+        if (following && !followingOpts.some((item) => item.value === following)) {
+            setFollowing('');
+        }
+    }, [following, followingOpts, maslak, maslakOpts]);
+
     const validate = (): boolean => {
         const e: Record<string, string> = {};
         if (!sect) e.sect = 'Required';
+        if (!maslak) e.maslak = 'Required';
         if (!isPractising) e.isPractising = 'Required';
         if (!prayers) e.prayers = 'Required';
         setErrors(e);
@@ -86,10 +145,10 @@ export default function Step6() {
         try {
             const payload: any = {
                 sect: { value_id: sect },
+                maslak: { value_id: maslak },
                 is_practising: isPractising,
                 prayers,
             };
-            if (maslak) payload.maslak = { value_id: maslak };
             if (following) payload.following = { value_id: following };
 
             const res = await profileService.updateProfile(payload);
@@ -106,24 +165,23 @@ export default function Step6() {
         }
     };
 
-    const sectOpts = toOpts('sect');
-    const maslakOpts = toOpts('maslak');
-    const followingOpts = toOpts('following');
-
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={6} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('step_6.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('step_6.subtitle')}</Text>
+                    <ProfileSetupHeader
+                        title={t('religious_title', { defaultValue: 'Religious Beliefs and Practices' })}
+                        subtitle={t('religious_desc', { defaultValue: 'Provide information about religious values and practices.' })}
+                    />
 
                     <FieldLabel text="Sect" required />
                     <SelectField value={sect ? getLabel(sect, sectOpts) : ''} placeholder="Select sect" onPress={() => setActiveSheet('sect')} icon={<BookOpen size={scale(18)} color={iconColor} />} hasError={!!errors.sect} />
                     {errors.sect && <ErrorText text={errors.sect} />}
 
-                    <FieldLabel text="Maslak / School of Thought" />
-                    <SelectField value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder="Select (optional)" onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} />
+                    <FieldLabel text="Maslak / School of Thought" required />
+                    <SelectField value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder="Select" onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
+                    {errors.maslak && <ErrorText text={errors.maslak} />}
 
                     <FieldLabel text="Following / Movement" />
                     <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder="Select (optional)" onPress={() => setActiveSheet('following')} icon={<Star size={scale(18)} color={iconColor} />} />
@@ -138,10 +196,10 @@ export default function Step6() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <View style={styles.footer}><GradientButton title={t('common.continue')} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
-            <SingleSelectSheet visible={activeSheet === 'sect'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSect(v); setErrors((e) => ({ ...e, sect: '' })); }} options={sectOpts} selected={sect} title="Sect" searchEnabled />
-            <SingleSelectSheet visible={activeSheet === 'maslak'} onClose={() => setActiveSheet(null)} onSelect={(v) => setMaslak(v)} options={maslakOpts} selected={maslak} title="Maslak" searchEnabled />
+            <SingleSelectSheet visible={activeSheet === 'sect'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSect(v); setMaslak(''); setFollowing(''); setErrors((e) => ({ ...e, sect: '', maslak: '' })); }} options={sectOpts} selected={sect} title="Sect" searchEnabled />
+            <SingleSelectSheet visible={activeSheet === 'maslak'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setMaslak(v); setErrors((e) => ({ ...e, maslak: '' })); }} options={maslakOpts} selected={maslak} title="Maslak" searchEnabled />
             <SingleSelectSheet visible={activeSheet === 'following'} onClose={() => setActiveSheet(null)} onSelect={(v) => setFollowing(v)} options={followingOpts} selected={following} title="Following" searchEnabled />
             <SingleSelectSheet visible={activeSheet === 'practising'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setIsPractising(v); setErrors((e) => ({ ...e, isPractising: '' })); }} options={practisingOptions} selected={isPractising} title="Practising Level" />
             <SingleSelectSheet visible={activeSheet === 'prayers'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setPrayers(v); setErrors((e) => ({ ...e, prayers: '' })); }} options={prayerOptions} selected={prayers} title="Prayer Habit" />

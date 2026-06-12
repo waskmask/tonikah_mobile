@@ -5,7 +5,7 @@ import { I18nManager } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // All namespaces used across the app
-const NAMESPACES = ["common", "countries", "nationalities", "designations", "ethnic_groups", "languages"] as const;
+const NAMESPACES = ["common", "countries", "nationalities", "designations", "ethnic_group", "ethnic_groups", "languages"] as const;
 
 // Supported languages: ar, de, en, es, fr, id, it, pl, pt, ru, tr
 const RESOURCES = {
@@ -14,6 +14,7 @@ const RESOURCES = {
         countries: require("../locales/en/countries.json"),
         nationalities: require("../locales/en/nationalities.json"),
         designations: require("../locales/en/designations.json"),
+        ethnic_group: require("../locales/en/ethnic_group.json"),
         ethnic_groups: require("../locales/en/ethnic_groups.json"),
         languages: require("../locales/en/languages.json"),
     },
@@ -22,6 +23,7 @@ const RESOURCES = {
         countries: require("../locales/ar/countries.json"),
         nationalities: require("../locales/ar/nationalities.json"),
         designations: require("../locales/ar/designations.json"),
+        ethnic_group: require("../locales/ar/ethnic_group.json"),
         ethnic_groups: require("../locales/ar/ethnic_groups.json"),
         languages: require("../locales/ar/languages.json"),
     },
@@ -30,6 +32,7 @@ const RESOURCES = {
         countries: require("../locales/de/countries.json"),
         nationalities: require("../locales/de/nationalities.json"),
         designations: require("../locales/de/designations.json"),
+        ethnic_group: require("../locales/de/ethnic_group.json"),
         ethnic_groups: require("../locales/de/ethnic_groups.json"),
         languages: require("../locales/de/languages.json"),
     },
@@ -38,6 +41,7 @@ const RESOURCES = {
         countries: require("../locales/es/countries.json"),
         nationalities: require("../locales/es/nationalities.json"),
         designations: require("../locales/es/designations.json"),
+        ethnic_group: require("../locales/es/ethnic_group.json"),
         ethnic_groups: require("../locales/es/ethnic_groups.json"),
         languages: require("../locales/es/languages.json"),
     },
@@ -46,6 +50,7 @@ const RESOURCES = {
         countries: require("../locales/fr/countries.json"),
         nationalities: require("../locales/fr/nationalities.json"),
         designations: require("../locales/fr/designations.json"),
+        ethnic_group: require("../locales/fr/ethnic_group.json"),
         ethnic_groups: require("../locales/fr/ethnic_groups.json"),
         languages: require("../locales/fr/languages.json"),
     },
@@ -54,6 +59,7 @@ const RESOURCES = {
         countries: require("../locales/id/countries.json"),
         nationalities: require("../locales/id/nationalities.json"),
         designations: require("../locales/id/designations.json"),
+        ethnic_group: require("../locales/id/ethnic_group.json"),
         ethnic_groups: require("../locales/id/ethnic_groups.json"),
         languages: require("../locales/id/languages.json"),
     },
@@ -62,6 +68,7 @@ const RESOURCES = {
         countries: require("../locales/it/countries.json"),
         nationalities: require("../locales/it/nationalities.json"),
         designations: require("../locales/it/designations.json"),
+        ethnic_group: require("../locales/it/ethnic_group.json"),
         ethnic_groups: require("../locales/it/ethnic_groups.json"),
         languages: require("../locales/it/languages.json"),
     },
@@ -70,6 +77,7 @@ const RESOURCES = {
         countries: require("../locales/pl/countries.json"),
         nationalities: require("../locales/pl/nationalities.json"),
         designations: require("../locales/pl/designations.json"),
+        ethnic_group: require("../locales/pl/ethnic_group.json"),
         ethnic_groups: require("../locales/pl/ethnic_groups.json"),
         languages: require("../locales/pl/languages.json"),
     },
@@ -78,6 +86,7 @@ const RESOURCES = {
         countries: require("../locales/pt/countries.json"),
         nationalities: require("../locales/pt/nationalities.json"),
         designations: require("../locales/pt/designations.json"),
+        ethnic_group: require("../locales/pt/ethnic_group.json"),
         ethnic_groups: require("../locales/pt/ethnic_groups.json"),
         languages: require("../locales/pt/languages.json"),
     },
@@ -86,6 +95,7 @@ const RESOURCES = {
         countries: require("../locales/ru/countries.json"),
         nationalities: require("../locales/ru/nationalities.json"),
         designations: require("../locales/ru/designations.json"),
+        ethnic_group: require("../locales/ru/ethnic_group.json"),
         ethnic_groups: require("../locales/ru/ethnic_groups.json"),
         languages: require("../locales/ru/languages.json"),
     },
@@ -94,6 +104,7 @@ const RESOURCES = {
         countries: require("../locales/tr/countries.json"),
         nationalities: require("../locales/tr/nationalities.json"),
         designations: require("../locales/tr/designations.json"),
+        ethnic_group: require("../locales/tr/ethnic_group.json"),
         ethnic_groups: require("../locales/tr/ethnic_groups.json"),
         languages: require("../locales/tr/languages.json"),
     },

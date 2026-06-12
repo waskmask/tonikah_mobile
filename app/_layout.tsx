@@ -3,6 +3,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { View, LogBox } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
     configureReanimatedLogger,
     ReanimatedLogLevel,
@@ -91,23 +92,25 @@ export default function RootLayout() {
     }
 
     return (
-        <QueryClientProvider client={queryClient}>
-            <Stack
-                screenOptions={{
-                    headerShown: false,
-                    animation: "fade",
-                    contentStyle: {
-                        backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
-                    }
-                }}
-            >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(onboarding)" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(profile-setup)" />
-                <Stack.Screen name="(tabs)" />
-            </Stack>
-            <ToastProvider />
-        </QueryClientProvider>
+        <SafeAreaProvider>
+            <QueryClientProvider client={queryClient}>
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                        animation: "fade",
+                        contentStyle: {
+                            backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                        }
+                    }}
+                >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="(onboarding)" />
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(profile-setup)" />
+                    <Stack.Screen name="(tabs)" />
+                </Stack>
+                <ToastProvider />
+            </QueryClientProvider>
+        </SafeAreaProvider>
     );
 }

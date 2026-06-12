@@ -1,19 +1,19 @@
-import { Stack, router } from 'expo-router';
+import { Stack, router, useSegments } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useEffect } from 'react';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function AuthLayout() {
-    const { isAuthenticated, user, isRestoringSession } = useAuthStore();
+    const { isAuthenticated, isRestoringSession } = useAuthStore();
     const { isRTL } = useLanguage();
+    const segments = useSegments();
 
     useEffect(() => {
-        // If not restoring session, and user IS authenticated AND verified, redirect to tabs
-        // If they are authenticated but NOT verified, we let them stay here so they can see the verify-email screen
-        if (!isRestoringSession && isAuthenticated && user?.email_verified) {
+        const currentRoute = segments[segments.length - 1];
+        if (!isRestoringSession && isAuthenticated && currentRoute !== 'verify-email' && currentRoute !== 'signup') {
             router.replace('/');
         }
-    }, [isAuthenticated, user, isRestoringSession]);
+    }, [isAuthenticated, isRestoringSession, segments]);
 
     return (
         <Stack
@@ -25,6 +25,7 @@ export default function AuthLayout() {
             <Stack.Screen name="login" />
             <Stack.Screen name="signup" />
             <Stack.Screen name="verify-email" />
+            <Stack.Screen name="forgot-pass" />
         </Stack>
     );
 }

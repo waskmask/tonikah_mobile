@@ -3,9 +3,9 @@ import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectSheet';
 import { MultiSelectSheet } from '@/components/ui/MultiSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
@@ -14,9 +14,10 @@ import { scale } from '@/hooks/useResponsive';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { Ruler, Palette, Users2 } from 'lucide-react-native';
+import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 
 export default function Step4() {
-    const { t } = useTranslation(['common', 'ethnic_groups']);
+    const { t, i18n } = useTranslation(['common', 'ethnic_groups']);
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
     const iconColor = isDark ? '#94A3B8' : '#6B7280';
@@ -52,7 +53,7 @@ export default function Step4() {
     const toOpts = (key: string): SelectOption[] =>
         (masterdata[key] || []).map((item: any) => ({
             value: item._id || item.value_id,
-            label: item.label || item.name || item._id,
+            label: formatProfileOptionLabel(item.label || item.name || item._id, i18n.language),
             description: item.description,
         }));
 
@@ -99,8 +100,10 @@ export default function Step4() {
             <ProgressBar currentStep={4} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('common:step_4.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('common:step_4.subtitle')}</Text>
+                    <ProfileSetupHeader
+                        title={t('appearance', { defaultValue: 'Appearance' })}
+                        subtitle={t('appearance_desc', { defaultValue: 'These details help others understand physical attributes respectfully.' })}
+                    />
 
                     <FieldLabel text="Height" required />
                     <SelectField value={height ? getLabel(height, heightOpts) : ''} placeholder="Select height" onPress={() => setActiveSheet('height')} icon={<Ruler size={scale(18)} color={iconColor} />} hasError={!!errors.height} />
@@ -116,7 +119,7 @@ export default function Step4() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <View style={styles.footer}><GradientButton title={t('common:common.continue')} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
             <SingleSelectSheet visible={activeSheet === 'height'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setHeight(v); setErrors((e) => ({ ...e, height: '' })); }} options={heightOpts} selected={height} title="Height" searchEnabled />
             <SingleSelectSheet visible={activeSheet === 'complexion'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setComplexion(v); setErrors((e) => ({ ...e, complexion: '' })); }} options={complexionOpts} selected={complexion} title="Complexion" />

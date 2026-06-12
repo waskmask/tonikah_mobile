@@ -11,8 +11,6 @@ import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { Config } from '@/constants/config';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,12 +22,11 @@ import { translateApiError } from '@/lib/apiErrorTranslator';
 const loginSchema = z.object({
     email: z
         .string()
-        .min(1, 'validation.email_required')
-        .email('validation.email_invalid'),
+        .min(1, 'email_required')
+        .email('invalid_email'),
     password: z
         .string()
-        .min(1, 'validation.password_required')
-        .min(8, 'validation.password_min_length'),
+        .min(1, 'password_required'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -42,10 +39,6 @@ export default function LoginScreen() {
 
     const [showPassword, setShowPassword] = useState(false);
     const [isGoogleLoading, setGoogleLoading] = useState(false);
-
-    // Example state for Email Not Verified Modal if you build one later
-    const [showVerifyModal, setShowVerifyModal] = useState(false);
-    const [verifyEmail, setVerifyEmail] = useState('');
 
     const {
         control,
@@ -66,20 +59,14 @@ export default function LoginScreen() {
             return;
         }
 
-        // Handle specific errors
         if (result.message === 'email_not_verified') {
-            // Show verification modal instead of toast
-            // For now, redirect to verify-email as a fallback until a modal is built
-            router.push({
-                pathname: '/(auth)/verify-email',
-                params: { email: data.email.toLowerCase().trim() },
-            });
+            toast.show(t('verify_email_browse_limit_message'), 'info');
             return;
         }
 
         if (result.message === 'invalid_credentials') {
             setError('email', { message: ' ' }); // visually highlight field without a string msg
-            setError('password', { message: t('api_errors.invalid_credentials') });
+            setError('password', { message: t('invalid_credentials') });
             return;
         }
 
@@ -107,9 +94,6 @@ export default function LoginScreen() {
         toast.show(errorMsg, 'error');
     };
 
-    const openTerms = () => WebBrowser.openBrowserAsync(Config.TERMS_URL);
-    const openPrivacy = () => WebBrowser.openBrowserAsync(Config.PRIVACY_URL);
-
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <KeyboardAvoidingView
@@ -128,7 +112,7 @@ export default function LoginScreen() {
                     {/* Content Area */}
                     <View className="px-6 items-center flex-1">
                         <Text variant="h2" className="mt-8 text-center">
-                            {t('auth.login_title')}
+                            {t('login')}
                         </Text>
 
                         {/* Email Field */}
@@ -138,7 +122,7 @@ export default function LoginScreen() {
                                 name="email"
                                 render={({ field: { onChange, onBlur, value } }) => (
                                     <Input
-                                        placeholder={t('auth.email_placeholder')}
+                                        placeholder={t('enter_email')}
                                         leftIcon={<Mail size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -160,7 +144,7 @@ export default function LoginScreen() {
                                 name="password"
                                 render={({ field: { onChange, onBlur, value } }) => (
                                     <Input
-                                        placeholder={t('auth.password_placeholder')}
+                                        placeholder={t('password')}
                                         leftIcon={<Lock size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
                                         rightIcon={
                                             <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
@@ -186,17 +170,17 @@ export default function LoginScreen() {
                         {/* Forgot Password */}
                         <Pressable
                             style={{ marginTop: scale(8), alignSelf: isRTL ? 'flex-end' : 'flex-start' }}
-                            onPress={() => WebBrowser.openBrowserAsync(Config.FORGOT_PASSWORD_URL)}
+                            onPress={() => router.push('/(auth)/forgot-pass')}
                         >
                             <Text className="text-[#4B68C4]">
-                                {t('auth.forgot_password')}
+                                {t('forgot_password')}?
                             </Text>
                         </Pressable>
 
                         {/* Submit Button */}
                         <View className="w-full mt-8 items-center">
                             <GradientButton
-                                title={t('auth.login_button')}
+                                title={t('login')}
                                 onPress={handleSubmit(onLogin)}
                                 loading={isSubmitting}
                                 disabled={!isValid || isSubmitting}
@@ -208,7 +192,7 @@ export default function LoginScreen() {
                         <View className="flex-row items-center gap-4 mt-8 w-full">
                             <View className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
                             <Text variant="body-sm" className="text-gray-500 dark:text-gray-400">
-                                {t('common.or')}
+                                {t('or')}
                             </Text>
                             <View className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
                         </View>
@@ -221,7 +205,7 @@ export default function LoginScreen() {
                         >
                             {isGoogleLoading ? (
                                 <Text variant="body" className="text-gray-900 dark:text-white">
-                                    {t('common.loading')}
+                                    {t('please_wait')}
                                 </Text>
                             ) : (
                                 <>
@@ -230,35 +214,20 @@ export default function LoginScreen() {
                                         style={{ width: scale(24), height: scale(24) }}
                                     />
                                     <Text variant="body" className="ms-3 text-gray-900 dark:text-white font-body-semi">
-                                        {t('auth.google_signin')}
+                                        {t('login_with_google')}
                                     </Text>
                                 </>
                             )}
                         </Pressable>
 
-                        {/* Google Terms */}
-                        <View className="mt-4 flex-row flex-wrap justify-center w-full max-w-[90%]">
-                            <Text variant="body-sm" className="text-gray-500 dark:text-gray-400 text-center">
-                                {t('auth.google_terms_prefix', { defaultValue: 'By continuing with Google, you agree to our' })}{' '}
-                                <Text variant="body-sm" className="text-[#4B68C4] underline" onPress={openTerms}>
-                                    {t('auth.terms_of_use', { defaultValue: 'Terms of Use' })}
-                                </Text>
-                                {' '}{t('auth.and', { defaultValue: 'and' })}{' '}
-                                <Text variant="body-sm" className="text-[#4B68C4] underline" onPress={openPrivacy}>
-                                    {t('auth.privacy_policy', { defaultValue: 'Privacy Policy' })}
-                                </Text>
-                                .
-                            </Text>
-                        </View>
-
                         {/* Footer */}
                         <View className="flex-row justify-center items-center gap-1 mt-auto pb-8 pt-8">
                             <Text variant="body">
-                                {t('auth.no_account')}
+                                {t('dont_have_an_account')}?
                             </Text>
                             <Pressable onPress={() => router.push('/(auth)/signup')}>
                                 <Text variant="body" className="text-[#4B68C4] font-body-semi">
-                                    {t('auth.create_account')}
+                                    {t('create_new_account')}
                                 </Text>
                             </Pressable>
                         </View>

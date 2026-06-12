@@ -3,9 +3,9 @@ import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
@@ -14,10 +14,26 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { UserCircle } from 'lucide-react-native';
 
+const PROFILE_MANAGER_OPTIONS = [
+    'self',
+    'father',
+    'mother',
+    'brother',
+    'sister',
+    'relative',
+    'friend',
+] as const;
+
+type ProfileManagerOption = (typeof PROFILE_MANAGER_OPTIONS)[number];
+
+function isProfileManagerOption(value: string): value is ProfileManagerOption {
+    return PROFILE_MANAGER_OPTIONS.includes(value as ProfileManagerOption);
+}
+
 export default function Step9() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
-    const { setProfileData, reset } = useProfileSetupStore();
+    const { setProfileData } = useProfileSetupStore();
     const iconColor = isDark ? '#94A3B8' : '#6B7280';
 
     const [profileManager, setProfileManager] = useState('');
@@ -25,19 +41,14 @@ export default function Step9() {
     const [showSheet, setShowSheet] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const options: SelectOption[] = [
-        { value: 'self', label: t('step_9.self') },
-        { value: 'father', label: t('step_9.father') },
-        { value: 'mother', label: t('step_9.mother') },
-        { value: 'brother', label: t('step_9.brother') },
-        { value: 'sister', label: t('step_9.sister') },
-        { value: 'relative', label: t('step_9.relative') },
-        { value: 'friend', label: t('step_9.friend') },
-    ];
+    const options: SelectOption[] = PROFILE_MANAGER_OPTIONS.map((value) => ({
+        value,
+        label: t(value),
+    }));
 
     const handleSubmit = async () => {
-        if (!profileManager) {
-            setErrors({ profileManager: 'Required' });
+        if (!isProfileManagerOption(profileManager)) {
+            setErrors({ profileManager: t('profile_manager_required') });
             return;
         }
         setLoading(true);
@@ -46,13 +57,12 @@ export default function Step9() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
-                reset();
-                router.replace('/(tabs)/home');
+                router.push('/(profile-setup)/step10');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update');
+                Alert.alert(t('common:error', { defaultValue: 'Error' }), res.message || t('common:server_error_default', { defaultValue: 'Failed to update' }));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('common:error', { defaultValue: 'Error' }), t('common:server_error_default', { defaultValue: 'Something went wrong' }));
         } finally {
             setLoading(false);
         }
@@ -63,13 +73,15 @@ export default function Step9() {
             <ProgressBar currentStep={9} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('step_9.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('step_9.subtitle')}</Text>
+                    <ProfileSetupHeader
+                        title={t('profile_m_title', { defaultValue: 'Who Is Creating This Profile?' })}
+                        subtitle={t('profile_m_desc', { defaultValue: 'Let us know who is operating this profile — yourself or someone on your behalf.' })}
+                    />
 
-                    <FieldLabel text={t('step_9.profile_manager')} required />
+                    <FieldLabel text={t('profile_manager')} required />
                     <SelectField
                         value={profileManager ? options.find((o) => o.value === profileManager)?.label || '' : ''}
-                        placeholder="Select"
+                        placeholder={t('pm_placeholder')}
                         onPress={() => setShowSheet(true)}
                         icon={<UserCircle size={scale(18)} color={iconColor} />}
                         hasError={!!errors.profileManager}
@@ -80,7 +92,7 @@ export default function Step9() {
 
             <View style={styles.footer}>
                 <GradientButton
-                    title={t('step_9.finish', { defaultValue: 'Finish' })}
+                    title={t('continue', { defaultValue: 'Continue' })}
                     onPress={handleSubmit}
                     loading={loading}
                     disabled={loading}
@@ -93,7 +105,7 @@ export default function Step9() {
                 onSelect={(v) => { setProfileManager(v); setErrors({}); }}
                 options={options}
                 selected={profileManager}
-                title={t('step_9.profile_manager')}
+                title={t('profile_manager')}
             />
         </SafeAreaView>
     );

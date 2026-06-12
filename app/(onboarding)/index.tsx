@@ -110,7 +110,7 @@ export default function OnboardingScreen() {
             <View style={[styles.slide, { width: SCREEN_WIDTH }]} className="bg-white dark:bg-slate-900">
                 <Image
                     source={require("@/assets/images/couple-illustration.png")}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     contentFit="cover"
                     contentPosition="bottom"
                 />

@@ -9,7 +9,7 @@ interface ProgressBarProps {
     totalSteps?: number;
 }
 
-export function ProgressBar({ currentStep, totalSteps = 9 }: ProgressBarProps) {
+export function ProgressBar({ currentStep, totalSteps = 10 }: ProgressBarProps) {
     const { isDark } = useTheme();
 
     return (
@@ -31,11 +31,11 @@ export function ProgressBar({ currentStep, totalSteps = 9 }: ProgressBarProps) {
                     >
                         {(isCompleted || isCurrent) && (
                             <LinearGradient
-                                colors={['#FE8A7B', '#F34B6F']}
+                                colors={['#F34B6F', '#E8447A']}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 0 }}
                                 style={[
-                                    StyleSheet.absoluteFillObject,
+                                    StyleSheet.absoluteFill,
                                     { opacity: isCurrent ? 0.7 : 1 },
                                 ]}
                             />

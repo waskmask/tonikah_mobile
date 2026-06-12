@@ -4,6 +4,7 @@ import { Text } from "./Text";
 import { scale } from "@/hooks/useResponsive";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/hooks/useTheme";
+import { Typography } from "@/constants/typography";
 
 interface InputProps extends TextInputProps {
     label?: string;
@@ -24,8 +25,9 @@ export const Input: React.FC<InputProps> = ({
     ...props
 }) => {
     const [isFocused, setIsFocused] = useState(false);
-    const { isRTL } = useLanguage();
+    const { currentLanguage, isRTL } = useLanguage();
     const { isDark } = useTheme();
+    const inputFontFamily = currentLanguage === "ar" ? Typography.font.arabic.regular : Typography.font.body.regular;
 
     return (
         <View className={`mb-3 w-full ${containerStyle}`}>
@@ -48,7 +50,7 @@ export const Input: React.FC<InputProps> = ({
                         borderColor: error
                             ? '#EF4444'
                             : isFocused
-                                ? '#FE8A7B'
+                                ? '#F34B6F'
                                 : isDark ? '#334155' : '#E2E8F0',
                     },
                 ]}
@@ -72,7 +74,7 @@ export const Input: React.FC<InputProps> = ({
                     style={{
                         flex: 1,
                         fontSize: scale(14),
-                        fontFamily: "Inter_400Regular",
+                        fontFamily: inputFontFamily,
                         color: isDark ? '#E2E8F0' : '#0A0D14',
                         textAlign: isRTL ? 'right' : 'left',
                         writingDirection: isRTL ? 'rtl' : 'ltr',

@@ -33,7 +33,7 @@ export const Text: React.FC<TextProps> = ({
     const { currentLanguage, isRTL } = useLanguage();
     const isArabicFamily = currentLanguage === "ar";
 
-    const getVariantStyles = (): { fontFamily: string; fontSize: number; letterSpacing?: number; textTransform?: "uppercase" | "none" } => {
+    const getVariantStyles = (): { fontFamily?: string; fontSize: number; letterSpacing?: number; textTransform?: "uppercase" | "none" } => {
         switch (variant) {
             case "h1":
                 return {

@@ -24,32 +24,48 @@ import { translateApiError } from '@/lib/apiErrorTranslator';
 const signupSchema = z.object({
     email: z
         .string()
-        .min(1, 'validation.email_required')
-        .email('validation.email_invalid'),
+        .min(1, 'email_required')
+        .email('invalid_email'),
     password: z
         .string()
-        .min(1, 'validation.password_required')
-        .min(8, 'validation.password_min_length')
-        .regex(/[A-Z]/, 'validation.password_uppercase')
-        .regex(/[a-z]/, 'validation.password_lowercase')
-        .regex(/[0-9]/, 'validation.password_number')
-        .regex(/[^A-Za-z0-9]/, 'validation.password_special'),
+        .min(1, 'password_required'),
     confirmPassword: z
         .string()
-        .min(1, 'validation.confirm_password_required'),
+        .min(1, 'confirm_password_required'),
     agreed: z
         .boolean()
-        .refine(val => val === true, { message: 'validation.terms_required' }),
+        .refine(val => val === true, { message: 'consent_required' }),
     marketingOptIn: z.boolean().optional(),
 }).refine(data => data.password === data.confirmPassword, {
-    message: 'validation.passwords_not_match',
+    message: 'passwords_mismatch',
     path: ['confirmPassword'],
 });
 
 type SignupForm = z.infer<typeof signupSchema>;
 
+function getConsentParts(consentStatement: string) {
+    const match = consentStatement.match(/^(.*?)<a\b[^>]*>(.*?)<\/a>(.*?)<a\b[^>]*>(.*?)<\/a>(.*)$/i);
+    if (!match) {
+        return {
+            beforeTerms: consentStatement,
+            termsLabel: '',
+            betweenLinks: '',
+            privacyLabel: '',
+            afterPrivacy: '',
+        };
+    }
+
+    return {
+        beforeTerms: match[1],
+        termsLabel: match[2],
+        betweenLinks: match[3],
+        privacyLabel: match[4],
+        afterPrivacy: match[5],
+    };
+}
+
 export default function SignupScreen() {
-    const { t, isRTL } = useLanguage();
+    const { t, isRTL, currentLanguage } = useLanguage();
     const { isDark } = useTheme();
     const { signup, googleAuth } = useAuthStore();
     const toast = useToast();
@@ -57,6 +73,7 @@ export default function SignupScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isGoogleLoading, setGoogleLoading] = useState(false);
+    const consentParts = getConsentParts(String(t('consent_statement')));
 
     const {
         control,
@@ -79,24 +96,22 @@ export default function SignupScreen() {
             password: data.password,
             agreed: data.agreed,
             marketing_opt_in: !!data.marketingOptIn,
+            lang: currentLanguage,
         });
 
         if (result.success) {
-            // Signup returns tokens — user is logged in but email not verified
-            router.replace({
-                pathname: '/(auth)/verify-email',
-                params: { email: data.email.toLowerCase().trim() },
-            });
+            toast.show(t('verify_email_browse_limit_message'), 'info');
+            router.replace('/(profile-setup)/step1');
             return;
         }
 
         // Field-specific errors
         if (result.message === 'email_already_exists') {
-            setError('email', { message: 'api_errors.email_already_exists' });
+            setError('email', { message: 'email_already_exists' });
             return;
         }
         if (result.message === 'consent_required') {
-            setError('agreed', { message: 'api_errors.consent_required' });
+            setError('agreed', { message: 'consent_required' });
             return;
         }
 
@@ -144,10 +159,10 @@ export default function SignupScreen() {
                     {/* Content Area */}
                     <View className="px-6 items-center flex-1">
                         <Text variant="h2" className="mt-4 text-center">
-                            {t('auth.signup_title')}
+                            {t('join_tonikah')}
                         </Text>
                         <Text variant="body" className="mt-1 text-gray-500 dark:text-gray-400 text-center">
-                            {t('auth.signup_subtitle')}
+                            {t('singup_desc')}
                         </Text>
 
                         {/* Email Field */}
@@ -157,7 +172,7 @@ export default function SignupScreen() {
                                 name="email"
                                 render={({ field: { onChange, onBlur, value } }) => (
                                     <Input
-                                        placeholder={t('auth.email_placeholder')}
+                                        placeholder={t('enter_email')}
                                         leftIcon={<Mail size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
                                         keyboardType="email-address"
                                         autoCapitalize="none"
@@ -179,7 +194,7 @@ export default function SignupScreen() {
                                 name="password"
                                 render={({ field: { onChange, onBlur, value } }) => (
                                     <Input
-                                        placeholder={t('auth.password_placeholder')}
+                                        placeholder={t('password')}
                                         leftIcon={<Lock size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
                                         rightIcon={
                                             <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
@@ -209,7 +224,7 @@ export default function SignupScreen() {
                                 name="confirmPassword"
                                 render={({ field: { onChange, onBlur, value } }) => (
                                     <Input
-                                        placeholder={t('auth.confirm_password_placeholder')}
+                                        placeholder={t('confirm_password')}
                                         leftIcon={<Lock size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
                                         rightIcon={
                                             <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={10}>
@@ -245,23 +260,27 @@ export default function SignupScreen() {
                                         label={
                                             <>
                                                 <Text variant="body-sm" className="text-gray-700 dark:text-gray-300">
-                                                    {t('auth.terms_agree_prefix')}
+                                                    {consentParts.beforeTerms}
                                                 </Text>
-                                                <Pressable onPress={openTerms} hitSlop={5}>
-                                                    <Text variant="body-sm" className="text-[#4B68C4] font-body-semi underline mx-1">
-                                                        {t('auth.terms_of_use')}
-                                                    </Text>
-                                                </Pressable>
-                                                <Text variant="body-sm" className="text-gray-700 dark:text-gray-300">
-                                                    {t('auth.terms_and')}
-                                                </Text>
-                                                <Pressable onPress={openPrivacy} hitSlop={5}>
-                                                    <Text variant="body-sm" className="text-[#4B68C4] font-body-semi underline mx-1">
-                                                        {t('auth.privacy_policy')}
-                                                    </Text>
-                                                </Pressable>
+                                                {consentParts.termsLabel ? (
+                                                    <Pressable onPress={openTerms} hitSlop={5}>
+                                                        <Text variant="body-sm" className="text-[#4B68C4] font-body-semi underline mx-1">
+                                                            {consentParts.termsLabel}
+                                                        </Text>
+                                                    </Pressable>
+                                                ) : null}
                                                 <Text variant="body-sm" className="text-gray-700 dark:text-gray-300 mt-1">
-                                                    {t('auth.terms_agree_suffix')}
+                                                    {consentParts.betweenLinks}
+                                                </Text>
+                                                {consentParts.privacyLabel ? (
+                                                    <Pressable onPress={openPrivacy} hitSlop={5}>
+                                                        <Text variant="body-sm" className="text-[#4B68C4] font-body-semi underline mx-1">
+                                                            {consentParts.privacyLabel}
+                                                        </Text>
+                                                    </Pressable>
+                                                ) : null}
+                                                <Text variant="body-sm" className="text-gray-700 dark:text-gray-300 mt-1">
+                                                    {consentParts.afterPrivacy}
                                                 </Text>
                                             </>
                                         }
@@ -279,7 +298,7 @@ export default function SignupScreen() {
                                     <Checkbox
                                         checked={value ?? false}
                                         onChange={onChange}
-                                        label={t('auth.marketing_optin')}
+                                        label={t('marketing_opt_statement')}
                                     />
                                 )}
                             />
@@ -288,7 +307,7 @@ export default function SignupScreen() {
                         {/* Submit Button */}
                         <View className="w-full mt-6 items-center">
                             <GradientButton
-                                title={t('auth.signup_button')}
+                                title={t('sign_up')}
                                 onPress={handleSubmit(onSignup)}
                                 loading={isSubmitting}
                                 disabled={!isValid || isSubmitting}
@@ -300,7 +319,7 @@ export default function SignupScreen() {
                         <View className="flex-row items-center gap-4 mt-6 w-full">
                             <View className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
                             <Text variant="body-sm" className="text-gray-500 dark:text-gray-400">
-                                {t('common.or')}
+                                {t('or')}
                             </Text>
                             <View className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
                         </View>
@@ -313,7 +332,7 @@ export default function SignupScreen() {
                         >
                             {isGoogleLoading ? (
                                 <Text variant="body" className="text-gray-900 dark:text-white">
-                                    {t('common.loading')}
+                                    {t('please_wait')}
                                 </Text>
                             ) : (
                                 <>
@@ -322,35 +341,20 @@ export default function SignupScreen() {
                                         style={{ width: scale(24), height: scale(24) }}
                                     />
                                     <Text variant="body" className="ms-3 text-gray-900 dark:text-white font-body-semi">
-                                        {t('auth.google_signin')}
+                                        {t('sign_in_with_google')}
                                     </Text>
                                 </>
                             )}
                         </Pressable>
 
-                        {/* Google Terms */}
-                        <View className="mt-4 flex-row flex-wrap justify-center w-full max-w-[90%] pb-8">
-                            <Text variant="body-sm" className="text-gray-500 dark:text-gray-400 text-center">
-                                {t('auth.google_terms_prefix', { defaultValue: 'By continuing with Google, you agree to our' })}{' '}
-                                <Text variant="body-sm" className="text-[#4B68C4] underline" onPress={openTerms}>
-                                    {t('auth.terms_of_use', { defaultValue: 'Terms of Use' })}
-                                </Text>
-                                {' '}{t('auth.and', { defaultValue: 'and' })}{' '}
-                                <Text variant="body-sm" className="text-[#4B68C4] underline" onPress={openPrivacy}>
-                                    {t('auth.privacy_policy', { defaultValue: 'Privacy Policy' })}
-                                </Text>
-                                .
-                            </Text>
-                        </View>
-
                         {/* Footer */}
                         <View className="flex-row justify-center items-center gap-1 mt-auto pb-8 pt-4">
                             <Text variant="body">
-                                {t('auth.has_account')}
+                                {t('already_have_an_account')}
                             </Text>
                             <Pressable onPress={() => router.push('/(auth)/login')}>
                                 <Text variant="body" className="text-[#4B68C4] font-body-semi">
-                                    {t('auth.login_here')}
+                                    {t('login_here')}
                                 </Text>
                             </Pressable>
                         </View>

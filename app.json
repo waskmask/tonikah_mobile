@@ -7,23 +7,25 @@
     "icon": "./assets/icon/adaptive-icon.png",
     "scheme": "tonikah",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/icon/adaptive-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tonikah.app",
       "infoPlist": {
-        "CFBundleAllowMixedLocalizations": true
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.349696991792-vkr3uaifi2i7ot8v39bjh79sf304f90f"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon/adaptive-icon.png",
-        "backgroundColor": "#FE8A7B"
+        "backgroundColor": "#F34B6F"
       },
       "package": "com.tonikah.app"
     },
@@ -34,7 +36,19 @@
     "plugins": [
       "expo-router",
       "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow toNikah to use your location to fill your current city."
+        }
+      ],
       "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow toNikah to access your photos so you can add profile gallery images."
+        }
+      ],
       "@react-native-google-signin/google-signin",
       [
         "expo-splash-screen",

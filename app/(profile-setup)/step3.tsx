@@ -3,9 +3,9 @@ import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
@@ -17,7 +17,7 @@ import { Heart, Baby, Calendar, MapPinned, Users } from 'lucide-react-native';
 export default function Step3() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
-    const { setProfileData } = useProfileSetupStore();
+    const { gender, setProfileData } = useProfileSetupStore();
     const iconColor = isDark ? '#94A3B8' : '#6B7280';
 
     const [maritalStatus, setMaritalStatus] = useState('');
@@ -37,7 +37,7 @@ export default function Step3() {
         { value: 'widowed', label: t('step_3.widowed', { defaultValue: 'Widowed' }) },
         { value: 'annulled', label: t('step_3.annulled') },
         { value: 'married', label: t('step_3.married') },
-    ];
+    ].filter((option) => option.value !== 'married' || gender === 'male');
 
     const childrenOptions: SelectOption[] = [
         { value: 'no_children', label: t('step_3.no_children') },
@@ -94,7 +94,13 @@ export default function Step3() {
         if (!validate()) return;
         setLoading(true);
         try {
-            const payload = { maritalStatus, hasChildren, wantsChildren, marriagePlan, relocationPlan };
+            const payload = {
+                marital_status: maritalStatus,
+                have_children: hasChildren,
+                wants_children: wantsChildren,
+                marriage_plan: marriagePlan,
+                relocation_plans: relocationPlan,
+            };
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
@@ -114,8 +120,10 @@ export default function Step3() {
             <ProgressBar currentStep={3} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    <Text variant="heading" className="font-heading mb-1" align="center">{t('step_3.title')}</Text>
-                    <Text variant="body-sm" className="mb-4" align="center" style={{ color: isDark ? '#94A3B8' : '#6B7280' }}>{t('step_3.subtitle')}</Text>
+                    <ProfileSetupHeader
+                        title={t('relationship_status', { defaultValue: 'Relationship Status' })}
+                        subtitle={t('relationship_status_descc', { defaultValue: 'Share your marital and future family expectations.' })}
+                    />
 
                     {fields.map((field) => (
                         <View key={field.key}>
@@ -133,7 +141,7 @@ export default function Step3() {
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            <View style={styles.footer}><GradientButton title={t('common.continue')} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
             {fields.map((field) => (
                 <SingleSelectSheet key={field.sheet} visible={activeSheet === field.sheet} onClose={() => setActiveSheet(null)} onSelect={(v) => { setters[field.key](v); setErrors((e) => ({ ...e, [field.key]: '' })); }} options={field.options} selected={field.value} title={field.label} />

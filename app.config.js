@@ -1,3 +1,9 @@
+const fs = require('fs');
+const path = require('path');
+
+const googleServicesPath = './google-services.json';
+const hasGoogleServicesFile = fs.existsSync(path.resolve(__dirname, googleServicesPath));
+
 module.exports = ({ config }) => {
     return {
         ...config,
@@ -5,6 +11,14 @@ module.exports = ({ config }) => {
             ...config.extra,
             APP_ENV: process.env.EXPO_PUBLIC_APP_ENV || 'dev',
         },
+        plugins: [
+            ...(config.plugins || []),
+            '@react-native-community/datetimepicker',
+            'expo-font',
+            'expo-image',
+            'expo-status-bar',
+            'expo-web-browser',
+        ],
         ios: {
             ...config.ios,
             infoPlist: {
@@ -20,7 +34,7 @@ module.exports = ({ config }) => {
         },
         android: {
             ...config.android,
-            googleServicesFile: './google-services.json', // only if using Firebase later
+            ...(hasGoogleServicesFile ? { googleServicesFile: googleServicesPath } : {}),
         },
     };
 };
