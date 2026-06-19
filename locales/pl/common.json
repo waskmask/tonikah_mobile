@@ -1734,7 +1734,7 @@
   "any": "Dowolny",
   "show_results": "Pokaż wyniki",
   "confirm": "Potwierdź",
-  "last_active": "Ostatnio aktywny",
+  "last_active": "Ostatnia aktywność",
   "recently_active": "Niedawno aktywny",
   "undo": "Cofnij",
   "not_interested": "Nie interesuje",
@@ -2059,5 +2059,17 @@
   "view_stamp": "POKAŻ",
   "save_stamp": "ZAPISZ",
   "logout_all_devices": "Wyloguj ze wszystkich urządzeń",
-  "logout_all_devices_confirm": "Spowoduje to wylogowanie ze wszystkich urządzeń, w tym z tego telefonu."
+  "logout_all_devices_confirm": "Spowoduje to wylogowanie ze wszystkich urządzeń, w tym z tego telefonu.",
+  "logout_other_devices": "Wyloguj inne urządzenia",
+  "logout_other_devices_confirm": "Spowoduje to wylogowanie ze wszystkich innych urządzeń. Ten telefon pozostanie zalogowany.",
+  "active_sessions": "Aktywne sesje",
+  "active_sessions_desc": "Zarządzaj miejscami, w których konto jest obecnie zalogowane.",
+  "other_sessions_revoked": "Inne urządzenia zostały wylogowane.",
+  "sessions_revoke_failed": "Nie udało się wylogować innych urządzeń. Spróbuj ponownie.",
+  "current_device": "Bieżące urządzenie",
+  "other_device": "Inne urządzenie",
+  "unknown_device": "Nieznane urządzenie",
+  "no_active_sessions": "Nie znaleziono aktywnych sesji.",
+  "refresh": "Odśwież",
+  "unknown": "Nieznane"
 }

@@ -2073,5 +2073,17 @@
   "view_stamp": "VOIR",
   "save_stamp": "SAUVER",
   "logout_all_devices": "Se déconnecter de tous les appareils",
-  "logout_all_devices_confirm": "Cela vous déconnectera de tous les appareils, y compris ce téléphone."
+  "logout_all_devices_confirm": "Cela vous déconnectera de tous les appareils, y compris ce téléphone.",
+  "logout_other_devices": "Déconnecter les autres appareils",
+  "logout_other_devices_confirm": "Cela vous déconnectera de tous les autres appareils. Ce téléphone restera connecté.",
+  "active_sessions": "Sessions actives",
+  "active_sessions_desc": "Gérez les appareils sur lesquels votre compte est connecté.",
+  "other_sessions_revoked": "Les autres appareils ont été déconnectés.",
+  "sessions_revoke_failed": "Impossible de déconnecter les autres appareils. Réessayez.",
+  "current_device": "Appareil actuel",
+  "other_device": "Autre appareil",
+  "unknown_device": "Appareil inconnu",
+  "no_active_sessions": "Aucune session active trouvée.",
+  "refresh": "Actualiser",
+  "unknown": "Inconnu"
 }

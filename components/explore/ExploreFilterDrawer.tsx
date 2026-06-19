@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, X } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -7,6 +8,7 @@ import { MultiSelectSheet, MultiSelectOption } from '@/components/ui/MultiSelect
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
+import { useToast } from '@/hooks/useToast';
 import { profileService } from '@/lib/profileService';
 import { t } from '@/lib/profileDisplay';
 import {
@@ -14,6 +16,7 @@ import {
     FilterSelectKey,
     activeExploreFilterCount,
     buildExploreParams,
+    cleanFilterOptionLabel,
     countryOptions,
     masterOptions,
     normalizeMasterKey,
@@ -36,6 +39,8 @@ type MasterState = {
     following: any[];
 };
 
+type DrawerOption = MultiSelectOption & { key?: string };
+
 const LABELS: Record<FilterSelectKey, string> = {
     country: 'country',
     marital_status: 'marital_status',
@@ -49,6 +54,7 @@ const LABELS: Record<FilterSelectKey, string> = {
 export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props) {
     const { isDark } = useTheme();
     const { isRTL } = useLanguage();
+    const toast = useToast();
     const [draft, setDraft] = useState<ExploreFilterState>(state);
     const [activeSelect, setActiveSelect] = useState<FilterSelectKey | null>(null);
     const [master, setMaster] = useState<MasterState>({ sect: [], education: [], ethnic_group: [], following: [] });
@@ -73,13 +79,17 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                 ethnic_group: ethnic.data || [],
                 following: following.data || [],
             });
-        }).catch(() => undefined);
+        }).catch(() => {
+            if (!mounted) return;
+            toast.show(t('filter_data_unavailable', 'Some filter data is unavailable. Please try again.'), 'warning');
+        });
         return () => {
             mounted = false;
         };
-    }, [visible]);
+    }, [state, toast, visible]);
 
-    const options = useMemo<Record<FilterSelectKey, MultiSelectOption[]>>(() => {
+    const options = useMemo<Record<FilterSelectKey, DrawerOption[]>>(() => {
+        const country = countryOptions();
         const sect = masterOptions(master.sect);
         const selectedSectKeys = draft.sect
             .map((id) => sect.find((item) => item.value === id)?.key)
@@ -95,7 +105,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
             following = following.filter((item) => !item.key || allowedFollowing.has(normalizeMasterKey(item.key)));
         }
         return {
-            country: countryOptions(),
+            country,
             marital_status: staticOptions(['never_married', 'divorced', 'separated', 'widowed', 'annulled']),
             sect,
             education: masterOptions(master.education),
@@ -106,7 +116,15 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
     }, [draft.sect, master]);
 
     const apply = () => {
-        onApply(draft, buildExploreParams(draft));
+        const labels = (Object.keys(LABELS) as FilterSelectKey[]).reduce<NonNullable<ExploreFilterState['labels']>>((acc, key) => {
+            acc[key] = options[key].reduce<Record<string, string>>((map, option) => {
+                map[option.value] = cleanFilterOptionLabel(option.label);
+                return map;
+            }, {});
+            return acc;
+        }, {});
+        const next = { ...draft, labels };
+        onApply(next, buildExploreParams(next));
         onClose();
     };
 
@@ -128,22 +146,43 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
     const activeCount = activeExploreFilterCount(draft);
     const activeOptions = activeSelect ? options[activeSelect] : [];
 
+    const openSelect = (key: FilterSelectKey) => {
+        if (options[key].length === 0) {
+            toast.show(t('filter_data_unavailable', 'No data is available for this filter right now.'), 'warning');
+            return;
+        }
+        setActiveSelect(key);
+    };
+
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-            <View style={[styles.root, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }]}>
+        <Modal
+            visible={visible}
+            animationType="slide"
+            presentationStyle="fullScreen"
+            statusBarTranslucent
+            navigationBarTranslucent
+            onRequestClose={onClose}
+        >
+            <SafeAreaView edges={['top', 'bottom']} style={[styles.root, { backgroundColor: isDark ? '#111827' : '#FFFFFF' }]}>
                 <View style={[styles.header, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderBottomColor: isDark ? '#334155' : '#E2E8F0' }]}>
                     <Pressable onPress={clearAll} disabled={activeCount === 0} style={styles.clearButton}>
-                        <Text variant="body-sm" className="font-body-semi" style={{ color: activeCount ? '#F34B6F' : isDark ? '#475569' : '#CBD5E1' }}>
+                        <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: activeCount ? '#F34B6F' : isDark ? '#475569' : '#CBD5E1' }}>
                             {t('clear_all', 'Clear all')}
                         </Text>
                     </Pressable>
-                    <Text variant="body" className="font-body-semi" style={styles.title}>{t('filters', 'Filters')}</Text>
+                    <View pointerEvents="none" style={styles.titleWrap}>
+                        <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={styles.title}>{t('filters', 'Filters')}</Text>
+                    </View>
                     <Pressable onPress={onClose} style={styles.closeButton}>
-                        <X size={scale(20)} color={isDark ? '#E2E8F0' : '#1F2A24'} />
+                        <X size={22} color={isDark ? '#E2E8F0' : '#1F2A24'} />
                     </Pressable>
                 </View>
 
-                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    style={{ backgroundColor: isDark ? '#0F172A' : '#F7F8F6' }}
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                >
                     <RangeRow
                         label={t('age', 'Age')}
                         min={18}
@@ -151,6 +190,8 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         step={1}
                         valueMin={draft.ageMin}
                         valueMax={draft.ageMax}
+                        defaultMin={18}
+                        defaultMax={80}
                         onChange={(ageMin, ageMax) => setDraft((current) => ({ ...current, ageMin, ageMax }))}
                         isDark={isDark}
                     />
@@ -162,6 +203,9 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         unit="cm"
                         valueMin={draft.heightMin}
                         valueMax={draft.heightMax}
+                        defaultMin={120}
+                        defaultMax={220}
+                        formatValue={formatHeight}
                         onChange={(heightMin, heightMax) => setDraft((current) => ({ ...current, heightMin, heightMax }))}
                         isDark={isDark}
                     />
@@ -173,7 +217,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                             options={options[key]}
                             isDark={isDark}
                             isRTL={isRTL}
-                            onOpen={() => setActiveSelect(key)}
+                            onOpen={() => openSelect(key)}
                             onClear={() => updateSelect(key, [])}
                         />
                     ))}
@@ -196,7 +240,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         presentation="drawer"
                     />
                 ) : null}
-            </View>
+            </SafeAreaView>
         </Modal>
     );
 }
@@ -209,6 +253,9 @@ function RangeRow({
     unit,
     valueMin,
     valueMax,
+    defaultMin,
+    defaultMax,
+    formatValue,
     onChange,
     isDark,
 }: {
@@ -219,30 +266,78 @@ function RangeRow({
     unit?: string;
     valueMin: number;
     valueMax: number;
+    defaultMin: number;
+    defaultMax: number;
+    formatValue?: (value: number) => string;
     onChange: (min: number, max: number) => void;
     isDark: boolean;
 }) {
-    const value = `${valueMin} - ${valueMax}${unit ? ` ${unit}` : ''}`;
+    const [trackWidth, setTrackWidth] = useState(0);
+    const isAny = valueMin === defaultMin && valueMax === defaultMax;
+    const minLabel = formatValue ? formatValue(valueMin) : `${valueMin}${unit ? ` ${unit}` : ''}`;
+    const maxLabel = formatValue ? formatValue(valueMax) : `${valueMax}${unit ? ` ${unit}` : ''}`;
+    const minPct = ((valueMin - min) / (max - min)) * 100;
+    const maxPct = ((valueMax - min) / (max - min)) * 100;
+
+    const setValueFromX = (x: number) => {
+        if (!trackWidth) return;
+        const raw = min + (Math.max(0, Math.min(trackWidth, x)) / trackWidth) * (max - min);
+        const nextValue = Math.round(raw / step) * step;
+        const distanceToMin = Math.abs(nextValue - valueMin);
+        const distanceToMax = Math.abs(nextValue - valueMax);
+        if (distanceToMin <= distanceToMax) {
+            onChange(Math.min(nextValue, valueMax - step), valueMax);
+        } else {
+            onChange(valueMin, Math.max(nextValue, valueMin + step));
+        }
+    };
+
     return (
-        <View style={[styles.row, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
-            <View style={{ flex: 1 }}>
-                <Text variant="body" className="font-body-semi">{label}</Text>
-                <Text variant="body-sm" style={{ color: '#F34B6F', marginTop: scale(3) }}>{value}</Text>
+        <View style={[styles.rangeCard, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
+            <View style={styles.rangeHeader}>
+                <Text variant="body-sm" className="font-body-bold" style={styles.rangeTitle}>{label}</Text>
+                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? '#8C928E' : '#F34B6F' }]}>
+                    {isAny ? t('any', 'Any') : `${minLabel} - ${maxLabel}`}
+                </Text>
             </View>
-            <Stepper label="-" onPress={() => onChange(Math.max(min, valueMin - step), valueMax)} isDark={isDark} />
-            <Stepper label="+" onPress={() => onChange(Math.min(valueMax - step, valueMin + step), valueMax)} isDark={isDark} />
-            <Stepper label="-" onPress={() => onChange(valueMin, Math.max(valueMin + step, valueMax - step))} isDark={isDark} />
-            <Stepper label="+" onPress={() => onChange(valueMin, Math.min(max, valueMax + step))} isDark={isDark} />
+            <View
+                style={styles.sliderBox}
+                onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(event) => setValueFromX(event.nativeEvent.locationX)}
+                onResponderMove={(event) => setValueFromX(event.nativeEvent.locationX)}
+            >
+                <View style={styles.sliderTrack} />
+                <View
+                    style={[
+                        styles.sliderActiveTrack,
+                        {
+                            left: `${minPct}%`,
+                            right: `${100 - maxPct}%`,
+                        },
+                    ]}
+                />
+                <View style={[styles.sliderThumb, { left: `${minPct}%` }]} />
+                <View style={[styles.sliderThumb, { left: `${maxPct}%` }]} />
+            </View>
+            <View style={styles.rangeValues}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : '#8C928E' }}>
+                    {formatValue ? formatValue(min) : String(min)}
+                </Text>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : '#8C928E' }}>
+                    {formatValue ? formatValue(max) : String(max)}
+                </Text>
+            </View>
         </View>
     );
 }
 
-function Stepper({ label, onPress, isDark }: { label: string; onPress: () => void; isDark: boolean }) {
-    return (
-        <Pressable onPress={onPress} style={[styles.stepper, { borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
-            <Text variant="body" className="font-body-semi">{label}</Text>
-        </Pressable>
-    );
+function formatHeight(cm: number) {
+    const totalInches = Math.round(cm / 2.54);
+    const feet = Math.floor(totalInches / 12);
+    const inches = totalInches % 12;
+    return `${feet}'${inches}" (${cm} cm)`;
 }
 
 function SelectRow({
@@ -256,7 +351,7 @@ function SelectRow({
 }: {
     label: string;
     values: string[];
-    options: MultiSelectOption[];
+    options: DrawerOption[];
     isDark: boolean;
     isRTL: boolean;
     onOpen: () => void;
@@ -268,16 +363,16 @@ function SelectRow({
     return (
         <Pressable onPress={onOpen} style={[styles.row, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={{ flex: 1 }}>
-                <Text variant="body" className="font-body-semi" style={{ textAlign: isRTL ? 'right' : 'left' }}>{label}</Text>
-                <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? '#F34B6F' : isDark ? '#94A3B8' : '#64748B', marginTop: scale(3), textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
+                <Text variant="body-sm" className="font-body-bold" style={[styles.selectTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+                <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? '#F34B6F' : isDark ? '#94A3B8' : '#64748B', marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
             </View>
             {values.length > 0 ? (
                 <Pressable onPress={onClear} style={styles.rowIcon}>
-                    <X size={scale(16)} color="#F34B6F" />
+                    <X size={16} color="#F34B6F" />
                 </Pressable>
             ) : (
                 <View style={styles.rowIcon}>
-                    <ChevronLeft size={scale(18)} color={isDark ? '#94A3B8' : '#64748B'} style={{ transform: [{ rotate: isRTL ? '0deg' : '180deg' }] }} />
+                    <ChevronLeft size={18} color={isDark ? '#94A3B8' : '#64748B'} style={{ transform: [{ rotate: isRTL ? '0deg' : '180deg' }] }} />
                 </View>
             )}
         </Pressable>
@@ -287,46 +382,110 @@ function SelectRow({
 const styles = StyleSheet.create({
     root: { flex: 1 },
     header: {
-        paddingTop: scale(40),
-        minHeight: scale(88),
+        height: 50,
         borderBottomWidth: 1,
-        paddingHorizontal: scale(14),
+        paddingHorizontal: 14,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        position: 'relative',
     },
-    clearButton: { minWidth: scale(78), paddingVertical: scale(8) },
-    title: { fontSize: scale(17) },
-    closeButton: { width: scale(40), height: scale(40), alignItems: 'center', justifyContent: 'center' },
-    content: { padding: scale(14), gap: scale(10), paddingBottom: scale(24) },
-    row: {
+    clearButton: { width: 96, paddingVertical: 8, zIndex: 1 },
+    titleWrap: {
+        position: 'absolute',
+        left: 112,
+        right: 112,
+        top: 0,
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    title: { fontSize: 14, lineHeight: 18, textAlign: 'center' },
+    closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+    content: { padding: 12, gap: 9, paddingBottom: 18 },
+    rangeCard: {
         borderWidth: 1,
-        borderRadius: scale(8),
-        minHeight: scale(64),
-        paddingHorizontal: scale(14),
-        paddingVertical: scale(12),
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 12,
+        minHeight: 112,
+    },
+    rangeHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: scale(8),
+        justifyContent: 'space-between',
+        marginBottom: 18,
     },
-    stepper: {
-        width: scale(34),
-        height: scale(34),
-        borderRadius: scale(17),
-        borderWidth: 1,
-        alignItems: 'center',
+    rangeTitle: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    rangeValue: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    sliderBox: {
+        height: 24,
         justifyContent: 'center',
+        marginHorizontal: 12,
+    },
+    sliderTrack: {
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#E4E8ED',
+    },
+    sliderActiveTrack: {
+        position: 'absolute',
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#F34B6F',
+    },
+    sliderThumb: {
+        position: 'absolute',
+        width: 24,
+        height: 24,
+        marginLeft: -12,
+        borderRadius: 12,
+        borderWidth: 2.5,
+        borderColor: '#F34B6F',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#F34B6F',
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+    },
+    rangeValues: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 6,
+    },
+    row: {
+        borderWidth: 1,
+        borderRadius: 8,
+        minHeight: 76,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     rowIcon: {
-        width: scale(32),
-        height: scale(32),
+        width: 32,
+        height: 32,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    selectTitle: {
+        fontSize: 14,
+        lineHeight: 20,
     },
     footer: {
         borderTopWidth: 1,
-        paddingHorizontal: scale(14),
-        paddingTop: scale(12),
-        paddingBottom: scale(20),
+        paddingHorizontal: 14,
+        paddingTop: 10,
+        paddingBottom: 10,
     },
 });

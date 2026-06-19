@@ -10,12 +10,14 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
+import { useToast } from '@/hooks/useToast';
 
 export default function SupportScreen() {
     const { isDark } = useTheme();
     const { currentLanguage } = useLanguage();
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
+    const toast = useToast();
     const [type, setType] = useState('bug');
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
@@ -37,7 +39,7 @@ export default function SupportScreen() {
         if (res.success) {
             setSubject('');
             setMessage('');
-            Alert.alert(t('report_issue', 'Report issue'), t('ticket_created', 'Ticket created.'));
+            toast.show(t('ticket_created', 'Ticket created.'), 'success', 3000);
         } else {
             Alert.alert(t('error', 'Error'), apiMessage(res.message));
         }

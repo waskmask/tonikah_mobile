@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Toast, ToastType } from '@/components/ui/Toast';
 
 interface ToastState {
@@ -8,10 +8,13 @@ interface ToastState {
     duration: number;
 }
 
-let globalToastRef: {
+type ToastHandle = {
     show: (message: string, type?: ToastType, duration?: number) => void;
     hide: () => void;
-} | null = null;
+};
+
+let globalToastRef: ToastHandle | null = null;
+const toastStack: ToastHandle[] = [];
 
 // The provider that should be mounted near the Root Layout
 export function ToastProvider() {
@@ -30,8 +33,18 @@ export function ToastProvider() {
         setState(prev => ({ ...prev, visible: false }));
     }, []);
 
-    // Bind to global ref so hooks can use it without Context overhead
-    globalToastRef = { show, hide };
+    const handle = useMemo(() => ({ show, hide }), [show, hide]);
+
+    useEffect(() => {
+        toastStack.push(handle);
+        globalToastRef = handle;
+
+        return () => {
+            const index = toastStack.indexOf(handle);
+            if (index >= 0) toastStack.splice(index, 1);
+            globalToastRef = toastStack[toastStack.length - 1] || null;
+        };
+    }, [handle]);
 
     return (
         <Toast

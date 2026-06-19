@@ -5,12 +5,13 @@ import { I18nManager } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // All namespaces used across the app
-const NAMESPACES = ["common", "countries", "nationalities", "designations", "ethnic_group", "ethnic_groups", "languages"] as const;
+const NAMESPACES = ["common", "chat", "countries", "nationalities", "designations", "ethnic_group", "ethnic_groups", "languages"] as const;
 
 // Supported languages: ar, de, en, es, fr, id, it, pl, pt, ru, tr
 const RESOURCES = {
     en: {
         common: require("../locales/en/common.json"),
+        chat: require("../locales/en/chat.json"),
         countries: require("../locales/en/countries.json"),
         nationalities: require("../locales/en/nationalities.json"),
         designations: require("../locales/en/designations.json"),
@@ -20,6 +21,7 @@ const RESOURCES = {
     },
     ar: {
         common: require("../locales/ar/common.json"),
+        chat: require("../locales/ar/chat.json"),
         countries: require("../locales/ar/countries.json"),
         nationalities: require("../locales/ar/nationalities.json"),
         designations: require("../locales/ar/designations.json"),
@@ -29,6 +31,7 @@ const RESOURCES = {
     },
     de: {
         common: require("../locales/de/common.json"),
+        chat: require("../locales/de/chat.json"),
         countries: require("../locales/de/countries.json"),
         nationalities: require("../locales/de/nationalities.json"),
         designations: require("../locales/de/designations.json"),
@@ -38,6 +41,7 @@ const RESOURCES = {
     },
     es: {
         common: require("../locales/es/common.json"),
+        chat: require("../locales/es/chat.json"),
         countries: require("../locales/es/countries.json"),
         nationalities: require("../locales/es/nationalities.json"),
         designations: require("../locales/es/designations.json"),
@@ -47,6 +51,7 @@ const RESOURCES = {
     },
     fr: {
         common: require("../locales/fr/common.json"),
+        chat: require("../locales/fr/chat.json"),
         countries: require("../locales/fr/countries.json"),
         nationalities: require("../locales/fr/nationalities.json"),
         designations: require("../locales/fr/designations.json"),
@@ -56,6 +61,7 @@ const RESOURCES = {
     },
     id: {
         common: require("../locales/id/common.json"),
+        chat: require("../locales/id/chat.json"),
         countries: require("../locales/id/countries.json"),
         nationalities: require("../locales/id/nationalities.json"),
         designations: require("../locales/id/designations.json"),
@@ -65,6 +71,7 @@ const RESOURCES = {
     },
     it: {
         common: require("../locales/it/common.json"),
+        chat: require("../locales/it/chat.json"),
         countries: require("../locales/it/countries.json"),
         nationalities: require("../locales/it/nationalities.json"),
         designations: require("../locales/it/designations.json"),
@@ -74,6 +81,7 @@ const RESOURCES = {
     },
     pl: {
         common: require("../locales/pl/common.json"),
+        chat: require("../locales/pl/chat.json"),
         countries: require("../locales/pl/countries.json"),
         nationalities: require("../locales/pl/nationalities.json"),
         designations: require("../locales/pl/designations.json"),
@@ -83,6 +91,7 @@ const RESOURCES = {
     },
     pt: {
         common: require("../locales/pt/common.json"),
+        chat: require("../locales/pt/chat.json"),
         countries: require("../locales/pt/countries.json"),
         nationalities: require("../locales/pt/nationalities.json"),
         designations: require("../locales/pt/designations.json"),
@@ -92,6 +101,7 @@ const RESOURCES = {
     },
     ru: {
         common: require("../locales/ru/common.json"),
+        chat: require("../locales/ru/chat.json"),
         countries: require("../locales/ru/countries.json"),
         nationalities: require("../locales/ru/nationalities.json"),
         designations: require("../locales/ru/designations.json"),
@@ -101,6 +111,7 @@ const RESOURCES = {
     },
     tr: {
         common: require("../locales/tr/common.json"),
+        chat: require("../locales/tr/chat.json"),
         countries: require("../locales/tr/countries.json"),
         nationalities: require("../locales/tr/nationalities.json"),
         designations: require("../locales/tr/designations.json"),

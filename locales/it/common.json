@@ -2059,5 +2059,17 @@
   "view_stamp": "VEDI",
   "save_stamp": "SALVA",
   "logout_all_devices": "Esci da tutti i dispositivi",
-  "logout_all_devices_confirm": "Questo ti disconnetterà da ogni dispositivo, incluso questo telefono."
+  "logout_all_devices_confirm": "Questo ti disconnetterà da ogni dispositivo, incluso questo telefono.",
+  "logout_other_devices": "Disconnetti gli altri dispositivi",
+  "logout_other_devices_confirm": "Questo ti disconnetterà da tutti gli altri dispositivi. Questo telefono resterà connesso.",
+  "active_sessions": "Sessioni attive",
+  "active_sessions_desc": "Gestisci dove il tuo account è attualmente connesso.",
+  "other_sessions_revoked": "Gli altri dispositivi sono stati disconnessi.",
+  "sessions_revoke_failed": "Impossibile disconnettere gli altri dispositivi. Riprova.",
+  "current_device": "Dispositivo attuale",
+  "other_device": "Altro dispositivo",
+  "unknown_device": "Dispositivo sconosciuto",
+  "no_active_sessions": "Nessuna sessione attiva trovata.",
+  "refresh": "Aggiorna",
+  "unknown": "Sconosciuto"
 }

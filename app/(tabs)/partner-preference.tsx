@@ -10,11 +10,13 @@ import { apiMessage, t } from '@/lib/profileDisplay';
 import { profileService } from '@/lib/profileService';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
+import { useToast } from '@/hooks/useToast';
 
 export default function PartnerPreferenceScreen() {
     const { isDark } = useTheme();
     const { refreshUser } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
+    const toast = useToast();
     const [about, setAbout] = useState('');
     const [ageFrom, setAgeFrom] = useState('');
     const [ageTo, setAgeTo] = useState('');
@@ -45,7 +47,7 @@ export default function PartnerPreferenceScreen() {
         const res = await profileService.savePartnerPreference(payload);
         if (res.success) {
             await refreshUser();
-            Alert.alert(t('partner_preference', 'Partner Preference'), t('partner_preference_updated', 'Partner preference updated successfully.'));
+            toast.show(t('partner_preference_updated', 'Partner preference updated successfully.'), 'success', 3000);
         } else {
             Alert.alert(t('error', 'Error'), apiMessage(res.message));
         }

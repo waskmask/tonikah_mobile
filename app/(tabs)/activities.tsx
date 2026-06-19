@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from 'react-native';
-import { router } from 'expo-router';
 import { Text } from '@/components/ui/Text';
 import { ProfileListCard } from '@/components/app/ProfileListCard';
+import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { usersService } from '@/lib/usersService';
 import { t } from '@/lib/profileDisplay';
 import { useTheme } from '@/hooks/useTheme';
@@ -16,6 +16,7 @@ export default function ActivitiesScreen() {
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
 
     const load = useCallback(async () => {
         const res = mode === 'visitors'
@@ -67,15 +68,30 @@ export default function ActivitiesScreen() {
             ) : (
                 <FlatList
                     data={items}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => String(item.id || item._id)}
+                    numColumns={2}
+                    columnWrapperStyle={{ gap: scale(10) }}
                     contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: 0, paddingBottom: scale(110), flexGrow: 1 }}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#F34B6F" />}
                     ListEmptyComponent={<View style={{ paddingTop: scale(90) }}><Text variant="h3" align="center">{t('not_set', 'Not set')}</Text></View>}
                     renderItem={({ item }) => (
-                        <ProfileListCard item={item} onPress={() => router.push(`/user/${item.id}` as any)} />
+                        <ProfileListCard item={item} onPress={() => setSelectedProfile(item)} />
                     )}
                 />
             )}
+            <UserProfileSheet
+                visible={Boolean(selectedProfile)}
+                userId={String(selectedProfile?.id || selectedProfile?._id || '')}
+                initialProfile={selectedProfile}
+                onClose={() => setSelectedProfile(null)}
+                onBlocked={(id) => {
+                    setSelectedProfile(null);
+                    setItems((current) => current.filter((item) => String(item.id || item._id) !== String(id)));
+                }}
+                onFavoriteChanged={(id, favorited) => {
+                    setItems((current) => current.map((item) => String(item.id || item._id) === String(id) ? { ...item, is_favorited: favorited } : item));
+                }}
+            />
         </View>
     );
 }

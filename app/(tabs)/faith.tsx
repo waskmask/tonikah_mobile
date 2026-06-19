@@ -9,6 +9,7 @@ import { apiMessage, displayText, t } from '@/lib/profileDisplay';
 import { profileService } from '@/lib/profileService';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
+import { useToast } from '@/hooks/useToast';
 
 function normalizeMaster(data: any): MultiSelectOption[] {
     const items = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
@@ -22,6 +23,7 @@ export default function FaithScreen() {
     const { isDark } = useTheme();
     const { user, refreshUser } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
+    const toast = useToast();
     const [options, setOptions] = useState<MultiSelectOption[]>([]);
     const [selected, setSelected] = useState<string[]>([]);
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -53,7 +55,7 @@ export default function FaithScreen() {
         const res = await profileService.saveFaithInDailyLife(selected);
         if (res.success) {
             await refreshUser();
-            Alert.alert(t('faith_in_daily_life', 'Faith in daily life'), t('faith_updated', 'Faith updated.'));
+            toast.show(t('faith_updated', 'Faith updated.'), 'success', 3000);
         } else {
             Alert.alert(t('error', 'Error'), apiMessage(res.message));
         }

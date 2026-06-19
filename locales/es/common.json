@@ -2060,5 +2060,17 @@
   "view_stamp": "VER",
   "save_stamp": "GUARDAR",
   "logout_all_devices": "Cerrar sesión en todos los dispositivos",
-  "logout_all_devices_confirm": "Esto cerrará tu sesión en todos los dispositivos, incluido este teléfono."
+  "logout_all_devices_confirm": "Esto cerrará tu sesión en todos los dispositivos, incluido este teléfono.",
+  "logout_other_devices": "Cerrar sesión en otros dispositivos",
+  "logout_other_devices_confirm": "Esto cerrará tu sesión en todos los demás dispositivos. Este teléfono seguirá conectado.",
+  "active_sessions": "Sesiones activas",
+  "active_sessions_desc": "Gestiona dónde está iniciada tu cuenta actualmente.",
+  "other_sessions_revoked": "Se cerró la sesión en los demás dispositivos.",
+  "sessions_revoke_failed": "No se pudo cerrar la sesión en otros dispositivos. Inténtalo de nuevo.",
+  "current_device": "Dispositivo actual",
+  "other_device": "Otro dispositivo",
+  "unknown_device": "Dispositivo desconocido",
+  "no_active_sessions": "No se encontraron sesiones activas.",
+  "refresh": "Actualizar",
+  "unknown": "Desconocido"
 }

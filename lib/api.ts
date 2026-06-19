@@ -17,14 +17,14 @@ export interface ApiResponse<T = any> {
 }
 
 let isRefreshing = false;
-let refreshSubscribers: ((accessToken: string) => void)[] = [];
+let refreshSubscribers: ((accessToken: string | null) => void)[] = [];
 
-const onRefreshed = (accessToken: string) => {
+const onRefreshed = (accessToken: string | null) => {
     refreshSubscribers.map(cb => cb(accessToken));
     refreshSubscribers = [];
 };
 
-const addRefreshSubscriber = (cb: (accessToken: string) => void) => {
+const addRefreshSubscriber = (cb: (accessToken: string | null) => void) => {
     refreshSubscribers.push(cb);
 };
 
@@ -86,59 +86,62 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
     }
 };
 
+const refreshAccessToken = async (): Promise<string | null> => {
+    const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
+
+    if (!refreshToken) {
+        await api.clearTokens();
+        return null;
+    }
+
+    if (isRefreshing) {
+        return new Promise((resolve) => {
+            addRefreshSubscriber((token) => resolve(token));
+        });
+    }
+
+    isRefreshing = true;
+
+    try {
+        const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getClientHeaders(),
+            },
+            body: JSON.stringify({ refreshToken }),
+        });
+
+        const refreshData = await refreshRes.json();
+
+        if (refreshData.success && refreshData.accessToken) {
+            await api.setTokens(refreshData.accessToken, refreshData.refreshToken || refreshToken);
+            isRefreshing = false;
+            onRefreshed(refreshData.accessToken);
+            return refreshData.accessToken;
+        }
+
+        await api.clearTokens();
+        isRefreshing = false;
+        onRefreshed(null);
+        return null;
+    } catch {
+        await api.clearTokens();
+        isRefreshing = false;
+        onRefreshed(null);
+        return null;
+    }
+};
+
 const handleResponse = async (response: Response, endpoint: string, options: FetchOptions): Promise<ApiResponse> => {
     // If 401 Unauthorized, handle token refresh logic
     if (response.status === 401 && endpoint !== '/app-user/mobile/refresh' && endpoint !== '/app-user/mobile/login') {
-        const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
-
-        if (refreshToken) {
-            if (!isRefreshing) {
-                isRefreshing = true;
-
-                try {
-                    const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            ...getClientHeaders(),
-                        },
-                        body: JSON.stringify({ refreshToken }),
-                    });
-
-                    const refreshData = await refreshRes.json();
-
-                    if (refreshData.success && refreshData.accessToken) {
-                        await api.setTokens(refreshData.accessToken, refreshData.refreshToken || refreshToken);
-                        isRefreshing = false;
-                        onRefreshed(refreshData.accessToken);
-
-                        // Re-attempt original request
-                        return apiRequest(endpoint, options);
-                    } else {
-                        // Refresh failed, clear tokens
-                        await api.clearTokens();
-                        isRefreshing = false;
-                        // Let the auth store handle state update when it fails to fetch `me` next time or propagate up
-                        return { success: false, message: 'unauthorized', status: 401 };
-                    }
-                } catch (e) {
-                    await api.clearTokens();
-                    isRefreshing = false;
-                    return { success: false, message: 'unauthorized', status: 401 };
-                }
-            } else {
-                // Wait for refresh to complete, then retry original request
-                return new Promise((resolve) => {
-                    addRefreshSubscriber((token) => {
-                        // we don't pass the token explicitly in options since `performFetch` reads it fresh from secure store
-                        resolve(apiRequest(endpoint, options));
-                    });
-                });
-            }
-        } else {
-            await api.clearTokens();
-            return { success: false, message: 'unauthorized', status: 401 };
+        const refreshedToken = await refreshAccessToken();
+        if (refreshedToken) {
+            // Re-attempt original request. `performFetch` reads the fresh token from secure store.
+            return apiRequest(endpoint, options);
         }
+        return { success: false, message: 'unauthorized', status: 401 };
     }
 
     try {
@@ -189,7 +192,17 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
             xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
         }
 
-        xhr.onload = () => {
+        xhr.onload = async () => {
+            if (xhr.status === 401 && endpoint !== '/app-user/mobile/refresh' && endpoint !== '/app-user/mobile/login') {
+                const refreshedToken = await refreshAccessToken();
+                if (refreshedToken) {
+                    resolve(formDataRequest(endpoint, body, timeout));
+                    return;
+                }
+                resolve({ success: false, message: 'unauthorized', status: 401 });
+                return;
+            }
+
             resolve(parseApiResponseText(xhr.responseText, xhr.status));
         };
 
@@ -222,6 +235,7 @@ export const api = {
     postFormData: (endpoint: string, body: FormData) => formDataRequest(endpoint, body),
     patch: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (endpoint: string) => apiRequest(endpoint, { method: 'DELETE' }),
+    deleteWithBody: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'DELETE', body: JSON.stringify(body) }),
     setTokens: async (access: string, refresh: string) => {
         await SecureStore.setItemAsync(TOKEN_KEYS.ACCESS, access);
         await SecureStore.setItemAsync(TOKEN_KEYS.REFRESH, refresh);

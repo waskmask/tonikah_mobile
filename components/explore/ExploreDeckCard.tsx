@@ -89,8 +89,8 @@ export function ExploreDeckCard({
                 ) : null}
                 {tags.length > 0 ? (
                     <View style={styles.tags}>
-                        {tags.map((tag) => (
-                            <View key={tag} style={styles.tag}>
+                        {tags.map((tag, index) => (
+                            <View key={`${index}-${tag}`} style={styles.tag}>
                                 <Text variant="caption" className="font-body-semi" numberOfLines={1} style={{ color: '#FFFFFF' }}>{tag}</Text>
                             </View>
                         ))}

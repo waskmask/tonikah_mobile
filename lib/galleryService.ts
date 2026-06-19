@@ -26,5 +26,6 @@ export const galleryService = {
     upload: (formData: FormData): Promise<ApiResponse> => api.postFormData('/gallery', formData),
     remove: (uuid: string): Promise<ApiResponse> => api.delete(`/gallery/${uuid}`),
     reorder: (uuids: string[]): Promise<ApiResponse> => api.patch('/gallery/reorder', { uuids }),
+    makePrimary: (uuid: string): Promise<ApiResponse> => api.patch(`/gallery/${uuid}`, { isPrimary: true }),
     updatePrivacy: (privacy: GalleryPrivacy): Promise<ApiResponse> => api.patch('/gallery/privacy', { privacy }),
 };

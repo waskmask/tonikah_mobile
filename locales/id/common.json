@@ -2073,5 +2073,17 @@
   "view_stamp": "LIHAT",
   "save_stamp": "SIMPAN",
   "logout_all_devices": "Keluar dari semua perangkat",
-  "logout_all_devices_confirm": "Ini akan mengeluarkan Anda dari semua perangkat, termasuk ponsel ini."
+  "logout_all_devices_confirm": "Ini akan mengeluarkan Anda dari semua perangkat, termasuk ponsel ini.",
+  "logout_other_devices": "Keluar dari perangkat lain",
+  "logout_other_devices_confirm": "Ini akan mengeluarkan Anda dari semua perangkat lain. Ponsel ini tetap masuk.",
+  "active_sessions": "Sesi aktif",
+  "active_sessions_desc": "Kelola tempat akun Anda sedang masuk.",
+  "other_sessions_revoked": "Perangkat lain telah dikeluarkan.",
+  "sessions_revoke_failed": "Tidak dapat mengeluarkan perangkat lain. Coba lagi.",
+  "current_device": "Perangkat saat ini",
+  "other_device": "Perangkat lain",
+  "unknown_device": "Perangkat tidak dikenal",
+  "no_active_sessions": "Tidak ada sesi aktif.",
+  "refresh": "Segarkan",
+  "unknown": "Tidak dikenal"
 }

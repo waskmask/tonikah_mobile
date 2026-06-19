@@ -5,6 +5,24 @@ export interface UserListResponse extends ApiResponse {
     nextCursor?: string | null;
     hasMore?: boolean;
     total?: number;
+    fallbackLevel?: 'none' | 'preference' | 'location';
+    droppedFilters?: string[];
+    showingSkipped?: boolean;
+}
+
+export interface UserFacetsResponse extends ApiResponse {
+    facets?: {
+        countries?: Array<{ _id: string; count: number }>;
+        cities?: Array<{ _id: string; count: number }>;
+        sects?: Array<{ _id: string; label?: string; count: number }>;
+        maslak?: Array<{ _id: string; label?: string; count: number }>;
+        marital_status?: Array<{ _id: string; count: number }>;
+        born_muslim?: Array<{ _id: string; count: number }>;
+        education?: Array<{ _id: string; label?: string; count: number }>;
+        occupation?: Array<{ _id: string; label?: string; count: number }>;
+        height_cm_minmax?: Array<{ min?: number; max?: number }>;
+        total?: Array<{ n: number }>;
+    };
 }
 
 const withQuery = (endpoint: string, params: Record<string, string | number | undefined | null>) => {
@@ -18,6 +36,8 @@ const withQuery = (endpoint: string, params: Record<string, string | number | un
 export const usersService = {
     list: (params: Record<string, string | number | undefined | null> = {}): Promise<UserListResponse> =>
         api.get(withQuery('/users/list', params)),
+    facets: (params: Record<string, string | number | undefined | null> = {}): Promise<UserFacetsResponse> =>
+        api.get(withQuery('/users/facets', params)),
     favorites: (params: Record<string, string | number | undefined | null> = {}): Promise<UserListResponse> =>
         api.get(withQuery('/users/me/favorites', params)),
     blocked: (params: Record<string, string | number | undefined | null> = {}): Promise<UserListResponse> =>

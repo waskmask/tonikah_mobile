@@ -5,6 +5,7 @@ const androidBody = {
     regular: "Inter_400Regular",
     medium: "Inter_500Medium",
     semi: "Inter_600SemiBold",
+    bold: "Inter_700Bold",
 };
 const androidHeading = {
     extra: "Manrope_800ExtraBold",
@@ -39,6 +40,7 @@ export const Typography = {
             regular: platformFont(androidBody.regular),
             medium: platformFont(androidBody.medium),
             semi: platformFont(androidBody.semi),
+            bold: platformFont(androidBody.bold),
         },
         arabic: {
             regular: "NotoSansArabic_400Regular",

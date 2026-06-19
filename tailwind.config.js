@@ -45,6 +45,7 @@ module.exports = {
         body: ["Inter_400Regular"],
         "body-medium": ["Inter_500Medium"],
         "body-semi": ["Inter_600SemiBold"],
+        "body-bold": ["Inter_700Bold"],
         arabic: ["NotoSansArabic_400Regular"],
         "arabic-semi": ["NotoSansArabic_600SemiBold"],
         "arabic-bold": ["NotoSansArabic_700Bold"],

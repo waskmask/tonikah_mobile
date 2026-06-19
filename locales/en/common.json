@@ -2272,5 +2272,17 @@
   "view_stamp": "VIEW",
   "save_stamp": "SAVE",
   "logout_all_devices": "Logout all devices",
-  "logout_all_devices_confirm": "This will sign you out on every device, including this phone."
+  "logout_all_devices_confirm": "This will sign you out on every device, including this phone.",
+  "logout_other_devices": "Log out other devices",
+  "logout_other_devices_confirm": "This will sign you out on all other devices. This phone will stay logged in.",
+  "active_sessions": "Active sessions",
+  "active_sessions_desc": "Manage where your account is currently logged in.",
+  "other_sessions_revoked": "Other devices have been logged out.",
+  "sessions_revoke_failed": "Could not log out other devices. Please try again.",
+  "current_device": "Current device",
+  "other_device": "Other device",
+  "unknown_device": "Unknown device",
+  "no_active_sessions": "No active sessions found.",
+  "refresh": "Refresh",
+  "unknown": "Unknown"
 }

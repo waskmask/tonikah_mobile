@@ -2059,5 +2059,17 @@
   "view_stamp": "GÖR",
   "save_stamp": "KAYDET",
   "logout_all_devices": "Tüm cihazlardan çıkış yap",
-  "logout_all_devices_confirm": "Bu işlem, bu telefon dahil tüm cihazlarda oturumunuzu kapatır."
+  "logout_all_devices_confirm": "Bu işlem, bu telefon dahil tüm cihazlarda oturumunuzu kapatır.",
+  "logout_other_devices": "Diğer cihazlardan çıkış yap",
+  "logout_other_devices_confirm": "Bu işlem diğer tüm cihazlarda oturumunuzu kapatır. Bu telefon oturumda kalır.",
+  "active_sessions": "Aktif oturumlar",
+  "active_sessions_desc": "Hesabınızın nerelerde açık olduğunu yönetin.",
+  "other_sessions_revoked": "Diğer cihazlardan çıkış yapıldı.",
+  "sessions_revoke_failed": "Diğer cihazlardan çıkış yapılamadı. Lütfen tekrar deneyin.",
+  "current_device": "Mevcut cihaz",
+  "other_device": "Diğer cihaz",
+  "unknown_device": "Bilinmeyen cihaz",
+  "no_active_sessions": "Aktif oturum bulunamadı.",
+  "refresh": "Yenile",
+  "unknown": "Bilinmiyor"
 }

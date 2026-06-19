@@ -177,8 +177,8 @@ export function SingleSelectSheet({
                                 </Pressable>
                             )}
                             <Text
-                                variant="body"
-                                className="font-body-semi"
+                                variant="body-sm"
+                                className="font-body-bold"
                                 style={[styles.drawerTitle, !isDrawer && styles.sheetTitle]}
                             >
                                 {title}
@@ -354,12 +354,12 @@ const styles = StyleSheet.create({
     },
     drawerTitle: {
         flex: 1,
-        fontSize: 22,
-        lineHeight: 28,
+        fontSize: 14,
+        lineHeight: 18,
     },
     sheetTitle: {
-        fontSize: 19,
-        lineHeight: 24,
+        fontSize: 14,
+        lineHeight: 18,
     },
     backButton: {
         width: 34,

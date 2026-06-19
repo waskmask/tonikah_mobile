@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { authService, AuthResponse, SignupRequest, User } from '@/lib/authService';
 import { api } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleSignIn';
+import { registerForPushNotifications, removeRegisteredPushToken } from '@/lib/pushNotifications';
 
 interface AuthState {
     user: User | null;
@@ -35,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
                 set({ user: result.user, isAuthenticated: true });
+                registerForPushNotifications().catch(() => { });
             }
             return result;
         } finally {
@@ -50,6 +52,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
                 set({ user: result.user, isAuthenticated: true });
+                registerForPushNotifications().catch(() => { });
             }
             return result;
         } finally {
@@ -75,6 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
                 set({ user: result.user, isAuthenticated: true });
+                registerForPushNotifications().catch(() => { });
             }
             return result;
         } finally {
@@ -85,6 +89,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logout: async () => {
         set({ isLoading: true });
         try {
+            await removeRegisteredPushToken().catch(() => { });
             const { refreshToken } = await api.getTokens();
             if (refreshToken) {
                 // Fire and forget logout call
@@ -99,13 +104,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logoutAllDevices: async () => {
         set({ isLoading: true });
         try {
+            await removeRegisteredPushToken().catch(() => { });
             const result = await authService.revokeAllSessions();
-            await api.clearTokens();
-            set({ user: null, isAuthenticated: false, isLoading: false });
+            if (result.success) {
+                await api.clearTokens();
+                set({ user: null, isAuthenticated: false, isLoading: false });
+                return result;
+            }
+            set({ isLoading: false });
             return result;
         } catch {
-            await api.clearTokens();
-            set({ user: null, isAuthenticated: false, isLoading: false });
+            set({ isLoading: false });
             return { success: false, message: 'logout_failed' };
         }
     },
@@ -132,6 +141,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             if (result.success && result.user) {
                 set({ user: result.user, isAuthenticated: true });
+                registerForPushNotifications().catch(() => { });
             } else {
                 await api.clearTokens();
                 set({ user: null, isAuthenticated: false });

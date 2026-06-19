@@ -2073,5 +2073,17 @@
   "view_stamp": "عرض",
   "save_stamp": "حفظ",
   "logout_all_devices": "تسجيل الخروج من جميع الأجهزة",
-  "logout_all_devices_confirm": "سيتم تسجيل خروجك من كل جهاز، بما في ذلك هذا الهاتف."
+  "logout_all_devices_confirm": "سيتم تسجيل خروجك من كل جهاز، بما في ذلك هذا الهاتف.",
+  "logout_other_devices": "تسجيل خروج الأجهزة الأخرى",
+  "logout_other_devices_confirm": "سيتم تسجيل خروجك من جميع الأجهزة الأخرى. سيبقى هذا الهاتف مسجل الدخول.",
+  "active_sessions": "الجلسات النشطة",
+  "active_sessions_desc": "إدارة الأماكن التي تم تسجيل دخول حسابك فيها حالياً.",
+  "other_sessions_revoked": "تم تسجيل خروج الأجهزة الأخرى.",
+  "sessions_revoke_failed": "تعذر تسجيل خروج الأجهزة الأخرى. يرجى المحاولة مرة أخرى.",
+  "current_device": "الجهاز الحالي",
+  "other_device": "جهاز آخر",
+  "unknown_device": "جهاز غير معروف",
+  "no_active_sessions": "لا توجد جلسات نشطة.",
+  "refresh": "تحديث",
+  "unknown": "غير معروف"
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Text as RNText, TextProps as RNTextProps } from "react-native";
+import { Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Typography } from "@/constants/typography";
 
@@ -32,60 +32,89 @@ export const Text: React.FC<TextProps> = ({
 }) => {
     const { currentLanguage, isRTL } = useLanguage();
     const isArabicFamily = currentLanguage === "ar";
+    const font = (fontFamily: string | undefined, fontWeight: TextStyle["fontWeight"]): TextStyle => ({
+        fontFamily,
+        fontWeight: fontFamily ? undefined : fontWeight,
+    });
 
-    const getVariantStyles = (): { fontFamily?: string; fontSize: number; letterSpacing?: number; textTransform?: "uppercase" | "none" } => {
+    const fontOverride = (): TextStyle => {
+        if (className.includes("font-body-bold")) {
+            return font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.body.bold, "700");
+        }
+        if (className.includes("font-body-semi")) {
+            return font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.body.semi, "600");
+        }
+        if (className.includes("font-body-medium")) {
+            return font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.body.medium, "500");
+        }
+        if (className.includes("font-heading-extra")) {
+            return font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.extra, "800");
+        }
+        if (className.includes("font-heading-semi")) {
+            return font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.heading.semi, "600");
+        }
+        if (className.includes("font-heading-medium")) {
+            return font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.heading.medium, "500");
+        }
+        if (className.includes("font-heading")) {
+            return font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold, "700");
+        }
+        return {};
+    };
+
+    const getVariantStyles = (): TextStyle => {
         switch (variant) {
             case "h1":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.extra,
+                    ...font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.extra, "800"),
                     fontSize: Typography.size["4xl"]
                 };
             case "h2":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold,
+                    ...font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold, "700"),
                     fontSize: Typography.size["3xl"]
                 };
             case "h3":
             case "heading-sm":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.semi : Typography.font.heading.semi,
+                    ...font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.heading.semi, "600"),
                     fontSize: Typography.size["2xl"]
                 };
             case "heading":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold,
+                    ...font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold, "700"),
                     fontSize: Typography.size["3xl"]
                 };
             case "subtitle":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.regular : Typography.font.heading.medium,
+                    ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.heading.medium, "500"),
                     fontSize: Typography.size.sm,
                     letterSpacing: 2,
                     textTransform: "uppercase"
                 };
             case "body":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular,
+                    ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
                     fontSize: Typography.size.base
                 };
             case "body-sm":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular,
+                    ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
                     fontSize: Typography.size.sm
                 };
             case "caption":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular,
+                    ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
                     fontSize: Typography.size.xs
                 };
             case "button":
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.semi : Typography.font.body.semi,
+                    ...font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.body.semi, "600"),
                     fontSize: Typography.size.lg
                 };
             default:
                 return {
-                    fontFamily: isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular,
+                    ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
                     fontSize: Typography.size.base
                 };
         }
@@ -108,10 +137,12 @@ export const Text: React.FC<TextProps> = ({
             style={[
                 {
                     fontFamily: variantStyle.fontFamily,
+                    fontWeight: variantStyle.fontWeight,
                     fontSize: variantStyle.fontSize,
                     letterSpacing: variantStyle.letterSpacing,
                     textTransform: variantStyle.textTransform,
                 },
+                fontOverride(),
                 style
             ]}
             {...props}

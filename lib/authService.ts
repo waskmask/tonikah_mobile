@@ -23,6 +23,23 @@ export interface AuthResponse extends ApiResponse {
     retryAfter?: number;
 }
 
+export interface UserSession {
+    id: string;
+    label: string;
+    clientType?: string;
+    clientPlatform?: string;
+    ip?: string;
+    createdAt?: string;
+    lastUsedAt?: string;
+    expiresAt?: string;
+    current?: boolean;
+}
+
+export interface SessionsResponse extends ApiResponse {
+    sessions?: UserSession[];
+    revokedCount?: number;
+}
+
 export const authService = {
     login: (data: LoginRequest): Promise<AuthResponse> =>
         api.post('/app-user/mobile/login', data),
@@ -45,8 +62,18 @@ export const authService = {
     revokeAllSessions: (): Promise<AuthResponse> =>
         api.post('/app-user/token/revoke-all', {}),
 
-    resendVerification: (email: string): Promise<AuthResponse> =>
-        api.post('/app-user/resend-verification', { email }),
+    listSessions: async (): Promise<SessionsResponse> => {
+        const { refreshToken } = await api.getTokens();
+        return api.post('/app-user/token/sessions', { refreshToken });
+    },
+
+    revokeOtherSessions: async (): Promise<SessionsResponse> => {
+        const { refreshToken } = await api.getTokens();
+        return api.post('/app-user/token/revoke-other-sessions', { refreshToken });
+    },
+
+    resendVerification: (email: string, lang?: string): Promise<AuthResponse> =>
+        api.post('/app-user/resend-verification', { email, ...(lang ? { lang } : {}) }),
 
     requestPasswordReset: (email: string): Promise<AuthResponse> =>
         api.post('/app-user/password/request-reset', { email }),

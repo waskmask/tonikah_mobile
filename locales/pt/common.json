@@ -2059,5 +2059,17 @@
   "view_stamp": "VER",
   "save_stamp": "SALVAR",
   "logout_all_devices": "Terminar sessão em todos os dispositivos",
-  "logout_all_devices_confirm": "Isto irá terminar a sessão em todos os dispositivos, incluindo este telefone."
+  "logout_all_devices_confirm": "Isto irá terminar a sessão em todos os dispositivos, incluindo este telefone.",
+  "logout_other_devices": "Terminar sessão noutros dispositivos",
+  "logout_other_devices_confirm": "Isto terminará a sessão em todos os outros dispositivos. Este telefone continuará com sessão iniciada.",
+  "active_sessions": "Sessões ativas",
+  "active_sessions_desc": "Gerencie onde a sua conta está atualmente ligada.",
+  "other_sessions_revoked": "Os outros dispositivos foram desconectados.",
+  "sessions_revoke_failed": "Não foi possível terminar sessão nos outros dispositivos. Tente novamente.",
+  "current_device": "Dispositivo atual",
+  "other_device": "Outro dispositivo",
+  "unknown_device": "Dispositivo desconhecido",
+  "no_active_sessions": "Nenhuma sessão ativa encontrada.",
+  "refresh": "Atualizar",
+  "unknown": "Desconhecido"
 }

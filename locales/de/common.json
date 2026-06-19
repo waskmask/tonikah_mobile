@@ -2061,5 +2061,17 @@
   "view_stamp": "ANSEHEN",
   "save_stamp": "MERKEN",
   "logout_all_devices": "Von allen Geräten abmelden",
-  "logout_all_devices_confirm": "Dadurch wirst du auf jedem Gerät abgemeldet, einschließlich dieses Telefons."
+  "logout_all_devices_confirm": "Dadurch wirst du auf jedem Gerät abgemeldet, einschließlich dieses Telefons.",
+  "logout_other_devices": "Andere Geräte abmelden",
+  "logout_other_devices_confirm": "Dadurch wirst du auf allen anderen Geräten abgemeldet. Dieses Telefon bleibt angemeldet.",
+  "active_sessions": "Aktive Sitzungen",
+  "active_sessions_desc": "Verwalte, wo dein Konto aktuell angemeldet ist.",
+  "other_sessions_revoked": "Andere Geräte wurden abgemeldet.",
+  "sessions_revoke_failed": "Andere Geräte konnten nicht abgemeldet werden. Bitte versuche es erneut.",
+  "current_device": "Aktuelles Gerät",
+  "other_device": "Anderes Gerät",
+  "unknown_device": "Unbekanntes Gerät",
+  "no_active_sessions": "Keine aktiven Sitzungen gefunden.",
+  "refresh": "Aktualisieren",
+  "unknown": "Unbekannt"
 }

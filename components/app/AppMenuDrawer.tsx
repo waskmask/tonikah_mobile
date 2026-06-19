@@ -93,8 +93,8 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                 >
                     <View style={[styles.header, { borderBottomColor: borderColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <Text
-                            variant="body"
-                            className="font-body-semi"
+                            variant="body-sm"
+                            className="font-body-bold"
                             style={[styles.headerTitle, { color: headingColor, textAlign: isRTL ? 'right' : 'left' }]}
                         >
                             {textValue(t('menu'), 'Menu')}
@@ -237,20 +237,20 @@ const styles = StyleSheet.create({
         bottom: 0,
     },
     header: {
-        minHeight: scale(58),
+        height: scale(50),
         alignItems: 'center',
         borderBottomWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: scale(14),
     },
     headerTitle: {
         flex: 1,
-        fontSize: 18,
-        lineHeight: 24,
+        fontSize: 14,
+        lineHeight: 18,
     },
     closeButton: {
-        width: scale(42),
-        height: scale(42),
-        borderRadius: scale(21),
+        width: scale(34),
+        height: scale(34),
+        borderRadius: scale(17),
         alignItems: 'center',
         justifyContent: 'center',
     },

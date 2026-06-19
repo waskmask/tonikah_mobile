@@ -1,1 +1,5 @@
-import React from 'react'; import { View } from 'react-native'; import { Text } from '@/components/ui/Text'; export default function Screen() { return ( <View className='flex-1 justify-center items-center bg-brand-bg-primary'><Text variant='h2'>Screen</Text></View> ); }
+import { Redirect } from 'expo-router';
+
+export default function RegisterRedirect() {
+    return <Redirect href="/(auth)/signup" />;
+}

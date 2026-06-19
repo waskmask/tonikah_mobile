@@ -5,6 +5,8 @@ export const profileService = {
     // Fetch current user profile (mobile lane)
     fetchMe: (): Promise<ApiResponse> => api.get('/app-user/mobile/me'),
 
+    fetchProfileCompletion: (): Promise<ApiResponse> => api.get('/app-user/profile-completion'),
+
     // Create profile (Step 1 only)
     createProfile: (data: object): Promise<ApiResponse> => api.post('/profile/new', data),
 

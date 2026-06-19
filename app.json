@@ -4,7 +4,7 @@
     "slug": "tonikah",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon/adaptive-icon.png",
+    "icon": "./assets/icon/icon.png",
     "scheme": "tonikah",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -24,8 +24,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon/adaptive-icon.png",
-        "backgroundColor": "#F34B6F"
+        "foregroundImage": "./assets/icon/icon.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.tonikah.app"
     },

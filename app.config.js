@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 const googleServicesPath = './google-services.json';
+const iosGoogleServicesPath = './GoogleService-Info.plist';
 const hasGoogleServicesFile = fs.existsSync(path.resolve(__dirname, googleServicesPath));
+const hasIosGoogleServicesFile = fs.existsSync(path.resolve(__dirname, iosGoogleServicesPath));
 
 module.exports = ({ config }) => {
     return {
@@ -16,11 +18,14 @@ module.exports = ({ config }) => {
             '@react-native-community/datetimepicker',
             'expo-font',
             'expo-image',
+            'expo-audio',
+            'expo-notifications',
             'expo-status-bar',
             'expo-web-browser',
         ],
         ios: {
             ...config.ios,
+            ...(hasIosGoogleServicesFile ? { googleServicesFile: iosGoogleServicesPath } : {}),
             infoPlist: {
                 ...config.ios?.infoPlist,
                 CFBundleURLTypes: [
@@ -35,6 +40,7 @@ module.exports = ({ config }) => {
         android: {
             ...config.android,
             ...(hasGoogleServicesFile ? { googleServicesFile: googleServicesPath } : {}),
+            softwareKeyboardLayoutMode: 'resize',
         },
     };
 };

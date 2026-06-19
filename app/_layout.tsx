@@ -1,7 +1,7 @@
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { View, LogBox } from "react-native";
+import { View, LogBox, StatusBar } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -31,7 +31,8 @@ import {
 import {
     Inter_400Regular,
     Inter_500Medium,
-    Inter_600SemiBold
+    Inter_600SemiBold,
+    Inter_700Bold
 } from "@expo-google-fonts/inter";
 import {
     NotoSansArabic_400Regular,
@@ -46,6 +47,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { configureGoogleSignIn } from "@/lib/googleSignIn";
 import { useAuthStore } from "@/store/authStore";
 import { ToastProvider } from "@/hooks/useToast";
+import { useToast } from "@/hooks/useToast";
+import { addPushNotificationListeners } from "@/lib/pushNotifications";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +59,7 @@ export default function RootLayout() {
     const { isDark } = useTheme();
     const { isRTL } = useLanguage();
     const { restoreSession, isRestoringSession } = useAuthStore();
+    const toast = useToast();
 
     const [loaded, error] = useFonts({
         Manrope_500Medium,
@@ -65,6 +69,7 @@ export default function RootLayout() {
         Inter_400Regular,
         Inter_500Medium,
         Inter_600SemiBold,
+        Inter_700Bold,
         NotoSansArabic_400Regular,
         NotoSansArabic_600SemiBold,
         NotoSansArabic_700Bold,
@@ -86,6 +91,12 @@ export default function RootLayout() {
         }
     }, [loaded, error, isRestoringSession]);
 
+    useEffect(() => {
+        return addPushNotificationListeners((message) => {
+            toast.show(message, 'info', 5000);
+        });
+    }, [toast]);
+
     // Hold rendering entirely until both fonts are loaded and secure session is checked
     if ((!loaded && !error) || isRestoringSession) {
         return null;
@@ -93,6 +104,10 @@ export default function RootLayout() {
 
     return (
         <SafeAreaProvider>
+            <StatusBar
+                barStyle={isDark ? "light-content" : "dark-content"}
+                backgroundColor={isDark ? "#0F172A" : "#FFFFFF"}
+            />
             <QueryClientProvider client={queryClient}>
                 <Stack
                     screenOptions={{

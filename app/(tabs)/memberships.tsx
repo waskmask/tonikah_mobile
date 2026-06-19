@@ -7,10 +7,12 @@ import { apiMessage, t } from '@/lib/profileDisplay';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { useToast } from '@/hooks/useToast';
 
 export default function MembershipsScreen() {
     const { isDark } = useTheme();
     const { requireVerified } = useEmailVerificationGuard();
+    const toast = useToast();
     const [plans, setPlans] = useState<any[]>([]);
     const [membership, setMembership] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -29,7 +31,11 @@ export default function MembershipsScreen() {
         if (!requireVerified('checkout')) return;
         setStarting(true);
         const res = await membershipService.startTrial(plan.slug || plan.id || plan._id);
-        Alert.alert(t('memberships', 'Memberships'), res.success || res.ok ? t('profile_updated_success', 'Profile updated successfully.') : apiMessage(res.message));
+        if (res.success || res.ok) {
+            toast.show(t('profile_updated_success', 'Profile updated successfully.'), 'success', 3000);
+        } else {
+            Alert.alert(t('error', 'Error'), apiMessage(res.message));
+        }
         setStarting(false);
     };
 
