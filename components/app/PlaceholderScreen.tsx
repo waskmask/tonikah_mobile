@@ -1,8 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
+import { space } from '@/constants/uiTokens';
 
 type PlaceholderScreenProps = {
     title: string;
@@ -10,24 +11,24 @@ type PlaceholderScreenProps = {
 };
 
 export function PlaceholderScreen({ title, subtitle }: PlaceholderScreenProps) {
-    const { isDark } = useTheme();
+    const colors = useColors();
 
     return (
         <View
             style={{
                 flex: 1,
                 justifyContent: 'center',
-                paddingHorizontal: scale(28),
-                backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
+                paddingHorizontal: space('lg'),
+                backgroundColor: colors.brand.bg.surface,
             }}
         >
-            <Text variant="h2" align="center" style={{ marginBottom: scale(10) }}>
+            <Text variant="h2" align="center" style={{ marginBottom: space('sm') }}>
                 {title}
             </Text>
             <Text
                 variant="body"
                 align="center"
-                style={{ color: isDark ? '#94A3B8' : '#64748B', lineHeight: scale(24) }}
+                style={{ color: colors.brand.text.subtitle, lineHeight: scale(24) }}
             >
                 {subtitle || 'This section is ready in the app shell and will be built next.'}
             </Text>

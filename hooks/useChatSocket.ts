@@ -47,6 +47,7 @@ export function useChatSocket({
 }: ChatSocketHandlers) {
     const socketRef = useRef<Socket | null>(null);
     const [connected, setConnected] = useState(false);
+    const refreshingSocketRef = useRef(false);
 
     useEffect(() => {
         let disposed = false;
@@ -73,9 +74,31 @@ export function useChatSocket({
 
             socketRef.current = socket;
 
-            socket.on('connect', () => setConnected(true));
+            socket.on('connect', () => {
+                refreshingSocketRef.current = false;
+                setConnected(true);
+            });
             socket.on('disconnect', () => setConnected(false));
-            socket.on('connect_error', () => setConnected(false));
+            socket.on('connect_error', async (error) => {
+                setConnected(false);
+                const message = String(error?.message || '');
+                if (!/(auth|token)/i.test(message) || refreshingSocketRef.current) return;
+
+                refreshingSocketRef.current = true;
+                const refreshed = await api.refreshAccessToken();
+                if (!refreshed || disposed) {
+                    refreshingSocketRef.current = false;
+                    return;
+                }
+
+                socket.auth = { token: refreshed };
+                socket.io.opts.extraHeaders = {
+                    ...(socket.io.opts.extraHeaders || {}),
+                    Cookie: `app_at=${refreshed}`,
+                    Authorization: `Bearer ${refreshed}`,
+                };
+                socket.connect();
+            });
 
             socket.on('chat:message', (payload) => {
                 const message = normalizeMessage(payload?.message || payload);

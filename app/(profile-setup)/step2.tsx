@@ -11,11 +11,13 @@ import { MultiSelectSheet } from '@/components/ui/MultiSelectSheet';
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { Languages, BookOpenCheck, MessageCircle, Shirt } from 'lucide-react-native';
 import { LANGUAGE_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
+import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step2() {
     const { t, i18n } = useTranslation(['common', 'languages']);
@@ -87,10 +89,10 @@ export default function Step2() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step3');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update profile');
+                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
         } finally {
             setLoading(false);
         }
@@ -102,28 +104,29 @@ export default function Step2() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={2} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
-                        title={t('profile_personal_cultural', { defaultValue: 'Personal and Cultural Background' })}
-                        subtitle={t('profile_personal_cultural_desc', { defaultValue: 'Tell us more about your cultural identity, language skills, and preferences for relocation or dress.' })}
+                        step={2}
+                        title={t('common:step_2.title', { defaultValue: 'Personal and Cultural Background' })}
+                        subtitle={t('common:step_2.subtitle', { defaultValue: 'Tell us more about your cultural identity, language skills, and preferences.' })}
                     />
 
                     <FieldLabel text={t('common:step_2.mother_tongue')} required />
-                    <SelectField value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder="Select language" onPress={() => setShowMotherTongueSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
+                    <SelectField value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder={t('common:select_limit_1_language', { defaultValue: 'Select language' })} onPress={() => setShowMotherTongueSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
                     {errors.motherTongue && <ErrorText text={errors.motherTongue} />}
 
                     <FieldLabel text={t('common:step_2.born_muslim')} required />
-                    <SelectField value={bornMuslim ? getLabel(bornMuslim, bornMuslimOptions) : ''} placeholder="Select" onPress={() => setShowBornMuslimSheet(true)} icon={<BookOpenCheck size={scale(18)} color={iconColor} />} hasError={!!errors.bornMuslim} />
+                    <SelectField value={bornMuslim ? getLabel(bornMuslim, bornMuslimOptions) : ''} placeholder={t('common:select', { defaultValue: 'Select' })} onPress={() => setShowBornMuslimSheet(true)} icon={<BookOpenCheck size={scale(18)} color={iconColor} />} hasError={!!errors.bornMuslim} />
                     {errors.bornMuslim && <ErrorText text={errors.bornMuslim} />}
 
                     <FieldLabel text={t('common:step_2.languages_spoken')} required />
-                    <SelectField value={languagesSpoken.length > 0 ? languagesSpoken.map((l) => getLabel(l, languageOptions)).join(', ') : ''} placeholder="Select languages (max 5)" onPress={() => setShowLanguagesSheet(true)} icon={<MessageCircle size={scale(18)} color={iconColor} />} hasError={!!errors.languagesSpoken} />
+                    <SelectField value={languagesSpoken.length > 0 ? languagesSpoken.map((l) => getLabel(l, languageOptions)).join(', ') : ''} placeholder={t('common:select_limit_5_languages', { defaultValue: 'Select languages (max 5)' })} onPress={() => setShowLanguagesSheet(true)} icon={<MessageCircle size={scale(18)} color={iconColor} />} hasError={!!errors.languagesSpoken} />
                     {errors.languagesSpoken && <ErrorText text={errors.languagesSpoken} />}
 
                     {isFemale && (
                         <>
                             <FieldLabel text={t('common:step_2.dress')} required />
-                            <SelectField value={dress ? getLabel(dress, dressOptions) : ''} placeholder="Select" onPress={() => setShowDressSheet(true)} icon={<Shirt size={scale(18)} color={iconColor} />} hasError={!!errors.dress} />
+                            <SelectField value={dress ? getLabel(dress, dressOptions) : ''} placeholder={t('common:select', { defaultValue: 'Select' })} onPress={() => setShowDressSheet(true)} icon={<Shirt size={scale(18)} color={iconColor} />} hasError={!!errors.dress} />
                             {errors.dress && <ErrorText text={errors.dress} />}
                         </>
                     )}
@@ -132,10 +135,10 @@ export default function Step2() {
 
             <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
-            <SingleSelectSheet visible={showMotherTongueSheet} onClose={() => setShowMotherTongueSheet(false)} onSelect={(v) => { setMotherTongue(v); setErrors((e) => ({ ...e, motherTongue: '' })); }} options={languageOptions} selected={motherTongue} title="Mother Tongue" searchEnabled />
-            <SingleSelectSheet visible={showBornMuslimSheet} onClose={() => setShowBornMuslimSheet(false)} onSelect={(v) => { setBornMuslim(v); setErrors((e) => ({ ...e, bornMuslim: '' })); }} options={bornMuslimOptions} selected={bornMuslim} title="Born Muslim?" />
-            <MultiSelectSheet visible={showLanguagesSheet} onClose={() => setShowLanguagesSheet(false)} onConfirm={(v) => { setLanguagesSpoken(v); setErrors((e) => ({ ...e, languagesSpoken: '' })); }} options={languageOptions} selected={languagesSpoken} title="Languages Spoken" maxSelections={5} searchEnabled />
-            {isFemale && <SingleSelectSheet visible={showDressSheet} onClose={() => setShowDressSheet(false)} onSelect={(v) => { setDress(v); setErrors((e) => ({ ...e, dress: '' })); }} options={dressOptions} selected={dress} title="How Do You Usually Dress?" />}
+            <SingleSelectSheet visible={showMotherTongueSheet} onClose={() => setShowMotherTongueSheet(false)} onSelect={(v) => { setMotherTongue(v); setErrors((e) => ({ ...e, motherTongue: '' })); }} options={languageOptions} selected={motherTongue} title={t('common:step_2.mother_tongue', { defaultValue: 'Mother Tongue' })} searchEnabled />
+            <SingleSelectSheet visible={showBornMuslimSheet} onClose={() => setShowBornMuslimSheet(false)} onSelect={(v) => { setBornMuslim(v); setErrors((e) => ({ ...e, bornMuslim: '' })); }} options={bornMuslimOptions} selected={bornMuslim} title={t('common:step_2.born_muslim', { defaultValue: 'Born Muslim?' })} />
+            <MultiSelectSheet visible={showLanguagesSheet} onClose={() => setShowLanguagesSheet(false)} onConfirm={(v) => { setLanguagesSpoken(v); setErrors((e) => ({ ...e, languagesSpoken: '' })); }} options={languageOptions} selected={languagesSpoken} title={t('common:step_2.languages_spoken', { defaultValue: 'Languages Spoken' })} maxSelections={5} searchEnabled />
+            {isFemale && <SingleSelectSheet visible={showDressSheet} onClose={() => setShowDressSheet(false)} onSelect={(v) => { setDress(v); setErrors((e) => ({ ...e, dress: '' })); }} options={dressOptions} selected={dress} title={t('common:step_2.dress', { defaultValue: 'How Do You Usually Dress?' })} />}
         </SafeAreaView>
     );
 }

@@ -20,12 +20,14 @@ import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Users, CalendarDays, Flag, Globe, User } from 'lucide-react-native';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
+import { apiMessage } from '@/lib/profileDisplay';
 
 /** Format date as DD.MM.YYYY */
 const formatDate = (date: Date): string => {
@@ -119,9 +121,9 @@ export default function Step1() {
                 defaultValue: 'Profile name, gender, date of birth, and where you grew up cannot be changed later. Are you sure?',
             }),
             [
-                { text: t('common:common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+                { text: t('common:cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
                 {
-                    text: t('common:common.continue', { defaultValue: 'Continue' }),
+                    text: t('common:continue', { defaultValue: 'Continue' }),
                     onPress: async () => {
                         setLoading(true);
                         try {
@@ -140,10 +142,10 @@ export default function Step1() {
                                 setProfileData(payload);
                                 router.push('/(profile-setup)/step2');
                             } else {
-                                Alert.alert('Error', res.message || 'Failed to create profile');
+                                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
                             }
                         } catch (err) {
-                            Alert.alert('Error', 'Something went wrong');
+                            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
                         } finally {
                             setLoading(false);
                         }
@@ -178,13 +180,14 @@ export default function Step1() {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <ScrollView
-                    contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }}
+                    contentContainerStyle={ProfileSetupTokens.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
                     <ProfileSetupHeader
-                        title={t('profile_basics', { defaultValue: 'Profile Basics' })}
-                        subtitle={t('profile_basics_desc', { defaultValue: 'Kindly provide the essential details of the person this profile is for.' })}
+                        step={1}
+                        title={t('common:step_1.title', { defaultValue: 'Profile Basics' })}
+                        subtitle={t('common:step_1.subtitle', { defaultValue: 'Kindly provide the essential details of the person this profile is for.' })}
                     />
 
                     {/* Profile Name */}
@@ -265,7 +268,7 @@ export default function Step1() {
             {/* Next Button */}
             <View style={styles.footer}>
                 <GradientButton
-                    title={t('common:common.continue', { defaultValue: 'Continue' })}
+                    title={t('common:continue', { defaultValue: 'Continue' })}
                     onPress={handleSubmit}
                     loading={loading}
                     disabled={loading}

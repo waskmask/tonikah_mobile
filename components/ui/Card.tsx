@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, View, ViewProps } from "react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface CardProps extends ViewProps {
     children: React.ReactNode;
@@ -14,6 +15,7 @@ export const Card: React.FC<CardProps> = ({
     className = "",
     ...props
 }) => {
+    const reduceMotion = useReducedMotion();
     const scaleValue = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -21,11 +23,11 @@ export const Card: React.FC<CardProps> = ({
     }));
 
     const handlePressIn = () => {
-        if (onPress) scaleValue.value = withSpring(0.98);
+        if (onPress) scaleValue.value = reduceMotion ? 1 : withSpring(0.98);
     };
 
     const handlePressOut = () => {
-        if (onPress) scaleValue.value = withSpring(1);
+        if (onPress) scaleValue.value = reduceMotion ? 1 : withSpring(1);
     };
 
     const Content = (

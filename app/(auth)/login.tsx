@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { translateApiError } from '@/lib/apiErrorTranslator';
+import { GoogleConsentNotice } from '@/components/auth/GoogleConsentNotice';
 // If using custom modal, import it here
 
 const loginSchema = z.object({
@@ -32,7 +33,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
-    const { t, isRTL } = useLanguage();
+    const { t, isRTL, currentLanguage } = useLanguage();
     const { isDark } = useTheme();
     const { login, googleAuth } = useAuthStore();
     const toast = useToast();
@@ -80,7 +81,11 @@ export default function LoginScreen() {
 
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
-        const result = await googleAuth();
+        const result = await googleAuth({
+            agreed: true,
+            marketing_opt_in: false,
+            lang: currentLanguage,
+        });
         setGoogleLoading(false);
 
         if (result.success) {
@@ -89,6 +94,11 @@ export default function LoginScreen() {
         }
 
         if (result.cancelled) return;
+
+        if (result.message === 'consent_required') {
+            toast.show(t('consent_required'), 'error');
+            return;
+        }
 
         const errorMsg = translateApiError(result.message || 'unknown_error');
         toast.show(errorMsg, 'error');
@@ -219,6 +229,8 @@ export default function LoginScreen() {
                                 </>
                             )}
                         </Pressable>
+
+                        <GoogleConsentNotice />
 
                         {/* Footer */}
                         <View className="flex-row justify-center items-center gap-1 mt-auto pb-8 pt-8">

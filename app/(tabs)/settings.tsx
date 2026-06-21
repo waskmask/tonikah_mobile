@@ -5,8 +5,11 @@ import { LogOut, RefreshCw, ShieldAlert, Smartphone } from 'lucide-react-native'
 import { Text } from '@/components/ui/Text';
 import { LanguagePicker } from '@/components/ui/LanguagePicker';
 import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
+import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
+import { SectionCard } from '@/components/ui/SectionCard';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
@@ -21,6 +24,8 @@ import {
 export default function SettingsScreen() {
     const { user, logout, logoutAllDevices, isLoading } = useAuthStore();
     const { isDark, toggleTheme } = useTheme();
+    const colors = useColors();
+    const primary = colors.chrome.primary;
     const toast = useToast();
     const [loggingOutOthers, setLoggingOutOthers] = useState(false);
     const [loggingOutAll, setLoggingOutAll] = useState(false);
@@ -140,10 +145,11 @@ export default function SettingsScreen() {
     };
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
-            <Text variant="h2">{t('settings', 'Settings')}</Text>
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+            <AppBackTitleBar title={t('settings', 'Settings')} fallbackHref="/(tabs)/profile" />
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
             {!emailVerified ? (
-                <View style={{ marginTop: scale(14) }}>
+                <View style={{ marginBottom: scale(14) }}>
                     <EmailVerificationRequiredBanner
                         email={user?.email}
                         title={t('email_not_verified', 'Email not verified')}
@@ -152,8 +158,11 @@ export default function SettingsScreen() {
                     />
                 </View>
             ) : null}
-            <Row label={t('email', 'Email')} value={user?.email || ''} isDark={isDark} />
-            <Row label={t('language', 'Language')} custom={<LanguagePicker />} isDark={isDark} />
+            <SectionCard title={t('account', 'Account')}>
+                <Row label={t('email', 'Email')} value={user?.email || ''} isDark={isDark} embedded />
+                <Row label={t('language', 'Language')} custom={<LanguagePicker />} isDark={isDark} embedded />
+            </SectionCard>
+            <SectionCard title={t('preferences', 'Preferences')}>
             <NotificationRow
                 label={t('chat:notifications_setting_title', 'Message notifications')}
                 description={t('chat:notifications_setting_desc', 'Get alerts for new messages and requests.')}
@@ -162,6 +171,8 @@ export default function SettingsScreen() {
                 onValueChange={toggleNotifications}
                 isDark={isDark}
             />
+            <Action label={t('theme', 'Theme')} onPress={toggleTheme} isDark={isDark} embedded />
+            </SectionCard>
             <SessionsSection
                 sessions={sessions}
                 loading={sessionsLoading}
@@ -171,30 +182,33 @@ export default function SettingsScreen() {
                 onRevokeOthers={confirmLogoutOtherDevices}
                 onRevokeAll={confirmLogoutAllDevices}
                 isDark={isDark}
+                primary={primary}
             />
-            <Action label={t('theme', 'Theme')} onPress={toggleTheme} isDark={isDark} />
-            <Action label={t('blocked_users', 'Blocked users')} onPress={() => router.push('/(tabs)/blocked-users')} isDark={isDark} />
-            <Action label={t('report_issue', 'Report issue')} onPress={() => router.push('/support')} isDark={isDark} />
-            <Action label={t('logout', 'Logout')} danger disabled={isLoading} onPress={async () => { await logout(); router.replace('/(auth)/login'); }} isDark={isDark} />
-        </ScrollView>
+            <SectionCard title={t('security_privacy', 'Security & privacy')}>
+            <Action label={t('blocked_users', 'Blocked users')} onPress={() => router.push({ pathname: '/(tabs)/activities', params: { tab: 'blocked' } })} isDark={isDark} embedded />
+            <Action label={t('report_issue', 'Report issue')} onPress={() => router.push('/support')} isDark={isDark} embedded />
+            <Action label={t('logout', 'Logout')} danger disabled={isLoading} onPress={async () => { await logout(); router.replace('/(auth)/login'); }} isDark={isDark} embedded />
+            </SectionCard>
+            </ScrollView>
+        </View>
     );
 }
 
-function SessionsSection({ sessions, loading, revokeOthersBusy, revokeAllBusy, onRefresh, onRevokeOthers, onRevokeAll, isDark }: any) {
+function SessionsSection({ sessions, loading, revokeOthersBusy, revokeAllBusy, onRefresh, onRevokeOthers, onRevokeAll, isDark, primary }: any) {
+    const colors = useColors();
     const otherSessions = sessions.filter((session: UserSession) => !session.current);
-    const borderColor = isDark ? '#1F2937' : '#E2E8F0';
-    const muted = isDark ? '#94A3B8' : '#64748B';
+    const borderColor = colors.brand.bg.border;
+    const muted = colors.brand.text.subtitle;
     const activeCount = sessions.length;
 
     return (
-        <View style={{ marginTop: scale(14), borderRadius: scale(18), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF' }}>
+        <SectionCard title={t('active_sessions', 'Active sessions')} style={{ marginTop: 0 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(12) }}>
-                <View style={{ width: scale(40), height: scale(40), borderRadius: scale(20), alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#1F2937' : '#FFF1F4' }}>
-                    <Smartphone size={scale(19)} color="#F34B6F" />
+                <View style={{ width: scale(40), height: scale(40), borderRadius: scale(20), alignItems: 'center', justifyContent: 'center', backgroundColor: colors.chrome.common.primaryTint }}>
+                    <Smartphone size={scale(19)} color={primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text variant="body" className="font-body-bold">{t('active_sessions', 'Active sessions')}</Text>
-                    <Text variant="caption" style={{ marginTop: scale(4), color: muted }}>
+                    <Text variant="caption" style={{ color: muted }}>
                         {activeCount ? t('active_sessions_count', '{{count}} active session(s)', { count: activeCount }).replace('{{count}}', String(activeCount)) : t('active_sessions_desc', 'Manage where your account is currently logged in.')}
                     </Text>
                 </View>
@@ -209,10 +223,10 @@ function SessionsSection({ sessions, loading, revokeOthersBusy, revokeAllBusy, o
                         alignItems: 'center',
                         justifyContent: 'center',
                         opacity: loading ? 0.5 : 1,
-                        backgroundColor: isDark ? '#1F2937' : '#F8FAFC',
+                        backgroundColor: colors.brand.bg.surface,
                     }}
                 >
-                    {loading ? <ActivityIndicator color="#F34B6F" size="small" /> : <RefreshCw size={scale(16)} color="#F34B6F" />}
+                    {loading ? <ActivityIndicator color={primary} size="small" /> : <RefreshCw size={scale(16)} color={primary} />}
                 </Pressable>
             </View>
 
@@ -223,7 +237,7 @@ function SessionsSection({ sessions, loading, revokeOthersBusy, revokeAllBusy, o
                     {sessions.length ? sessions.map((session: UserSession) => (
                         <SessionRow key={session.id} session={session} isDark={isDark} />
                     )) : (
-                        <Text variant="body-sm" style={{ marginTop: scale(12), color: isDark ? '#94A3B8' : '#64748B' }}>
+                        <Text variant="body-sm" style={{ marginTop: scale(12), color: colors.brand.text.subtitle }}>
                             {t('no_active_sessions', 'No active sessions found.')}
                         </Text>
                     )}
@@ -234,7 +248,7 @@ function SessionsSection({ sessions, loading, revokeOthersBusy, revokeAllBusy, o
                 <SessionSecurityButton
                     label={revokeOthersBusy ? t('please_wait', 'Please wait') : t('logout_other_devices', 'Log out other devices')}
                     description={t('logout_other_devices_hint', 'Keep this phone signed in and remove every other session.')}
-                    icon={<LogOut size={scale(17)} color="#F34B6F" />}
+                    icon={<LogOut size={scale(17)} color={primary} />}
                     disabled={revokeOthersBusy || revokeAllBusy || otherSessions.length === 0}
                     onPress={onRevokeOthers}
                     isDark={isDark}
@@ -249,11 +263,12 @@ function SessionsSection({ sessions, loading, revokeOthersBusy, revokeAllBusy, o
                     danger
                 />
             </View>
-        </View>
+        </SectionCard>
     );
 }
 
 function SessionSecurityButton({ label, description, icon, disabled, onPress, isDark, danger }: any) {
+    const colors = useColors();
     return (
         <Pressable
             disabled={disabled}
@@ -261,21 +276,21 @@ function SessionSecurityButton({ label, description, icon, disabled, onPress, is
             style={{
                 borderRadius: scale(14),
                 borderWidth: 1,
-                borderColor: danger ? '#FECACA' : (isDark ? '#334155' : '#E2E8F0'),
+                borderColor: danger ? colors.chrome.common.dangerRing : colors.brand.bg.border,
                 padding: scale(12),
                 opacity: disabled ? 0.55 : 1,
-                backgroundColor: danger ? (isDark ? '#2A1220' : '#FFF1F4') : (isDark ? '#0F172A' : '#FFFFFF'),
+                backgroundColor: danger ? colors.chrome.common.dangerTint : colors.chrome.common.card,
             }}
         >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(10) }}>
-                <View style={{ width: scale(34), height: scale(34), borderRadius: scale(17), alignItems: 'center', justifyContent: 'center', backgroundColor: danger ? '#FFE4E6' : '#FFF1F4' }}>
+                <View style={{ width: scale(34), height: scale(34), borderRadius: scale(17), alignItems: 'center', justifyContent: 'center', backgroundColor: danger ? colors.chrome.common.dangerTint : colors.chrome.common.primaryTint }}>
                     {icon}
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text variant="body-sm" className="font-body-semi" style={{ color: danger ? '#E11D48' : undefined }}>
+                    <Text variant="body-sm" className="font-body-semi" style={{ color: danger ? colors.brand.accent.error : colors.chrome.common.textStrong }}>
                         {label}
                     </Text>
-                    <Text variant="caption" style={{ marginTop: scale(3), color: isDark ? '#94A3B8' : '#64748B' }}>
+                    <Text variant="caption" style={{ marginTop: scale(3), color: colors.brand.text.subtitle }}>
                         {description}
                     </Text>
                 </View>
@@ -285,27 +300,28 @@ function SessionSecurityButton({ label, description, icon, disabled, onPress, is
 }
 
 function SessionRow({ session, isDark }: { session: UserSession; isDark: boolean }) {
+    const colors = useColors();
     const lastUsed = formatSessionDate(session.lastUsedAt || session.createdAt);
     const platformLabel = session.current
         ? t('current_device', 'Current device')
         : t('other_device', 'Other device');
 
     return (
-        <View style={{ paddingVertical: scale(12), borderBottomWidth: 1, borderBottomColor: isDark ? '#1F2937' : '#E2E8F0' }}>
+        <View style={{ paddingVertical: scale(12), borderBottomWidth: 1, borderBottomColor: colors.brand.bg.border }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: scale(12) }}>
                 <View style={{ flex: 1 }}>
                     <Text variant="body-sm" className="font-body-semi">{session.label || t('unknown_device', 'Unknown device')}</Text>
-                    <Text variant="caption" style={{ marginTop: scale(3), color: isDark ? '#94A3B8' : '#64748B' }}>
+                    <Text variant="caption" style={{ marginTop: scale(3), color: colors.brand.text.subtitle }}>
                         {t('last_active', 'Last active')}: {lastUsed}
                     </Text>
                     {session.ip ? (
-                        <Text variant="caption" style={{ marginTop: scale(2), color: isDark ? '#64748B' : '#94A3B8' }}>
+                        <Text variant="caption" style={{ marginTop: scale(2), color: colors.brand.text.muted }}>
                             {session.ip}
                         </Text>
                     ) : null}
                 </View>
-                <View style={{ alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: scale(8), paddingVertical: scale(4), backgroundColor: session.current ? '#DCFCE7' : (isDark ? '#1F2937' : '#F1F5F9') }}>
-                    <Text variant="caption" className="font-body-semi" style={{ color: session.current ? '#15803D' : (isDark ? '#CBD5E1' : '#64748B') }}>
+                <View style={{ alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: scale(8), paddingVertical: scale(4), backgroundColor: session.current ? colors.chrome.toast.success.bg : colors.brand.bg.surface }}>
+                    <Text variant="caption" className="font-body-semi" style={{ color: session.current ? colors.chrome.common.successStrong : colors.brand.text.subtitle }}>
                         {platformLabel}
                     </Text>
                 </View>
@@ -327,12 +343,13 @@ function formatSessionDate(value?: string) {
 }
 
 function NotificationRow({ label, description, value, disabled, onValueChange, isDark }: any) {
+    const colors = useColors();
     return (
-        <View style={{ marginTop: scale(14), borderRadius: scale(14), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF' }}>
+        <View style={{ marginTop: scale(8) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(12) }}>
                 <View style={{ flex: 1 }}>
                     <Text variant="body" className="font-body-semi">{label}</Text>
-                    <Text variant="caption" style={{ marginTop: scale(4), color: isDark ? '#94A3B8' : '#64748B' }}>
+                    <Text variant="caption" style={{ marginTop: scale(4), color: colors.brand.text.subtitle }}>
                         {description}
                     </Text>
                 </View>
@@ -340,27 +357,29 @@ function NotificationRow({ label, description, value, disabled, onValueChange, i
                     value={value}
                     disabled={disabled}
                     onValueChange={onValueChange}
-                    trackColor={{ false: '#CBD5E1', true: '#F9A8BA' }}
-                    thumbColor={value ? '#F34B6F' : '#FFFFFF'}
+                    trackColor={{ false: colors.brand.bg.border, true: colors.chrome.common.primaryGlow }}
+                    thumbColor={value ? colors.chrome.primary : colors.chrome.common.inverseText}
                 />
             </View>
         </View>
     );
 }
 
-function Row({ label, value, custom, isDark }: any) {
+function Row({ label, value, custom, isDark, embedded }: any) {
+    const colors = useColors();
     return (
-        <View style={{ marginTop: scale(14), borderRadius: scale(14), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF' }}>
-            <Text variant="caption" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>{label}</Text>
+        <View style={embedded ? { marginTop: scale(10) } : { marginTop: scale(14), borderRadius: scale(14), padding: scale(14), backgroundColor: colors.chrome.common.card }}>
+            <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>{label}</Text>
             {custom || <Text variant="body" style={{ marginTop: scale(4) }}>{value}</Text>}
         </View>
     );
 }
 
-function Action({ label, onPress, danger, isDark, disabled }: any) {
+function Action({ label, onPress, danger, isDark, disabled, embedded }: any) {
+    const colors = useColors();
     return (
-        <Pressable disabled={disabled} onPress={onPress} style={{ marginTop: scale(10), borderRadius: scale(14), padding: scale(14), opacity: disabled ? 0.55 : 1, backgroundColor: isDark ? '#111827' : '#FFFFFF' }}>
-            <Text variant="body" style={{ color: danger ? '#E11D48' : undefined }}>{label}</Text>
+        <Pressable disabled={disabled} onPress={onPress} style={{ marginTop: embedded ? scale(8) : scale(10), borderRadius: scale(14), padding: scale(14), opacity: disabled ? 0.55 : 1, backgroundColor: embedded ? 'transparent' : colors.chrome.common.card }}>
+            <Text variant="body" style={{ color: danger ? colors.brand.accent.error : colors.chrome.common.textStrong }}>{label}</Text>
         </Pressable>
     );
 }

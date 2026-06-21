@@ -10,6 +10,7 @@ import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectShe
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { UserCircle } from 'lucide-react-native';
@@ -59,10 +60,10 @@ export default function Step9() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step10');
             } else {
-                Alert.alert(t('common:error', { defaultValue: 'Error' }), res.message || t('common:server_error_default', { defaultValue: 'Failed to update' }));
+                Alert.alert(t('error', { defaultValue: 'Error' }), res.message || t('server_error_default', { defaultValue: 'Failed to update' }));
             }
         } catch {
-            Alert.alert(t('common:error', { defaultValue: 'Error' }), t('common:server_error_default', { defaultValue: 'Something went wrong' }));
+            Alert.alert(t('error', { defaultValue: 'Error' }), t('server_error_default', { defaultValue: 'Something went wrong' }));
         } finally {
             setLoading(false);
         }
@@ -72,8 +73,9 @@ export default function Step9() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={9} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
+                        step={9}
                         title={t('profile_m_title', { defaultValue: 'Who Is Creating This Profile?' })}
                         subtitle={t('profile_m_desc', { defaultValue: 'Let us know who is operating this profile — yourself or someone on your behalf.' })}
                     />

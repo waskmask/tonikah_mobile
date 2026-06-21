@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -32,6 +32,7 @@ import {
   Wine,
 } from "lucide-react-native";
 
+import { AppBackTitleBar } from "@/components/app/AppBackTitleBar";
 import { EditProfileMediaEditor } from "@/components/profile/EditProfileMediaEditor";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { MultiSelectOption, MultiSelectSheet } from "@/components/ui/MultiSelectSheet";
@@ -55,7 +56,7 @@ import {
   displayText,
   profileImage,
   selectLabel,
-  t,
+  t as translateText,
   translateCountry,
 } from "@/lib/profileDisplay";
 import { profileService } from "@/lib/profileService";
@@ -376,8 +377,15 @@ export default function EditProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
+  const initialLoadStartedRef = useRef(false);
 
-  const fallbackText = useMemo(() => t("common.not_set", NOT_SET), [currentLanguage]);
+  const t = useCallback(
+    (key: string, fallback?: string, options?: Record<string, any>) =>
+      typeof translateText === "function" ? translateText(key, fallback, options) : fallback || key,
+    [currentLanguage],
+  );
+
+  const fallbackText = useMemo(() => t("not_set", NOT_SET), [currentLanguage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -405,7 +413,7 @@ export default function EditProfileScreen() {
   }, []);
 
   const loadCompletion = useCallback(
-    async (nextProfile = profile, nextGallery = gallery) => {
+    async (nextProfile: any = {}, nextGallery: GalleryItem[] = []) => {
       try {
         const response = await profileService.fetchProfileCompletion();
         const data = response.completion || response.profileCompletion || response.data;
@@ -428,7 +436,7 @@ export default function EditProfileScreen() {
 
       setCompletion(localCompletion(nextProfile || {}, nextGallery || []));
     },
-    [gallery, profile],
+    [],
   );
 
   const loadProfile = useCallback(async () => {
@@ -451,9 +459,11 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loadCompletion, toast]);
+  }, [loadCompletion]);
 
   useEffect(() => {
+    if (initialLoadStartedRef.current) return;
+    initialLoadStartedRef.current = true;
     void loadProfile();
   }, [loadProfile]);
 
@@ -464,6 +474,10 @@ export default function EditProfileScreen() {
     });
     return sortedGallery[0]?.url || profileImage(profile) || PROFILE_PLACEHOLDER_IMAGE;
   }, [gallery, profile]);
+  const primaryImageSource = useMemo(
+    () => (typeof primaryImage === "string" ? { uri: primaryImage } : primaryImage),
+    [primaryImage],
+  );
 
   const age = useMemo(() => calculateAge(profile?.dob), [profile?.dob]);
   const displayName = profile?.profileName || profile?.profile_name || t("profile.my_profile", "My profile");
@@ -1102,7 +1116,10 @@ export default function EditProfileScreen() {
 
   const openFieldEditor = (row: FieldRow) => {
     if (row.id === "current_location") {
-      void refreshCurrentLocation();
+      toast.show(
+        t("profile.location_edit_from_device", "Location editing will use your device location. We will open this as a dedicated edit screen."),
+        "info",
+      );
       return;
     }
 
@@ -1133,13 +1150,15 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.background }}
-      contentContainerStyle={[styles.container, { paddingHorizontal: scale(20) }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <AppBackTitleBar title={t("edit_profile", "Edit profile")} fallbackHref="/(tabs)/profile" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.container, { paddingHorizontal: scale(20) }]}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={[styles.summary, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-        <Image source={{ uri: primaryImage }} style={styles.avatar} contentFit="cover" />
+        <Image source={primaryImageSource as any} style={styles.avatar} contentFit="cover" />
         <View style={styles.summaryBody}>
           <View style={[styles.nameRow, isRTL && styles.rowReverse]}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
@@ -1239,7 +1258,7 @@ export default function EditProfileScreen() {
         {errors.annualIncome ? <Text style={styles.error}>{errors.annualIncome}</Text> : null}
 
         <GradientButton
-          title={t("common.save", "Save")}
+          title={t("save", "Save")}
           onPress={saveInlineFields}
           loading={saving}
           containerStyle={styles.saveButton}
@@ -1332,7 +1351,8 @@ export default function EditProfileScreen() {
         maxSelections={activeMultiMax}
         searchEnabled
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

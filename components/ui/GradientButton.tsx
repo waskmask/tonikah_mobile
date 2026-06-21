@@ -4,6 +4,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "./Text";
 import { scale, wp } from "@/hooks/useResponsive";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useColors } from "@/hooks/useColors";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { useHaptics } from "@/hooks/useHaptics";
 import { ChevronRight, ChevronLeft } from "lucide-react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 
@@ -35,24 +38,29 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
     containerStyle,
 }) => {
     const { isRTL } = useLanguage();
+    const palette = useColors();
+    const reduceMotion = useReducedMotion();
+    const { lightImpact } = useHaptics();
     const scaleValue = useSharedValue(1);
 
-    const colors =
+    const gradientColors =
         variant === "outline"
             ? (["transparent", "transparent"] as [string, string])
             : variant === "primary"
-                ? (["#F34B6F", "#E8447A"] as [string, string])
-                : (["#1E293B", "#334155"] as [string, string]);
+                ? ([palette.chrome.primary, palette.chrome.primaryEnd] as [string, string])
+                : ([palette.brand.bg.surface, palette.brand.bg.border] as [string, string]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scaleValue.value }],
     }));
 
     const handlePressIn = () => {
-        if (!disabled && !loading) scaleValue.value = withSpring(0.97);
+        if (!disabled && !loading) {
+            scaleValue.value = reduceMotion ? 1 : withSpring(0.97);
+        }
     };
     const handlePressOut = () => {
-        scaleValue.value = withSpring(1);
+        scaleValue.value = reduceMotion ? 1 : withSpring(1);
     };
 
     return (
@@ -67,7 +75,10 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
         >
             <View style={styles.shadowWrapper}>
                 <TouchableOpacity
-                    onPress={onPress}
+                    onPress={() => {
+                        if (!disabled && !loading) lightImpact();
+                        onPress();
+                    }}
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                     disabled={disabled || loading}
@@ -80,12 +91,12 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                         },
                         variant === 'outline' && {
                             borderWidth: 1,
-                            borderColor: '#E2E8F0',
+                            borderColor: palette.brand.bg.border,
                         },
                     ]}
                 >
                     <LinearGradient
-                        colors={colors}
+                        colors={gradientColors}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={{
@@ -97,7 +108,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                         }}
                     >
                         {loading ? (
-                            <ActivityIndicator color={variant === 'outline' ? '#F34B6F' : '#FFFFFF'} />
+                            <ActivityIndicator color={variant === 'outline' ? palette.chrome.primary : '#FFFFFF'} />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: variant === 'outline' ? 'space-between' : 'center', width: '100%', paddingHorizontal: variant === 'outline' ? 4 : 0 }}>
                                 <Text variant={variant === 'outline' ? 'body-sm' : 'button'} className={variant === 'outline' ? 'font-body text-brand-text-body' : 'text-white font-body-semi text-center'} numberOfLines={1} style={variant === 'outline' ? { flex: 1 } : undefined}>

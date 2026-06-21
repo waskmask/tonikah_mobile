@@ -245,6 +245,7 @@ export const api = {
         const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
         return { accessToken, refreshToken };
     },
+    refreshAccessToken,
     clearTokens: async () => {
         await SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS);
         await SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH);

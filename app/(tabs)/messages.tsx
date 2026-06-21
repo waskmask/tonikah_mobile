@@ -14,6 +14,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Archive, Bell, BellOff, Check, MessageCircle, Search, Send, UserRoundPlus, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
+import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import {
     chatService,
     Conversation,
@@ -25,6 +26,7 @@ import { apiMessage, profileImage, t } from '@/lib/profileDisplay';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { translateChatText } from '@/lib/chatDisplay';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
@@ -37,7 +39,6 @@ import {
     shouldShowPushBannerToday,
 } from '@/lib/pushNotifications';
 
-const PRIMARY = '#F34B6F';
 const TABS: Array<{ key: ConversationTab; labelKey: string; fallback: string; Icon: any }> = [
     { key: 'chats', labelKey: 'chat:tab_chats', fallback: 'Chats', Icon: MessageCircle },
     { key: 'requests', labelKey: 'chat:tab_requests', fallback: 'Requests', Icon: UserRoundPlus },
@@ -75,6 +76,7 @@ function openConversation(conversation: Conversation) {
             name: otherName(conversation),
             avatar: profileImage(other),
             online: other.recently_active ? '1' : '0',
+            accountDeleted: other.account_deleted ? '1' : '0',
             state: conversation.state,
             requestRole: conversation.requestRole || '',
         },
@@ -83,6 +85,8 @@ function openConversation(conversation: Conversation) {
 
 export default function MessagesScreen() {
     const { isDark } = useTheme();
+    const palette = useColors();
+    const primary = palette.chrome.primary;
     const { currentLanguage, isRTL } = useLanguage();
     const toast = useToast();
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
@@ -213,6 +217,11 @@ export default function MessagesScreen() {
     }, [activeTab, conversations, requests, search, sent]);
 
     const runRequestAction = async (conversation: Conversation, action: 'accept' | 'decline' | 'withdraw') => {
+        if (conversation.otherUser?.account_deleted) {
+            toast.show(t('chat:account_deleted_request_removed', 'This request is no longer available because the account was deleted.'), 'info');
+            await load('replace');
+            return;
+        }
         const res = action === 'accept'
             ? await chatService.accept(conversation.id)
             : action === 'decline'
@@ -233,7 +242,7 @@ export default function MessagesScreen() {
         return (
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={styles.center}>
-                    <ActivityIndicator color={PRIMARY} />
+                    <ActivityIndicator color={primary} />
                 </View>
             </SafeAreaView>
         );
@@ -248,24 +257,23 @@ export default function MessagesScreen() {
                     return (
                         <Pressable key={key} onPress={() => setActiveTab(key)} style={styles.tab}>
                             <View style={styles.tabIconWrap}>
-                                <Icon size={scale(17)} color={active ? PRIMARY : colors.text} strokeWidth={active ? 2.5 : 2.1} fill={active && key === 'chats' ? PRIMARY : 'transparent'} />
-                                {badge > 0 && (
-                                    <View style={styles.badgeSmall}>
-                                        <Text variant="caption" className="font-body-bold" style={styles.badgeSmallText}>
-                                            {badge > 9 ? '9+' : badge}
-                                        </Text>
-                                    </View>
-                                )}
+                                <Icon size={scale(17)} color={active ? primary : colors.text} strokeWidth={active ? 2.5 : 2.1} fill={active && key === 'chats' ? primary : 'transparent'} />
+                                <UnreadBadge
+                                    count={badge}
+                                    variant="sm"
+                                    borderColor={colors.card}
+                                    style={styles.tabBadge}
+                                />
                             </View>
                             <Text
                                 variant="caption"
                                 numberOfLines={1}
                                 className={active ? 'font-body-bold' : 'font-body-semi'}
-                                style={{ color: active ? PRIMARY : colors.text, fontSize: scale(9.5), lineHeight: scale(11) }}
+                                style={{ color: active ? primary : colors.text, fontSize: scale(9.5), lineHeight: scale(11) }}
                             >
                                 {t(labelKey, fallback)}
                             </Text>
-                            {active && <View style={styles.activeLine} />}
+                            {active && <View style={[styles.activeLine, { backgroundColor: primary }]} />}
                         </Pressable>
                     );
                 })}
@@ -287,7 +295,7 @@ export default function MessagesScreen() {
             {notificationBannerVisible && (
                 <View style={[styles.notificationBanner, { backgroundColor: isDark ? '#172033' : '#FFF1F5', borderColor: isDark ? '#334155' : '#FEC9D5' }]}>
                     <View style={styles.notificationBannerIcon}>
-                        <Bell size={scale(15)} color={PRIMARY} strokeWidth={2.5} />
+                        <Bell size={scale(15)} color={primary} strokeWidth={2.5} />
                     </View>
                     <View style={styles.notificationBannerText}>
                         <Text variant="caption" className="font-body-bold" style={{ color: colors.text }}>
@@ -298,7 +306,7 @@ export default function MessagesScreen() {
                         </Text>
                     </View>
                     <Pressable disabled={notificationBannerBusy} onPress={enableNotificationsFromBanner} style={styles.notificationBannerAction}>
-                        <Text variant="caption" className="font-body-bold" style={{ color: PRIMARY }}>
+                        <Text variant="caption" className="font-body-bold" style={{ color: primary }}>
                             {t('chat:notification_banner_enable', 'Enable')}
                         </Text>
                     </Pressable>
@@ -322,7 +330,7 @@ export default function MessagesScreen() {
                 keyExtractor={(item) => item.id}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ paddingBottom: scale(110), flexGrow: 1 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={PRIMARY} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={primary} />}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.45}
                 ListEmptyComponent={
@@ -347,7 +355,7 @@ export default function MessagesScreen() {
                         </Text>
                     </View>
                 }
-                ListFooterComponent={loadingMore ? <ActivityIndicator color={PRIMARY} style={{ paddingVertical: scale(16) }} /> : null}
+                ListFooterComponent={loadingMore ? <ActivityIndicator color={primary} style={{ paddingVertical: scale(16) }} /> : null}
                 renderItem={({ item }) => (
                     <ConversationRow
                         conversation={item}
@@ -381,10 +389,12 @@ function ConversationRow({
     onDecline: () => void;
     onWithdraw: () => void;
 }) {
+    const primary = useColors().chrome.primary;
     const other = (conversation.otherUser || {}) as ConversationOtherUser;
     const avatar = profileImage(other);
     const initial = otherName(conversation).trim().charAt(0).toUpperCase() || '?';
     const isRequest = variant === 'requests' || variant === 'sent';
+    const isDeleted = !!other.account_deleted;
     const preview = translateChatText(conversation.lastMessagePreview || (variant === 'requests' ? 'sent_you_a_message' : ''));
 
     return (
@@ -415,7 +425,7 @@ function ConversationRow({
                             <Text
                                 variant="caption"
                                 className="font-body-semi"
-                                style={{ color: conversation.unreadCount > 0 ? PRIMARY : colors.muted }}
+                                style={{ color: conversation.unreadCount > 0 ? colors.primary : colors.muted }}
                             >
                                 {formatRelative(conversation.lastMessageAt)}
                             </Text>
@@ -433,24 +443,18 @@ function ConversationRow({
                         <View style={styles.rowMeta}>
                             {conversation.muted && <BellOff size={scale(14)} color={colors.muted} />}
                             {variant === 'sent' && <Check size={scale(14)} color={colors.muted} strokeWidth={2.5} />}
-                            {conversation.unreadCount > 0 && (
-                                <View style={styles.unreadBadge}>
-                                    <Text variant="caption" className="font-body-bold" style={styles.unreadText}>
-                                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
-                                    </Text>
-                                </View>
-                            )}
+                            <UnreadBadge count={conversation.unreadCount} variant="lg" />
                         </View>
                     </View>
                 </View>
             </Pressable>
-            {variant === 'requests' && (
+            {variant === 'requests' && !isDeleted && (
                 <View style={styles.actions}>
                     <ActionPill label={t('chat:accept', 'Accept')} icon={Check} tone="primary" onPress={onAccept} />
                     <ActionPill label={t('chat:decline', 'Decline')} icon={X} tone="neutral" onPress={onDecline} />
                 </View>
             )}
-            {variant === 'sent' && (
+            {variant === 'sent' && !isDeleted && (
                 <View style={styles.actions}>
                     <ActionPill label={t('chat:withdraw', 'Withdraw')} icon={X} tone="neutral" onPress={onWithdraw} />
                 </View>
@@ -460,11 +464,20 @@ function ConversationRow({
 }
 
 function ActionPill({ label, icon: Icon, tone, onPress }: { label: string; icon: any; tone: 'primary' | 'neutral'; onPress: () => void }) {
-    const primary = tone === 'primary';
+    const palette = useColors();
+    const isPrimary = tone === 'primary';
     return (
-        <Pressable onPress={onPress} style={[styles.actionPill, primary ? styles.actionPrimary : styles.actionNeutral]}>
-            <Icon size={scale(12)} color={primary ? '#FFFFFF' : '#475569'} strokeWidth={2.8} />
-            <Text variant="caption" className="font-body-bold" style={{ color: primary ? '#FFFFFF' : '#475569' }}>
+        <Pressable
+            onPress={onPress}
+            style={[
+                styles.actionPill,
+                isPrimary
+                    ? { backgroundColor: palette.chrome.primary }
+                    : styles.actionNeutral,
+            ]}
+        >
+            <Icon size={scale(12)} color={isPrimary ? '#FFFFFF' : '#475569'} strokeWidth={2.8} />
+            <Text variant="caption" className="font-body-bold" style={{ color: isPrimary ? '#FFFFFF' : '#475569' }}>
                 {label}
             </Text>
         </Pressable>
@@ -501,21 +514,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    badgeSmall: {
+    tabBadge: {
         position: 'absolute',
-        top: 0,
-        right: 0,
-        minWidth: scale(12),
-        height: scale(12),
-        borderRadius: scale(6),
-        paddingHorizontal: scale(2),
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: PRIMARY,
-        borderWidth: scale(1.5),
-        borderColor: '#FFFFFF',
+        top: -scale(2),
+        right: -scale(8),
     },
-    badgeSmallText: { color: '#FFFFFF', fontSize: scale(7), lineHeight: scale(8) },
     activeLine: {
         position: 'absolute',
         left: scale(12),
@@ -523,7 +526,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         height: scale(2.5),
         borderRadius: scale(2),
-        backgroundColor: PRIMARY,
     },
     searchWrap: { paddingHorizontal: scale(18), paddingTop: scale(14), paddingBottom: scale(10) },
     searchBox: {
@@ -570,18 +572,7 @@ const styles = StyleSheet.create({
     previewRow: { flexDirection: 'row', alignItems: 'center', gap: scale(8), marginTop: scale(3) },
     preview: { flex: 1, fontSize: scale(13), lineHeight: scale(17) },
     rowMeta: { flexDirection: 'row', alignItems: 'center', gap: scale(5) },
-    unreadBadge: {
-        minWidth: scale(20),
-        height: scale(20),
-        borderRadius: scale(10),
-        paddingHorizontal: scale(5),
-        backgroundColor: PRIMARY,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    unreadText: { color: '#FFFFFF', fontSize: scale(10), lineHeight: scale(12) },
     actions: { flexDirection: 'row', alignItems: 'center', gap: scale(8), paddingLeft: scale(74), paddingBottom: scale(12) },
     actionPill: { height: scale(28), borderRadius: scale(14), paddingHorizontal: scale(12), flexDirection: 'row', alignItems: 'center', gap: scale(5) },
-    actionPrimary: { backgroundColor: PRIMARY },
     actionNeutral: { backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#CBD5E1' },
 });

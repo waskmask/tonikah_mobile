@@ -13,6 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale } from '@/hooks/useResponsive';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColors } from '@/hooks/useColors';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -24,41 +25,20 @@ export interface ToastProps {
     duration?: number;
 }
 
-const TOAST_CONFIG = {
-    success: {
-        bg: 'bg-green-50 dark:bg-green-900/20',
-        border: 'border-green-500',
-        icon: CheckCircle2,
-        iconColor: '#22C55E', // green-500
-        textColor: 'text-green-800 dark:text-green-200'
-    },
-    error: {
-        bg: 'bg-red-50 dark:bg-red-900/20',
-        border: 'border-red-500',
-        icon: AlertCircle,
-        iconColor: '#EF4444', // red-500
-        textColor: 'text-red-800 dark:text-red-200'
-    },
-    warning: {
-        bg: 'bg-amber-50 dark:bg-amber-900/20',
-        border: 'border-amber-500',
-        icon: AlertTriangle,
-        iconColor: '#F59E0B', // amber-500
-        textColor: 'text-amber-800 dark:text-amber-200'
-    },
-    info: {
-        bg: 'bg-blue-50 dark:bg-blue-900/20',
-        border: 'border-blue-500',
-        icon: Info,
-        iconColor: '#3B82F6', // blue-500
-        textColor: 'text-blue-800 dark:text-blue-200'
-    }
+const TOAST_ICONS = {
+    success: CheckCircle2,
+    error: AlertCircle,
+    warning: AlertTriangle,
+    info: Info,
 };
 
 export function Toast({ visible, message, type = 'info', onDismiss, duration = 4000 }: ToastProps) {
     const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
+    const colors = useColors();
     const translateY = useSharedValue(-150);
+    const toastStyle = colors.chrome.toast[type];
+    const Icon = TOAST_ICONS[type];
 
     useEffect(() => {
         if (visible) {
@@ -90,16 +70,11 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
         });
     };
 
-    const animatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ translateY: translateY.value }],
-        };
-    });
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }],
+    }));
 
     if (!visible && translateY.value <= -149) return null;
-
-    const config = TOAST_CONFIG[type];
-    const Icon = config.icon;
 
     return (
         <Animated.View
@@ -108,23 +83,32 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                 { paddingTop: insets.top + scale(10) },
                 animatedStyle
             ]}
-            className="absolute top-0 w-full px-4 z-50 elevation-5"
         >
-            <Pressable onPress={hideToast} className="w-full shadow-sm">
+            <Pressable onPress={hideToast} style={styles.pressable}>
                 <View
-                    className={`flex-row items-center p-4 rounded-xl border-s-4 shadow-sm backdrop-blur-md ${config.bg} ${config.border}`}
-                    style={{ minHeight: scale(60) }}
+                    style={[
+                        styles.card,
+                        {
+                            minHeight: scale(60),
+                            backgroundColor: toastStyle.bg,
+                            borderLeftColor: toastStyle.border,
+                        },
+                    ]}
                 >
-                    <Icon size={scale(24)} color={config.iconColor} />
+                    <Icon size={scale(24)} color={toastStyle.icon} />
                     <Text
                         variant="body-sm"
-                        className={`flex-1 mx-3 ${config.textColor}`}
-                        style={{ textAlign: isRTL ? 'right' : 'left' }}
+                        style={{
+                            flex: 1,
+                            marginHorizontal: scale(12),
+                            color: toastStyle.text,
+                            textAlign: isRTL ? 'right' : 'left',
+                        }}
                     >
                         {message}
                     </Text>
-                    <Pressable onPress={hideToast} hitSlop={10} className="p-1 opacity-60">
-                        <X size={scale(20)} color={config.iconColor} />
+                    <Pressable onPress={hideToast} hitSlop={10} style={styles.dismiss}>
+                        <X size={scale(20)} color={toastStyle.icon} />
                     </Pressable>
                 </View>
             </Pressable>
@@ -134,9 +118,29 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
 
 const styles = StyleSheet.create({
     container: {
-        shadowColor: "#000",
+        position: 'absolute',
+        top: 0,
+        width: '100%',
+        paddingHorizontal: scale(16),
+        zIndex: 50,
+        elevation: 5,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.15,
         shadowRadius: 8,
-    }
+    },
+    pressable: {
+        width: '100%',
+    },
+    card: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: scale(16),
+        borderRadius: scale(12),
+        borderLeftWidth: scale(4),
+    },
+    dismiss: {
+        padding: scale(4),
+        opacity: 0.7,
+    },
 });

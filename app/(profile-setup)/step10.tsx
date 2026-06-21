@@ -23,8 +23,10 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { ErrorText, FieldLabel } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { Typography } from '@/constants/typography';
 import { profileService } from '@/lib/profileService';
 import { galleryService, GalleryItem, GalleryPrivacy } from '@/lib/galleryService';
@@ -62,6 +64,7 @@ function template(text: string, values: Record<string, string | number>) {
 export default function Step10() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
+    const colors = useColors();
     const { currentLanguage } = useLanguage();
     const { gender, profileData, setProfileData, reset } = useProfileSetupStore();
     const { user, refreshUser } = useAuthStore();
@@ -318,9 +321,9 @@ export default function Step10() {
         setSubmitting(false);
     }
 
-    const iconColor = isDark ? '#CBD5E1' : '#475569';
-    const borderColor = isDark ? '#334155' : '#E2E8F0';
-    const inputBackground = isDark ? '#1E293B' : '#FFFFFF';
+    const iconColor = colors.brand.text.subtitle;
+    const borderColor = colors.brand.bg.border;
+    const inputBackground = colors.chrome.common.card;
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
 
     return (
@@ -328,11 +331,12 @@ export default function Step10() {
             <ProgressBar currentStep={10} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView
-                    contentContainerStyle={{ padding: scale(20), paddingBottom: scale(120) }}
+                    contentContainerStyle={ProfileSetupTokens.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
                     <ProfileSetupHeader
+                        step={10}
                         title={translated(t, 'profile_summary', 'Photos and Profile Summary')}
                         subtitle={translated(t, 'profile_summary_desc', 'Add images, your headline and a short bio to personalize the profile.')}
                     />
@@ -340,7 +344,7 @@ export default function Step10() {
                     <FieldLabel text={t('photo_gallery')} />
                     {loadingGallery ? (
                         <View style={styles.loadingBox}>
-                            <ActivityIndicator color="#F34B6F" />
+                            <ActivityIndicator color={colors.chrome.primary} />
                         </View>
                     ) : (
                         <View style={styles.galleryGrid}>
@@ -359,7 +363,7 @@ export default function Step10() {
                                         ) : (
                                             <View style={styles.emptySlot}>
                                                 <ImagePlus size={scale(26)} color={iconColor} />
-                                                <Text variant="caption" align="center" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+                                                <Text variant="caption" align="center" style={{ color: colors.brand.text.subtitle }}>
                                                     {template(t('add_photo_slot'), { number: index + 1 })}
                                                 </Text>
                                             </View>
@@ -367,7 +371,7 @@ export default function Step10() {
 
                                         {busy && (
                                             <View style={styles.busyOverlay}>
-                                                <ActivityIndicator color="#FFFFFF" />
+                                                <ActivityIndicator color={colors.chrome.common.inverseText} />
                                             </View>
                                         )}
 
@@ -375,15 +379,15 @@ export default function Step10() {
                                             <>
                                                 {index > 0 && (
                                                     <Pressable onPress={() => moveImageUp(index)} style={[styles.slotButton, styles.slotTopButton]} disabled={busy}>
-                                                        <ArrowUp size={scale(15)} color="#FFFFFF" />
+                                                        <ArrowUp size={scale(15)} color={colors.chrome.common.inverseText} />
                                                     </Pressable>
                                                 )}
                                                 <View style={styles.slotActions}>
                                                     <Pressable onPress={() => pickImage(index)} style={styles.slotButton} disabled={busy}>
-                                                        <Pencil size={scale(15)} color="#FFFFFF" />
+                                                        <Pencil size={scale(15)} color={colors.chrome.common.inverseText} />
                                                     </Pressable>
                                                     <Pressable onPress={() => removeImage(item.uuid)} style={[styles.slotButton, styles.dangerButton]} disabled={busy}>
-                                                        <Trash2 size={scale(15)} color="#FFFFFF" />
+                                                        <Trash2 size={scale(15)} color={colors.chrome.common.inverseText} />
                                                     </Pressable>
                                                 </View>
                                             </>
@@ -399,7 +403,7 @@ export default function Step10() {
                             variant="body-sm"
                             style={{
                                 marginTop: scale(10),
-                                color: message.type === 'success' ? '#059669' : '#E11D48',
+                                color: message.type === 'success' ? colors.chrome.common.successStrong : colors.brand.accent.error,
                             }}
                         >
                             {message.text}
@@ -408,7 +412,7 @@ export default function Step10() {
 
                     {canUsePrivateGallery && (
                         <View style={[styles.privacyRow, { borderColor, backgroundColor: inputBackground }]}>
-                            <View style={[styles.privacyIcon, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }]}>
+                            <View style={[styles.privacyIcon, { backgroundColor: colors.brand.bg.surface }]}>
                                 {privacy === 'private' ? (
                                     <Lock size={scale(16)} color={iconColor} />
                                 ) : (
@@ -429,8 +433,8 @@ export default function Step10() {
                                             styles.privacySwitch,
                                             {
                                                 backgroundColor: privacy === 'private'
-                                                    ? '#F34B6F'
-                                                    : isDark ? 'rgba(255,255,255,0.14)' : '#DFE2EA',
+                                                    ? colors.chrome.primary
+                                                    : colors.brand.bg.border,
                                                 opacity: updatingPrivacy ? 0.72 : 1,
                                             },
                                         ]}
@@ -441,11 +445,11 @@ export default function Step10() {
                                                 privacy === 'private' && styles.privacySwitchThumbOn,
                                             ]}
                                         >
-                                            {updatingPrivacy ? <ActivityIndicator size="small" color="#F34B6F" /> : null}
+                                            {updatingPrivacy ? <ActivityIndicator size="small" color={colors.chrome.primary} /> : null}
                                         </View>
                                     </Pressable>
                                 </View>
-                                <Text variant="caption" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+                                <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
                                     {t('gallery_privacy_note')}
                                 </Text>
                             </View>
@@ -460,20 +464,20 @@ export default function Step10() {
                             if (errors.headline) setErrors((current) => ({ ...current, headline: '' }));
                         }}
                         placeholder={t('profile_headline_ph')}
-                        placeholderTextColor={isDark ? '#64748B' : '#9CA3AF'}
+                        placeholderTextColor={colors.brand.text.muted}
                         maxLength={140}
                         style={[
                             styles.input,
                             {
-                                color: isDark ? '#E2E8F0' : '#0A0D14',
+                                color: colors.brand.text.body,
                                 backgroundColor: inputBackground,
-                                borderColor: errors.headline ? '#EF4444' : borderColor,
+                                borderColor: errors.headline ? colors.brand.accent.error : borderColor,
                                 fontFamily: inputFontFamily,
                             },
                         ]}
                     />
                     {errors.headline && <ErrorText text={errors.headline} />}
-                    <Text variant="caption" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+                    <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
                         {countNonSpace(headline)}/{HEADLINE_MAX}
                     </Text>
 
@@ -485,22 +489,22 @@ export default function Step10() {
                             if (errors.bio) setErrors((current) => ({ ...current, bio: '' }));
                         }}
                         placeholder={t('bio_ph')}
-                        placeholderTextColor={isDark ? '#64748B' : '#9CA3AF'}
+                        placeholderTextColor={colors.brand.text.muted}
                         multiline
                         textAlignVertical="top"
                         maxLength={900}
                         style={[
                             styles.textArea,
                             {
-                                color: isDark ? '#E2E8F0' : '#0A0D14',
+                                color: colors.brand.text.body,
                                 backgroundColor: inputBackground,
-                                borderColor: errors.bio ? '#EF4444' : borderColor,
+                                borderColor: errors.bio ? colors.brand.accent.error : borderColor,
                                 fontFamily: inputFontFamily,
                             },
                         ]}
                     />
                     {errors.bio && <ErrorText text={errors.bio} />}
-                    <Text variant="caption" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+                    <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
                         {countNonSpace(bio)}/{BIO_MAX}
                     </Text>
                 </ScrollView>

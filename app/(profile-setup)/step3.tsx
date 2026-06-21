@@ -10,9 +10,11 @@ import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectShe
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { Heart, Baby, Calendar, MapPinned, Users } from 'lucide-react-native';
+import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step3() {
     const { t } = useTranslation('common');
@@ -106,10 +108,10 @@ export default function Step3() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step4');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update profile');
+                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
         } finally {
             setLoading(false);
         }
@@ -119,10 +121,11 @@ export default function Step3() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={3} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
-                        title={t('relationship_status', { defaultValue: 'Relationship Status' })}
-                        subtitle={t('relationship_status_descc', { defaultValue: 'Share your marital and future family expectations.' })}
+                        step={3}
+                        title={t('step_3.title', { defaultValue: 'Relationship Status' })}
+                        subtitle={t('step_3.subtitle', { defaultValue: 'Please select the option that best describes your current relationship status.' })}
                     />
 
                     {fields.map((field) => (
@@ -130,7 +133,7 @@ export default function Step3() {
                             <FieldLabel text={field.label} required />
                             <SelectField
                                 value={field.value ? field.options.find((o) => o.value === field.value)?.label || '' : ''}
-                                placeholder="Select"
+                                placeholder={t('select', { defaultValue: 'Select' })}
                                 onPress={() => setActiveSheet(field.sheet)}
                                 icon={field.icon}
                                 hasError={!!errors[field.key]}

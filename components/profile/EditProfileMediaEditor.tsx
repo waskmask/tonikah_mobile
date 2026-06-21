@@ -9,6 +9,7 @@ import { galleryService, GalleryItem, GalleryPrivacy } from '@/lib/galleryServic
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
 
@@ -42,6 +43,7 @@ function normalizeGallery(items: GalleryItem[] = []) {
 
 export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = [], initialPrivacy = 'public', onGalleryChange }: Props) {
     const { isDark } = useTheme();
+    const colors = useColors();
     const toast = useToast();
     const [privacy, setPrivacy] = useState<GalleryPrivacy>(canUsePrivateGallery ? initialPrivacy : 'public');
     const [gallery, setGallery] = useState<GalleryItem[]>(() => normalizeGallery(initialGallery));
@@ -57,10 +59,10 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
         [gallery]
     );
 
-    const borderColor = isDark ? '#334155' : '#E2E8F0';
-    const surface = isDark ? '#111827' : '#FFFFFF';
-    const mutedSurface = isDark ? '#1E293B' : '#F8FAFC';
-    const mutedText = isDark ? '#94A3B8' : '#64748B';
+    const borderColor = colors.brand.bg.border;
+    const surface = colors.chrome.common.card;
+    const mutedSurface = colors.brand.bg.surface;
+    const mutedText = colors.brand.text.subtitle;
 
     const refreshGallery = useCallback(async (showLoader = false) => {
         if (showLoader) setLoading(true);
@@ -197,7 +199,7 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
 
             {loading ? (
                 <View style={styles.loading}>
-                    <ActivityIndicator color="#F34B6F" />
+                    <ActivityIndicator color={colors.chrome.primary} />
                 </View>
             ) : (
                 <View style={styles.grid}>
@@ -226,29 +228,29 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
 
                                 {primary && item ? (
                                     <View style={styles.primaryBadge}>
-                                        <Star size={scale(11)} color="#FFFFFF" fill="#FFFFFF" />
+                                        <Star size={scale(11)} color={colors.chrome.common.inverseText} fill={colors.chrome.common.inverseText} />
                                         <Text style={styles.primaryText}>{t('primary', 'Primary')}</Text>
                                     </View>
                                 ) : null}
 
                                 {busy ? (
                                     <View style={styles.busyOverlay}>
-                                        <ActivityIndicator color="#FFFFFF" />
+                                        <ActivityIndicator color={colors.chrome.common.inverseText} />
                                     </View>
                                 ) : null}
 
                                 {item ? (
                                     <View style={styles.slotActions}>
                                         <Pressable onPress={() => pickImage(index)} style={styles.slotAction} hitSlop={8}>
-                                            <Pencil size={scale(14)} color="#FFFFFF" />
+                                            <Pencil size={scale(14)} color={colors.chrome.common.inverseText} />
                                         </Pressable>
                                         {!primary ? (
                                             <Pressable onPress={() => uuid && makePrimary(uuid)} style={styles.slotAction} hitSlop={8}>
-                                                <ArrowUp size={scale(15)} color="#FFFFFF" />
+                                                <ArrowUp size={scale(15)} color={colors.chrome.common.inverseText} />
                                             </Pressable>
                                         ) : null}
                                         <Pressable onPress={() => uuid && removeImage(uuid)} style={[styles.slotAction, styles.deleteAction]} hitSlop={8}>
-                                            <Trash2 size={scale(14)} color="#FFFFFF" />
+                                            <Trash2 size={scale(14)} color={colors.chrome.common.inverseText} />
                                         </Pressable>
                                     </View>
                                 ) : null}
@@ -261,7 +263,7 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
             {canUsePrivateGallery ? (
                 <View style={[styles.privacyRow, { borderColor, backgroundColor: mutedSurface }]}>
                     <View style={[styles.privacyIcon, { backgroundColor: surface }]}>
-                        {privacy === 'private' ? <Lock size={scale(18)} color="#475569" /> : <Unlock size={scale(18)} color="#475569" />}
+                        {privacy === 'private' ? <Lock size={scale(18)} color={colors.brand.text.subtitle} /> : <Unlock size={scale(18)} color={colors.brand.text.subtitle} />}
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text variant="body-sm" className="font-body-semi">{t('gallery_privacy_title', 'Keep my photos private')}</Text>
@@ -274,7 +276,7 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
                         disabled={privacyBusy}
                         accessibilityRole="switch"
                         accessibilityState={{ checked: privacy === 'private', disabled: privacyBusy }}
-                        style={[styles.switchTrack, { backgroundColor: privacy === 'private' ? '#F34B6F' : isDark ? '#334155' : '#E2E8F0' }]}
+                        style={[styles.switchTrack, { backgroundColor: privacy === 'private' ? colors.chrome.primary : colors.brand.bg.border }]}
                     >
                         <View style={[styles.switchThumb, privacy === 'private' && styles.switchThumbOn]} />
                     </Pressable>

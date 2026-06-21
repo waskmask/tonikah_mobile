@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text as RNText, TouchableOpacity, View } from 'react-native';
 import { CircleHelp, Menu, SlidersHorizontal } from 'lucide-react-native';
 import { scale } from '@/hooks/useResponsive';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
 
 export function ExploreTopOverlay({
@@ -16,25 +16,25 @@ export function ExploreTopOverlay({
     onOpenTour: () => void;
     onOpenMenu: () => void;
 }) {
-    const { isDark } = useTheme();
-    const iconColor = isDark ? '#F8FAFC' : '#1F2D27';
+    const colors = useColors();
+    const iconColor = colors.chrome.header.icon;
 
     return (
-        <View style={[styles.root, { backgroundColor: isDark ? '#111827' : '#FFFFFF' }]}>
-            <TouchableOpacity activeOpacity={0.82} onPress={onOpenFilters} style={styles.filterButton}>
-                <SlidersHorizontal size={scale(17)} color="#FFFFFF" strokeWidth={2.5} />
-                <RNText style={styles.filterText}>{t('filters', 'Filters')}</RNText>
+        <View style={[styles.root, { backgroundColor: colors.chrome.header.background, borderBottomColor: colors.chrome.common.hairline }]}>
+            <TouchableOpacity activeOpacity={0.82} onPress={onOpenFilters} style={[styles.filterButton, { backgroundColor: colors.chrome.primary, borderColor: colors.chrome.primary, shadowColor: colors.chrome.primary }]}>
+                <SlidersHorizontal size={scale(17)} color={colors.chrome.common.inverseText} strokeWidth={2.5} />
+                <RNText style={[styles.filterText, { color: colors.chrome.common.inverseText }]}>{t('filters', 'Filters')}</RNText>
                 {filterCount > 0 ? (
                     <View style={styles.countBadge}>
-                        <RNText style={styles.countText}>{filterCount}</RNText>
+                        <RNText style={[styles.countText, { color: colors.chrome.common.inverseText }]}>{filterCount}</RNText>
                     </View>
                 ) : null}
             </TouchableOpacity>
             <View style={styles.actions}>
-                <IconButton isDark={isDark} onPress={onOpenTour}>
+                <IconButton onPress={onOpenTour}>
                     <CircleHelp size={scale(20)} color={iconColor} strokeWidth={2.35} />
                 </IconButton>
-                <IconButton isDark={isDark} onPress={onOpenMenu}>
+                <IconButton onPress={onOpenMenu}>
                     <Menu size={scale(22)} color={iconColor} strokeWidth={2.55} />
                 </IconButton>
             </View>
@@ -42,13 +42,14 @@ export function ExploreTopOverlay({
     );
 }
 
-function IconButton({ children, isDark, onPress }: { children: React.ReactNode; isDark: boolean; onPress: () => void }) {
+function IconButton({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+    const colors = useColors();
     return (
         <Pressable
             onPress={onPress}
             style={({ pressed }) => [
                 styles.button,
-                { backgroundColor: isDark ? '#1F2937' : '#F6F7F8', borderColor: isDark ? '#374151' : '#E5EAF0' },
+                { backgroundColor: colors.chrome.header.iconBackground, borderColor: colors.brand.bg.border },
                 pressed && styles.pressed,
             ]}
         >
@@ -65,7 +66,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingHorizontal: scale(14),
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(148,163,184,0.18)',
     },
     actions: {
         flexDirection: 'row',
@@ -77,16 +77,13 @@ const styles = StyleSheet.create({
         minWidth: scale(80),
         minHeight: scale(34),
         borderRadius: scale(18),
-        backgroundColor: '#F34B6F',
         borderWidth: 1,
-        borderColor: '#F34B6F',
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         gap: scale(7),
         paddingHorizontal: scale(10),
         paddingVertical: scale(6),
-        shadowColor: '#F34B6F',
         shadowOpacity: 0.24,
         shadowRadius: scale(12),
         shadowOffset: { width: 0, height: 5 },
@@ -94,7 +91,6 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     filterText: {
-        color: '#FFFFFF',
         fontWeight: '700',
         fontSize: scale(13),
         lineHeight: scale(16),

@@ -5,9 +5,11 @@ export interface UserListResponse extends ApiResponse {
     nextCursor?: string | null;
     hasMore?: boolean;
     total?: number;
-    fallbackLevel?: 'none' | 'preference' | 'location';
+    fallbackLevel?: 'none' | 'preference' | 'location' | 'skipped';
     droppedFilters?: string[];
     showingSkipped?: boolean;
+    mode?: 'fresh' | 'skipped';
+    skippedFallbackAvailable?: boolean;
 }
 
 export interface UserFacetsResponse extends ApiResponse {

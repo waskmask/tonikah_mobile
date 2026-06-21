@@ -15,10 +15,12 @@ import { Text } from './Text';
 import { GradientButton } from './GradientButton';
 import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { Search, X, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography } from '@/constants/typography';
+import { t } from '@/lib/profileDisplay';
 
 export interface MultiSelectOption {
     value: string;
@@ -60,6 +62,7 @@ export function MultiSelectSheet({
     presentation,
 }: MultiSelectSheetProps) {
     const { isDark } = useTheme();
+    const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const searchFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
@@ -163,7 +166,7 @@ export function MultiSelectSheet({
                     <AnimatedPressable
                         style={[
                             isDrawer ? styles.drawer : styles.sheet,
-                            { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' },
+                            { backgroundColor: palette.chrome.common.card },
                             isDrawer && {
                                 paddingTop: insets.top + 18,
                                 transform: [{ translateX: drawerX }],
@@ -177,7 +180,7 @@ export function MultiSelectSheet({
                                 <View
                                     style={[
                                         styles.handle,
-                                        { backgroundColor: isDark ? '#475569' : '#CBD5E1' },
+                                        { backgroundColor: palette.brand.text.muted },
                                     ]}
                                 />
                             </View>
@@ -188,9 +191,9 @@ export function MultiSelectSheet({
                             {isDrawer && (
                                 <Pressable onPress={handleClose} hitSlop={12} style={styles.backButton}>
                                     {isRTL ? (
-                                        <ChevronRight size={22} color={isDark ? '#E2E8F0' : '#0A0D14'} />
+                                        <ChevronRight size={22} color={palette.brand.text.body} />
                                     ) : (
-                                        <ChevronLeft size={22} color={isDark ? '#E2E8F0' : '#0A0D14'} />
+                                        <ChevronLeft size={22} color={palette.brand.text.body} />
                                     )}
                                 </Pressable>
                             )}
@@ -206,17 +209,17 @@ export function MultiSelectSheet({
                                     <Text
                                         variant="body-sm"
                                         style={{
-                                            color: isDark ? '#64748B' : '#9CA3AF',
+                                            color: palette.brand.text.muted,
                                             marginTop: scale(2),
                                         }}
                                     >
-                                        {localSelected.length}/{maxSelections} selected
+                                        {localSelected.length}/{maxSelections} {t('selected', 'selected')}
                                     </Text>
                                 )}
                             </View>
                             {!isDrawer && (
                                 <Pressable onPress={handleClose} hitSlop={12}>
-                                    <X size={scale(20)} color={isDark ? '#94A3B8' : '#6B7280'} />
+                                    <X size={scale(20)} color={palette.brand.text.subtitle} />
                                 </Pressable>
                             )}
                         </View>
@@ -227,21 +230,21 @@ export function MultiSelectSheet({
                                 style={[
                                     styles.searchContainer,
                                     {
-                                        backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                                        borderColor: isDark ? '#334155' : '#E2E8F0',
+                                        backgroundColor: palette.brand.bg.surface,
+                                        borderColor: palette.brand.bg.border,
                                     },
                                 ]}
                             >
-                                <Search size={scale(16)} color={isDark ? '#64748B' : '#9CA3AF'} />
+                                <Search size={scale(16)} color={palette.brand.text.muted} />
                                 <TextInput
                                     value={search}
                                     onChangeText={setSearch}
                                     placeholder={searchPlaceholder}
-                                    placeholderTextColor={isDark ? '#64748B' : '#9CA3AF'}
+                                    placeholderTextColor={palette.brand.text.muted}
                                     style={[
                                         styles.searchInput,
                                         {
-                                            color: isDark ? '#E2E8F0' : '#0A0D14',
+                                            color: palette.brand.text.body,
                                             fontFamily: searchFontFamily,
                                             textAlign: isRTL ? 'right' : 'left',
                                         },
@@ -249,7 +252,7 @@ export function MultiSelectSheet({
                                 />
                                 {search.length > 0 && (
                                     <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                                        <X size={scale(14)} color={isDark ? '#64748B' : '#9CA3AF'} />
+                                        <X size={scale(14)} color={palette.brand.text.muted} />
                                     </Pressable>
                                 )}
                             </View>
@@ -277,8 +280,8 @@ export function MultiSelectSheet({
                                             isMaxed && { opacity: 0.4 },
                                             isChecked && {
                                                 backgroundColor: isDark
-                                                    ? 'rgba(243,75,111,0.12)'
-                                                    : 'rgba(243,75,111,0.08)',
+                                                    ? palette.chrome.common.primaryTint
+                                                    : palette.chrome.common.primaryTint,
                                             },
                                         ]}
                                     >
@@ -287,23 +290,23 @@ export function MultiSelectSheet({
                                                 styles.checkbox,
                                                 {
                                                     borderColor: isChecked
-                                                        ? '#F34B6F'
-                                                        : isDark ? '#475569' : '#CBD5E1',
+                                                        ? palette.chrome.primary
+                                                        : palette.brand.text.muted,
                                                     backgroundColor: isChecked
-                                                        ? '#F34B6F'
+                                                        ? palette.chrome.primary
                                                         : 'transparent',
                                                 },
                                             ]}
                                         >
                                             {isChecked && (
-                                                <Check size={scale(12)} color="#FFF" strokeWidth={3} />
+                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} strokeWidth={3} />
                                             )}
                                         </View>
                                         <Text
                                             variant="body"
                                             style={[
                                                 { flex: 1, marginLeft: scale(12) },
-                                                isChecked && { color: '#F34B6F' },
+                                                isChecked && { color: palette.chrome.primary },
                                             ]}
                                         >
                                             {item.label}
@@ -313,8 +316,8 @@ export function MultiSelectSheet({
                             }}
                             ListEmptyComponent={
                                 <View style={{ padding: scale(24), alignItems: 'center' }}>
-                                    <Text variant="body-sm" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
-                                        No results found
+                                    <Text variant="body-sm" style={{ color: palette.brand.text.muted }}>
+                                        {t('no_results_found', 'No results found')}
                                     </Text>
                                 </View>
                             }
@@ -323,7 +326,7 @@ export function MultiSelectSheet({
                         {/* Done button */}
                         <View style={styles.footer}>
                             <GradientButton
-                                title={`Done${localSelected.length > 0 ? ` (${localSelected.length})` : ''}`}
+                                title={`${t('done', 'Done')}${localSelected.length > 0 ? ` (${localSelected.length})` : ''}`}
                                 onPress={handleDone}
                                 disabled={localSelected.length === 0}
                             />

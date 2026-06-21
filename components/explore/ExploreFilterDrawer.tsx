@@ -8,6 +8,7 @@ import { MultiSelectSheet, MultiSelectOption } from '@/components/ui/MultiSelect
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
 import { profileService } from '@/lib/profileService';
 import { t } from '@/lib/profileDisplay';
@@ -53,6 +54,7 @@ const LABELS: Record<FilterSelectKey, string> = {
 
 export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props) {
     const { isDark } = useTheme();
+    const colors = useColors();
     const { isRTL } = useLanguage();
     const toast = useToast();
     const [draft, setDraft] = useState<ExploreFilterState>(state);
@@ -163,10 +165,10 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
             navigationBarTranslucent
             onRequestClose={onClose}
         >
-            <SafeAreaView edges={['top', 'bottom']} style={[styles.root, { backgroundColor: isDark ? '#111827' : '#FFFFFF' }]}>
-                <View style={[styles.header, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderBottomColor: isDark ? '#334155' : '#E2E8F0' }]}>
+            <SafeAreaView edges={['top', 'bottom']} style={[styles.root, { backgroundColor: colors.chrome.header.background }]}>
+                <View style={[styles.header, { backgroundColor: colors.chrome.header.background, borderBottomColor: colors.brand.bg.border }]}>
                     <Pressable onPress={clearAll} disabled={activeCount === 0} style={styles.clearButton}>
-                        <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: activeCount ? '#F34B6F' : isDark ? '#475569' : '#CBD5E1' }}>
+                        <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: activeCount ? colors.chrome.primary : colors.brand.text.muted }}>
                             {t('clear_all', 'Clear all')}
                         </Text>
                     </Pressable>
@@ -174,12 +176,12 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={styles.title}>{t('filters', 'Filters')}</Text>
                     </View>
                     <Pressable onPress={onClose} style={styles.closeButton}>
-                        <X size={22} color={isDark ? '#E2E8F0' : '#1F2A24'} />
+                        <X size={22} color={colors.chrome.header.icon} />
                     </Pressable>
                 </View>
 
                 <ScrollView
-                    style={{ backgroundColor: isDark ? '#0F172A' : '#F7F8F6' }}
+                    style={{ backgroundColor: colors.brand.bg.surface }}
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
                 >
@@ -194,6 +196,10 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         defaultMax={80}
                         onChange={(ageMin, ageMax) => setDraft((current) => ({ ...current, ageMin, ageMax }))}
                         isDark={isDark}
+                        primaryColor={colors.chrome.primary}
+                        borderColor={colors.brand.bg.border}
+                        cardColor={colors.chrome.common.card}
+                        mutedColor={colors.chrome.common.textMuted}
                     />
                     <RangeRow
                         label={t('height', 'Height')}
@@ -208,6 +214,10 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         formatValue={formatHeight}
                         onChange={(heightMin, heightMax) => setDraft((current) => ({ ...current, heightMin, heightMax }))}
                         isDark={isDark}
+                        primaryColor={colors.chrome.primary}
+                        borderColor={colors.brand.bg.border}
+                        cardColor={colors.chrome.common.card}
+                        mutedColor={colors.chrome.common.textMuted}
                     />
                     {(Object.keys(LABELS) as FilterSelectKey[]).map((key) => (
                         <SelectRow
@@ -215,15 +225,18 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                             label={t(LABELS[key], LABELS[key].replace(/_/g, ' '))}
                             values={draft[key]}
                             options={options[key]}
-                            isDark={isDark}
                             isRTL={isRTL}
+                            primaryColor={colors.chrome.primary}
+                            borderColor={colors.brand.bg.border}
+                            cardColor={colors.chrome.common.card}
+                            mutedColor={colors.chrome.common.textSubtle}
                             onOpen={() => openSelect(key)}
                             onClear={() => updateSelect(key, [])}
                         />
                     ))}
                 </ScrollView>
 
-                <View style={[styles.footer, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderTopColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                <View style={[styles.footer, { backgroundColor: colors.chrome.header.background, borderTopColor: colors.brand.bg.border }]}>
                     <GradientButton title={t('show_results', 'Show results')} onPress={apply} widthMode="full" />
                 </View>
 
@@ -258,6 +271,10 @@ function RangeRow({
     formatValue,
     onChange,
     isDark,
+    primaryColor,
+    borderColor,
+    cardColor,
+    mutedColor,
 }: {
     label: string;
     min: number;
@@ -271,6 +288,10 @@ function RangeRow({
     formatValue?: (value: number) => string;
     onChange: (min: number, max: number) => void;
     isDark: boolean;
+    primaryColor: string;
+    borderColor: string;
+    cardColor: string;
+    mutedColor: string;
 }) {
     const [trackWidth, setTrackWidth] = useState(0);
     const isAny = valueMin === defaultMin && valueMax === defaultMax;
@@ -293,10 +314,10 @@ function RangeRow({
     };
 
     return (
-        <View style={[styles.rangeCard, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
+        <View style={[styles.rangeCard, { backgroundColor: cardColor, borderColor }]}>
             <View style={styles.rangeHeader}>
                 <Text variant="body-sm" className="font-body-bold" style={styles.rangeTitle}>{label}</Text>
-                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? '#8C928E' : '#F34B6F' }]}>
+                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? mutedColor : primaryColor }]}>
                     {isAny ? t('any', 'Any') : `${minLabel} - ${maxLabel}`}
                 </Text>
             </View>
@@ -315,17 +336,18 @@ function RangeRow({
                         {
                             left: `${minPct}%`,
                             right: `${100 - maxPct}%`,
+                            backgroundColor: primaryColor,
                         },
                     ]}
                 />
-                <View style={[styles.sliderThumb, { left: `${minPct}%` }]} />
-                <View style={[styles.sliderThumb, { left: `${maxPct}%` }]} />
+                <View style={[styles.sliderThumb, { left: `${minPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
+                <View style={[styles.sliderThumb, { left: `${maxPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
             </View>
             <View style={styles.rangeValues}>
-                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : '#8C928E' }}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : mutedColor }}>
                     {formatValue ? formatValue(min) : String(min)}
                 </Text>
-                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : '#8C928E' }}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : mutedColor }}>
                     {formatValue ? formatValue(max) : String(max)}
                 </Text>
             </View>
@@ -344,16 +366,22 @@ function SelectRow({
     label,
     values,
     options,
-    isDark,
     isRTL,
+    primaryColor,
+    borderColor,
+    cardColor,
+    mutedColor,
     onOpen,
     onClear,
 }: {
     label: string;
     values: string[];
     options: DrawerOption[];
-    isDark: boolean;
     isRTL: boolean;
+    primaryColor: string;
+    borderColor: string;
+    cardColor: string;
+    mutedColor: string;
     onOpen: () => void;
     onClear: () => void;
 }) {
@@ -361,18 +389,18 @@ function SelectRow({
         ? values.map((value) => options.find((item) => item.value === value)?.label || value).join(', ')
         : t('no_preference', 'No preference');
     return (
-        <Pressable onPress={onOpen} style={[styles.row, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Pressable onPress={onOpen} style={[styles.row, { backgroundColor: cardColor, borderColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={{ flex: 1 }}>
                 <Text variant="body-sm" className="font-body-bold" style={[styles.selectTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
-                <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? '#F34B6F' : isDark ? '#94A3B8' : '#64748B', marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
+                <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? primaryColor : mutedColor, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
             </View>
             {values.length > 0 ? (
                 <Pressable onPress={onClear} style={styles.rowIcon}>
-                    <X size={16} color="#F34B6F" />
+                    <X size={16} color={primaryColor} />
                 </Pressable>
             ) : (
                 <View style={styles.rowIcon}>
-                    <ChevronLeft size={18} color={isDark ? '#94A3B8' : '#64748B'} style={{ transform: [{ rotate: isRTL ? '0deg' : '180deg' }] }} />
+                    <ChevronLeft size={18} color={mutedColor} style={{ transform: [{ rotate: isRTL ? '0deg' : '180deg' }] }} />
                 </View>
             )}
         </Pressable>
@@ -439,7 +467,6 @@ const styles = StyleSheet.create({
         position: 'absolute',
         height: 4,
         borderRadius: 2,
-        backgroundColor: '#F34B6F',
     },
     sliderThumb: {
         position: 'absolute',
@@ -448,9 +475,7 @@ const styles = StyleSheet.create({
         marginLeft: -12,
         borderRadius: 12,
         borderWidth: 2.5,
-        borderColor: '#F34B6F',
         backgroundColor: '#FFFFFF',
-        shadowColor: '#F34B6F',
         shadowOpacity: 0.2,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 3 },

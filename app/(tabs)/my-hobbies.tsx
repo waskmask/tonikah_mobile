@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
+import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { MultiSelectSheet, MultiSelectOption } from '@/components/ui/MultiSelectSheet';
+import { useColors } from '@/hooks/useColors';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
 import { apiMessage, displayText, t } from '@/lib/profileDisplay';
@@ -21,6 +23,8 @@ function normalizeMaster(data: any): MultiSelectOption[] {
 
 export default function MyHobbiesScreen() {
     const { isDark } = useTheme();
+    const colors = useColors();
+    const primary = colors.chrome.primary;
     const { user, refreshUser } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
@@ -63,12 +67,13 @@ export default function MyHobbiesScreen() {
         setSaving(false);
     };
 
-    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}><ActivityIndicator color="#F34B6F" /></View>;
+    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand.bg.surface }}><ActivityIndicator color={primary} /></View>;
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
-            <Text variant="h2">{t('hobbies', 'Hobbies')}</Text>
-            <Text variant="body-sm" style={{ color: isDark ? '#94A3B8' : '#64748B', marginTop: scale(5), marginBottom: scale(18) }}>
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+            <AppBackTitleBar title={t('hobbies', 'Hobbies')} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
+            <Text variant="body-sm" style={{ color: colors.brand.text.subtitle, marginBottom: scale(18) }}>
                 {t('click_add_hobbies', 'Click here to add Hobbies')}
             </Text>
             <Pressable onPress={() => setSheetOpen(true)} style={{ minHeight: scale(120), borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF' }}>
@@ -77,5 +82,6 @@ export default function MyHobbiesScreen() {
             <GradientButton title={t('save', 'Save')} onPress={save} loading={saving} disabled={saving} widthMode="full" containerStyle={{ marginTop: scale(20) }} />
             <MultiSelectSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={setSelected} options={options} selected={selected} title={t('hobbies', 'Hobbies')} />
         </ScrollView>
+        </View>
     );
 }

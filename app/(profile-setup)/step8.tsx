@@ -11,6 +11,7 @@ import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
 import { FieldLabel } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { LocateFixed } from 'lucide-react-native';
@@ -132,7 +133,7 @@ export default function Step8() {
             const permission = await Location.requestForegroundPermissionsAsync();
             if (permission.status !== Location.PermissionStatus.GRANTED) {
                 Alert.alert(
-                    t('common:error', { defaultValue: 'Error' }),
+                    t('error', { defaultValue: 'Error' }),
                     t('common:location_permission_required', { defaultValue: 'Location permission is required to fill your current city.' }),
                 );
                 return;
@@ -141,7 +142,7 @@ export default function Step8() {
             const servicesEnabled = await Location.hasServicesEnabledAsync();
             if (!servicesEnabled) {
                 Alert.alert(
-                    t('common:error', { defaultValue: 'Error' }),
+                    t('error', { defaultValue: 'Error' }),
                     t('common:device_location_services_disabled', { defaultValue: 'Please turn on device location services and try again.' }),
                 );
                 return;
@@ -161,7 +162,7 @@ export default function Step8() {
 
             if (!position) {
                 Alert.alert(
-                    t('common:error', { defaultValue: 'Error' }),
+                    t('error', { defaultValue: 'Error' }),
                     t('common:device_location_unavailable', { defaultValue: 'Could not get your device location. Please enable location services and try again.' }),
                 );
                 return;
@@ -184,12 +185,12 @@ export default function Step8() {
                         : 'common:location_resolve_failed';
 
             Alert.alert(
-                t('common:error', { defaultValue: 'Error' }),
+                t('error', { defaultValue: 'Error' }),
                 t(messageKey, { defaultValue: 'Could not resolve your city from this location. Please try again.' }),
             );
         } catch {
             Alert.alert(
-                t('common:error', { defaultValue: 'Error' }),
+                t('error', { defaultValue: 'Error' }),
                 t('common:device_location_unavailable', { defaultValue: 'Could not get your device location. Please enable location services and try again.' }),
             );
         } finally {
@@ -237,10 +238,10 @@ export default function Step8() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step9');
             } else {
-                Alert.alert(t('common:error', { defaultValue: 'Error' }), res.message || t('common:server_error_default', { defaultValue: 'Failed to update' }));
+                Alert.alert(t('error', { defaultValue: 'Error' }), res.message || t('server_error_default', { defaultValue: 'Failed to update' }));
             }
         } catch {
-            Alert.alert(t('common:error', { defaultValue: 'Error' }), t('common:network_error', { defaultValue: 'Network error' }));
+            Alert.alert(t('error', { defaultValue: 'Error' }), t('network_error', { defaultValue: 'Network error' }));
         } finally {
             setLoading(false);
         }
@@ -250,8 +251,9 @@ export default function Step8() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={8} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
+                        step={8}
                         title={t('location_title', { defaultValue: 'Current location' })}
                         subtitle={t('location_desc', { defaultValue: 'Enter your present residing city and country.' })}
                     />

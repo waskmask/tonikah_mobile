@@ -11,11 +11,13 @@ import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectShe
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { GraduationCap, Briefcase, Award, Building2, DollarSign } from 'lucide-react-native';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { COMPANY_MAX, MAX_INCOME, formatAmount, isAllowedProfileText, parseAmount } from '@/lib/profileValidation';
+import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step5() {
     const { t, i18n } = useTranslation('common');
@@ -112,10 +114,10 @@ export default function Step5() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step6');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update');
+                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
         } finally {
             setLoading(false);
         }
@@ -129,10 +131,11 @@ export default function Step5() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={5} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
-                        title={t('edu_title', { defaultValue: 'Education and Career' })}
-                        subtitle={t('edu_desc', { defaultValue: 'Highlight academic background and current job details.' })}
+                        step={5}
+                        title={t('step_5.title', { defaultValue: 'Education and Career' })}
+                        subtitle={t('step_5.subtitle', { defaultValue: 'Highlight academic background and current job details.' })}
                     />
 
                     <FieldLabel text={t('education', { defaultValue: 'Education' })} required />
@@ -163,7 +166,7 @@ export default function Step5() {
                     <FieldLabel text={t('annual_income', { defaultValue: 'Annual income' })} />
                     <View style={{ flexDirection: 'row', gap: scale(8) }}>
                         <View style={{ width: scale(100) }}>
-                            <SelectField value={currency} placeholder="USD" onPress={() => setActiveSheet('currency')} icon={<DollarSign size={scale(16)} color={iconColor} />} />
+                            <SelectField value={currency} placeholder={t('select_currency', { defaultValue: 'Select currency' })} onPress={() => setActiveSheet('currency')} icon={<DollarSign size={scale(16)} color={iconColor} />} />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Input

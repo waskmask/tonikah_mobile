@@ -5,8 +5,10 @@ import { useAuthStore } from "@/store/authStore";
 import { useFirstLaunch } from "@/hooks/useFirstLaunch";
 import { useProfileSetupStore } from "@/store/profileSetupStore";
 import { profileService } from "@/lib/profileService";
+import { useColors } from "@/hooks/useColors";
 
 export default function Index() {
+    const colors = useColors();
     const { isAuthenticated, isRestoringSession, setUser } = useAuthStore();
     const { isFirstLaunch } = useFirstLaunch();
     const { getIncompleteStep, setGender } = useProfileSetupStore();
@@ -50,8 +52,8 @@ export default function Index() {
     // Wait until session is restored
     if (isRestoringSession || !profileChecked) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
-                <ActivityIndicator size="large" color="#F34B6F" />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.chrome.loader.background }}>
+                <ActivityIndicator size="large" color={colors.chrome.loader.spinner} />
             </View>
         );
     }

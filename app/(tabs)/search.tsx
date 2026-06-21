@@ -29,6 +29,7 @@ import { usersService } from '@/lib/usersService';
 
 type HistoryEntry = { action: 'skip' | 'favorite' | 'view'; profile: any };
 type VerificationReason = 'browse_limit' | 'save_or_skip' | null;
+type ExploreMode = 'fresh' | 'skipped';
 
 const EXPLORE_BATCH_LIMIT = 30;
 const PREFETCH_THRESHOLD = 5;
@@ -66,6 +67,7 @@ export default function ExploreScreen() {
     const isFetchingRef = useRef(false);
     const seenRef = useRef<Set<string>>(new Set());
     const filtersRef = useRef(filters);
+    const exploreModeRef = useRef<ExploreMode>('fresh');
 
     const current = profiles[0] || null;
     const currentId = current ? profileId(current) : '';
@@ -74,12 +76,20 @@ export default function ExploreScreen() {
 
     const load = useCallback(async (
         nextFilters = filtersRef.current,
-        options: { reset?: boolean; allowDroppedRetry?: boolean } = {},
+        options: { reset?: boolean; allowDroppedRetry?: boolean; mode?: ExploreMode } = {},
     ) => {
         const reset = options.reset ?? true;
         const allowDroppedRetry = options.allowDroppedRetry ?? true;
+        let mode = options.mode ?? exploreModeRef.current;
         if (isFetchingRef.current) return;
-        if (!reset && !hasMoreRef.current) return;
+
+        if (!reset && !hasMoreRef.current) {
+            if (exploreModeRef.current !== 'fresh') return;
+            mode = 'skipped';
+            exploreModeRef.current = 'skipped';
+            nextCursorRef.current = null;
+            hasMoreRef.current = true;
+        }
 
         isFetchingRef.current = true;
         if (reset) {
@@ -88,6 +98,7 @@ export default function ExploreScreen() {
             setVerificationReason(null);
             nextCursorRef.current = null;
             hasMoreRef.current = true;
+            exploreModeRef.current = mode;
             seenRef.current = new Set();
             filtersRef.current = nextFilters;
         }
@@ -97,11 +108,15 @@ export default function ExploreScreen() {
         const res = await usersService.list({
             limit: EXPLORE_BATCH_LIMIT,
             ...params,
+            ...(mode === 'skipped' ? { mode: 'skipped' } : {}),
             ...(cursor ? { cursor } : {}),
         });
 
         if (res.success) {
-            const droppedFilters = normalizeDroppedFilters(res.droppedFilters as any[]);
+            const responseMode: ExploreMode = res.mode === 'skipped' || res.showingSkipped ? 'skipped' : mode;
+            exploreModeRef.current = responseMode;
+
+            const droppedFilters = responseMode === 'fresh' ? normalizeDroppedFilters(res.droppedFilters as any[]) : [];
             if (droppedFilters.length > 0) {
                 const labels = describeDroppedFilters(nextFilters, droppedFilters);
                 if (labels.length) {
@@ -121,7 +136,7 @@ export default function ExploreScreen() {
 
                     if (allowDroppedRetry) {
                         isFetchingRef.current = false;
-                        await load(cleanedFilters, { reset: true, allowDroppedRetry: false });
+                        await load(cleanedFilters, { reset: true, allowDroppedRetry: false, mode: 'fresh' });
                         return;
                     }
                 }
@@ -138,6 +153,17 @@ export default function ExploreScreen() {
             nextCursorRef.current = res.nextCursor || null;
             hasMoreRef.current = typeof res.hasMore === 'boolean' ? res.hasMore : Boolean(res.nextCursor);
             setProfiles((items) => reset ? uniqueItems : [...items, ...uniqueItems]);
+
+            const shouldTrySkipped =
+                responseMode === 'fresh' &&
+                uniqueItems.length === 0 &&
+                !hasMoreRef.current;
+
+            if (shouldTrySkipped) {
+                isFetchingRef.current = false;
+                await load(nextFilters, { reset, allowDroppedRetry: false, mode: 'skipped' });
+                return;
+            }
         } else {
             if (reset) {
                 setProfiles([]);
@@ -237,7 +263,13 @@ export default function ExploreScreen() {
         filtersRef.current = next;
         setHistory([]);
         setViewedCount(0);
-        void load(next, { reset: true });
+        void load(next, { reset: true, mode: 'fresh' });
+    };
+
+    const refreshSkippedProfiles = () => {
+        setHistory([]);
+        setViewedCount(0);
+        void load(filtersRef.current, { reset: true, allowDroppedRetry: false, mode: 'skipped' });
     };
 
     useEffect(() => {
@@ -310,11 +342,18 @@ export default function ExploreScreen() {
                     <Text variant="body-sm" align="center" style={{ color: isDark ? '#94A3B8' : '#64748B', marginTop: scale(8) }}>
                         {t('explore_no_profiles', 'Expand your filters to see more profiles.')}
                     </Text>
-                    <Pressable onPress={() => setFiltersOpen(true)} style={styles.emptyButton}>
-                        <Text variant="body-sm" className="font-body-semi" style={{ color: '#FFFFFF' }}>
-                            {t('filters', 'Filters')}
-                        </Text>
-                    </Pressable>
+                    <View style={styles.emptyActions}>
+                        <Pressable onPress={refreshSkippedProfiles} style={styles.emptyButton}>
+                            <Text variant="body-sm" className="font-body-semi" style={{ color: '#FFFFFF' }}>
+                                {t('refresh', 'Refresh')}
+                            </Text>
+                        </Pressable>
+                        <Pressable onPress={() => setFiltersOpen(true)} style={[styles.emptyButton, styles.emptyButtonSecondary]}>
+                            <Text variant="body-sm" className="font-body-semi" style={{ color: '#F34B6F' }}>
+                                {t('filters', 'Filters')}
+                            </Text>
+                        </Pressable>
+                    </View>
                 </View>
             )}
 
@@ -355,11 +394,21 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: scale(24) },
-    emptyButton: {
+    emptyActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(10),
         marginTop: scale(18),
+    },
+    emptyButton: {
         borderRadius: scale(999),
         backgroundColor: '#F34B6F',
         paddingHorizontal: scale(18),
         paddingVertical: scale(11),
+    },
+    emptyButtonSecondary: {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: '#F34B6F',
     },
 });

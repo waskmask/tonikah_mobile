@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
+import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
+import { SectionCard } from '@/components/ui/SectionCard';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
+import { space } from '@/constants/uiTokens';
 
 const LANGUAGES = [
     { code: 'en', key: 'English', fallback: 'English' },
@@ -28,15 +29,13 @@ function textValue(value: unknown, fallback: string) {
 
 export default function LanguageScreen() {
     const { currentLanguage, changeLanguage, t, isRTL } = useLanguage();
-    const { isDark } = useTheme();
+    const colors = useColors();
+    const primary = colors.chrome.primary;
     const [savingCode, setSavingCode] = useState<string | null>(null);
 
-    const backgroundColor = isDark ? '#0F172A' : '#F8FAFC';
-    const surfaceColor = isDark ? '#111827' : '#FFFFFF';
-    const borderColor = isDark ? '#334155' : '#E2E8F0';
-    const textColor = isDark ? '#E2E8F0' : '#1F2A24';
-    const mutedColor = isDark ? '#94A3B8' : '#64748B';
-    const BackIcon = isRTL ? ChevronRight : ChevronLeft;
+    const textColor = colors.brand.text.body;
+    const mutedColor = colors.brand.text.subtitle;
+    const borderColor = colors.brand.bg.border;
 
     async function selectLanguage(code: string) {
         if (code === currentLanguage || savingCode) return;
@@ -45,19 +44,10 @@ export default function LanguageScreen() {
     }
 
     return (
-        <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor }]}>
-            <View style={[styles.topbar, { backgroundColor: surfaceColor, borderBottomColor: borderColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
-                    <BackIcon size={scale(22)} color={textColor} />
-                </Pressable>
-                <Text variant="h3" numberOfLines={1} style={[styles.title, { color: textColor, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {textValue(t('language'), 'Language')}
-                </Text>
-                <View style={styles.backButton} />
-            </View>
-
+        <View style={[styles.root, { backgroundColor: colors.brand.bg.surface }]}>
+            <AppBackTitleBar title={textValue(t('language'), 'Language')} fallbackHref="/(tabs)/settings" />
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                <View style={[styles.panel, { backgroundColor: surfaceColor, borderColor }]}>
+                <SectionCard>
                     {LANGUAGES.map((language, index) => {
                         const active = language.code === currentLanguage;
                         const loading = savingCode === language.code;
@@ -71,7 +61,7 @@ export default function LanguageScreen() {
                                 style={({ pressed }) => [
                                     styles.row,
                                     index > 0 && { borderTopColor: borderColor, borderTopWidth: StyleSheet.hairlineWidth },
-                                    active && { backgroundColor: isDark ? 'rgba(243,75,111,0.12)' : 'rgba(243,75,111,0.07)' },
+                                    active && { backgroundColor: isRTL ? 'rgba(243,75,111,0.12)' : 'rgba(243,75,111,0.07)' },
                                     pressed && !savingCode && styles.pressed,
                                     { flexDirection: isRTL ? 'row-reverse' : 'row' },
                                 ]}
@@ -81,14 +71,14 @@ export default function LanguageScreen() {
                                     className="font-body-semi"
                                     style={[
                                         styles.label,
-                                        { color: active ? '#F34B6F' : textColor, textAlign: isRTL ? 'right' : 'left' },
+                                        { color: active ? primary : textColor, textAlign: isRTL ? 'right' : 'left' },
                                     ]}
                                 >
                                     {label}
                                 </Text>
-                                <View style={[styles.checkCircle, active ? styles.activeCircle : { borderColor }]}>
+                                <View style={[styles.checkCircle, active ? { borderColor: primary, backgroundColor: primary } : { borderColor }]}>
                                     {loading ? (
-                                        <ActivityIndicator size="small" color={active ? '#FFFFFF' : '#F34B6F'} />
+                                        <ActivityIndicator size="small" color={active ? '#FFFFFF' : primary} />
                                     ) : active ? (
                                         <Check size={scale(13)} color="#FFFFFF" strokeWidth={3} />
                                     ) : null}
@@ -96,54 +86,33 @@ export default function LanguageScreen() {
                             </Pressable>
                         );
                     })}
-                </View>
+                </SectionCard>
 
                 <Text variant="caption" style={[styles.helper, { color: mutedColor, textAlign: isRTL ? 'right' : 'left' }]}>
                     {textValue(t('language_reload_note'), 'The app reloads after changing language so layout and translations update correctly.')}
                 </Text>
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    root: {
         flex: 1,
-    },
-    topbar: {
-        minHeight: scale(54),
-        alignItems: 'center',
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        paddingHorizontal: scale(12),
-    },
-    backButton: {
-        width: scale(42),
-        height: scale(42),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        flex: 1,
-        fontSize: scale(18),
-        lineHeight: scale(23),
     },
     content: {
-        paddingHorizontal: scale(14),
-        paddingTop: scale(14),
+        paddingHorizontal: space('md'),
+        paddingTop: space('md'),
         paddingBottom: scale(32),
-    },
-    panel: {
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderRadius: scale(8),
     },
     row: {
         minHeight: scale(56),
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: scale(12),
-        paddingHorizontal: scale(16),
         paddingVertical: scale(12),
+        marginHorizontal: -space('xs'),
+        paddingHorizontal: space('sm'),
     },
     label: {
         flex: 1,
@@ -158,12 +127,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    activeCircle: {
-        borderColor: '#F34B6F',
-        backgroundColor: '#F34B6F',
-    },
     helper: {
-        marginTop: scale(12),
+        marginTop: space('sm'),
         paddingHorizontal: scale(4),
     },
     pressed: {

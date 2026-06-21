@@ -1,16 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-native';
 import { Bookmark, Compass, History, Send, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
+import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { chatService } from '@/lib/chatService';
 import { Typography } from '@/constants/typography';
+import { useHaptics } from '@/hooks/useHaptics';
+import { useChatSocket } from '@/hooks/useChatSocket';
 
-const BRAND_PINK = '#F34B6F';
+const ACTIVE_STROKE = 2;
+const INACTIVE_STROKE = 1.8;
 
 type TabRoute = {
     name: string;
@@ -23,16 +27,26 @@ const TAB_ROUTES: TabRoute[] = [
     { name: 'search', labelKey: 'explore', fallback: 'Explore', Icon: Compass },
     { name: 'messages', labelKey: 'messages', fallback: 'Messages', Icon: Send },
     { name: 'favourited', labelKey: 'favourited', fallback: 'Saved', Icon: Bookmark },
-    { name: 'activities', labelKey: 'activities', fallback: 'Activities', Icon: History },
-    { name: 'profile', labelKey: 'my_profile', fallback: 'Profile', Icon: User },
+    { name: 'activities', labelKey: 'activities', fallback: 'Activity', Icon: History },
+    { name: 'profile', labelKey: 'profile', fallback: 'Me', Icon: User },
 ];
 
 const VISIBLE_ROUTE_NAMES = new Set(TAB_ROUTES.map((item) => item.name));
 
+function safeLabel(value: unknown, fallback: string) {
+    return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function unreadFromResponse(value: any) {
+    return Number(value?.unreadCount ?? value?.count ?? value?.data?.unreadCount ?? value?.data?.count ?? 0) || 0;
+}
+
 export function BottomTabBar({ state, descriptors, navigation }: any) {
-    const { isDark } = useTheme();
+    const colors = useColors();
+    const tabChrome = colors.chrome.tabBar;
     const { currentLanguage, t, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
+    const { lightImpact } = useHaptics();
     const [pendingRoute, setPendingRoute] = useState<string | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const activeRouteName = state.routes[state.index]?.name;
@@ -41,18 +55,42 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
         setPendingRoute(null);
     }, [activeRouteName]);
 
+    const refreshUnreadCount = useCallback(async () => {
+        try {
+            const res = await chatService.unreadCount();
+            setUnreadCount(unreadFromResponse(res));
+        } catch {
+            // Keep the existing badge value if the refresh fails.
+        }
+    }, []);
+
     useEffect(() => {
-        let mounted = true;
+        let active = true;
         chatService.unreadCount()
             .then((res) => {
-                if (!mounted) return;
-                setUnreadCount(Number(res.unreadCount ?? res.count ?? 0) || 0);
+                if (active) setUnreadCount(unreadFromResponse(res));
             })
             .catch(() => undefined);
         return () => {
-            mounted = false;
+            active = false;
         };
     }, []);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (stateValue) => {
+            if (stateValue === 'active') {
+                refreshUnreadCount();
+            }
+        });
+        return () => subscription.remove();
+    }, [refreshUnreadCount]);
+
+    useChatSocket({
+        enabled: true,
+        onUnread: (payload) => setUnreadCount(unreadFromResponse(payload)),
+        onMessage: () => refreshUnreadCount(),
+        onConversationChanged: () => refreshUnreadCount(),
+    });
 
     const visibleRoutes = useMemo(
         () => TAB_ROUTES.map((item) => {
@@ -64,17 +102,15 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
 
     if (!VISIBLE_ROUTE_NAMES.has(activeRouteName)) return null;
 
-    const borderColor = isDark ? '#334155' : '#E2E8F0';
-    const backgroundColor = isDark ? 'rgba(17, 24, 39, 0.98)' : 'rgba(255, 255, 255, 0.98)';
-
     return (
         <View
             style={[
                 styles.container,
                 {
-                    paddingBottom: Math.max(insets.bottom, scale(6)),
-                    backgroundColor,
-                    borderTopColor: borderColor,
+                    paddingBottom: Math.max(insets.bottom, scale(8)),
+                    backgroundColor: tabChrome.background,
+                    borderTopColor: tabChrome.border,
+                    shadowColor: colors.chrome.common.shadow,
                 },
             ]}
         >
@@ -83,11 +119,13 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                     const options = descriptors[item.route.key]?.options || {};
                     const isFocused = activeRouteName === item.name;
                     const pending = pendingRoute === item.name;
+                    const isActive = isFocused || pending;
                     const label = safeLabel(t(item.labelKey), item.fallback);
-                    const color = isFocused || pending ? BRAND_PINK : isDark ? '#94A3B8' : '#25322B';
-                    const fontSize = label.length > 13 ? 9 : 10.5;
+                    const color = isActive ? tabChrome.active : tabChrome.inactive;
                     const badge = item.name === 'messages' ? unreadCount : 0;
-                    const labelFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.semi;
+                    const labelFontFamily = currentLanguage === 'ar'
+                        ? (isActive ? Typography.font.arabic.bold : Typography.font.arabic.semi)
+                        : (isActive ? Typography.font.body.semi : Typography.font.body.medium);
                     const fill = isFocused && item.name === 'favourited' ? color : 'transparent';
 
                     function onPress() {
@@ -98,6 +136,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                         });
 
                         if (isFocused || event.defaultPrevented) return;
+                        lightImpact();
                         setPendingRoute(item.name);
                         navigation.navigate(item.route.name, item.route.params);
                     }
@@ -114,35 +153,46 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                 pressed && styles.itemPressed,
                             ]}
                         >
-                            <View style={styles.iconWrap}>
-                                {pending ? (
-                                    <ActivityIndicator size="small" color={color} />
-                                ) : (
-                                    <item.Icon
-                                        size={scale(22)}
-                                        color={color}
-                                        strokeWidth={isFocused ? 2.7 : 2.1}
-                                        fill={fill}
-                                    />
-                                )}
-                                {badge > 0 ? <View style={[styles.badge, { borderColor: backgroundColor }]} /> : null}
+                            <View style={styles.iconSlot}>
+                                <View style={styles.iconWrap}>
+                                    {pending ? (
+                                        <ActivityIndicator size="small" color={color} />
+                                    ) : (
+                                        <item.Icon
+                                            size={scale(22)}
+                                            color={color}
+                                            strokeWidth={isActive ? ACTIVE_STROKE : INACTIVE_STROKE}
+                                            fill={fill}
+                                        />
+                                    )}
+                                    {badge > 0 ? (
+                                        <UnreadBadge
+                                            count={badge}
+                                            variant="md"
+                                            borderColor={tabChrome.background}
+                                            style={styles.tabBadge}
+                                        />
+                                    ) : null}
+                                </View>
                             </View>
-                            <Text
-                                variant="caption"
-                                numberOfLines={1}
-                                ellipsizeMode="tail"
-                                style={[
-                                    styles.label,
-                                    {
-                                        color,
-                                        fontSize,
-                                        fontFamily: labelFontFamily,
-                                        lineHeight: 13,
-                                    },
-                                ]}
-                            >
-                                {label}
-                            </Text>
+                            <View style={styles.labelWrap}>
+                                <Text
+                                    variant="caption"
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                    style={[
+                                        styles.label,
+                                        {
+                                            color,
+                                            fontSize: scale(10),
+                                            lineHeight: scale(12),
+                                            fontFamily: labelFontFamily,
+                                        },
+                                    ]}
+                                >
+                                    {label}
+                                </Text>
+                            </View>
                         </Pressable>
                     );
                 })}
@@ -151,58 +201,65 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     );
 }
 
-function safeLabel(value: unknown, fallback: string) {
-    return typeof value === 'string' && value.trim() ? value.trim() : fallback;
-}
-
 const styles = StyleSheet.create({
     container: {
-        borderTopWidth: 1,
+        borderTopWidth: StyleSheet.hairlineWidth,
         paddingTop: scale(7),
-        paddingHorizontal: scale(14),
-        shadowColor: '#0F172A',
-        shadowOpacity: 0.08,
-        shadowRadius: scale(18),
-        shadowOffset: { width: 0, height: -4 },
-        elevation: 12,
+        paddingHorizontal: scale(16),
+        shadowOpacity: 0.06,
+        shadowRadius: scale(16),
+        shadowOffset: { width: 0, height: -3 },
+        elevation: 10,
     },
     inner: {
         width: '100%',
         maxWidth: 640,
         alignSelf: 'center',
-        alignItems: 'center',
+        flexDirection: 'row',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
     },
     item: {
-        width: scale(58),
-        minHeight: scale(54),
+        flex: 1,
+        flexBasis: 0,
+        minWidth: 0,
+        minHeight: scale(52),
         alignItems: 'center',
         justifyContent: 'center',
-        gap: scale(3),
+        gap: scale(5),
         paddingHorizontal: 0,
     },
     itemPressed: {
-        opacity: 0.72,
+        opacity: 0.82,
+        transform: [{ scale: 0.96 }],
     },
-    iconWrap: {
-        width: scale(58),
-        height: scale(25),
+    iconSlot: {
         alignItems: 'center',
         justifyContent: 'center',
+        minHeight: scale(28),
+        width: '100%',
+        maxWidth: scale(62),
     },
-    badge: {
+    iconWrap: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: scale(28),
+        minHeight: scale(28),
+        maxWidth: scale(62),
+    },
+    tabBadge: {
         position: 'absolute',
-        top: scale(1),
-        right: scale(1),
-        width: scale(9),
-        height: scale(9),
-        borderRadius: scale(5),
-        backgroundColor: BRAND_PINK,
-        borderWidth: 2,
+        top: -scale(4),
+        right: -scale(10),
+    },
+    labelWrap: {
+        width: '100%',
+        minWidth: 0,
+        maxWidth: scale(62),
+        paddingHorizontal: 0,
     },
     label: {
-        width: scale(58),
-        maxWidth: scale(58),
+        width: '100%',
         textAlign: 'center',
         includeFontPadding: false,
     },

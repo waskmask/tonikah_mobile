@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
+import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { membershipService } from '@/lib/membershipService';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
 
 export default function MembershipsScreen() {
     const { isDark } = useTheme();
+    const colors = useColors();
+    const primary = colors.chrome.primary;
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
     const [plans, setPlans] = useState<any[]>([]);
@@ -39,12 +43,13 @@ export default function MembershipsScreen() {
         setStarting(false);
     };
 
-    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}><ActivityIndicator color="#F34B6F" /></View>;
+    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand.bg.surface }}><ActivityIndicator color={primary} /></View>;
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
-            <Text variant="h2">{t('memberships', 'Memberships')}</Text>
-            <Text variant="body-sm" style={{ color: isDark ? '#94A3B8' : '#64748B', marginTop: scale(6), marginBottom: scale(16) }}>
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+            <AppBackTitleBar title={t('memberships', 'Memberships')} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
+            <Text variant="body-sm" style={{ color: colors.brand.text.subtitle, marginBottom: scale(16) }}>
                 {t('web_handoff_required', 'Paid checkout will use secure web handoff after the one-time session endpoint is implemented.')}
             </Text>
             <View style={{ borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF', marginBottom: scale(14) }}>
@@ -63,5 +68,6 @@ export default function MembershipsScreen() {
                 </View>
             ))}
         </ScrollView>
+        </View>
     );
 }

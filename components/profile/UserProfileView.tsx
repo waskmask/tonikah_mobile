@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Dimensions,
     KeyboardAvoidingView,
     Modal,
     Platform,
     Pressable,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     TextInput,
@@ -35,6 +35,7 @@ import {
     MessageCircle,
     Moon,
     MoreVertical,
+    Pencil,
     Plane,
     Quote,
     Ruler,
@@ -52,6 +53,7 @@ import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale, wp } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
@@ -64,9 +66,12 @@ import {
     listText,
     t,
     translateCountry,
+    toKey,
+    translateNamespace,
 } from '@/lib/profileDisplay';
 import {
     bioText,
+    flagEmoji,
     formatProfileLocation,
     imageUrl,
     isMembershipActive,
@@ -91,17 +96,146 @@ function truncateHeaderName(value: string, max = 11) {
     return trimmed.length > max ? `${trimmed.slice(0, max)}..` : trimmed;
 }
 
+const HOBBY_EMOJI: Record<string, string> = {
+    sports: '\u{1F3C6}',
+    reading: '\u{1F4DA}',
+    reading_quran: '\u{1F4D6}',
+    traveling: '\u{2708}\u{FE0F}',
+    travel: '\u{2708}\u{FE0F}',
+    cooking: '\u{1F373}',
+    baking: '\u{1F9C1}',
+    music: '\u{1F3B5}',
+    art: '\u{1F3A8}',
+    painting: '\u{1F3A8}',
+    drawing: '\u{270F}\u{FE0F}',
+    photography: '\u{1F4F8}',
+    gaming: '\u{1F3AE}',
+    video_games: '\u{1F3AE}',
+    fitness: '\u{1F4AA}',
+    gym: '\u{1F4AA}',
+    running: '\u{1F3C3}',
+    hiking: '\u{1F97E}',
+    swimming: '\u{1F3CA}',
+    cycling: '\u{1F6B4}',
+    yoga: '\u{1F9D8}',
+    meditation: '\u{1F9D8}',
+    football: '\u{26BD}',
+    soccer: '\u{26BD}',
+    basketball: '\u{1F3C0}',
+    cricket: '\u{1F3CF}',
+    tennis: '\u{1F3BE}',
+    chess: '\u{265F}\u{FE0F}',
+    horse_riding: '\u{1F40E}',
+    fishing: '\u{1F3A3}',
+    writing: '\u{270D}\u{FE0F}',
+    calligraphy: '\u{1F58B}\u{FE0F}',
+    vlogging: '\u{1F3A5}',
+    diy: '\u{1F6E0}\u{FE0F}',
+    gardening: '\u{1F331}',
+    fashion: '\u{1F457}',
+    investing: '\u{1F4C8}',
+    volunteering: '\u{1F91D}',
+    animals_pets: '\u{1F43E}',
+    animals_and_pets: '\u{1F43E}',
+    pets: '\u{1F43E}',
+    movies: '\u{1F3AC}',
+    netflix: '\u{1F4FA}',
+    podcasts: '\u{1F399}\u{FE0F}',
+    poetry: '\u{1F4DC}',
+    technology: '\u{1F4BB}',
+    coding: '\u{1F4BB}',
+    teaching: '\u{1F468}\u{200D}\u{1F3EB}',
+    dancing: '\u{1F483}',
+    singing: '\u{1F3A4}',
+};
+
+const FAITH_EMOJI: Record<string, string> = {
+    prays_5_times: '\u{1F932}',
+    prays_5_times_a_day: '\u{1F932}',
+    prays_on_time: '\u{23F1}\u{FE0F}',
+    prays_sometimes: '\u{1F932}',
+    jummah_regular: '\u{1F54C}',
+    regular_for_friday_prayer: '\u{1F54C}',
+    quran_recitation: '\u{1F4D6}',
+    recites_quran: '\u{1F4D6}',
+    recites_qur_an: '\u{1F4D6}',
+    dhikr_regular: '\u{1F319}',
+    regular_in_dhikr: '\u{1F319}',
+    fasts_ramadan: '\u{1F319}',
+    fasts_in_ramadan: '\u{1F319}',
+    fasts_sunnah: '\u{1F319}',
+    gives_sadaqah: '\u{1F49D}',
+    zakat_conscious: '\u{1F4B0}',
+    careful_about_zakat: '\u{1F4B0}',
+    completed_umrah: '\u{1F54B}',
+    plans_umrah: '\u{1F54B}',
+    plans_to_perform_umrah: '\u{1F54B}',
+    completed_hajj: '\u{1F54B}',
+    plans_hajj: '\u{1F54B}',
+    plans_to_perform_hajj: '\u{1F54B}',
+    halal_earnings_priority: '\u{2705}',
+    prioritizes_halal_earnings: '\u{2705}',
+    avoids_interest_riba: '\u{1F6AB}',
+    avoids_interest: '\u{1F6AB}',
+    avoids_alcohol: '\u{1F6AB}',
+    avoids_smoking: '\u{1F6AB}',
+    modest_lifestyle: '\u{1F33F}',
+    lives_a_modest_lifestyle: '\u{1F33F}',
+    honest_trustworthy: '\u{1F48E}',
+    honest_and_trustworthy: '\u{1F48E}',
+    kind_soft_spoken: '\u{1F497}',
+    kind_and_soft_spoken: '\u{1F497}',
+    patient_calm_temper: '\u{1F343}',
+    patient_and_calm: '\u{1F343}',
+    respectful: '\u{1F64F}',
+    respectful_to_others: '\u{1F64F}',
+    growth_in_deen: '\u{1F331}',
+    focused_on_growing_in_deen: '\u{1F331}',
+    family_oriented: '\u{1F46A}',
+    close_to_family: '\u{1F46A}',
+    values_marriage: '\u{1F48D}',
+    community_minded: '\u{1F30D}',
+    balances_deen_dunya: '\u{2696}\u{FE0F}',
+    balances_deen_and_duniya: '\u{2696}\u{FE0F}',
+    attends_mosque: '\u{1F54C}',
+    studies_hadith: '\u{1F4DC}',
+    modest_dressing: '\u{1F9D5}',
+    islamic_lectures: '\u{1F399}\u{FE0F}',
+    learns_islam: '\u{1F4DA}',
+};
+
+function profileFieldSlug(value: any) {
+    const raw = String(
+        typeof value === 'object' && value !== null
+            ? value.label || value.name || value.title || value.value || value.value_id || ''
+            : value || '',
+    ).trim();
+    return toKey(raw);
+}
+
+function emojiChipItem(value: any, type: 'faith' | 'hobby') {
+    const slug = profileFieldSlug(value);
+    const fallback = displayText(value);
+    const label = type === 'hobby' ? t(`hobby_${slug}`, fallback) : t(slug, fallback);
+    const emoji = type === 'hobby' ? HOBBY_EMOJI[slug] || '\u{2728}' : FAITH_EMOJI[slug] || '\u{1F319}';
+    return { label, emoji, slug };
+}
+
 export type UserProfileViewProps = {
     userId?: string;
     initialProfile?: any;
     mode?: 'inline' | 'screen' | 'modal';
     showClose?: boolean;
+    isOwnProfile?: boolean;
     advanceOnClose?: boolean;
+    onEditProfile?: () => void;
     onClose?: () => void;
     onAfterClose?: () => void;
     onBlocked?: (userId: string) => void;
     onUnblocked?: (userId: string) => void;
     onFavoriteChanged?: (userId: string, favorited: boolean) => void;
+    refreshing?: boolean;
+    onRefresh?: () => void;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -111,14 +245,20 @@ export function UserProfileView({
     initialProfile,
     mode = 'inline',
     showClose = true,
+    isOwnProfile = false,
     advanceOnClose = false,
+    onEditProfile,
     onClose,
     onAfterClose,
     onBlocked,
     onUnblocked,
     onFavoriteChanged,
+    refreshing = false,
+    onRefresh,
 }: UserProfileViewProps) {
     const { isDark } = useTheme();
+    const colors = useColors();
+    const commonColors = colors.chrome.common;
     const toast = useToast();
     const { isRTL } = useLanguage();
     const { requireVerified } = useEmailVerificationGuard();
@@ -136,6 +276,9 @@ export function UserProfileView({
     const [locallySentRequestIds, setLocallySentRequestIds] = useState<Set<string>>(() => new Set());
     const [pendingProfileToast, setPendingProfileToast] = useState<PendingProfileToast | null>(null);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+    const [blockBusy, setBlockBusy] = useState(false);
+    const [unblockBusy, setUnblockBusy] = useState(false);
 
     const resolvedUserId = userId || profileId(initialProfile);
 
@@ -174,12 +317,14 @@ export function UserProfileView({
     const age = profileAge(profile);
     const title = `${name}${age ? `, ${age}` : ''}`;
     const headerTitle = `${truncateHeaderName(name)}${age ? `, ${age}` : ''}`;
+    const visibleHeaderTitle = isOwnProfile ? t('my_profile', 'My profile') : headerTitle;
     const gallery = normalizeGallery(profile);
     const photos = gallery.map(imageUrl).filter(Boolean);
-    const privateGallery = (profile?.privacy || 'public') === 'private';
+    const privateGallery = !isOwnProfile && (profile?.privacy || profile?.gallery_privacy || profile?.galleryPrivacy || 'public') === 'private';
     const verified = isVerifiedProfile(profile);
     const activeMembership = isMembershipActive(profile);
     const location = formatProfileLocation(profile, true);
+    const countryFlag = flagEmoji(profile);
     const headline = cleanProfileText(profile?.profile_headline);
     const bio = bioText(profile);
     const blocked = profile?.blocked === true;
@@ -324,42 +469,41 @@ export function UserProfileView({
     const blockUser = () => {
         if (!id || !requireVerified('report')) return;
         setProfileMenuOpen(false);
-        Alert.alert(
-            t('block_user', 'Block user'),
-            t('block_user_confirm', 'Are you sure you want to block this user?'),
-            [
-                { text: t('cancel', 'Cancel'), style: 'cancel' },
-                {
-                    text: t('block', 'Block'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        const res = await usersService.block(id);
-                        if (res.success) {
-                            onBlocked?.(id);
-                            close();
-                            setTimeout(() => {
-                                toast.show(t('blocked', 'User has been blocked.'), 'success', 2500);
-                            }, 360);
-                        } else {
-                            toast.show(apiMessage(res.message), 'error');
-                        }
-                    },
-                },
-            ],
-        );
+        setBlockConfirmOpen(true);
     };
 
-    const unblockUser = async () => {
-        if (!id) return;
-        const res = await usersService.unblock(id);
+    const confirmBlockUser = async () => {
+        if (!id || blockBusy) return;
+        setBlockBusy(true);
+        const res = await usersService.block(id);
+        setBlockBusy(false);
         if (res.success) {
-            onUnblocked?.(id);
+            setBlockConfirmOpen(false);
+            onBlocked?.(id);
             close();
             setTimeout(() => {
-                toast.show(t('unblocked', 'User has been unblocked.'), 'success', 2500);
+                toast.show(t('blocked', 'User has been blocked.'), 'success', 2500);
             }, 360);
         } else {
             toast.show(apiMessage(res.message), 'error');
+        }
+    };
+
+    const unblockUser = async () => {
+        if (!id || unblockBusy) return;
+        setUnblockBusy(true);
+        try {
+            const res = await usersService.unblock(id);
+            if (res.success) {
+                setProfile((current: any) => ({ ...current, blocked: false }));
+                onUnblocked?.(id);
+                toast.show(t('unblocked', 'User has been unblocked.'), 'success', 2500);
+                void load();
+            } else {
+                toast.show(apiMessage(res.message), 'error');
+            }
+        } finally {
+            setUnblockBusy(false);
         }
     };
 
@@ -371,25 +515,29 @@ export function UserProfileView({
 
     if (loading) {
         return (
-            <View style={[styles.center, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }]}>
-                <ActivityIndicator color="#F34B6F" />
+            <View style={[styles.center, { backgroundColor: colors.brand.bg.surface }]}>
+                <ActivityIndicator color={colors.chrome.primary} />
             </View>
         );
     }
 
     if (error || !profile || blocked) {
         return (
-            <View style={[styles.center, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC', padding: scale(24) }]}>
+            <View style={[styles.center, { backgroundColor: colors.brand.bg.surface, padding: scale(24) }]}>
                 <Text variant="h3" align="center">
                     {blocked ? t('you_blocked_this_user', 'You have blocked this user') : error || t('profile_unavailable', 'Profile unavailable')}
                 </Text>
                 {blocked ? (
-                    <Pressable onPress={unblockUser} style={[styles.closeError, { borderColor: '#F34B6F', backgroundColor: '#F34B6F' }]}>
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{t('unblock', 'Unblock')}</Text>
+                    <Pressable disabled={unblockBusy} onPress={unblockUser} style={[styles.closeError, { borderColor: colors.chrome.primary, backgroundColor: colors.chrome.primary, opacity: unblockBusy ? 0.72 : 1 }]}>
+                        {unblockBusy ? (
+                            <ActivityIndicator size="small" color={colors.chrome.common.inverseText} />
+                        ) : (
+                            <Text style={{ color: colors.chrome.common.inverseText, fontWeight: '700' }}>{t('unblock', 'Unblock')}</Text>
+                        )}
                     </Pressable>
                 ) : null}
                 {showClose ? (
-                    <Pressable onPress={close} style={[styles.closeError, { borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                    <Pressable onPress={close} style={[styles.closeError, { borderColor: colors.brand.bg.border }]}>
                         <Text>{t('close', 'Close')}</Text>
                     </Pressable>
                 ) : null}
@@ -398,39 +546,63 @@ export function UserProfileView({
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}>
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <View
                 style={[
                     styles.header,
                     {
                         paddingTop: headerTopInset,
                         minHeight: headerTopInset + headerRowHeight,
-                        backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
-                        borderBottomColor: isDark ? '#334155' : '#E2E8F0',
+                        backgroundColor: colors.chrome.header.background,
+                        borderBottomColor: colors.brand.bg.border,
                     },
                 ]}
             >
-                {showClose ? (
+                {!isOwnProfile && showClose ? (
                     <Pressable onPress={close} style={styles.headerButton} hitSlop={10}>
-                        <ChevronLeft size={scale(23)} color={isDark ? '#E2E8F0' : '#1F2A24'} />
+                        <ChevronLeft size={scale(23)} color={colors.chrome.header.icon} />
                     </Pressable>
-                ) : <View style={styles.headerButton} />}
+                ) : isOwnProfile ? null : <View style={styles.headerButton} />}
                 <Text variant="body" className="font-body-semi" numberOfLines={1} style={[styles.headerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>
-                    {headerTitle}
+                    {visibleHeaderTitle}
                 </Text>
-                <Pressable onPress={toggleFavorite} style={styles.headerButton} hitSlop={10}>
-                    <Bookmark size={scale(21)} color={profile?.is_favorited ? '#F34B6F' : isDark ? '#E2E8F0' : '#1F2A24'} fill={profile?.is_favorited ? '#F34B6F' : 'transparent'} />
-                </Pressable>
-                <Pressable onPress={startMessage} style={styles.headerButton} hitSlop={10}>
-                    {messageChecking ? <ActivityIndicator size="small" color="#F34B6F" /> : <MessageCircle size={scale(21)} color={isDark ? '#E2E8F0' : '#1F2A24'} />}
-                </Pressable>
-                <Pressable onPress={() => setProfileMenuOpen(true)} style={styles.headerButton} hitSlop={10}>
-                    <MoreVertical size={scale(21)} color={isDark ? '#E2E8F0' : '#1F2A24'} />
-                </Pressable>
+                {isOwnProfile ? (
+                    <Pressable
+                        onPress={onEditProfile || (() => router.push('/(tabs)/edit-profile'))}
+                        style={[styles.editProfileButton, { borderColor: colors.brand.bg.border }]}
+                        hitSlop={8}
+                    >
+                        <Pencil size={scale(15)} color={colors.chrome.primary} />
+                        <Text variant="body-sm" className="font-body-semi" style={{ color: colors.chrome.primary }}>
+                            {t('edit_profile', 'Edit profile')}
+                        </Text>
+                    </Pressable>
+                ) : (
+                    <>
+                        <Pressable onPress={toggleFavorite} style={styles.headerButton} hitSlop={10}>
+                            <Bookmark size={scale(21)} color={profile?.is_favorited ? colors.chrome.primary : colors.chrome.header.icon} fill={profile?.is_favorited ? colors.chrome.primary : 'transparent'} />
+                        </Pressable>
+                        <Pressable onPress={startMessage} style={styles.headerButton} hitSlop={10}>
+                            {messageChecking ? <ActivityIndicator size="small" color={colors.chrome.primary} /> : <MessageCircle size={scale(21)} color={colors.chrome.header.icon} />}
+                        </Pressable>
+                        <Pressable onPress={() => setProfileMenuOpen(true)} style={styles.headerButton} hitSlop={10}>
+                            <MoreVertical size={scale(21)} color={colors.chrome.header.icon} />
+                        </Pressable>
+                    </>
+                )}
             </View>
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
+                refreshControl={onRefresh ? (
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={colors.chrome.primary}
+                        colors={[colors.chrome.primary]}
+                        progressBackgroundColor={colors.chrome.header.background}
+                    />
+                ) : undefined}
                 contentContainerStyle={[
                     styles.content,
                     mode === 'screen' ? { paddingBottom: scale(120) } : { paddingBottom: scale(26) },
@@ -442,6 +614,7 @@ export function UserProfileView({
                     name={name}
                     age={age}
                     location={location}
+                    countryFlag={countryFlag}
                     verified={verified}
                     activeMembership={activeMembership}
                     onOpenPhoto={(index) => setLightboxIndex(index)}
@@ -453,7 +626,7 @@ export function UserProfileView({
                         {headline ? <Text variant="h3" style={styles.headline}>{headline}</Text> : null}
                         {bio ? (
                             <View style={styles.bioBox}>
-                                <Quote size={scale(24)} color="rgba(243,75,111,0.28)" style={styles.quoteIcon} />
+                                <Quote size={scale(24)} color={commonColors.primaryGlow} style={styles.quoteIcon} />
                                 <Text variant="body" style={styles.bioText}>{bio}</Text>
                             </View>
                         ) : null}
@@ -462,12 +635,26 @@ export function UserProfileView({
 
                 <SectionFacts title={t('religious_beliefs', 'Faith & Values')} facts={facts.faith} isDark={isDark} isRTL={isRTL} />
                 <SectionFacts title={t('marriage_future_plans', 'Marriage / Future plans')} facts={facts.marriage} isDark={isDark} isRTL={isRTL} />
-                <ChipSection title={t('faith_in_daily_life', 'Faith in Daily Life')} items={(profile?.faith_in_daily_life || []).map(displayText)} isDark={isDark} isRTL={isRTL} />
+                <ChipSection
+                    title={t('faith_in_daily_life', 'Faith in Daily Life')}
+                    items={profile?.faith_in_daily_life || []}
+                    type="faith"
+                    isDark={isDark}
+                    isRTL={isRTL}
+                    action={isOwnProfile ? { label: t('edit', 'Edit'), onPress: () => router.push('/(tabs)/faith') } : undefined}
+                />
                 <SectionFacts title={t('education_career', 'Education & Career')} facts={facts.career} isDark={isDark} isRTL={isRTL} />
                 <SectionFacts title={t('background', 'Background')} facts={facts.background} isDark={isDark} isRTL={isRTL} />
                 <SectionFacts title={t('appearance', 'Appearance')} facts={facts.appearance} isDark={isDark} isRTL={isRTL} />
                 <SectionFacts title={t('lifestyle', 'Lifestyle')} facts={facts.lifestyle} isDark={isDark} isRTL={isRTL} />
-                <ChipSection title={t('hobbies', 'Hobbies')} items={(profile?.hobbies || []).map(displayText)} isDark={isDark} isRTL={isRTL} />
+                <ChipSection
+                    title={t('hobbies', 'Hobbies')}
+                    items={profile?.hobbies || []}
+                    type="hobby"
+                    isDark={isDark}
+                    isRTL={isRTL}
+                    action={isOwnProfile ? { label: t('edit', 'Edit'), onPress: () => router.push('/(tabs)/my-hobbies') } : undefined}
+                />
                 {showPartnerPreference ? (
                     <Section title={t('partner_preference', 'Partner Preference')} isDark={isDark}>
                         {partnerAbout ? (
@@ -478,14 +665,39 @@ export function UserProfileView({
                         <FactRows facts={partnerFacts} isRTL={isRTL} />
                     </Section>
                 ) : null}
-                <View style={[styles.profileFooterActionWrap, { borderTopColor: isDark ? '#334155' : '#E2E8F0' }]}>
-                    <Pressable onPress={reportProfile} style={({ pressed }) => [styles.reportProfileButton, pressed && styles.profileMenuItemPressed]}>
-                        <Flag size={scale(18)} color="#EF4444" strokeWidth={2.4} />
-                        <Text variant="body-sm" className="font-body-semi" style={styles.reportProfileText}>
-                            {t('report_profile', 'Report profile')}
-                        </Text>
-                    </Pressable>
+                {!isOwnProfile ? (
+                <View style={[styles.profileFooterActionWrap, { borderTopColor: colors.brand.bg.border }]}>
+                    <View style={styles.profileFooterActionRow}>
+                        <Pressable onPress={reportProfile} style={({ pressed }) => [styles.profileFooterActionButton, pressed && styles.profileMenuItemPressed]}>
+                            <View style={styles.profileFooterActionIconSlot}>
+                                <Flag size={scale(19)} color={colors.brand.text.subtitle} strokeWidth={2.1} />
+                            </View>
+                            <Text variant="body-sm" style={[styles.profileFooterActionText, { color: colors.brand.text.subtitle }]}>
+                                {t('report_profile', 'Report profile')}
+                            </Text>
+                        </Pressable>
+                        <Pressable onPress={toggleFavorite} style={({ pressed }) => [styles.profileFooterActionButton, pressed && styles.profileMenuItemPressed]}>
+                            <View style={styles.profileFooterActionIconSlot}>
+                                <Bookmark
+                                    size={scale(19)}
+                                    color={profile?.is_favorited ? colors.chrome.primary : colors.brand.text.subtitle}
+                                    fill={profile?.is_favorited ? colors.chrome.primary : 'transparent'}
+                                    strokeWidth={2.1}
+                                />
+                            </View>
+                            <Text
+                                variant="body-sm"
+                                style={[
+                                    styles.profileFooterActionText,
+                                    { color: profile?.is_favorited ? colors.chrome.primary : colors.brand.text.subtitle },
+                                ]}
+                            >
+                                {profile?.is_favorited ? t('saved', 'Saved') : t('save_profile', 'Save profile')}
+                            </Text>
+                        </Pressable>
+                    </View>
                 </View>
+                ) : null}
             </ScrollView>
 
             <ImageLightbox
@@ -520,7 +732,95 @@ export function UserProfileView({
                 onReport={reportProfile}
                 onBlock={blockUser}
             />
+            <BlockConfirmModal
+                visible={blockConfirmOpen}
+                loading={blockBusy}
+                onCancel={() => {
+                    if (!blockBusy) setBlockConfirmOpen(false);
+                }}
+                onConfirm={confirmBlockUser}
+            />
         </View>
+    );
+}
+
+function BlockConfirmModal({
+    visible,
+    loading,
+    onCancel,
+    onConfirm,
+}: {
+    visible: boolean;
+    loading: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+}) {
+    const palette = useColors();
+    return (
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+            <View style={styles.confirmLayer}>
+                <Pressable style={styles.confirmBackdrop} onPress={onCancel} />
+                <View
+                    style={[
+                        styles.confirmCard,
+                        {
+                            backgroundColor: palette.chrome.common.card,
+                            borderColor: palette.brand.bg.border,
+                        },
+                    ]}
+                >
+                    <View style={[styles.confirmIcon, { backgroundColor: palette.chrome.common.primaryTint }]}>
+                        <Ban size={scale(22)} color={palette.brand.accent.error} strokeWidth={2.3} />
+                    </View>
+                    <Text variant="h3" align="center" style={{ color: palette.chrome.common.textStrong }}>
+                        {t('block_user', 'Block user')}
+                    </Text>
+                    <Text variant="body-sm" align="center" style={{ color: palette.brand.text.subtitle, lineHeight: scale(19) }}>
+                        {t('block_user_confirm', 'Are you sure you want to block this user?')}
+                    </Text>
+                    <View style={styles.confirmActions}>
+                        <Pressable
+                            disabled={loading}
+                            onPress={onCancel}
+                            style={({ pressed }) => [
+                                styles.confirmButton,
+                                {
+                                    borderColor: palette.brand.bg.border,
+                                    backgroundColor: palette.chrome.common.card,
+                                },
+                                pressed && styles.profileMenuItemPressed,
+                                loading && { opacity: 0.7 },
+                            ]}
+                        >
+                            <Text variant="body-sm" style={{ color: palette.chrome.common.textStrong, fontWeight: '600' }}>
+                                {t('cancel', 'Cancel')}
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            disabled={loading}
+                            onPress={onConfirm}
+                            style={({ pressed }) => [
+                                styles.confirmButton,
+                                {
+                                    borderColor: palette.brand.accent.error,
+                                    backgroundColor: palette.brand.accent.error,
+                                },
+                                pressed && { opacity: 0.85 },
+                                loading && { opacity: 0.78 },
+                            ]}
+                        >
+                            {loading ? (
+                                <ActivityIndicator size="small" color={palette.chrome.common.inverseText} />
+                            ) : (
+                                <Text variant="body-sm" style={{ color: palette.chrome.common.inverseText, fontWeight: '700' }}>
+                                    {t('block', 'Block')}
+                                </Text>
+                            )}
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        </Modal>
     );
 }
 
@@ -539,10 +839,12 @@ function ProfileActionsMenu({
     onReport: () => void;
     onBlock: () => void;
 }) {
+    const palette = useColors();
     const colors = {
-        card: isDark ? '#111827' : '#FFFFFF',
-        border: isDark ? '#334155' : '#E2E8F0',
-        text: isDark ? '#E2E8F0' : '#1F2A24',
+        card: palette.chrome.common.card,
+        border: palette.brand.bg.border,
+        text: palette.chrome.common.textStrong,
+        danger: palette.brand.accent.error,
     };
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -558,8 +860,8 @@ function ProfileActionsMenu({
                         </Pressable>
                     </View>
                     <View style={styles.profileMenuLinks}>
-                        <ProfileMenuItem icon={Flag} label={t('report_profile', 'Report profile')} color={colors.text} danger onPress={onReport} />
-                        <ProfileMenuItem icon={Ban} label={t('block_user', 'Block user')} color={colors.text} danger onPress={onBlock} />
+                        <ProfileMenuItem icon={Flag} label={t('report_profile', 'Report profile')} color={colors.text} dangerColor={colors.danger} danger onPress={onReport} />
+                        <ProfileMenuItem icon={Ban} label={t('block_user', 'Block user')} color={colors.text} dangerColor={colors.danger} danger onPress={onBlock} />
                     </View>
                 </View>
             </View>
@@ -571,23 +873,25 @@ function ProfileMenuItem({
     icon: Icon,
     label,
     color,
+    dangerColor,
     danger,
     onPress,
 }: {
     icon: LucideIcon;
     label: string;
     color: string;
+    dangerColor?: string;
     danger?: boolean;
     onPress: () => void;
 }) {
-    const tint = danger ? '#EF4444' : color;
+    const tint = danger ? dangerColor || color : color;
     return (
         <Pressable onPress={onPress} style={({ pressed }) => [styles.profileMenuItem, pressed && styles.profileMenuItemPressed]}>
             <View style={styles.profileMenuItemRow}>
                 <View style={styles.profileMenuIcon}>
                     <Icon size={scale(18)} color={tint} strokeWidth={2.4} />
                 </View>
-                <Text variant="body-sm" numberOfLines={1} className="font-body-semi" style={[styles.profileMenuLabel, { color: tint }]}>
+                <Text variant="body-sm" numberOfLines={1} style={[styles.profileMenuLabel, { color: tint }]}>
                     {label}
                 </Text>
             </View>
@@ -621,6 +925,7 @@ function IntroMessageSheet({
     onSend: () => void;
 }) {
     const insets = useSafeAreaInsets();
+    const palette = useColors();
     const inputRef = React.useRef<TextInput>(null);
     const keyboardOffset = Platform.OS === 'ios' ? insets.top : 0;
     const maxSheetHeight = Math.round(Dimensions.get('window').height * 0.72);
@@ -646,19 +951,19 @@ function IntroMessageSheet({
                     style={[
                         styles.messageSheet,
                         {
-                            backgroundColor: isDark ? '#111827' : '#FFFFFF',
-                            borderColor: isDark ? '#334155' : '#E2E8F0',
+                            backgroundColor: palette.chrome.common.card,
+                            borderColor: palette.brand.bg.border,
                             paddingBottom: Math.max(insets.bottom + scale(12), scale(22)),
                             maxHeight: maxSheetHeight,
                         },
                     ]}
                 >
                     <View style={styles.messageSheetHeader}>
-                        <Text variant="body-sm" className="font-body-bold" style={{ color: isDark ? '#F8FAFC' : '#1F2A24' }}>
+                        <Text variant="body-sm" className="font-body-bold" style={{ color: palette.chrome.common.textStrong }}>
                             {title}
                         </Text>
                         <Pressable onPress={onClose} disabled={sending} style={styles.messageSheetClose} hitSlop={10}>
-                            <X size={scale(20)} color={isDark ? '#CBD5E1' : '#1F2A24'} />
+                            <X size={scale(20)} color={palette.chrome.common.textStrong} />
                         </Pressable>
                     </View>
                     <ScrollView
@@ -671,30 +976,30 @@ function IntroMessageSheet({
                             value={value}
                             onChangeText={onChange}
                             placeholder={placeholder}
-                            placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                            placeholderTextColor={palette.brand.text.muted}
                             multiline
                             textAlignVertical="top"
                             scrollEnabled
                             style={[
                                 styles.messageInput,
                                 {
-                                    color: isDark ? '#F8FAFC' : '#1F2A24',
-                                    backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                                    borderColor: isDark ? '#334155' : '#E2E8F0',
+                                    color: palette.chrome.common.textStrong,
+                                    backgroundColor: palette.brand.bg.surface,
+                                    borderColor: palette.brand.bg.border,
                                     textAlign: isRTL ? 'right' : 'left',
                                 },
                             ]}
                         />
                         <View style={styles.messageMetaRow}>
-                            <Text variant="caption" style={{ color: isDark ? '#94A3B8' : '#64748B', flex: 1 }}>
+                            <Text variant="caption" style={{ color: palette.brand.text.subtitle, flex: 1 }}>
                                 {hint}
                             </Text>
-                            <Text variant="caption" className="font-body-semi" style={{ color: value.length > 450 ? '#F34B6F' : isDark ? '#94A3B8' : '#64748B' }}>
+                            <Text variant="caption" className="font-body-semi" style={{ color: value.length > 450 ? palette.chrome.primary : palette.brand.text.subtitle }}>
                                 {value.length}/500
                             </Text>
                         </View>
                         <Pressable disabled={sending || !value.trim()} onPress={onSend} style={[styles.messageSendButton, (!value.trim() || sending) && styles.messageSendDisabled]}>
-                            {sending ? <ActivityIndicator color="#FFFFFF" /> : <Text variant="body-sm" className="font-body-bold" style={{ color: '#FFFFFF' }}>{t('send', 'Send')}</Text>}
+                            {sending ? <ActivityIndicator color={palette.chrome.common.inverseText} /> : <Text variant="body-sm" className="font-body-bold" style={{ color: palette.chrome.common.inverseText }}>{t('send', 'Send')}</Text>}
                         </Pressable>
                     </ScrollView>
                 </View>
@@ -709,6 +1014,7 @@ function ProfileGallery({
     name,
     age,
     location,
+    countryFlag,
     verified,
     activeMembership,
     onOpenPhoto,
@@ -719,29 +1025,31 @@ function ProfileGallery({
     name: string;
     age: number | null;
     location: string;
+    countryFlag: string;
     verified: boolean;
     activeMembership: boolean;
     onOpenPhoto: (index: number) => void;
     isDark: boolean;
 }) {
+    const palette = useColors();
     const slots = [0, 1, 2].map((index) => photos[index] || '');
     const slideWidth = Math.round(SCREEN_WIDTH * 0.68);
 
     return (
-        <View style={[styles.gallery, { backgroundColor: isDark ? '#111827' : '#FFFFFF' }]}>
+        <View style={[styles.gallery, { backgroundColor: palette.chrome.common.card }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={slideWidth} decelerationRate="fast">
                 {slots.map((src, index) => (
                     <Pressable
                         key={`${src}-${index}`}
                         disabled={!src || privateGallery}
                         onPress={() => onOpenPhoto(index)}
-                        style={[styles.gallerySlide, { width: slideWidth, backgroundColor: isDark ? '#1E293B' : '#E2E8F0' }]}
+                        style={[styles.gallerySlide, { width: slideWidth, backgroundColor: palette.brand.bg.surface }]}
                     >
                         <Image source={src ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={privateGallery ? 18 : 0} />
                         {privateGallery && (
                             <View style={styles.privateOverlay}>
-                                <Lock size={scale(22)} color="#FFFFFF" />
-                                <Text variant="caption" style={{ color: '#FFFFFF' }}>{t('gallery_isprivate', 'Gallery is private')}</Text>
+                                <Lock size={scale(22)} color={palette.chrome.common.inverseText} />
+                                <Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>{t('gallery_isprivate', 'Gallery is private')}</Text>
                             </View>
                         )}
                     </Pressable>
@@ -749,32 +1057,54 @@ function ProfileGallery({
             </ScrollView>
             <LinearGradient colors={['rgba(15,23,42,0.02)', 'rgba(15,23,42,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
             <View style={styles.photoCount}>
-                <Text variant="caption" style={{ color: '#FFFFFF' }}>{photos.length || 0}</Text>
+                <Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>{photos.length || 0}</Text>
             </View>
             <View style={styles.galleryIdentity} pointerEvents="none">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(8), flexWrap: 'wrap' }}>
-                    <Text variant="h2" numberOfLines={2} style={{ color: '#FFFFFF', fontSize: scale(23), lineHeight: scale(28), flexShrink: 1 }}>
+                    <Text variant="h2" numberOfLines={2} style={{ color: palette.chrome.common.inverseText, fontSize: scale(23), lineHeight: scale(28), flexShrink: 1 }}>
                         {name}{age ? `, ${age}` : ''}
                     </Text>
-                    {verified ? <ShieldCheck size={scale(22)} color="#FFFFFF" fill="#3D63F3" /> : null}
-                    {activeMembership ? <View style={styles.membershipBadge}><Text variant="caption" style={{ color: '#FFFFFF' }}>M</Text></View> : null}
+                    {verified ? <ShieldCheck size={scale(22)} color={palette.chrome.common.inverseText} fill="#3D63F3" /> : null}
+                    {activeMembership ? <View style={styles.membershipBadge}><Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>M</Text></View> : null}
                 </View>
-                {location ? <Text variant="body-sm" style={{ color: '#FFFFFF', marginTop: scale(5) }}>{location}</Text> : null}
+                {location ? (
+                    <View style={styles.heroLocationRow}>
+                        {countryFlag ? <Text variant="body-sm" style={styles.heroLocationFlag}>{countryFlag}</Text> : <MapPin size={scale(15)} color={palette.chrome.common.inverseText} />}
+                        <Text variant="body-sm" numberOfLines={1} style={{ color: palette.chrome.common.inverseText, flexShrink: 1 }}>
+                            {location}
+                        </Text>
+                    </View>
+                ) : null}
             </View>
         </View>
     );
 }
 
-function SectionFacts({ title, facts, isDark, isRTL }: { title: string; facts: Fact[]; isDark: boolean; isRTL: boolean }) {
+type SectionAction = { label: string; onPress: () => void };
+
+function SectionFacts({
+    title,
+    facts,
+    isDark,
+    isRTL,
+    action,
+}: {
+    title: string;
+    facts: Fact[];
+    isDark: boolean;
+    isRTL: boolean;
+    action?: SectionAction;
+}) {
     if (!facts.length) return null;
     return (
-        <Section title={title} isDark={isDark}>
+        <Section title={title} isDark={isDark} action={action}>
             <FactRows facts={facts} isRTL={isRTL} />
         </Section>
     );
 }
 
 function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
+    const palette = useColors();
     if (!facts.length) return null;
     return (
         <View style={{ gap: scale(14) }}>
@@ -783,10 +1113,10 @@ function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
                 return (
                     <View key={`${fact.label}-${fact.value}`} style={[styles.factRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={styles.factIcon}>
-                            <Icon size={scale(18)} color="#F34B6F" />
+                            <Icon size={scale(18)} color={palette.chrome.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { textAlign: isRTL ? 'right' : 'left' }]}>{fact.label}</Text>
+                            <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { color: palette.chrome.common.textMuted, textAlign: isRTL ? 'right' : 'left' }]}>{fact.label}</Text>
                             <Text variant="body" className="font-body-semi" style={{ textAlign: isRTL ? 'right' : 'left' }}>{fact.value}</Text>
                         </View>
                     </View>
@@ -796,15 +1126,31 @@ function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
     );
 }
 
-function ChipSection({ title, items, isDark, isRTL }: { title: string; items: string[]; isDark: boolean; isRTL: boolean }) {
-    const clean = items.filter(Boolean);
+function ChipSection({
+    title,
+    items,
+    type,
+    isDark,
+    isRTL,
+    action,
+}: {
+    title: string;
+    items: any[];
+    type: 'faith' | 'hobby';
+    isDark: boolean;
+    isRTL: boolean;
+    action?: SectionAction;
+}) {
+    const palette = useColors();
+    const clean = items.map((item) => emojiChipItem(item, type)).filter((item) => item.label);
     if (!clean.length) return null;
     return (
-        <Section title={title} isDark={isDark}>
+        <Section title={title} isDark={isDark} action={action}>
             <View style={[styles.chipWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                {clean.map((item) => (
-                    <View key={item} style={[styles.chip, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC', borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
-                        <Text variant="body-sm" className="font-body-semi">{item}</Text>
+                {clean.map((item, index) => (
+                    <View key={`${type}-${item.slug}-${index}`} style={[styles.chip, styles.emojiChip, { backgroundColor: palette.brand.bg.surface, borderColor: palette.brand.bg.border }]}>
+                        <Text style={styles.emojiText}>{item.emoji}</Text>
+                        <Text variant="body-sm" style={styles.emojiChipLabel}>{item.label}</Text>
                     </View>
                 ))}
             </View>
@@ -812,10 +1158,21 @@ function ChipSection({ title, items, isDark, isRTL }: { title: string; items: st
     );
 }
 
-function Section({ title, children, isDark }: { title: string; children: React.ReactNode; isDark: boolean }) {
+function Section({ title, children, isDark, action }: { title: string; children: React.ReactNode; isDark: boolean; action?: SectionAction }) {
+    const palette = useColors();
     return (
-        <View style={[styles.section, { backgroundColor: isDark ? '#111827' : '#FFFFFF', borderTopColor: isDark ? '#334155' : '#E2E8F0' }]}>
-            <Text variant="caption" className="font-body-semi" style={styles.sectionTitle}>{title}</Text>
+        <View style={[styles.section, { backgroundColor: palette.chrome.common.card, borderTopColor: palette.brand.bg.border }]}>
+            <View style={styles.sectionHeader}>
+                <Text variant="caption" className="font-body-semi" style={[styles.sectionTitle, { color: palette.chrome.common.textStrong }]}>{title}</Text>
+                {action ? (
+                    <Pressable onPress={action.onPress} style={styles.sectionAction} hitSlop={8}>
+                        <Pencil size={scale(13)} color={palette.chrome.primary} />
+                        <Text variant="caption" className="font-body-semi" style={[styles.sectionActionText, { color: palette.chrome.primary }]}>
+                            {action.label}
+                        </Text>
+                    </Pressable>
+                ) : null}
+            </View>
             {children}
         </View>
     );
@@ -833,6 +1190,7 @@ function ImageLightbox({
     onReport: () => void;
 }) {
     const [current, setCurrent] = useState(0);
+    const palette = useColors();
     useEffect(() => {
         if (index !== null) setCurrent(index);
     }, [index]);
@@ -846,25 +1204,25 @@ function ImageLightbox({
             <View style={styles.lightbox}>
                 <View style={styles.lightboxTopbar}>
                     <Pressable onPress={onClose} style={styles.lightboxIconButton} hitSlop={10}>
-                        <X size={scale(23)} color="#FFFFFF" />
+                        <X size={scale(23)} color={palette.chrome.common.inverseText} />
                     </Pressable>
                     {hasMultiple ? (
-                        <Text variant="body-sm" className="font-body-semi" style={{ color: '#FFFFFF' }}>
+                        <Text variant="body-sm" className="font-body-semi" style={{ color: palette.chrome.common.inverseText }}>
                             {current + 1}/{photos.length}
                         </Text>
                     ) : <View />}
                     <Pressable onPress={onReport} style={styles.lightboxIconButton} hitSlop={10}>
-                        <Flag size={scale(21)} color="#FFFFFF" />
+                        <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
                     </Pressable>
                 </View>
                 {src ? <Image source={{ uri: src }} style={styles.lightboxImage} contentFit="contain" /> : null}
                 {hasMultiple ? (
                     <>
                         <Pressable onPress={goPrevious} style={[styles.lightboxNav, styles.lightboxNavLeft]} hitSlop={12}>
-                            <ChevronLeft size={scale(28)} color="#FFFFFF" />
+                            <ChevronLeft size={scale(28)} color={palette.chrome.common.inverseText} />
                         </Pressable>
                         <Pressable onPress={goNext} style={[styles.lightboxNav, styles.lightboxNavRight]} hitSlop={12}>
-                            <ChevronRight size={scale(28)} color="#FFFFFF" />
+                            <ChevronRight size={scale(28)} color={palette.chrome.common.inverseText} />
                         </Pressable>
                     </>
                 ) : null}
@@ -928,11 +1286,19 @@ function buildFacts(profile: any) {
 function buildPartnerFacts(partnerPreference: any) {
     const compact = (facts: Array<Fact | null | false | undefined>) =>
         facts.filter((fact): fact is Fact => Boolean(fact && typeof fact !== 'boolean' && fact.value.trim()));
-    const list = (values: any[]) => listText((values || []).map((value) => {
+    const asArray = (value: any) => {
+        if (Array.isArray(value)) return value;
+        return value ? [value] : [];
+    };
+    const list = (values: any) => listText(asArray(values).map((value) => {
         if (typeof value === 'object') return displayText(value?.label || value?.name || value?.value);
         return displayText(value);
     }));
-    const countryList = (values: any[]) => listText((values || []).map((value) => {
+    const ethnicList = (values: any) => listText(asArray(values).map((value) => {
+        const raw = typeof value === 'object' ? value?.label || value?.name || value?.value : value;
+        return translateNamespace('ethnic_group', raw);
+    }));
+    const countryList = (values: any) => listText(asArray(values).map((value) => {
         if (typeof value === 'object') return translateCountry(value?.label || value?.name || value?.value || value?.country);
         return translateCountry(value);
     }));
@@ -943,9 +1309,10 @@ function buildPartnerFacts(partnerPreference: any) {
 
     return compact([
         heightFrom && heightTo ? { icon: Ruler, label: t('preferred_height', 'Preferred height'), value: `${heightFrom} - ${heightTo}` } : null,
-        ageFrom && ageTo ? { icon: CalendarHeart, label: t('preferred_age', 'Preferred age'), value: `${ageFrom} - ${ageTo}` } : null,
-        { icon: Users, label: t('preferred_marital_status', 'Preferred marital status'), value: displayText(partnerPreference?.marital_status) },
-        { icon: Languages, label: t('preferred_languages', 'Preferred languages'), value: list(partnerPreference?.mother_tongue || partnerPreference?.languages || []) },
+        ageFrom && ageTo ? { icon: CalendarHeart, label: t('preferred_age', 'Preferred age'), value: `${ageFrom} - ${ageTo} ${t('years', 'years')}` } : null,
+        { icon: Users, label: t('preferred_marital_status', 'Preferred marital status'), value: list(partnerPreference?.marital_status) },
+        { icon: Languages, label: t('preferred_languages', 'Preferred languages'), value: list(partnerPreference?.languages_spoken || partnerPreference?.languages || partnerPreference?.mother_tongue) },
+        { icon: Users, label: t('preferred_ethnicity', 'Preferred ethnicity'), value: ethnicList(partnerPreference?.ethnic_group) },
         { icon: MapPin, label: t('location', 'Location'), value: countryList(partnerPreference?.location || partnerPreference?.countries || []) },
     ]);
 }
@@ -957,10 +1324,20 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: scale(8),
+        paddingHorizontal: scale(14),
     },
     headerButton: { width: scale(38), height: scale(38), alignItems: 'center', justifyContent: 'center' },
     headerTitle: { flex: 1, fontSize: scale(16), lineHeight: scale(20) },
+    editProfileButton: {
+        minHeight: scale(34),
+        borderWidth: 1,
+        borderRadius: scale(999),
+        paddingHorizontal: scale(12),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(6),
+    },
     content: { paddingHorizontal: 0, paddingTop: 0 },
     gallery: { overflow: 'hidden', minHeight: scale(342), marginBottom: 0 },
     gallerySlide: { aspectRatio: 3 / 4, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -968,13 +1345,30 @@ const styles = StyleSheet.create({
     privateOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: scale(6), backgroundColor: 'rgba(15,23,42,0.22)' },
     photoCount: { position: 'absolute', right: scale(14), top: scale(14), minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(15,23,42,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
     galleryIdentity: { position: 'absolute', left: scale(18), right: scale(18), bottom: scale(18) },
+    heroLocationRow: { flexDirection: 'row', alignItems: 'center', gap: scale(6), marginTop: scale(5) },
+    heroLocationFlag: { lineHeight: scale(18) },
     membershipBadge: { width: scale(22), height: scale(22), borderRadius: scale(11), backgroundColor: '#F34B6F', alignItems: 'center', justifyContent: 'center' },
     section: {
         borderTopWidth: 1,
         paddingHorizontal: scale(18),
         paddingVertical: scale(20),
     },
-    sectionTitle: { textTransform: 'uppercase', letterSpacing: 2, color: '#1F2A24', marginBottom: scale(14), fontSize: scale(13) },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: scale(12),
+        marginBottom: scale(14),
+    },
+    sectionTitle: { textTransform: 'uppercase', letterSpacing: 2, color: '#1F2A24', fontSize: scale(13), flexShrink: 1 },
+    sectionAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
+        paddingHorizontal: scale(4),
+        paddingVertical: scale(3),
+    },
+    sectionActionText: { color: '#F34B6F' },
     headline: { fontSize: scale(20), lineHeight: scale(25), marginBottom: scale(10) },
     bioBox: { borderLeftWidth: 4, borderLeftColor: '#F34B6F', backgroundColor: 'rgba(243,75,111,0.04)', borderRadius: scale(8), padding: scale(14) },
     quoteIcon: { position: 'absolute', right: scale(12), top: scale(10) },
@@ -985,21 +1379,42 @@ const styles = StyleSheet.create({
     factLabel: { color: '#7A8480', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: scale(3) },
     chipWrap: { flexWrap: 'wrap', gap: scale(8) },
     chip: { borderWidth: 1, borderRadius: scale(999), paddingHorizontal: scale(12), paddingVertical: scale(8) },
+    emojiChip: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
+    emojiText: { fontSize: scale(15), lineHeight: scale(18) },
+    emojiChipLabel: { fontWeight: '400' },
     profileFooterActionWrap: {
         borderTopWidth: 1,
         paddingHorizontal: scale(18),
         paddingTop: scale(18),
         paddingBottom: scale(34),
     },
-    reportProfileButton: {
-        minHeight: scale(44),
-        alignSelf: 'flex-start',
+    profileFooterActionRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(16),
+    },
+    profileFooterActionButton: {
+        minWidth: scale(96),
+        minHeight: scale(58),
+        borderRadius: scale(12),
+        alignItems: 'center',
+        justifyContent: 'center',
         gap: scale(10),
         paddingVertical: scale(8),
     },
-    reportProfileText: { color: '#EF4444' },
+    profileFooterActionIconSlot: {
+        width: '100%',
+        height: scale(24),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    profileFooterActionText: {
+        textAlign: 'center',
+        fontSize: scale(13),
+        lineHeight: scale(17),
+        fontWeight: '400',
+    },
     profileMenuLayer: {
         position: 'absolute',
         top: 0,
@@ -1049,7 +1464,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(10),
         paddingTop: scale(8),
         paddingBottom: scale(12),
-        gap: scale(10),
+        gap: scale(14),
     },
     profileMenuItem: {
         height: scale(52),
@@ -1072,9 +1487,63 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: scale(14),
         lineHeight: scale(18),
+        fontWeight: '400',
     },
     profileMenuItemPressed: {
         backgroundColor: 'rgba(148,163,184,0.12)',
+    },
+    confirmLayer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: scale(22),
+    },
+    confirmBackdrop: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        backgroundColor: 'rgba(15,23,42,0.42)',
+    },
+    confirmCard: {
+        width: '100%',
+        maxWidth: scale(360),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: scale(18),
+        paddingHorizontal: scale(18),
+        paddingTop: scale(20),
+        paddingBottom: scale(16),
+        alignItems: 'center',
+        gap: scale(12),
+        shadowColor: '#000000',
+        shadowOpacity: 0.18,
+        shadowRadius: scale(24),
+        shadowOffset: { width: 0, height: scale(12) },
+        elevation: 18,
+    },
+    confirmIcon: {
+        width: scale(48),
+        height: scale(48),
+        borderRadius: scale(24),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    confirmActions: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(10),
+        marginTop: scale(4),
+    },
+    confirmButton: {
+        flex: 1,
+        minHeight: scale(42),
+        borderRadius: scale(21),
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: scale(14),
     },
     lightbox: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
     lightboxTopbar: { position: 'absolute', left: 0, right: 0, top: scale(42), zIndex: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(16) },

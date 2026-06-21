@@ -80,6 +80,8 @@
   "sender_chat_limit_reached": "Their active chat limit is full.",
   "message_failed": "Message failed to send. Tap to retry.",
   "account_deleted": "Deleted Account",
+  "account_deleted_message_disabled": "This account has been deleted. You can no longer send messages.",
+  "account_deleted_request_removed": "This request is no longer available because the account was deleted.",
   "slots_counter": "{{used}}/{{total}}",
   "tab_sent": "Sent",
   "view_once": "View once",
@@ -117,5 +119,7 @@
   "notifications_enabled": "Notifications enabled.",
   "notifications_disabled": "Notifications disabled.",
   "notifications_blocked": "Notifications are blocked. Enable them in device settings.",
-  "notifications_not_available": "Notifications are not available yet."
+  "notifications_not_available": "Notifications are not available yet.",
+  "accept_request_to_reply": "Accept the request before replying.",
+  "waiting_for_request_acceptance": "Waiting for this request to be accepted."
 }

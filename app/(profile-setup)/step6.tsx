@@ -10,10 +10,12 @@ import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectShe
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { BookOpen, Landmark, Star, Sparkles, HandHeart } from 'lucide-react-native';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
+import { apiMessage } from '@/lib/profileDisplay';
 
 const SECT_FILTERS: Record<string, { maslak: string[]; following: string[] }> = {
     sunni: {
@@ -156,10 +158,10 @@ export default function Step6() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step7');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update');
+                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
         } finally {
             setLoading(false);
         }
@@ -169,40 +171,41 @@ export default function Step6() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={6} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
-                        title={t('religious_title', { defaultValue: 'Religious Beliefs and Practices' })}
-                        subtitle={t('religious_desc', { defaultValue: 'Provide information about religious values and practices.' })}
+                        step={6}
+                        title={t('step_6.title', { defaultValue: 'Religious Beliefs and Practices' })}
+                        subtitle={t('step_6.subtitle', { defaultValue: 'Provide information about your religious values and practices.' })}
                     />
 
-                    <FieldLabel text="Sect" required />
-                    <SelectField value={sect ? getLabel(sect, sectOpts) : ''} placeholder="Select sect" onPress={() => setActiveSheet('sect')} icon={<BookOpen size={scale(18)} color={iconColor} />} hasError={!!errors.sect} />
+                    <FieldLabel text={t('sect', { defaultValue: 'Sect' })} required />
+                    <SelectField value={sect ? getLabel(sect, sectOpts) : ''} placeholder={t('select_sect', { defaultValue: 'Select sect' })} onPress={() => setActiveSheet('sect')} icon={<BookOpen size={scale(18)} color={iconColor} />} hasError={!!errors.sect} />
                     {errors.sect && <ErrorText text={errors.sect} />}
 
-                    <FieldLabel text="Maslak / School of Thought" required />
-                    <SelectField value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder="Select" onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
+                    <FieldLabel text={t('maslak_school', { defaultValue: 'Maslak / School of Thought' })} required />
+                    <SelectField value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder={t('select_maslak', { defaultValue: 'Select' })} onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
                     {errors.maslak && <ErrorText text={errors.maslak} />}
 
-                    <FieldLabel text="Following / Movement" />
-                    <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder="Select (optional)" onPress={() => setActiveSheet('following')} icon={<Star size={scale(18)} color={iconColor} />} />
+                    <FieldLabel text={t('following_movement', { defaultValue: 'Following / Movement' })} />
+                    <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder={t('select_optional', { defaultValue: 'Select (optional)' })} onPress={() => setActiveSheet('following')} icon={<Star size={scale(18)} color={iconColor} />} />
 
-                    <FieldLabel text="How Practising Are You?" required />
-                    <SelectField value={isPractising ? getLabel(isPractising, practisingOptions) : ''} placeholder="Select level" onPress={() => setActiveSheet('practising')} icon={<Sparkles size={scale(18)} color={iconColor} />} hasError={!!errors.isPractising} />
+                    <FieldLabel text={t('how_practising', { defaultValue: 'How Practising Are You?' })} required />
+                    <SelectField value={isPractising ? getLabel(isPractising, practisingOptions) : ''} placeholder={t('select_practising', { defaultValue: 'Select level' })} onPress={() => setActiveSheet('practising')} icon={<Sparkles size={scale(18)} color={iconColor} />} hasError={!!errors.isPractising} />
                     {errors.isPractising && <ErrorText text={errors.isPractising} />}
 
-                    <FieldLabel text="Prayer Habit" required />
-                    <SelectField value={prayers ? getLabel(prayers, prayerOptions) : ''} placeholder="Select" onPress={() => setActiveSheet('prayers')} icon={<HandHeart size={scale(18)} color={iconColor} />} hasError={!!errors.prayers} />
+                    <FieldLabel text={t('prayers_title', { defaultValue: 'Prayer Habit' })} required />
+                    <SelectField value={prayers ? getLabel(prayers, prayerOptions) : ''} placeholder={t('select_prayer', { defaultValue: 'Select' })} onPress={() => setActiveSheet('prayers')} icon={<HandHeart size={scale(18)} color={iconColor} />} hasError={!!errors.prayers} />
                     {errors.prayers && <ErrorText text={errors.prayers} />}
                 </ScrollView>
             </KeyboardAvoidingView>
 
             <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 
-            <SingleSelectSheet visible={activeSheet === 'sect'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSect(v); setMaslak(''); setFollowing(''); setErrors((e) => ({ ...e, sect: '', maslak: '' })); }} options={sectOpts} selected={sect} title="Sect" searchEnabled />
-            <SingleSelectSheet visible={activeSheet === 'maslak'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setMaslak(v); setErrors((e) => ({ ...e, maslak: '' })); }} options={maslakOpts} selected={maslak} title="Maslak" searchEnabled />
-            <SingleSelectSheet visible={activeSheet === 'following'} onClose={() => setActiveSheet(null)} onSelect={(v) => setFollowing(v)} options={followingOpts} selected={following} title="Following" searchEnabled />
-            <SingleSelectSheet visible={activeSheet === 'practising'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setIsPractising(v); setErrors((e) => ({ ...e, isPractising: '' })); }} options={practisingOptions} selected={isPractising} title="Practising Level" />
-            <SingleSelectSheet visible={activeSheet === 'prayers'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setPrayers(v); setErrors((e) => ({ ...e, prayers: '' })); }} options={prayerOptions} selected={prayers} title="Prayer Habit" />
+            <SingleSelectSheet visible={activeSheet === 'sect'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSect(v); setMaslak(''); setFollowing(''); setErrors((e) => ({ ...e, sect: '', maslak: '' })); }} options={sectOpts} selected={sect} title={t('sect', { defaultValue: 'Sect' })} searchEnabled />
+            <SingleSelectSheet visible={activeSheet === 'maslak'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setMaslak(v); setErrors((e) => ({ ...e, maslak: '' })); }} options={maslakOpts} selected={maslak} title={t('maslak', { defaultValue: 'Maslak' })} searchEnabled />
+            <SingleSelectSheet visible={activeSheet === 'following'} onClose={() => setActiveSheet(null)} onSelect={(v) => setFollowing(v)} options={followingOpts} selected={following} title={t('following', { defaultValue: 'Following' })} searchEnabled />
+            <SingleSelectSheet visible={activeSheet === 'practising'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setIsPractising(v); setErrors((e) => ({ ...e, isPractising: '' })); }} options={practisingOptions} selected={isPractising} title={t('practising_label', { defaultValue: 'Practising Level' })} />
+            <SingleSelectSheet visible={activeSheet === 'prayers'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setPrayers(v); setErrors((e) => ({ ...e, prayers: '' })); }} options={prayerOptions} selected={prayers} title={t('prayers_title', { defaultValue: 'Prayer Habit' })} />
         </SafeAreaView>
     );
 }

@@ -14,11 +14,13 @@ import {
 import { Text } from './Text';
 import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { Search, X, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography } from '@/constants/typography';
+import { t } from '@/lib/profileDisplay';
 
 export interface SelectOption {
     value: string;
@@ -62,6 +64,7 @@ export function SingleSelectSheet({
     presentation,
 }: SingleSelectSheetProps) {
     const { isDark } = useTheme();
+    const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const searchFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
@@ -142,7 +145,7 @@ export function SingleSelectSheet({
                         style={[
                             isDrawer ? styles.drawer : styles.sheet,
                             {
-                                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                                backgroundColor: palette.chrome.common.card,
                             },
                             isDrawer && { minHeight: Dimensions.get('window').height },
                             !isDrawer && { minHeight: minHeight || Dimensions.get('window').height * 0.4 },
@@ -159,7 +162,7 @@ export function SingleSelectSheet({
                                 <View
                                     style={[
                                         styles.handle,
-                                        { backgroundColor: isDark ? '#475569' : '#CBD5E1' },
+                                        { backgroundColor: palette.brand.text.muted },
                                     ]}
                                 />
                             </View>
@@ -170,9 +173,9 @@ export function SingleSelectSheet({
                             {isDrawer && (
                                 <Pressable onPress={onClose} hitSlop={12} style={styles.backButton}>
                                     {isRTL ? (
-                                        <ChevronRight size={22} color={isDark ? '#E2E8F0' : '#0A0D14'} />
+                                        <ChevronRight size={22} color={palette.brand.text.body} />
                                     ) : (
-                                        <ChevronLeft size={22} color={isDark ? '#E2E8F0' : '#0A0D14'} />
+                                        <ChevronLeft size={22} color={palette.brand.text.body} />
                                     )}
                                 </Pressable>
                             )}
@@ -185,7 +188,7 @@ export function SingleSelectSheet({
                             </Text>
                             {!isDrawer && (
                                 <Pressable onPress={onClose} hitSlop={12}>
-                                    <X size={scale(20)} color={isDark ? '#94A3B8' : '#6B7280'} />
+                                    <X size={scale(20)} color={palette.brand.text.subtitle} />
                                 </Pressable>
                             )}
                         </View>
@@ -196,21 +199,21 @@ export function SingleSelectSheet({
                                 style={[
                                     styles.searchContainer,
                                     {
-                                        backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                                        borderColor: isDark ? '#334155' : '#E2E8F0',
+                                        backgroundColor: palette.brand.bg.surface,
+                                        borderColor: palette.brand.bg.border,
                                     },
                                 ]}
                             >
-                                <Search size={scale(16)} color={isDark ? '#64748B' : '#9CA3AF'} />
+                                <Search size={scale(16)} color={palette.brand.text.muted} />
                                 <TextInput
                                     value={search}
                                     onChangeText={setSearch}
                                     placeholder={searchPlaceholder}
-                                    placeholderTextColor={isDark ? '#64748B' : '#9CA3AF'}
+                                    placeholderTextColor={palette.brand.text.muted}
                                     style={[
                                         styles.searchInput,
                                         {
-                                            color: isDark ? '#E2E8F0' : '#0A0D14',
+                                            color: palette.brand.text.body,
                                             fontFamily: searchFontFamily,
                                             textAlign: isRTL ? 'right' : 'left',
                                         },
@@ -218,7 +221,7 @@ export function SingleSelectSheet({
                                 />
                                 {search.length > 0 && (
                                     <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                                        <X size={scale(14)} color={isDark ? '#64748B' : '#9CA3AF'} />
+                                        <X size={scale(14)} color={palette.brand.text.muted} />
                                     </Pressable>
                                 )}
                             </View>
@@ -240,8 +243,8 @@ export function SingleSelectSheet({
                                             styles.option,
                                             isActive && {
                                                 backgroundColor: isDark
-                                                    ? 'rgba(243,75,111,0.12)'
-                                                    : 'rgba(243,75,111,0.08)',
+                                                    ? palette.chrome.common.primaryTint
+                                                    : palette.chrome.common.primaryTint,
                                             },
                                         ]}
                                     >
@@ -249,7 +252,7 @@ export function SingleSelectSheet({
                                             <Text
                                                 variant="body"
                                                 className={isActive ? 'font-body-semi' : ''}
-                                                style={isActive ? { color: '#F34B6F' } : undefined}
+                                                style={isActive ? { color: palette.chrome.primary } : undefined}
                                             >
                                                 {item.label}
                                             </Text>
@@ -257,7 +260,7 @@ export function SingleSelectSheet({
                                                 <Text
                                                     variant="body-sm"
                                                     style={{
-                                                        color: isDark ? '#64748B' : '#9CA3AF',
+                                                        color: palette.brand.text.muted,
                                                         marginTop: scale(2),
                                                     }}
                                                 >
@@ -268,12 +271,12 @@ export function SingleSelectSheet({
                                         {isActive && (
                                             <View style={styles.checkCircle}>
                                                 <LinearGradient
-                                                    colors={['#F34B6F', '#E8447A']}
+                                                    colors={[palette.chrome.primary, palette.chrome.primaryEnd]}
                                                     start={{ x: 0, y: 0 }}
                                                     end={{ x: 1, y: 1 }}
                                                     style={StyleSheet.absoluteFill}
                                                 />
-                                                <Check size={scale(12)} color="#FFF" strokeWidth={3} />
+                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} strokeWidth={3} />
                                             </View>
                                         )}
                                     </Pressable>
@@ -281,8 +284,8 @@ export function SingleSelectSheet({
                             }}
                             ListEmptyComponent={
                                 <View style={{ padding: scale(24), alignItems: 'center' }}>
-                                    <Text variant="body-sm" style={{ color: isDark ? '#64748B' : '#9CA3AF' }}>
-                                        No results found
+                                    <Text variant="body-sm" style={{ color: palette.brand.text.muted }}>
+                                        {t('no_results_found', 'No results found')}
                                     </Text>
                                 </View>
                             }

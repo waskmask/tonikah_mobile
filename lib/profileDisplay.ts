@@ -14,8 +14,12 @@ export function toKey(value: string) {
         .replace(/^_+|_+$/g, '');
 }
 
-export function displayText(value?: string | null) {
-    const raw = String(value || '').trim();
+export function displayText(value?: any) {
+    const raw = String(
+        typeof value === 'object' && value !== null
+            ? value.label || value.name || value.title || value.value || value.value_id || ''
+            : value || '',
+    ).trim();
     if (!raw) return '';
     const key = toKey(raw);
     if (i18n.exists(key)) return t(key, raw);

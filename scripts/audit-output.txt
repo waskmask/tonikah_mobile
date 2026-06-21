@@ -1,0 +1,20 @@
+﻿node : <anonymous_script>:1
+At C:\Users\wewe4\AppData\Local\Temp\ps-script-992b6d2f-013f-43e0-88c8-be54d66a231d.ps1:115 char:44
++ ... apps\React-Native-APP"; node scripts/audit-i18n-temp.mjs 2>&1 | Out-F ...
++                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (<anonymous_script>:1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+∩╗┐{}
+^
+
+SyntaxError: Unexpected token '∩╗┐', "∩╗┐{}
+
+" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at file:///D:/Tonikah-dev/apps/React-Native-APP/scripts/audit-i18n-temp.mjs:32:48
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.13.1

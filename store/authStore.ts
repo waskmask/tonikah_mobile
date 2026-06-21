@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authService, AuthResponse, SignupRequest, User } from '@/lib/authService';
+import { authService, AuthResponse, GoogleAuthRequest, SignupRequest, User } from '@/lib/authService';
 import { api } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleSignIn';
 import { registerForPushNotifications, removeRegisteredPushToken } from '@/lib/pushNotifications';
@@ -12,7 +12,7 @@ interface AuthState {
 
     login: (email: string, password: string) => Promise<AuthResponse>;
     signup: (data: SignupRequest) => Promise<AuthResponse>;
-    googleAuth: () => Promise<AuthResponse>;
+    googleAuth: (options?: Pick<GoogleAuthRequest, 'agreed' | 'marketing_opt_in' | 'lang'>) => Promise<AuthResponse>;
     logout: () => Promise<void>;
     logoutAllDevices: () => Promise<AuthResponse>;
     restoreSession: () => Promise<void>;
@@ -60,7 +60,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    googleAuth: async () => {
+    googleAuth: async (options) => {
         set({ isLoading: true });
         try {
             const googleResult = await signInWithGoogle();
@@ -73,7 +73,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 return { success: false, message: googleResult.error || 'google_signin_failed' };
             }
 
-            const result = await authService.googleAuth({ credential: googleResult.idToken });
+            const payload: GoogleAuthRequest = {
+                credential: googleResult.idToken,
+                agreed: options?.agreed ?? true,
+                marketing_opt_in: options?.marketing_opt_in ?? false,
+                ...(options?.lang ? { lang: options.lang } : {}),
+            };
+
+            const result = await authService.googleAuth(payload);
 
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');

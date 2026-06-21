@@ -16,7 +16,6 @@ type ToastHandle = {
 let globalToastRef: ToastHandle | null = null;
 const toastStack: ToastHandle[] = [];
 
-// The provider that should be mounted near the Root Layout
 export function ToastProvider() {
     const [state, setState] = useState<ToastState>({
         visible: false,
@@ -30,7 +29,7 @@ export function ToastProvider() {
     }, []);
 
     const hide = useCallback(() => {
-        setState(prev => ({ ...prev, visible: false }));
+        setState((prev) => ({ ...prev, visible: false }));
     }, []);
 
     const handle = useMemo(() => ({ show, hide }), [show, hide]);
@@ -48,22 +47,21 @@ export function ToastProvider() {
 
     return (
         <Toast
-      visible= { state.visible }
-    message = { state.message }
-    type = { state.type }
-    duration = { state.duration }
-    onDismiss = { hide }
+            visible={state.visible}
+            message={state.message}
+            type={state.type}
+            duration={state.duration}
+            onDismiss={hide}
         />
-  );
+    );
 }
 
-// Hook for triggering toasts from components
 export function useToast() {
     const show = useCallback((message: string, type: ToastType = 'info', duration: number = 4000) => {
         if (globalToastRef) {
             globalToastRef.show(message, type, duration);
         } else {
-            console.warn("ToastProvider is not mounted. Cannot show toast:", message);
+            console.warn('ToastProvider is not mounted. Cannot show toast:', message);
         }
     }, []);
 
@@ -73,3 +71,5 @@ export function useToast() {
 
     return { show, hide };
 }
+
+export type { ToastType };

@@ -2,24 +2,33 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { ProfileListCard } from '@/components/app/ProfileListCard';
+import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { usersService } from '@/lib/usersService';
 import { apiMessage, t } from '@/lib/profileDisplay';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
 
 export default function BlockedUsersScreen() {
-    const { isDark } = useTheme();
+    const colors = useColors();
+    const primary = colors.chrome.primary;
     const toast = useToast();
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
 
-    const load = useCallback(async () => {
-        const res = await usersService.blocked({ limit: 30 });
-        if (res.success) setItems(res.items || []);
+    const load = useCallback(async (cursor?: string | null, append = false) => {
+        const res = await usersService.blocked({ limit: 30, cursor });
+        if (res.success) {
+            setItems((current) => append ? [...current, ...(res.items || [])] : (res.items || []));
+            setNextCursor(res.nextCursor || null);
+            setHasMore(Boolean(res.nextCursor));
+        }
     }, []);
 
     useEffect(() => {
@@ -32,8 +41,15 @@ export default function BlockedUsersScreen() {
 
     const refresh = async () => {
         setRefreshing(true);
-        await load();
+        await load(null, false);
         setRefreshing(false);
+    };
+
+    const loadMore = async () => {
+        if (loading || refreshing || loadingMore || !hasMore || !nextCursor) return;
+        setLoadingMore(true);
+        await load(nextCursor, true);
+        setLoadingMore(false);
     };
 
     const unblock = async (id: string) => {
@@ -47,10 +63,11 @@ export default function BlockedUsersScreen() {
         }
     };
 
-    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}><ActivityIndicator color="#F34B6F" /></View>;
+    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand.bg.surface }}><ActivityIndicator color={primary} /></View>;
 
     return (
-        <View style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}>
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+            <AppBackTitleBar title={t('blocked_users', 'Blocked users')} />
             <FlatList
                 data={items}
                 keyExtractor={(item) => String(item.id || item._id)}
@@ -58,8 +75,10 @@ export default function BlockedUsersScreen() {
                 columnWrapperStyle={{ gap: scale(10) }}
                 style={{ flex: 1 }}
                 contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(110), flexGrow: 1 }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#F34B6F" />}
-                ListHeaderComponent={<Text variant="h2" style={{ marginBottom: scale(14) }}>{t('blocked_users', 'Blocked users')}</Text>}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={primary} />}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.35}
+                ListFooterComponent={loadingMore ? <View style={{ paddingVertical: scale(18) }}><ActivityIndicator color={primary} /></View> : null}
                 ListEmptyComponent={<View style={{ paddingTop: scale(90) }}><Text variant="h3" align="center">{t('no_blocked_users', 'No blocked users')}</Text></View>}
                 renderItem={({ item }) => (
                     <ProfileListCard
@@ -67,7 +86,9 @@ export default function BlockedUsersScreen() {
                         onPress={() => setSelectedProfile(item)}
                         onFavorite={() => unblock(String(item.id || item._id))}
                         favoriteLabel={t('unblock', 'Unblock')}
+                        badgeLabel={t('blocked_label', 'Blocked')}
                         actionTone="danger"
+                        actionPlacement="overlayPill"
                     />
                 )}
             />

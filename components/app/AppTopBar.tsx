@@ -7,7 +7,8 @@ import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
 import { Text } from '@/components/ui/Text';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
+import { HeaderTokens } from '@/constants/uiTokens';
 import { scale } from '@/hooks/useResponsive';
 
 function textValue(value: unknown, fallback: string) {
@@ -16,7 +17,8 @@ function textValue(value: unknown, fallback: string) {
 
 export function AppTopBar() {
     const { t, isRTL } = useLanguage();
-    const { isDark } = useTheme();
+    const colors = useColors();
+    const chrome = colors.chrome.header;
     const user = useAuthStore((state) => state.user);
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -25,10 +27,6 @@ export function AppTopBar() {
         return textValue(profileName, textValue(user?.username, user?.email || 'toNikah'));
     }, [user?.email, user?.profile?.profileName, user?.username]);
 
-    const iconColor = isDark ? '#CBD5E1' : '#475569';
-    const borderColor = isDark ? '#334155' : '#E2E8F0';
-    const surfaceColor = isDark ? '#111827' : '#FFFFFF';
-
     return (
         <>
             <SafeAreaView
@@ -36,8 +34,8 @@ export function AppTopBar() {
                 style={[
                     styles.safeArea,
                     {
-                        backgroundColor: surfaceColor,
-                        borderBottomColor: borderColor,
+                        backgroundColor: chrome.background,
+                        borderBottomColor: chrome.border,
                     },
                 ]}
             >
@@ -46,13 +44,13 @@ export function AppTopBar() {
                         onPress={() => router.push('/(tabs)/search')}
                         style={[styles.brandBlock, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}
                     >
-                        <Text variant="h3" style={styles.brand}>
+                        <Text variant="h3" style={[styles.brand, { color: chrome.title }]}>
                             toNikah
                         </Text>
                         <Text
                             variant="caption"
                             numberOfLines={1}
-                            style={{ color: isDark ? '#94A3B8' : '#64748B', maxWidth: scale(220) }}
+                            style={{ color: chrome.subtitle, maxWidth: scale(220) }}
                         >
                             {displayName}
                         </Text>
@@ -63,17 +61,17 @@ export function AppTopBar() {
                             accessibilityRole="button"
                             accessibilityLabel={textValue(t('my_profile'), 'My Profile')}
                             onPress={() => router.push('/(tabs)/profile')}
-                            style={[styles.iconButton, { borderColor, backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}
+                            style={[styles.iconButton, { borderColor: chrome.border, backgroundColor: chrome.iconBackground }]}
                         >
-                            <User size={scale(19)} color={iconColor} />
+                            <User size={19} color={chrome.icon} />
                         </Pressable>
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={textValue(t('menu'), 'Menu')}
                             onPress={() => setMenuOpen(true)}
-                            style={[styles.iconButton, { borderColor, backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}
+                            style={[styles.iconButton, { borderColor: chrome.border, backgroundColor: chrome.iconBackground }]}
                         >
-                            <Menu size={scale(20)} color={iconColor} />
+                            <Menu size={20} color={chrome.icon} />
                         </Pressable>
                     </View>
                 </View>
@@ -89,10 +87,10 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
     topBar: {
-        minHeight: scale(48),
+        minHeight: HeaderTokens.minHeight,
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: scale(14),
+        paddingHorizontal: HeaderTokens.paddingHorizontal,
         paddingBottom: 0,
     },
     brandBlock: {
@@ -100,18 +98,18 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     brand: {
-        fontSize: scale(21),
-        lineHeight: scale(24),
+        fontSize: HeaderTokens.brandFontSize,
+        lineHeight: HeaderTokens.brandLineHeight,
     },
     actions: {
         alignItems: 'center',
-        gap: scale(10),
+        gap: HeaderTokens.actionGap,
     },
     iconButton: {
-        width: scale(38),
-        height: scale(38),
+        width: HeaderTokens.iconButtonSize,
+        height: HeaderTokens.iconButtonSize,
         borderWidth: 1,
-        borderRadius: scale(13),
+        borderRadius: HeaderTokens.iconButtonRadius,
         alignItems: 'center',
         justifyContent: 'center',
     },

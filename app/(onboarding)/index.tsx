@@ -95,6 +95,12 @@ export default function OnboardingScreen() {
         if (item.type === "welcome") {
             return (
                 <View style={[styles.slide, { width: SCREEN_WIDTH }]} className="bg-white dark:bg-slate-900">
+                    <Image
+                        source={require("@/assets/images/couple-illustration.png")}
+                        style={[StyleSheet.absoluteFill, { opacity: isDark ? 0.14 : 0.22 }]}
+                        contentFit="cover"
+                        contentPosition="bottom"
+                    />
                     <View style={styles.centerContent}>
                         <Image
                             source={isDark ? require("@/assets/images/logo-dark.png") : require("@/assets/images/logo-light.png")}

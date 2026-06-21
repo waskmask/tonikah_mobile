@@ -42,6 +42,7 @@ import {
 
 import "@/lib/i18n"; // Initialize i18n
 import "../global.css";
+import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/hooks/useLanguage";
 import { configureGoogleSignIn } from "@/lib/googleSignIn";
@@ -49,6 +50,7 @@ import { useAuthStore } from "@/store/authStore";
 import { ToastProvider } from "@/hooks/useToast";
 import { useToast } from "@/hooks/useToast";
 import { addPushNotificationListeners } from "@/lib/pushNotifications";
+import { ThemeSync } from "@/components/app/ThemeSync";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +59,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
     const { isDark } = useTheme();
+    const colors = useColors();
     const { isRTL } = useLanguage();
     const { restoreSession, isRestoringSession } = useAuthStore();
     const toast = useToast();
@@ -104,9 +107,10 @@ export default function RootLayout() {
 
     return (
         <SafeAreaProvider>
+            <ThemeSync />
             <StatusBar
                 barStyle={isDark ? "light-content" : "dark-content"}
-                backgroundColor={isDark ? "#0F172A" : "#FFFFFF"}
+                backgroundColor={colors.brand.bg.primary}
             />
             <QueryClientProvider client={queryClient}>
                 <Stack
@@ -114,7 +118,7 @@ export default function RootLayout() {
                         headerShown: false,
                         animation: "fade",
                         contentStyle: {
-                            backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+                            backgroundColor: colors.brand.bg.primary,
                         }
                     }}
                 >

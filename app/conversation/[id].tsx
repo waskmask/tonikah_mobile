@@ -5,6 +5,7 @@ import {
     Animated,
     FlatList,
     Image as RNImage,
+    Keyboard,
     KeyboardAvoidingView,
     Modal,
     PanResponder,
@@ -44,8 +45,10 @@ import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
@@ -166,13 +169,17 @@ function buildItems(messages: ChatMessage[]): ListItem[] {
 }
 
 export default function ConversationScreen() {
-    const { id, recipientId, name, avatar: routeAvatar, online, state: routeState, requestRole: routeRequestRole } = useLocalSearchParams<{ id: string; recipientId?: string; name?: string; avatar?: string; online?: string; state?: string; requestRole?: string }>();
+    const { id, recipientId, name, avatar: routeAvatar, online, accountDeleted, state: routeState, requestRole: routeRequestRole } = useLocalSearchParams<{ id: string; recipientId?: string; name?: string; avatar?: string; online?: string; accountDeleted?: string; state?: string; requestRole?: string }>();
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
     const { isDark } = useTheme();
+    const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const toast = useToast();
+    const { lightImpact } = useHaptics();
     const insets = useSafeAreaInsets();
+    const headerHeight = scale(56);
+    const keyboardVerticalOffset = Platform.OS === 'ios' ? insets.top + headerHeight : 0;
     const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
     const recorderState = useAudioRecorderState(recorder, 250);
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
@@ -205,14 +212,26 @@ export default function ConversationScreen() {
     const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
     const [messageActionBusy, setMessageActionBusy] = useState(false);
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+    const [keyboardOpen, setKeyboardOpen] = useState(false);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     const colors = {
-        bg: isDark ? '#0F172A' : '#F8FAFC',
-        card: isDark ? '#111827' : '#FFFFFF',
-        surface: isDark ? '#1E293B' : '#F1F5F9',
-        text: isDark ? '#E2E8F0' : '#17211D',
-        muted: isDark ? '#94A3B8' : '#64748B',
-        border: isDark ? '#1F2937' : '#E2E8F0',
+        bg: palette.brand.bg.surface,
+        card: palette.chrome.common.card,
+        surface: palette.chrome.common.cardAlt,
+        text: palette.chrome.common.textStrong,
+        muted: palette.brand.text.subtitle,
+        subtle: palette.brand.text.muted,
+        border: palette.brand.bg.border,
+        primary: palette.chrome.primary,
+        primaryEnd: palette.chrome.primaryEnd,
+        primaryTint: palette.chrome.common.primaryTint,
+        primaryRing: palette.chrome.common.primaryRing,
+        inverse: palette.chrome.common.inverseText,
+        danger: palette.brand.accent.error,
+        success: palette.chrome.common.successStrong,
+        waveMuted: palette.brand.bg.border,
+        blueAction: palette.chrome.common.blueAction,
     };
 
     const scrollToBottom = useCallback((animated = false) => {
@@ -222,6 +241,24 @@ export default function ConversationScreen() {
             setTimeout(() => listRef.current?.scrollToEnd({ animated }), 240);
         });
     }, []);
+
+    useEffect(() => {
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+        const show = Keyboard.addListener(showEvent, (event) => {
+            setKeyboardOpen(true);
+            setKeyboardHeight(event.endCoordinates?.height || 0);
+            setTimeout(() => scrollToBottom(true), Platform.OS === 'ios' ? 80 : 120);
+        });
+        const hide = Keyboard.addListener(hideEvent, () => {
+            setKeyboardOpen(false);
+            setKeyboardHeight(0);
+        });
+        return () => {
+            show.remove();
+            hide.remove();
+        };
+    }, [scrollToBottom]);
 
     useEffect(() => {
         if (!voicePanelOpen || !recorderState.isRecording) return;
@@ -390,24 +427,27 @@ export default function ConversationScreen() {
                 id: recipientId || '',
                 profileName: name || null,
                 avatar: routeAvatar || null,
-                recently_active: online === '1',
+                account_deleted: accountDeleted === '1',
+                recently_active: accountDeleted === '1' ? false : online === '1',
             },
         } as Conversation;
-    }, [id, name, online, recipientId, routeAvatar, routeRequestRole, routeState]);
+    }, [accountDeleted, id, name, online, recipientId, routeAvatar, routeRequestRole, routeState]);
     const activeConversation = conversation || routeConversation;
     const other = (activeConversation?.otherUser || {}) as ConversationOtherUser;
     const headerOther: ConversationOtherUser = {
         ...other,
         profileName: other.profileName || name || null,
         avatar: other.avatar || routeAvatar || null,
-        recently_active: typeof other.recently_active === 'boolean' ? other.recently_active : online === '1',
+        account_deleted: !!other.account_deleted || accountDeleted === '1',
+        recently_active: (other.account_deleted || accountDeleted === '1') ? false : (typeof other.recently_active === 'boolean' ? other.recently_active : online === '1'),
     };
     const avatar = profileImage(headerOther);
     const peerId = String(headerOther.id || headerOther._id || recipientId || '');
+    const peerDeleted = !!headerOther.account_deleted;
     const isRequest = activeConversation?.state === 'request_pending';
     const isSentRequest = isRequest && activeConversation?.requestRole === 'sent';
     const isEnded = activeConversation?.state === 'ended';
-    const canCompose = id === 'new' || activeConversation?.state === 'active';
+    const canCompose = !peerDeleted && (id === 'new' || activeConversation?.state === 'active');
 
     const handleListContentSizeChange = useCallback(() => {
         if (
@@ -433,6 +473,10 @@ export default function ConversationScreen() {
 
     const send = async () => {
         if (!requireVerified('chat')) return;
+        if (peerDeleted) {
+            toast.show(t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.'), 'info');
+            return;
+        }
         if (!canCompose) {
             toast.show(t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
@@ -442,6 +486,7 @@ export default function ConversationScreen() {
             Alert.alert(t('message_empty', 'Please enter a message before sending.'));
             return;
         }
+        lightImpact();
         setSending(true);
         const tempId = `tmp_${Date.now()}`;
         const reply = replyTo;
@@ -520,7 +565,9 @@ export default function ConversationScreen() {
     const pickAndUploadImage = async () => {
         if (!requireVerified('chat')) return;
         if (!canCompose) {
-            toast.show(t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
+            toast.show(peerDeleted
+                ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
+                : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
         if (id === 'new') {
@@ -554,6 +601,12 @@ export default function ConversationScreen() {
 
     const sendImageAttachment = async () => {
         if (!imageAttachment || uploadingMedia || id === 'new') return;
+        if (!canCompose) {
+            toast.show(peerDeleted
+                ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
+                : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
+            return;
+        }
         setUploadingMedia(true);
         const formData = new FormData();
         formData.append('file', {
@@ -582,7 +635,9 @@ export default function ConversationScreen() {
     const startRecording = async () => {
         if (!requireVerified('chat')) return;
         if (!canCompose) {
-            toast.show(t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
+            toast.show(peerDeleted
+                ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
+                : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
         if (id === 'new') {
@@ -661,6 +716,12 @@ export default function ConversationScreen() {
 
     const sendVoicePreview = async () => {
         if (!voicePreview || voiceSending || id === 'new') return;
+        if (!canCompose) {
+            toast.show(peerDeleted
+                ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
+                : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
+            return;
+        }
         setVoiceSending(true);
         try {
             const formData = new FormData();
@@ -893,7 +954,7 @@ export default function ConversationScreen() {
         return (
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={styles.center}>
-                    <ActivityIndicator color={PRIMARY} />
+                    <ActivityIndicator color={colors.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -903,7 +964,7 @@ export default function ConversationScreen() {
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={0}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? keyboardVerticalOffset : 0}
                 style={styles.screen}
             >
                 <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -923,20 +984,20 @@ export default function ConversationScreen() {
                                     <Image source={PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
                                 )}
                             </View>
-                            <View style={styles.headerText}>
-                                <Text variant="body-sm" numberOfLines={1} className="font-body-bold" style={[styles.headerNameText, { color: colors.text }]}>
+                            <View style={styles.headerText} pointerEvents="none">
+                                <RNText numberOfLines={1} style={[styles.headerNameText, { color: colors.text }]}>
                                     {peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
-                                </Text>
+                                </RNText>
                                 {(activeConversation || name) && (
                                     <View style={styles.headerStatusRow}>
                                         <View style={[styles.headerStatusDot, { backgroundColor: headerOther.recently_active ? '#22C55E' : colors.muted }]} />
-                                        <Text variant="caption" numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted }]}>
+                                        <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted }]}>
                                             {headerOther.account_deleted
                                             ? t('chat:account_deleted', 'Account deleted')
                                                 : headerOther.recently_active
                                                 ? t('chat:online', 'Online')
                                                 : t('chat:offline', 'Offline')}
-                                        </Text>
+                                        </RNText>
                                     </View>
                                 )}
                             </View>
@@ -959,7 +1020,7 @@ export default function ConversationScreen() {
                     onContentSizeChange={handleListContentSizeChange}
                     onStartReached={loadMore}
                     onStartReachedThreshold={0.15}
-                    ListHeaderComponent={loadingMore ? <ActivityIndicator color={PRIMARY} style={{ paddingVertical: scale(10) }} /> : null}
+                    ListHeaderComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: scale(10) }} /> : null}
                     ListEmptyComponent={
                         <View style={styles.empty}>
                             <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
@@ -1005,7 +1066,7 @@ export default function ConversationScreen() {
                     }}
                 />
 
-                {isRequest && activeConversation && (
+                {isRequest && activeConversation && !peerDeleted && (
                     <View style={[styles.requestBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, scale(12)) }]}>
                         <Text variant="caption" className="font-body-semi" align="center" style={[styles.requestHint, { color: colors.muted }]}>
                             {isSentRequest
@@ -1014,23 +1075,31 @@ export default function ConversationScreen() {
                         </Text>
                         <View style={styles.requestActions}>
                         {isSentRequest ? (
-                            <Pressable disabled={requestBusy} onPress={() => requestAction('withdraw')} style={[styles.requestButton, styles.requestNeutral, requestBusy && styles.disabledButton]}>
-                                <X size={scale(14)} color="#475569" />
-                                <Text variant="caption" className="font-body-bold" style={{ color: '#475569' }}>{t('chat:withdraw', 'Withdraw')}</Text>
+                            <Pressable disabled={requestBusy} onPress={() => requestAction('withdraw')} style={[styles.requestButton, styles.requestNeutral, { backgroundColor: colors.card, borderColor: colors.border }, requestBusy && styles.disabledButton]}>
+                                <X size={scale(14)} color={colors.muted} />
+                                <Text variant="caption" className="font-body-bold" style={{ color: colors.muted }}>{t('chat:withdraw', 'Withdraw')}</Text>
                             </Pressable>
                         ) : (
                             <>
-                                <Pressable disabled={requestBusy} onPress={() => requestAction('accept')} style={[styles.requestButton, styles.requestPrimary, requestBusy && styles.disabledButton]}>
-                                    {requestBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Check size={scale(14)} color="#FFFFFF" />}
-                                    <Text variant="caption" className="font-body-bold" style={{ color: '#FFFFFF' }}>{t('chat:accept', 'Accept')}</Text>
+                                <Pressable disabled={requestBusy} onPress={() => requestAction('accept')} style={[styles.requestButton, { backgroundColor: colors.primary }, requestBusy && styles.disabledButton]}>
+                                    {requestBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <Check size={scale(14)} color={colors.inverse} />}
+                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.inverse }}>{t('chat:accept', 'Accept')}</Text>
                                 </Pressable>
-                                <Pressable disabled={requestBusy} onPress={() => requestAction('decline')} style={[styles.requestButton, styles.requestNeutral, requestBusy && styles.disabledButton]}>
-                                    <X size={scale(14)} color="#475569" />
-                                    <Text variant="caption" className="font-body-bold" style={{ color: '#475569' }}>{t('chat:decline', 'Decline')}</Text>
+                                <Pressable disabled={requestBusy} onPress={() => requestAction('decline')} style={[styles.requestButton, styles.requestNeutral, { backgroundColor: colors.card, borderColor: colors.border }, requestBusy && styles.disabledButton]}>
+                                    <X size={scale(14)} color={colors.muted} />
+                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.muted }}>{t('chat:decline', 'Decline')}</Text>
                                 </Pressable>
                             </>
                         )}
                         </View>
+                    </View>
+                )}
+
+                {peerDeleted && (
+                    <View style={[styles.endedBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+                        <Text variant="body-sm" className="font-body-semi" align="center" style={{ color: colors.muted }}>
+                            {t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')}
+                        </Text>
                     </View>
                 )}
 
@@ -1043,11 +1112,22 @@ export default function ConversationScreen() {
                 )}
 
                 {canCompose && !isEnded && (
-                    <View style={[styles.composer, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, scale(10)) }]}>
+                    <View
+                        style={[
+                            styles.composer,
+                            {
+                                backgroundColor: colors.card,
+                                borderTopColor: colors.border,
+                                paddingBottom: keyboardOpen
+                                    ? scale(7)
+                                    : Math.max(insets.bottom, scale(10)),
+                            },
+                        ]}
+                    >
                         {replyTo && (
-                            <View style={[styles.replyComposerBar, { backgroundColor: colors.surface, borderLeftColor: PRIMARY }]}>
+                            <View style={[styles.replyComposerBar, { backgroundColor: colors.surface, borderLeftColor: colors.primary }]}>
                                 <View style={styles.replyComposerText}>
-                                    <Text variant="caption" className="font-body-bold" style={{ color: PRIMARY }}>
+                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
                                         {t('chat:reply', 'Reply')}
                                     </Text>
                                     <Text variant="caption" numberOfLines={1} style={{ color: colors.muted }}>
@@ -1079,7 +1159,7 @@ export default function ConversationScreen() {
                                     disabled={uploadingMedia || recordingBusy || voiceSending}
                                     style={styles.toolButton}
                                 >
-                                    {uploadingMedia ? <ActivityIndicator color={PRIMARY} /> : <ImageIcon size={scale(20)} color={colors.muted} />}
+                                    {uploadingMedia ? <ActivityIndicator color={colors.primary} /> : <ImageIcon size={scale(20)} color={colors.muted} />}
                                 </Pressable>
                                 <TextInput
                                     value={content}
@@ -1096,7 +1176,7 @@ export default function ConversationScreen() {
                                 />
                                 {content.trim() ? (
                                     <Pressable onPress={send} disabled={sending} style={styles.send}>
-                                        {sending ? <ActivityIndicator color="#FFFFFF" /> : <Send size={scale(18)} color="#FFFFFF" />}
+                                        {sending ? <ActivityIndicator color={colors.inverse} /> : <Send size={scale(18)} color={colors.inverse} />}
                                     </Pressable>
                                 ) : (
                                     <Pressable
@@ -1104,7 +1184,7 @@ export default function ConversationScreen() {
                                         disabled={recordingBusy || voiceSending}
                                         style={styles.toolButton}
                                     >
-                                        {recordingBusy ? <ActivityIndicator color={PRIMARY} /> : <Mic size={scale(20)} color={colors.muted} />}
+                                        {recordingBusy ? <ActivityIndicator color={colors.primary} /> : <Mic size={scale(20)} color={colors.muted} />}
                                     </Pressable>
                                 )}
                             </View>
@@ -1115,9 +1195,14 @@ export default function ConversationScreen() {
 
             <Modal visible={!!imageAttachment} transparent animationType="fade" onRequestClose={closeImageAttachment}>
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     keyboardVerticalOffset={0}
-                    style={styles.attachmentOverlay}
+                    style={[
+                        styles.attachmentOverlay,
+                        Platform.OS === 'android' && keyboardOpen
+                            ? { paddingBottom: Math.max(scale(10), keyboardHeight > 0 ? scale(10) : 0) }
+                            : null,
+                    ]}
                 >
                     <View
                         style={[
@@ -1177,22 +1262,22 @@ export default function ConversationScreen() {
                                 style={[
                                     styles.attachmentViewOnceToggle,
                                     {
-                                        backgroundColor: imageViewOnce ? 'rgba(243,75,111,0.12)' : colors.surface,
-                                        borderColor: imageViewOnce ? 'rgba(243,75,111,0.38)' : colors.border,
+                                        backgroundColor: imageViewOnce ? colors.primaryTint : colors.surface,
+                                        borderColor: imageViewOnce ? colors.primaryRing : colors.border,
                                     },
                                 ]}
                             >
                                 {imageViewOnce
-                                    ? <Eye size={scale(15)} color={PRIMARY} fill={PRIMARY} />
+                                    ? <Eye size={scale(15)} color={colors.primary} fill={colors.primary} />
                                     : <EyeOff size={scale(15)} color={colors.muted} />}
-                                <Text variant="caption" className="font-body-semi" style={{ color: imageViewOnce ? PRIMARY : colors.muted }}>
+                                <Text variant="caption" className="font-body-semi" style={{ color: imageViewOnce ? colors.primary : colors.muted }}>
                                     {translateChatText('view_once_toggle', 'View once photo')}
                                 </Text>
                             </Pressable>
 
                             <Pressable onPress={sendImageAttachment} disabled={uploadingMedia || !imageAttachment} style={[styles.attachmentSend, (uploadingMedia || !imageAttachment) && styles.disabledButton]}>
-                                {uploadingMedia ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Send size={scale(16)} color="#FFFFFF" />}
-                                <Text variant="caption" className="font-body-bold" style={{ color: '#FFFFFF' }}>
+                                {uploadingMedia ? <ActivityIndicator color={colors.inverse} size="small" /> : <Send size={scale(16)} color={colors.inverse} />}
+                                <Text variant="caption" className="font-body-bold" style={{ color: colors.inverse }}>
                                     {uploadingMedia ? translateChatText('sending', 'Sending...') : translateChatText('send', 'Send')}
                                 </Text>
                             </Pressable>
@@ -1265,7 +1350,7 @@ export default function ConversationScreen() {
                             <ConversationMenuItem
                                 icon={XCircle}
                                 label={translateChatText('end_conversation', 'End conversation')}
-                                color={colors.text}
+                                color={colors.danger}
                                 danger
                                 disabled={menuBusy}
                                 onPress={endConversation}
@@ -1273,7 +1358,7 @@ export default function ConversationScreen() {
                             <ConversationMenuItem
                                 icon={Trash2}
                                 label={translateChatText('delete_chat', 'Delete chat')}
-                                color={colors.text}
+                                color={colors.danger}
                                 danger
                                 disabled={menuBusy}
                                 onPress={deleteConversation}
@@ -1287,7 +1372,7 @@ export default function ConversationScreen() {
                 <View style={styles.messageMenuLayer}>
                     <Pressable style={styles.messageMenuBackdrop} onPress={closeMessageMenu} />
                     {!!selectedMessage && (
-                        <View style={[styles.messageMenuSheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, scale(14)) }]}>
+                        <View style={[styles.messageMenuSheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom + scale(50), scale(50)) }]}>
                             <View style={styles.quickReactionRow}>
                                 {QUICK_REACTIONS.map((emoji) => (
                                     <Pressable
@@ -1319,7 +1404,7 @@ export default function ConversationScreen() {
                             <MessageActionItem
                                 icon={Trash2}
                                 label={translateChatText('delete_for_me', 'Delete for me')}
-                                color={colors.text}
+                                color={colors.danger}
                                 danger
                                 disabled={messageActionBusy}
                                 onPress={deleteSelectedMessage}
@@ -1328,7 +1413,7 @@ export default function ConversationScreen() {
                                 <MessageActionItem
                                     icon={Undo2}
                                     label={translateChatText('unsend', 'Unsend')}
-                                    color={colors.text}
+                                    color={colors.danger}
                                     danger
                                     disabled={messageActionBusy}
                                     onPress={unsendSelectedMessage}
@@ -1363,7 +1448,7 @@ function ConversationMenuItem({
     disabled?: boolean;
     onPress: () => void;
 }) {
-    const tint = danger ? '#EF4444' : color;
+    const tint = danger ? color : color;
     return (
         <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.conversationMenuItem, pressed && styles.conversationMenuItemPressed, disabled && { opacity: 0.55 }]}>
             <View style={styles.conversationMenuItemRow}>
@@ -1393,7 +1478,7 @@ function MessageActionItem({
     disabled?: boolean;
     onPress: () => void;
 }) {
-    const tint = danger ? '#EF4444' : color;
+    const tint = danger ? color : color;
     return (
         <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.messageActionItem, pressed && styles.messageActionPressed, disabled && { opacity: 0.55 }]}>
             <View style={styles.messageActionItemRow}>
@@ -1439,7 +1524,7 @@ function VoiceRecorderPanel({
             <View style={styles.voiceRecorderHeader}>
                 <View style={styles.voiceRecorderTimer}>
                     {isRecording && <View style={styles.recordDot} />}
-                    <Mic size={scale(15)} color={PRIMARY} />
+                    <Mic size={scale(15)} color={colors.primary} />
                     <Text variant="caption" className="font-body-bold" style={{ color: colors.text }}>
                         {formatDuration(duration)}
                     </Text>
@@ -1460,7 +1545,7 @@ function VoiceRecorderPanel({
                                 styles.voiceRecorderWaveBar,
                                 {
                                     height: scale(7 + value * 30),
-                                    backgroundColor: PRIMARY,
+                                    backgroundColor: colors.primary,
                                 },
                             ]}
                         />
@@ -1477,14 +1562,14 @@ function VoiceRecorderPanel({
                 </Pressable>
                 {previewUri ? (
                     <Pressable onPress={onSend} disabled={disabled} style={[styles.voiceRecorderPrimary, disabled && styles.disabledButton]}>
-                        {sending ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Send size={scale(16)} color="#FFFFFF" />}
+                        {sending ? <ActivityIndicator color={colors.inverse} size="small" /> : <Send size={scale(16)} color={colors.inverse} />}
                         <Text variant="caption" className="font-body-bold" style={styles.voiceRecorderPrimaryText}>
                             {sending ? t('chat:sending', 'Sending') : t('chat:send', 'Send')}
                         </Text>
                     </Pressable>
                 ) : (
                     <Pressable onPress={onStop} disabled={disabled || !isRecording} style={[styles.voiceRecorderPrimary, (disabled || !isRecording) && styles.disabledButton]}>
-                        {recordingBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Square size={scale(15)} color="#FFFFFF" fill="#FFFFFF" />}
+                        {recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <Square size={scale(15)} color={colors.inverse} fill={colors.inverse} />}
                         <Text variant="caption" className="font-body-bold" style={styles.voiceRecorderPrimaryText}>
                             {t('chat:voice_stop', 'Stop')}
                         </Text>
@@ -1531,8 +1616,8 @@ function VoicePreviewPlayer({
         <Pressable onPress={toggle} style={[styles.voiceRecorderPreview, { backgroundColor: colors.surface }]}>
             <View style={styles.voiceRecorderPreviewPlay}>
                 {status.playing
-                    ? <Pause size={scale(14)} color="#FFFFFF" fill="#FFFFFF" />
-                    : <Play size={scale(14)} color="#FFFFFF" fill="#FFFFFF" />}
+                    ? <Pause size={scale(14)} color={colors.inverse} fill={colors.inverse} />
+                    : <Play size={scale(14)} color={colors.inverse} fill={colors.inverse} />}
             </View>
             <View style={styles.voiceRecorderPreviewTrack}>
                 <View style={styles.wave}>
@@ -1543,7 +1628,7 @@ function VoicePreviewPlayer({
                                 styles.waveBar,
                                 {
                                     height: scale(7 + value * 21),
-                                    backgroundColor: progress * waveform.length >= index ? PRIMARY : '#CBD5E1',
+                                    backgroundColor: progress * waveform.length >= index ? colors.primary : colors.waveMuted,
                                 },
                             ]}
                         />
@@ -1664,7 +1749,7 @@ function MessageBubble({
                         },
                     ]}
                 >
-                    <Reply size={scale(17)} color={PRIMARY} strokeWidth={2.6} />
+                    <Reply size={scale(17)} color={colors.primary} strokeWidth={2.6} />
                 </Animated.View>
                 <Animated.View
                     {...panResponder.panHandlers}
@@ -1674,14 +1759,14 @@ function MessageBubble({
                         <View style={[
                             styles.bubble,
                             mine ? styles.mineBubble : styles.theirBubble,
-                            { backgroundColor: mine ? 'rgba(243,75,111,0.10)' : colors.card, borderColor: mine ? 'rgba(243,75,111,0.20)' : colors.border },
+                            { backgroundColor: mine ? colors.primaryTint : colors.card, borderColor: mine ? colors.primaryRing : colors.border },
                         ]}>
                             {replyTo && (
                                 <Pressable
                                     onPress={() => onReplyClick(replyTo.id)}
-                                    style={[styles.replyQuote, { backgroundColor: mine ? 'rgba(243,75,111,0.08)' : colors.surface, borderLeftColor: PRIMARY }]}
+                                    style={[styles.replyQuote, { backgroundColor: mine ? colors.primaryTint : colors.surface, borderLeftColor: colors.primary }]}
                                 >
-                                    <Text variant="caption" className="font-body-bold" style={{ color: PRIMARY }}>
+                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
                                         {t('chat:reply', 'Reply')}
                                     </Text>
                                     <Text variant="caption" numberOfLines={2} style={{ color: colors.muted }}>
@@ -1703,10 +1788,10 @@ function MessageBubble({
                         <Pressable
                             onPress={() => !mine && !media?.viewedAt && onOpenViewOnce(message)}
                             disabled={mine || !!media?.viewedAt || viewOnceLoading}
-                            style={[styles.viewOnceButton, { backgroundColor: mine ? 'rgba(243,75,111,0.08)' : colors.surface }]}
+                            style={[styles.viewOnceButton, { backgroundColor: mine ? colors.primaryTint : colors.surface }]}
                         >
                             <View style={styles.viewOnceIconBadge}>
-                                {viewOnceLoading ? <ActivityIndicator color={PRIMARY} size="small" /> : <Eye size={scale(17)} color={PRIMARY} fill={PRIMARY} />}
+                                {viewOnceLoading ? <ActivityIndicator color={colors.primary} size="small" /> : <Eye size={scale(17)} color={colors.primary} fill={colors.primary} />}
                             </View>
                             <View style={styles.viewOnceTextWrap}>
                                 <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={{ color: colors.text }}>
@@ -1750,7 +1835,7 @@ function MessageBubble({
                                     </Text>
                                 )}
                                 {message.failed && (
-                                    <Text variant="caption" className="font-body-bold" style={{ color: '#EF4444' }}>!</Text>
+                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>!</Text>
                                 )}
                             </View>
                         </View>
@@ -1786,6 +1871,7 @@ function CachedImageMessage({
     onOpenImage: (url: string) => void;
 }) {
     const toast = useToast();
+    const palette = useColors();
     const [displayUri, setDisplayUri] = useState(media.thumbnail || media.url || '');
     const [cachedUri, setCachedUri] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -1839,7 +1925,7 @@ function CachedImageMessage({
             <Image source={{ uri: displayUri }} style={styles.mediaImage} contentFit="cover" />
             {(!cachedUri || loading) && (
                 <View style={styles.mediaDownloadOverlay}>
-                    {loading ? <ActivityIndicator color="#FFFFFF" /> : <Download size={scale(18)} color="#FFFFFF" />}
+                    {loading ? <ActivityIndicator color={palette.chrome.common.inverseText} /> : <Download size={scale(18)} color={palette.chrome.common.inverseText} />}
                 </View>
             )}
         </Pressable>
@@ -1938,10 +2024,10 @@ function VoiceMessage({
         <Pressable onPress={toggle} style={styles.voiceWrap}>
             <View style={styles.voicePlayButton}>
                 {downloading || status.isBuffering
-                    ? <ActivityIndicator color="#FFFFFF" size="small" />
+                    ? <ActivityIndicator color={colors.inverse} size="small" />
                     : status.playing
-                        ? <Pause size={scale(14)} color="#FFFFFF" fill="#FFFFFF" />
-                        : <Play size={scale(14)} color="#FFFFFF" fill="#FFFFFF" />}
+                        ? <Pause size={scale(14)} color={colors.inverse} fill={colors.inverse} />
+                        : <Play size={scale(14)} color={colors.inverse} fill={colors.inverse} />}
             </View>
             <View style={styles.voiceProgressTrack}>
                 <View style={styles.wave}>
@@ -1952,7 +2038,7 @@ function VoiceMessage({
                                 styles.waveBar,
                                 {
                                     height: scale(7 + ((index * 5) % 18)),
-                                    backgroundColor: progress * VOICE_WAVE_BAR_COUNT >= index ? PRIMARY : '#CBD5E1',
+                                    backgroundColor: progress * VOICE_WAVE_BAR_COUNT >= index ? colors.primary : colors.waveMuted,
                                 },
                             ]}
                         />
@@ -1994,16 +2080,18 @@ const styles = StyleSheet.create({
         paddingRight: scale(8),
     },
     headerProfileContent: {
+        flex: 1,
+        width: '100%',
         minWidth: 0,
         flexDirection: 'row',
         alignItems: 'center',
     },
     headerAvatar: { width: scale(38), height: scale(38), borderRadius: scale(19), overflow: 'hidden', marginRight: scale(10) },
-    headerText: { flex: 1, minWidth: 0, justifyContent: 'center' },
-    headerNameText: { fontSize: scale(15), lineHeight: scale(18), includeFontPadding: false, textAlignVertical: 'center' },
+    headerText: { flex: 1, minWidth: scale(90), justifyContent: 'center' },
+    headerNameText: { fontSize: scale(15), lineHeight: scale(18), fontWeight: '700', includeFontPadding: false, textAlignVertical: 'center' },
     headerStatusRow: { marginTop: scale(3), flexDirection: 'row', alignItems: 'center' },
     headerStatusDot: { width: scale(6), height: scale(6), borderRadius: scale(3), marginRight: scale(5) },
-    headerStatusText: { fontSize: scale(11), lineHeight: scale(13), includeFontPadding: false },
+    headerStatusText: { flexShrink: 1, fontSize: scale(11), lineHeight: scale(13), fontWeight: '400', includeFontPadding: false },
     headerMenuButton: { marginLeft: 'auto' },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: scale(80) },
     dateWrap: { alignItems: 'center', marginVertical: scale(8) },
@@ -2320,7 +2408,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: scale(14),
         lineHeight: scale(18),
-        fontWeight: '600',
+        fontWeight: '400',
     },
     conversationMenuItemPressed: {
         backgroundColor: 'rgba(148,163,184,0.12)',
@@ -2329,7 +2417,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(10),
         paddingTop: scale(8),
         paddingBottom: scale(12),
-        gap: scale(10),
+        gap: scale(14),
     },
     messageMenuLayer: {
         flex: 1,
@@ -2348,7 +2436,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: scale(18),
         paddingHorizontal: scale(12),
         paddingTop: scale(10),
-        gap: scale(10),
+        gap: scale(14),
         shadowColor: '#000000',
         shadowOpacity: 0.18,
         shadowRadius: scale(20),
@@ -2376,7 +2464,7 @@ const styles = StyleSheet.create({
     quickReactionText: { fontSize: scale(22), lineHeight: scale(26) },
     messageActionItem: {
         width: '100%',
-        minHeight: scale(48),
+        minHeight: scale(52),
         paddingHorizontal: scale(14),
         borderRadius: scale(10),
         justifyContent: 'center',
@@ -2393,7 +2481,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(14), lineHeight: scale(18), fontWeight: '600' },
+    messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(14), lineHeight: scale(18), fontWeight: '400' },
     messageActionPressed: { backgroundColor: 'rgba(148,163,184,0.12)' },
     replyQuote: {
         borderLeftWidth: scale(3),

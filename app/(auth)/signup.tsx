@@ -80,6 +80,7 @@ export default function SignupScreen() {
         handleSubmit,
         setError,
         formState: { errors, isValid, isSubmitting },
+        watch,
     } = useForm<SignupForm>({
         resolver: zodResolver(signupSchema),
         mode: 'onChange',
@@ -124,7 +125,11 @@ export default function SignupScreen() {
 
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
-        const result = await googleAuth();
+        const result = await googleAuth({
+            agreed: true,
+            marketing_opt_in: !!watch('marketingOptIn'),
+            lang: currentLanguage,
+        });
         setGoogleLoading(false);
 
         if (result.success) {
@@ -133,6 +138,11 @@ export default function SignupScreen() {
         }
 
         if (result.cancelled) return;
+
+        if (result.message === 'consent_required') {
+            toast.show(t('consent_required'), 'error');
+            return;
+        }
 
         const errorMsg = translateApiError(result.message || 'unknown_error');
         toast.show(errorMsg, 'error');

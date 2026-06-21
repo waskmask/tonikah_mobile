@@ -2,7 +2,12 @@ import { api, ApiResponse } from './api';
 
 export interface LoginRequest { email: string; password: string }
 export interface SignupRequest { email: string; password: string; agreed: boolean; marketing_opt_in: boolean; lang?: string }
-export interface GoogleAuthRequest { credential: string }
+export interface GoogleAuthRequest {
+    credential: string;
+    agreed?: boolean;
+    marketing_opt_in?: boolean;
+    lang?: string;
+}
 export interface RefreshRequest { refreshToken: string }
 
 export interface User {

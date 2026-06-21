@@ -57,6 +57,20 @@ function getProjectId() {
     );
 }
 
+async function getPushToken(Notifications: NotificationsModule, projectId: string) {
+    if (Platform.OS === 'android') {
+        try {
+            const nativeToken = await Notifications.getDevicePushTokenAsync();
+            const token = nativeToken?.data ? String(nativeToken.data) : '';
+            if (token) return token;
+        } catch (error) {
+            console.warn('[push] native Android token unavailable, falling back to Expo token', error);
+        }
+    }
+
+    return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+}
+
 function notificationTarget(data: Record<string, unknown> | undefined) {
     const conversationId = data?.conversationId ? String(data.conversationId) : '';
     const kind = data?.kind ? String(data.kind) : '';
@@ -83,6 +97,12 @@ export async function registerForPushNotifications() {
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#F34B6F',
         });
+        await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default',
+            importance: Notifications.AndroidImportance.HIGH,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#F34B6F',
+        });
     }
 
     const projectId = getProjectId();
@@ -100,7 +120,7 @@ export async function registerForPushNotifications() {
         return { success: false, message: 'push_permission_denied' };
     }
 
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    const token = await getPushToken(Notifications, projectId);
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
     const result = await api.post('/device-tokens', { token, platform });
 

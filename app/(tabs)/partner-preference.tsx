@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
+import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
@@ -14,6 +16,8 @@ import { useToast } from '@/hooks/useToast';
 
 export default function PartnerPreferenceScreen() {
     const { isDark } = useTheme();
+    const colors = useColors();
+    const primary = colors.chrome.primary;
     const { refreshUser } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
@@ -54,11 +58,12 @@ export default function PartnerPreferenceScreen() {
         setSaving(false);
     };
 
-    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}><ActivityIndicator color="#F34B6F" /></View>;
+    if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand.bg.surface }}><ActivityIndicator color={primary} /></View>;
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
-            <Text variant="h2">{t('partner_preference', 'Partner Preference')}</Text>
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+            <AppBackTitleBar title={t('partner_preference', 'Partner Preference')} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
             <Field label={t('about_partner', 'About partner')} value={about} onChangeText={setAbout} multiline isDark={isDark} />
             <View style={{ flexDirection: 'row', gap: scale(10) }}>
                 <Field label={t('preferred_age', 'Preferred age')} value={ageFrom} onChangeText={setAgeFrom} keyboardType="number-pad" isDark={isDark} style={{ flex: 1 }} />
@@ -66,6 +71,7 @@ export default function PartnerPreferenceScreen() {
             </View>
             <GradientButton title={t('save', 'Save')} onPress={save} loading={saving} disabled={saving} widthMode="full" containerStyle={{ marginTop: scale(20) }} />
         </ScrollView>
+        </View>
     );
 }
 

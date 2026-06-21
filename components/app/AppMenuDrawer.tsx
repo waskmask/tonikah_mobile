@@ -43,7 +43,7 @@ const QUICK_ITEMS: MenuItem[] = [
 const ACCOUNT_ITEMS: MenuItem[] = [
     { href: '/(tabs)/edit-profile', labelKey: 'edit_profile', fallback: 'Edit profile', icon: PencilLine },
     { href: '/(tabs)/memberships', labelKey: 'memberships', fallback: 'Memberships', icon: CreditCard },
-    { href: '/(tabs)/blocked-users', labelKey: 'blocked_users', fallback: 'Blocked users', icon: Ban },
+    { href: { pathname: '/(tabs)/activities', params: { tab: 'blocked' } }, labelKey: 'blocked_users', fallback: 'Blocked users', icon: Ban },
     { href: '/support', labelKey: 'report_issue', fallback: 'Report an issue', icon: LifeBuoy },
     { href: '/(tabs)/settings', labelKey: 'settings', fallback: 'Settings', icon: Settings },
 ];
@@ -113,7 +113,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
 
                         {QUICK_ITEMS.map((item) => (
                             <MenuRow
-                                key={String(item.href)}
+                                key={item.labelKey}
                                 icon={item.icon}
                                 label={textValue(t(item.labelKey), item.fallback)}
                                 onPress={() => navigate(item.href)}
@@ -122,7 +122,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
 
                         {ACCOUNT_ITEMS.map((item) => (
                             <MenuRow
-                                key={String(item.href)}
+                                key={item.labelKey}
                                 icon={item.icon}
                                 label={textValue(t(item.labelKey), item.fallback)}
                                 onPress={() => navigate(item.href)}

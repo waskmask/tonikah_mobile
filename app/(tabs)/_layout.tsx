@@ -1,5 +1,4 @@
 import { Tabs } from "expo-router";
-import { AppTopBar } from "@/components/app/AppTopBar";
 import { BottomTabBar } from "@/components/app/BottomTabBar";
 import { usePeriodicLocationRefresh } from "@/hooks/usePeriodicLocationRefresh";
 
@@ -9,8 +8,7 @@ export default function TabsLayout() {
     return (
         <Tabs
             screenOptions={{
-                headerShown: true,
-                header: () => <AppTopBar />,
+                headerShown: false,
             }}
             tabBar={(props) => <BottomTabBar {...props} />}
         >
@@ -32,18 +30,21 @@ export default function TabsLayout() {
                 name="favourited"
                 options={{
                     title: "Saved",
+                    headerShown: false,
                 }}
             />
             <Tabs.Screen
                 name="activities"
                 options={{
                     title: "Activities",
+                    headerShown: false,
                 }}
             />
             <Tabs.Screen
                 name="profile"
                 options={{
                     title: "Profile",
+                    headerShown: false,
                 }}
             />
             <Tabs.Screen name="edit-profile" options={{ href: null }} />

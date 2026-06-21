@@ -10,9 +10,11 @@ import { SingleSelectSheet, SelectOption } from '@/components/ui/SingleSelectShe
 import { FieldLabel, ErrorText, SelectField } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
+import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { Cigarette, Wine } from 'lucide-react-native';
+import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step7() {
     const { t } = useTranslation('common');
@@ -59,10 +61,10 @@ export default function Step7() {
                 setProfileData(payload);
                 router.push('/(profile-setup)/step8');
             } else {
-                Alert.alert('Error', res.message || 'Failed to update');
+                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
             }
         } catch {
-            Alert.alert('Error', 'Something went wrong');
+            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
         } finally {
             setLoading(false);
         }
@@ -74,10 +76,11 @@ export default function Step7() {
         <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
             <ProgressBar currentStep={7} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={{ padding: scale(20), paddingBottom: scale(100) }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                     <ProfileSetupHeader
-                        title={t('lifestyle_title', { defaultValue: 'Lifestyle & Habits' })}
-                        subtitle={t('lifestyle_desc', { defaultValue: 'Help others understand your day-to-day habits and choices.' })}
+                        step={7}
+                        title={t('step_7.title', { defaultValue: 'Lifestyle & Habits' })}
+                        subtitle={t('step_7.subtitle', { defaultValue: 'Help others understand your day-to-day habits and choices.' })}
                     />
 
                     <FieldLabel text={t('smoking')} required />

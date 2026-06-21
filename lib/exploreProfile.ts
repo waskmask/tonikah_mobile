@@ -151,7 +151,9 @@ export function formatProfileLocation(profile: any, includeState = false) {
     const state = includeState ? scalar(loc.state || profile?.state) : '';
     const country = scalar(countryIso(profile) || loc.country || profile?.country || profile?.country_iso);
     const place = [city, state].filter(Boolean).join(', ');
-    return [place, translateCountry(country)].filter(Boolean).join(' · ');
+    const countryLabel = translateCountry(country);
+    const countryWithFlag = countryLabel;
+    return [place, countryWithFlag].filter(Boolean).join(' · ');
 }
 
 export function profileTags(profile: any) {
