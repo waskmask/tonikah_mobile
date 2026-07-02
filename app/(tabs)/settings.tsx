@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
+import i18n from '@/lib/i18n';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
 import { authService, UserSession } from '@/lib/authService';
@@ -302,6 +303,7 @@ function SessionSecurityButton({ label, description, icon, disabled, onPress, is
 function SessionRow({ session, isDark }: { session: UserSession; isDark: boolean }) {
     const colors = useColors();
     const lastUsed = formatSessionDate(session.lastUsedAt || session.createdAt);
+    const locationLabel = formatSessionLocation(session);
     const platformLabel = session.current
         ? t('current_device', 'Current device')
         : t('other_device', 'Other device');
@@ -314,6 +316,11 @@ function SessionRow({ session, isDark }: { session: UserSession; isDark: boolean
                     <Text variant="caption" style={{ marginTop: scale(3), color: colors.brand.text.subtitle }}>
                         {t('last_active', 'Last active')}: {lastUsed}
                     </Text>
+                    {locationLabel ? (
+                        <Text variant="caption" style={{ marginTop: scale(2), color: colors.brand.text.subtitle }}>
+                            {locationLabel}
+                        </Text>
+                    ) : null}
                     {session.ip ? (
                         <Text variant="caption" style={{ marginTop: scale(2), color: colors.brand.text.muted }}>
                             {session.ip}
@@ -328,6 +335,23 @@ function SessionRow({ session, isDark }: { session: UserSession; isDark: boolean
             </View>
         </View>
     );
+}
+
+function formatSessionLocation(session: UserSession): string | null {
+    const code = session.locationCountryCode?.trim().toUpperCase();
+    if (code) {
+        let country = code;
+        try {
+            country = new (Intl as any).DisplayNames([i18n.language || 'en'], { type: 'region' }).of(code) || code;
+        } catch {
+            country = code;
+        }
+
+        const city = session.locationCity?.trim();
+        return city ? `${city}, ${country}` : country;
+    }
+
+    return session.privateLocation ? t('session_private_location', 'Private location') : null;
 }
 
 function formatSessionDate(value?: string) {

@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
-    KeyboardAvoidingView,
     Modal,
     Platform,
     Pressable,
@@ -12,6 +11,14 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import { Gesture, GestureDetector, ScrollView as GHScrollView } from 'react-native-gesture-handler';
+import Animated, {
+    runOnJS,
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -55,6 +62,7 @@ import { scale, wp } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
 import { chatService, normalizeConversation } from '@/lib/chatService';
@@ -82,6 +90,8 @@ import {
     profileName,
 } from '@/lib/exploreProfile';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+
+const AnimatedScrollView = Animated.createAnimatedComponent(GHScrollView);
 
 type Fact = { icon: LucideIcon; label: string; value: string };
 type PendingProfileToast = {
@@ -227,10 +237,8 @@ export type UserProfileViewProps = {
     mode?: 'inline' | 'screen' | 'modal';
     showClose?: boolean;
     isOwnProfile?: boolean;
-    advanceOnClose?: boolean;
     onEditProfile?: () => void;
     onClose?: () => void;
-    onAfterClose?: () => void;
     onBlocked?: (userId: string) => void;
     onUnblocked?: (userId: string) => void;
     onFavoriteChanged?: (userId: string, favorited: boolean) => void;
@@ -246,10 +254,8 @@ export function UserProfileView({
     mode = 'inline',
     showClose = true,
     isOwnProfile = false,
-    advanceOnClose = false,
     onEditProfile,
     onClose,
-    onAfterClose,
     onBlocked,
     onUnblocked,
     onFavoriteChanged,
@@ -279,6 +285,7 @@ export function UserProfileView({
     const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
     const [blockBusy, setBlockBusy] = useState(false);
     const [unblockBusy, setUnblockBusy] = useState(false);
+    const scrollOffsetRef = useRef(0);
 
     const resolvedUserId = userId || profileId(initialProfile);
 
@@ -319,7 +326,12 @@ export function UserProfileView({
     const headerTitle = `${truncateHeaderName(name)}${age ? `, ${age}` : ''}`;
     const visibleHeaderTitle = isOwnProfile ? t('my_profile', 'My profile') : headerTitle;
     const gallery = normalizeGallery(profile);
-    const photos = gallery.map(imageUrl).filter(Boolean);
+    const photos = (() => {
+        const fromGallery = gallery.map(imageUrl).filter(Boolean);
+        if (fromGallery.length > 0) return fromGallery;
+        const avatar = typeof profile?.avatar === 'string' ? profile.avatar.trim() : '';
+        return avatar ? [avatar] : [];
+    })();
     const privateGallery = !isOwnProfile && (profile?.privacy || profile?.gallery_privacy || profile?.galleryPrivacy || 'public') === 'private';
     const verified = isVerifiedProfile(profile);
     const activeMembership = isMembershipActive(profile);
@@ -329,10 +341,50 @@ export function UserProfileView({
     const bio = bioText(profile);
     const blocked = profile?.blocked === true;
 
-    const close = () => {
+    const close = useCallback(() => {
         onClose?.();
-        if (advanceOnClose) onAfterClose?.();
-    };
+    }, [onClose]);
+
+    const scrollY = useSharedValue(0);
+    const dragY = useSharedValue(0);
+    const setScrollOffset = useCallback((value: number) => {
+        scrollOffsetRef.current = value;
+    }, []);
+
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (event) => {
+            scrollY.value = event.contentOffset.y;
+            runOnJS(setScrollOffset)(event.contentOffset.y);
+        },
+    });
+
+    const modalDismissGesture = useMemo(() => Gesture.Pan()
+        .enabled(mode === 'modal')
+        .activeOffsetY(8)
+        .failOffsetX([-32, 32])
+        .onUpdate((event) => {
+            if (scrollY.value <= 1 && event.translationY > 0) {
+                dragY.value = event.translationY;
+            } else if (event.translationY <= 0) {
+                dragY.value = 0;
+            }
+        })
+        .onEnd((event) => {
+            if (scrollY.value <= 1 && event.translationY > 64) {
+                runOnJS(close)();
+            }
+            dragY.value = withSpring(0);
+        }), [mode, close]);
+
+    const modalScrollGesture = useMemo(() => Gesture.Native(), []);
+    const modalGesture = useMemo(
+        () => Gesture.Simultaneous(modalDismissGesture, modalScrollGesture),
+        [modalDismissGesture, modalScrollGesture],
+    );
+
+    const modalSheetStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: mode === 'modal' ? dragY.value : 0 }],
+    }));
 
     const startMessage = async () => {
         if (!id || !requireVerified('chat')) return;
@@ -546,7 +598,8 @@ export function UserProfileView({
     }
 
     return (
-        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+        <GestureDetector gesture={mode === 'modal' ? modalGesture : Gesture.Native()}>
+            <Animated.View style={[{ flex: 1, backgroundColor: colors.brand.bg.surface }, modalSheetStyle]}>
             <View
                 style={[
                     styles.header,
@@ -557,6 +610,7 @@ export function UserProfileView({
                         borderBottomColor: colors.brand.bg.border,
                     },
                 ]}
+                collapsable={false}
             >
                 {!isOwnProfile && showClose ? (
                     <Pressable onPress={close} style={styles.headerButton} hitSlop={10}>
@@ -592,8 +646,10 @@ export function UserProfileView({
                 )}
             </View>
 
-            <ScrollView
+            <AnimatedScrollView
                 showsVerticalScrollIndicator={false}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
                 refreshControl={onRefresh ? (
                     <RefreshControl
                         refreshing={refreshing}
@@ -611,6 +667,7 @@ export function UserProfileView({
                 <ProfileGallery
                     photos={photos}
                     privateGallery={privateGallery}
+                    canOpenPhotos={!privateGallery}
                     name={name}
                     age={age}
                     location={location}
@@ -698,11 +755,12 @@ export function UserProfileView({
                     </View>
                 </View>
                 ) : null}
-            </ScrollView>
+            </AnimatedScrollView>
 
             <ImageLightbox
                 photos={photos}
                 index={lightboxIndex}
+                showReport={!isOwnProfile}
                 onClose={() => setLightboxIndex(null)}
                 onReport={() => {
                     setLightboxIndex(null);
@@ -740,7 +798,8 @@ export function UserProfileView({
                 }}
                 onConfirm={confirmBlockUser}
             />
-        </View>
+            </Animated.View>
+        </GestureDetector>
     );
 }
 
@@ -927,7 +986,7 @@ function IntroMessageSheet({
     const insets = useSafeAreaInsets();
     const palette = useColors();
     const inputRef = React.useRef<TextInput>(null);
-    const keyboardOffset = Platform.OS === 'ios' ? insets.top : 0;
+    const keyboard = useKeyboardHeight();
     const maxSheetHeight = Math.round(Dimensions.get('window').height * 0.72);
 
     useEffect(() => {
@@ -941,10 +1000,16 @@ function IntroMessageSheet({
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={keyboardOffset}
-                style={styles.messageOverlay}
+            <View
+                style={[
+                    styles.messageOverlay,
+                    keyboard.visible
+                        ? {
+                            justifyContent: 'flex-end',
+                            paddingBottom: keyboard.height,
+                        }
+                        : null,
+                ]}
             >
                 <Pressable style={styles.messageBackdrop} onPress={onClose} />
                 <View
@@ -1003,7 +1068,7 @@ function IntroMessageSheet({
                         </Pressable>
                     </ScrollView>
                 </View>
-            </KeyboardAvoidingView>
+            </View>
         </Modal>
     );
 }
@@ -1011,6 +1076,7 @@ function IntroMessageSheet({
 function ProfileGallery({
     photos,
     privateGallery,
+    canOpenPhotos = true,
     name,
     age,
     location,
@@ -1022,6 +1088,7 @@ function ProfileGallery({
 }: {
     photos: string[];
     privateGallery: boolean;
+    canOpenPhotos?: boolean;
     name: string;
     age: number | null;
     location: string;
@@ -1034,6 +1101,7 @@ function ProfileGallery({
     const palette = useColors();
     const slots = [0, 1, 2].map((index) => photos[index] || '');
     const slideWidth = Math.round(SCREEN_WIDTH * 0.68);
+    const showPrivateBadge = privateGallery && photos.length > 0;
 
     return (
         <View style={[styles.gallery, { backgroundColor: palette.chrome.common.card }]}>
@@ -1041,23 +1109,30 @@ function ProfileGallery({
                 {slots.map((src, index) => (
                     <Pressable
                         key={`${src}-${index}`}
-                        disabled={!src || privateGallery}
+                        disabled={!src || !canOpenPhotos}
                         onPress={() => onOpenPhoto(index)}
                         style={[styles.gallerySlide, { width: slideWidth, backgroundColor: palette.brand.bg.surface }]}
                     >
-                        <Image source={src ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={privateGallery ? 18 : 0} />
-                        {privateGallery && (
-                            <View style={styles.privateOverlay}>
-                                <Lock size={scale(22)} color={palette.chrome.common.inverseText} />
-                                <Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>{t('gallery_isprivate', 'Gallery is private')}</Text>
-                            </View>
-                        )}
+                        <Image
+                            source={src ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                        />
                     </Pressable>
                 ))}
             </ScrollView>
             <LinearGradient colors={['rgba(15,23,42,0.02)', 'rgba(15,23,42,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
-            <View style={styles.photoCount}>
-                <Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>{photos.length || 0}</Text>
+            <View style={styles.galleryBadges}>
+                {showPrivateBadge ? (
+                    <View style={styles.privateBadge} accessibilityLabel={t('gallery_isprivate', 'User gallery is private')}>
+                        <Lock size={scale(18)} color={palette.chrome.common.inverseText} />
+                    </View>
+                ) : null}
+                {photos.length > 0 ? (
+                    <View style={styles.photoCount}>
+                        <Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>{photos.length}</Text>
+                    </View>
+                ) : null}
             </View>
             <View style={styles.galleryIdentity} pointerEvents="none">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(8), flexWrap: 'wrap' }}>
@@ -1183,11 +1258,13 @@ function ImageLightbox({
     index,
     onClose,
     onReport,
+    showReport = true,
 }: {
     photos: string[];
     index: number | null;
     onClose: () => void;
     onReport: () => void;
+    showReport?: boolean;
 }) {
     const [current, setCurrent] = useState(0);
     const palette = useColors();
@@ -1211,9 +1288,13 @@ function ImageLightbox({
                             {current + 1}/{photos.length}
                         </Text>
                     ) : <View />}
-                    <Pressable onPress={onReport} style={styles.lightboxIconButton} hitSlop={10}>
-                        <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
-                    </Pressable>
+                    {showReport ? (
+                        <Pressable onPress={onReport} style={styles.lightboxIconButton} hitSlop={10}>
+                            <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
+                        </Pressable>
+                    ) : (
+                        <View style={styles.lightboxIconButton} />
+                    )}
                 </View>
                 {src ? <Image source={{ uri: src }} style={styles.lightboxImage} contentFit="contain" /> : null}
                 {hasMultiple ? (
@@ -1342,8 +1423,23 @@ const styles = StyleSheet.create({
     gallery: { overflow: 'hidden', minHeight: scale(342), marginBottom: 0 },
     gallerySlide: { aspectRatio: 3 / 4, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     galleryGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
-    privateOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: scale(6), backgroundColor: 'rgba(15,23,42,0.22)' },
-    photoCount: { position: 'absolute', right: scale(14), top: scale(14), minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(15,23,42,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
+    galleryBadges: {
+        position: 'absolute',
+        right: scale(14),
+        top: scale(14),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(8),
+    },
+    privateBadge: {
+        width: scale(32),
+        height: scale(32),
+        borderRadius: scale(16),
+        backgroundColor: 'rgba(15,23,42,0.62)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    photoCount: { minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(15,23,42,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
     galleryIdentity: { position: 'absolute', left: scale(18), right: scale(18), bottom: scale(18) },
     heroLocationRow: { flexDirection: 'row', alignItems: 'center', gap: scale(6), marginTop: scale(5) },
     heroLocationFlag: { lineHeight: scale(18) },

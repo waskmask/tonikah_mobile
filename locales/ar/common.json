@@ -2380,5 +2380,6 @@
   "profile.sect": "الطائفة",
   "profile.smoking": "التدخين",
   "profile.update_error": "تعذر تحديث الملف الشخصي.",
-  "profile.wants_children": "يريد أطفالًا"
+  "profile.wants_children": "يريد أطفالًا",
+  "session_private_location": "موقع خاص"
 }

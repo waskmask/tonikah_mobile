@@ -57,6 +57,7 @@ export default function ExploreScreen() {
     const [message, setMessage] = useState('');
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [profileSheetClosing, setProfileSheetClosing] = useState(false);
     const [viewedCount, setViewedCount] = useState(0);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [tourOpen, setTourOpen] = useState(false);
@@ -116,14 +117,16 @@ export default function ExploreScreen() {
             const responseMode: ExploreMode = res.mode === 'skipped' || res.showingSkipped ? 'skipped' : mode;
             exploreModeRef.current = responseMode;
 
-            const droppedFilters = responseMode === 'fresh' ? normalizeDroppedFilters(res.droppedFilters as any[]) : [];
+            const droppedFilters = responseMode === 'fresh' && Array.isArray(res.droppedFilters)
+                ? res.droppedFilters
+                : [];
             if (droppedFilters.length > 0) {
                 const labels = describeDroppedFilters(nextFilters, droppedFilters);
-                if (labels.length) {
-                    const cleanedFilters = clearDroppedFilters(nextFilters, droppedFilters);
-                    setFilters(cleanedFilters);
-                    filtersRef.current = cleanedFilters;
+                const cleanedFilters = clearDroppedFilters(nextFilters, droppedFilters);
+                setFilters(cleanedFilters);
+                filtersRef.current = cleanedFilters;
 
+                if (labels.length) {
                     const filtersText = labels.join(', ');
                     const messageText = t(
                         'filters_reset_msg',
@@ -133,12 +136,12 @@ export default function ExploreScreen() {
                         .replaceAll('{filters}', filtersText)
                         .replaceAll('{{filters}}', filtersText);
                     toast.show(messageText, 'info', 5000);
+                }
 
-                    if (allowDroppedRetry) {
-                        isFetchingRef.current = false;
-                        await load(cleanedFilters, { reset: true, allowDroppedRetry: false, mode: 'fresh' });
-                        return;
-                    }
+                if (allowDroppedRetry) {
+                    isFetchingRef.current = false;
+                    await load(cleanedFilters, { reset: true, allowDroppedRetry: false, mode: 'fresh' });
+                    return;
                 }
             }
 
@@ -240,22 +243,24 @@ export default function ExploreScreen() {
         }
     };
 
+    const deckLocked = detailOpen || profileSheetClosing;
+
     const viewProfile = () => {
         if (!current) return;
         if (viewedCount >= 5 && !emailVerified) {
             setVerificationReason('browse_limit');
             return;
         }
+        setProfileSheetClosing(false);
+        setViewedCount((count) => count + 1);
         setDetailOpen(true);
     };
 
-    const closeDetailAndAdvance = () => {
-        if (current) {
-            const viewedId = profileId(current);
-            advance({ action: 'skip', profile: current });
-            if (viewedId) void usersService.skip(viewedId).catch(() => undefined);
-        }
-        setViewedCount((count) => count + 1);
+    const closeProfileSheet = () => {
+        setDetailOpen(false);
+        // Block deck taps until the modal slide animation finishes (prevents accidental skip).
+        setProfileSheetClosing(true);
+        setTimeout(() => setProfileSheetClosing(false), 450);
     };
 
     const applyFilters = (next: ExploreFilterState) => {
@@ -309,7 +314,7 @@ export default function ExploreScreen() {
                             />
                         </View>
                     ) : null}
-                    <View style={styles.deckArea}>
+                    <View style={styles.deckArea} pointerEvents={deckLocked ? 'none' : 'auto'}>
                         <ExploreDeckCard
                             profile={current}
                             viewerLat={viewerCoordinates?.lat}
@@ -319,7 +324,7 @@ export default function ExploreScreen() {
                     </View>
                     <ExploreActionBar
                         canUndo={history.length > 0}
-                        busy={busy}
+                        busy={busy || deckLocked}
                         onUndo={undo}
                         onSkip={skip}
                         onFavorite={favorite}
@@ -369,9 +374,7 @@ export default function ExploreScreen() {
                 visible={detailOpen && Boolean(currentId)}
                 userId={currentId}
                 initialProfile={current}
-                advanceOnClose
-                onClose={() => setDetailOpen(false)}
-                onAfterClose={closeDetailAndAdvance}
+                onClose={closeProfileSheet}
                 onBlocked={(id) => {
                     setProfiles((items) => items.filter((item) => profileId(item) !== id));
                 }}

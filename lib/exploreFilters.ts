@@ -195,36 +195,58 @@ function selectedValueLabels(state: ExploreFilterState, key: FilterSelectKey) {
         .filter(Boolean);
 }
 
-export function describeDroppedFilters(state: ExploreFilterState, droppedParams: string[]) {
+export type DroppedFilterEntry =
+    | string
+    | { param?: string; key?: string; values?: string[] };
+
+export function describeDroppedFilters(state: ExploreFilterState, droppedEntries: DroppedFilterEntry[]) {
     const seen = new Set<string>();
     const descriptions: string[] = [];
 
-    droppedParams.forEach((param) => {
-        const rangeKey = RANGE_FILTER_KEY_BY_PARAM[param];
-        if (rangeKey && !seen.has(rangeKey)) {
-            if (
-                (rangeKey === 'age' && (state.ageMin !== 18 || state.ageMax !== 80)) ||
-                (rangeKey === 'height' && (state.heightMin !== 120 || state.heightMax !== 220))
-            ) {
-                descriptions.push(droppedFilterLabel(param));
-                seen.add(rangeKey);
+    droppedEntries.forEach((entry) => {
+        if (typeof entry === 'string') {
+            const param = entry.split(/[=:]/)[0].trim();
+            const rangeKey = RANGE_FILTER_KEY_BY_PARAM[param];
+            if (rangeKey && !seen.has(rangeKey)) {
+                if (
+                    (rangeKey === 'age' && (state.ageMin !== 18 || state.ageMax !== 80)) ||
+                    (rangeKey === 'height' && (state.heightMin !== 120 || state.heightMax !== 220))
+                ) {
+                    descriptions.push(droppedFilterLabel(param));
+                    seen.add(rangeKey);
+                }
+                return;
             }
+
+            const key = SELECT_FILTER_KEY_BY_PARAM[param];
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+
+            if (state[key].length === 0) return;
+            const values = selectedValueLabels(state, key);
+            descriptions.push(`${droppedFilterLabel(param)}: ${values.join(', ')}`);
             return;
         }
 
+        const param = String(entry.param || entry.key || '').trim();
         const key = SELECT_FILTER_KEY_BY_PARAM[param];
-        if (!key || seen.has(key)) return;
-        seen.add(key);
+        const droppedValues = Array.isArray(entry.values) ? entry.values.map(String) : [];
+        if (!key || !droppedValues.length) return;
 
-        if (state[key].length === 0) return;
-        const values = selectedValueLabels(state, key);
-        descriptions.push(`${droppedFilterLabel(param)}: ${values.join(', ')}`);
+        const valueLabels = droppedValues
+            .map((value) => cleanFilterOptionLabel(state.labels?.[key]?.[value] || fallbackValueLabel(key, value)))
+            .filter(Boolean);
+        for (const label of valueLabels) {
+            if (seen.has(label)) continue;
+            seen.add(label);
+            descriptions.push(label);
+        }
     });
 
     return descriptions;
 }
 
-export function clearDroppedFilters(state: ExploreFilterState, droppedParams: string[]) {
+export function clearDroppedFilters(state: ExploreFilterState, droppedEntries: DroppedFilterEntry[]) {
     const next: ExploreFilterState = {
         ...state,
         country: [...state.country],
@@ -238,25 +260,41 @@ export function clearDroppedFilters(state: ExploreFilterState, droppedParams: st
     };
     const seen = new Set<string>();
 
-    droppedParams.forEach((param) => {
-        const rangeKey = RANGE_FILTER_KEY_BY_PARAM[param];
-        if (rangeKey && !seen.has(rangeKey)) {
-            seen.add(rangeKey);
-            if (rangeKey === 'age') {
-                next.ageMin = 18;
-                next.ageMax = 80;
-            } else {
-                next.heightMin = 120;
-                next.heightMax = 220;
+    droppedEntries.forEach((entry) => {
+        if (typeof entry === 'string') {
+            const param = entry.split(/[=:]/)[0].trim();
+            const rangeKey = RANGE_FILTER_KEY_BY_PARAM[param];
+            if (rangeKey && !seen.has(rangeKey)) {
+                seen.add(rangeKey);
+                if (rangeKey === 'age') {
+                    next.ageMin = 18;
+                    next.ageMax = 80;
+                } else {
+                    next.heightMin = 120;
+                    next.heightMax = 220;
+                }
+                return;
             }
+
+            const key = SELECT_FILTER_KEY_BY_PARAM[param];
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+
+            next[key] = [];
+            if (next.labels?.[key]) next.labels[key] = {};
             return;
         }
 
+        const param = String(entry.param || entry.key || '').trim();
         const key = SELECT_FILTER_KEY_BY_PARAM[param];
-        if (!key || seen.has(key)) return;
-        seen.add(key);
+        const droppedValues = Array.isArray(entry.values) ? entry.values.map(String) : [];
+        if (!key || !droppedValues.length) return;
 
-        next[key] = [];
+        const dropSet = new Set(droppedValues);
+        next[key] = next[key].filter((value) => !dropSet.has(String(value)));
+        for (const value of droppedValues) {
+            if (next.labels?.[key]) delete next.labels[key][value];
+        }
     });
 
     return next;

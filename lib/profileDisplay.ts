@@ -112,6 +112,21 @@ export function apiMessage(message?: string, fallback = 'something_went_wrong') 
     return t(message || fallback, t(fallback, 'Something went wrong.'));
 }
 
+/** Resolve a display URL from a profile card or gallery item (includes blur URLs for private galleries). */
 export function profileImage(item?: any) {
-    return item?.image || item?.avatar || item?.urls?.avatar || item?.urls?.small || item?.urls?.thumb || item?.urls?.original || item?.url || '';
+    if (!item) return '';
+    if (typeof item === 'string') return item.trim();
+    const fromUrls = item.urls
+        ? item.urls.original || item.urls.small || item.urls.thumb || item.urls.blur || item.urls.avatar
+        : '';
+    return (
+        item.image ||
+        item.photo ||
+        item.profile_image ||
+        item.profile_photo ||
+        item.avatar ||
+        fromUrls ||
+        item.url ||
+        ''
+    );
 }

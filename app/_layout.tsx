@@ -2,6 +2,8 @@ import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { View, LogBox, StatusBar } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -16,7 +18,6 @@ configureReanimatedLogger({
 
 // Suppress expected warnings from dependencies that aren't actionable
 LogBox.ignoreLogs([
-    'SafeAreaView has been deprecated',
     '[GoogleSignIn] Native module',
     'i18next is maintained with support from Locize',
     'RTL change manual reload required',
@@ -106,6 +107,8 @@ export default function RootLayout() {
     }
 
     return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+        <KeyboardProvider>
         <SafeAreaProvider>
             <ThemeSync />
             <StatusBar
@@ -131,5 +134,7 @@ export default function RootLayout() {
                 <ToastProvider />
             </QueryClientProvider>
         </SafeAreaProvider>
+        </KeyboardProvider>
+        </GestureHandlerRootView>
     );
 }

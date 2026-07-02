@@ -2380,5 +2380,6 @@
   "profile.sect": "Sect",
   "profile.smoking": "Smoking",
   "profile.update_error": "Could not update profile.",
-  "profile.wants_children": "Wants children"
+  "profile.wants_children": "Wants children",
+  "session_private_location": "Localização privada"
 }

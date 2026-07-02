@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -73,6 +73,7 @@ function openConversation(conversation: Conversation) {
         pathname: '/conversation/[id]',
         params: {
             id: conversation.id,
+            recipientId: String(other.id || other._id || ''),
             name: otherName(conversation),
             avatar: profileImage(other),
             online: other.recently_active ? '1' : '0',
@@ -137,9 +138,18 @@ export default function MessagesScreen() {
         }
     }, [nextCursor]);
 
+    // Keep a live ref to load so the socket handler stays referentially stable.
+    // Otherwise load (which depends on nextCursor) would change identity on every
+    // pagination, tearing down and reconnecting the socket and dropping the
+    // chat:message / chat:unread events that should update the list instantly.
+    const loadRef = useRef(load);
+    useEffect(() => {
+        loadRef.current = load;
+    });
+
     const refreshFromSocket = useCallback(() => {
-        void load('replace');
-    }, [load]);
+        void loadRef.current('replace');
+    }, []);
 
     useChatSocket({
         enabled: true,

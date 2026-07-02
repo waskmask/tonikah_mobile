@@ -55,8 +55,10 @@ export function imageUrl(item?: GalleryLike | any) {
 }
 
 export function firstProfileImage(profile: any) {
+    const fromProfile = profileImage(profile);
+    if (fromProfile) return fromProfile;
     const gallery = normalizeGallery(profile);
-    return imageUrl(gallery[0]) || profileImage(profile);
+    return imageUrl(gallery[0]) || '';
 }
 
 function scalar(value: any) {

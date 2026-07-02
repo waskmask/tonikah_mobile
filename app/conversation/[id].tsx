@@ -5,16 +5,18 @@ import {
     Animated,
     FlatList,
     Image as RNImage,
-    Keyboard,
-    KeyboardAvoidingView,
     Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     PanResponder,
     Platform,
     Pressable,
+    StyleProp,
     StyleSheet,
     Text as RNText,
     TextInput,
     View,
+    ViewStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,7 +31,7 @@ import {
     useAudioRecorderState,
 } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Bell, BellOff, Check, CheckCheck, Copy, Download, Eye, EyeOff, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Bell, BellOff, Check, CheckCheck, ChevronDown, Copy, Download, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import {
@@ -49,20 +51,37 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
 import { useHaptics } from '@/hooks/useHaptics';
+import { useChatScrollAnchor, CHAT_NEAR_BOTTOM_THRESHOLD } from '@/hooks/useChatScrollAnchor';
+import { loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
+import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode';
+import { KeyboardController } from 'react-native-keyboard-controller';
+import Reanimated, {
+    FadeInDown,
+    ZoomIn,
+    ZoomOut,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
+} from 'react-native-reanimated';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
 import { cacheChatMedia, deleteCachedChatMediaForMessage, getCachedChatMedia } from '@/lib/chatMediaCache';
 import { translateChatText } from '@/lib/chatDisplay';
+import { ImageAttachmentComposer } from '@/components/chat/ImageAttachmentComposer';
+import { ChatKeyboardAvoider, ChatComposerBar } from '@/components/chat/ChatKeyboardFooter';
+import { ViewOnceIcon } from '@/components/chat/ViewOnceIcon';
+import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
+import { profileId } from '@/lib/exploreProfile';
+import { routeParam } from '@/lib/routeParams';
 
 const PRIMARY = '#F34B6F';
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const UNSEND_WINDOW_MIN = 15;
 const VOICE_WAVE_BAR_COUNT = 28;
 const MAX_VOICE_RECORDING_SECONDS = 60;
-const IMAGE_CAPTION_LIMIT = 500;
-
 type ListItem =
     | { kind: 'date'; id: string; label: string }
     | { kind: 'message'; id: string; message: ChatMessage };
@@ -169,7 +188,15 @@ function buildItems(messages: ChatMessage[]): ListItem[] {
 }
 
 export default function ConversationScreen() {
-    const { id, recipientId, name, avatar: routeAvatar, online, accountDeleted, state: routeState, requestRole: routeRequestRole } = useLocalSearchParams<{ id: string; recipientId?: string; name?: string; avatar?: string; online?: string; accountDeleted?: string; state?: string; requestRole?: string }>();
+    const params = useLocalSearchParams<{ id: string; recipientId?: string; name?: string; avatar?: string; online?: string; accountDeleted?: string; state?: string; requestRole?: string }>();
+    const id = routeParam(params.id);
+    const recipientId = routeParam(params.recipientId);
+    const name = routeParam(params.name);
+    const routeAvatar = routeParam(params.avatar);
+    const online = routeParam(params.online);
+    const accountDeleted = routeParam(params.accountDeleted);
+    const routeState = routeParam(params.state);
+    const routeRequestRole = routeParam(params.requestRole);
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
     const { isDark } = useTheme();
@@ -178,14 +205,18 @@ export default function ConversationScreen() {
     const toast = useToast();
     const { lightImpact } = useHaptics();
     const insets = useSafeAreaInsets();
-    const headerHeight = scale(56);
-    const keyboardVerticalOffset = Platform.OS === 'ios' ? insets.top + headerHeight : 0;
+    useConversationKeyboardMode();
     const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
     const recorderState = useAudioRecorderState(recorder, 250);
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const listRef = useRef<FlatList<ListItem>>(null);
-    const pendingInitialScrollRef = useRef(false);
-    const initialScrollConversationRef = useRef<string | null>(null);
+    const { isNearBottomRef } = useChatScrollAnchor<ListItem>();
+    // Holds the live socket API so scroll/seen helpers stay referentially stable
+    // (the socket object is recreated on render).
+    const socketRef = useRef<{ markSeen: (id?: string | null) => void } | null>(null);
+    // True when messages arrived from the peer while the user was scrolled up;
+    // we defer marking them seen until they're actually brought into view.
+    const pendingSeenRef = useRef(false);
     const [conversation, setConversation] = useState<Conversation | null>(null);
     const [items, setItems] = useState<ChatMessage[]>([]);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -201,21 +232,24 @@ export default function ConversationScreen() {
     const [voiceSending, setVoiceSending] = useState(false);
     const [requestBusy, setRequestBusy] = useState(false);
     const [viewOnce, setViewOnce] = useState<{ url: string; messageId: string; seconds: number } | null>(null);
-    const [viewOnceLoading, setViewOnceLoading] = useState(false);
+    const [viewOnceLoadingId, setViewOnceLoadingId] = useState<string | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageAttachment, setImageAttachment] = useState<PendingImageAttachment | null>(null);
     const [imageCaption, setImageCaption] = useState('');
     const [imageViewOnce, setImageViewOnce] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuBusy, setMenuBusy] = useState(false);
+    const [messagesReady, setMessagesReady] = useState(false);
+    const [showScrollDown, setShowScrollDown] = useState(false);
+    const [unseenWhileAway, setUnseenWhileAway] = useState(0);
+    const [chatFooterHeight, setChatFooterHeight] = useState(scale(72));
     const [profileSheetOpen, setProfileSheetOpen] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
     const [messageActionBusy, setMessageActionBusy] = useState(false);
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-    const [keyboardOpen, setKeyboardOpen] = useState(false);
-    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const prevListLengthRef = useRef(0);
 
-    const colors = {
+    const colors = useMemo(() => ({
         bg: palette.brand.bg.surface,
         card: palette.chrome.common.card,
         surface: palette.chrome.common.cardAlt,
@@ -232,33 +266,26 @@ export default function ConversationScreen() {
         success: palette.chrome.common.successStrong,
         waveMuted: palette.brand.bg.border,
         blueAction: palette.chrome.common.blueAction,
-    };
+    }), [palette]);
 
+    // Inverted list: the newest message lives at offset 0 (the visual bottom),
+    // so "scroll to latest" is just a jump to offset 0 — instant and reliable.
+    // When the keyboard opens, the inverted list keeps the bottom pinned as the
+    // container shrinks, so no extra scroll-on-keyboard handling is needed.
     const scrollToBottom = useCallback((animated = false) => {
-        requestAnimationFrame(() => {
-            listRef.current?.scrollToEnd({ animated });
-            setTimeout(() => listRef.current?.scrollToEnd({ animated }), 80);
-            setTimeout(() => listRef.current?.scrollToEnd({ animated }), 240);
-        });
+        listRef.current?.scrollToOffset({ offset: 0, animated });
     }, []);
 
-    useEffect(() => {
-        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-        const show = Keyboard.addListener(showEvent, (event) => {
-            setKeyboardOpen(true);
-            setKeyboardHeight(event.endCoordinates?.height || 0);
-            setTimeout(() => scrollToBottom(true), Platform.OS === 'ios' ? 80 : 120);
-        });
-        const hide = Keyboard.addListener(hideEvent, () => {
-            setKeyboardOpen(false);
-            setKeyboardHeight(0);
-        });
-        return () => {
-            show.remove();
-            hide.remove();
-        };
-    }, [scrollToBottom]);
+    // Flush "seen" once the newest messages are actually in view. Clears the
+    // deferred-unseen state and the scroll-down badge.
+    const markConversationSeen = useCallback(() => {
+        pendingSeenRef.current = false;
+        setUnseenWhileAway(0);
+        if (id && id !== 'new') {
+            void chatService.markRead(id);
+            socketRef.current?.markSeen(id);
+        }
+    }, [id]);
 
     useEffect(() => {
         if (!voicePanelOpen || !recorderState.isRecording) return;
@@ -312,12 +339,23 @@ export default function ConversationScreen() {
         setItems((current) => {
             const next = normalizeMessage(message);
             if (!next.id || current.some((item) => item.id === next.id)) return current;
+            // Mark this incoming message to play the enter animation.
+            animateIdsRef.current.add(next.id);
             return [...current, next];
         });
-        if (id && id !== 'new') {
+        if (!id || id === 'new') return;
+        const myId = String(user?._id || user?.id || '');
+        const fromPeer = String(message?.sender || '') !== myId;
+        // Only mark seen if the user is viewing the bottom (message is visible).
+        // If they're scrolled up, defer until they scroll back down and surface a
+        // count on the scroll-to-bottom button instead.
+        if (isNearBottomRef.current) {
             void chatService.markRead(id);
+        } else if (fromPeer) {
+            pendingSeenRef.current = true;
+            setUnseenWhileAway((current) => current + 1);
         }
-    }, [id]);
+    }, [id, user?._id, user?.id, isNearBottomRef]);
 
     const handleSocketUnsent = useCallback((incomingMessageId: string) => {
         if (!incomingMessageId) return;
@@ -384,21 +422,57 @@ export default function ConversationScreen() {
     });
 
     useEffect(() => {
+        socketRef.current = socket;
+    });
+
+    useEffect(() => {
+        let cancelled = false;
+        // Reset per-conversation state up front so we never flash the previous
+        // chat's messages or reuse its pagination cursor when switching chats.
+        setItems([]);
+        setNextCursor(null);
+        setShowScrollDown(false);
+        setUnseenWhileAway(0);
+        pendingSeenRef.current = false;
+        isNearBottomRef.current = true;
         (async () => {
             if (!id || id === 'new') {
                 setLoading(false);
+                setMessagesReady(true);
                 return;
             }
-            pendingInitialScrollRef.current = true;
-            initialScrollConversationRef.current = id;
             setLoading(true);
+            setMessagesReady(false);
+            const userId = String(user?._id || user?.id || '');
+            // 1) Instant open: render cached messages right away (inverted list lands
+            //    on the newest message with no scroll, no spinner). Skipped if the
+            //    user isn't hydrated yet — the effect re-runs once they are.
+            const cached = userId ? await loadCachedMessages(userId, id) : null;
+            if (!cancelled && cached && cached.length) {
+                setItems(cached);
+                setMessagesReady(true);
+                setLoading(false);
+            }
+            // 2) Background refresh: pull the latest from the server and reconcile.
             await load('replace');
+            if (cancelled) return;
             setLoading(false);
-            scrollToBottom(false);
+            setMessagesReady(true);
             await chatService.markRead(id);
             socket.markSeen(id);
         })();
-    }, [id]);
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, user?._id, user?.id]);
+
+    // Persist the newest slice locally so the next open is instant.
+    useEffect(() => {
+        if (!id || id === 'new' || !messagesReady) return;
+        const userId = String(user?._id || user?.id || '');
+        void saveCachedMessages(userId, id, items);
+    }, [items, id, messagesReady, user?._id, user?.id]);
 
     useEffect(() => {
         if (!viewOnce) return;
@@ -413,6 +487,78 @@ export default function ConversationScreen() {
     }, [viewOnce]);
 
     const listItems = useMemo(() => buildItems(items), [items]);
+    // Inverted FlatList renders index 0 at the visual bottom, so the newest
+    // message must come first. buildItems keeps date headers above each group;
+    // reversing preserves that ordering once the list is flipped.
+    const invertedItems = useMemo(() => [...listItems].reverse(), [listItems]);
+    // Keep a live ref to the current data so stable callbacks (reply-jump) never
+    // read a stale list without having to be recreated on every render.
+    const invertedItemsRef = useRef(invertedItems);
+    useEffect(() => {
+        invertedItemsRef.current = invertedItems;
+    });
+    // IDs of messages that should play the enter animation. Only freshly sent or
+    // received messages are added here, so opening a conversation (bulk load,
+    // cache, pagination) never animates — preventing the "whole page dancing"
+    // effect. `entering` fires once on mount, so leaving ids in the set is safe.
+    const animateIdsRef = useRef<Set<string>>(new Set());
+
+    // Reset the animation memory when switching conversations.
+    useEffect(() => {
+        animateIdsRef.current = new Set();
+    }, [id]);
+
+    useEffect(() => {
+        if (!messagesReady || loadingMore) {
+            prevListLengthRef.current = listItems.length;
+            return;
+        }
+        if (listItems.length > prevListLengthRef.current && isNearBottomRef.current) {
+            scrollToBottom(true);
+        }
+        prevListLengthRef.current = listItems.length;
+    }, [listItems.length, loadingMore, messagesReady, scrollToBottom, isNearBottomRef]);
+
+    const handleReplyJump = useCallback((replyId: string) => {
+        const index = invertedItemsRef.current.findIndex((entry) => entry.kind === 'message' && entry.message.id === replyId);
+        if (index >= 0) {
+            try {
+                listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+            } catch {
+                // target may be virtualized out of range
+            }
+        }
+    }, []);
+
+    const renderMessageItem = useCallback(({ item }: { item: ListItem }) => {
+        if (item.kind === 'date') {
+            return (
+                <View style={styles.dateWrap}>
+                    <Text variant="caption" className="font-body-bold" style={[styles.dateLabel, { backgroundColor: colors.card, color: colors.muted }]}>
+                        {item.label}
+                    </Text>
+                </View>
+            );
+        }
+        const message = item.message;
+        const mine = String(message.sender) === String(user?._id || user?.id);
+        const animateIn = animateIdsRef.current.has(item.id);
+        return (
+            <MessageBubble
+                message={message}
+                mine={mine}
+                colors={colors}
+                userId={String(user?._id || user?.id || '')}
+                animateIn={animateIn}
+                onOpenImage={setImagePreview}
+                onOpenViewOnce={openViewOnce}
+                viewOnceLoading={viewOnceLoadingId === message.id}
+                onOpenMenu={setSelectedMessage}
+                onSwipeReply={beginReply}
+                onReplyClick={handleReplyJump}
+            />
+        );
+    }, [colors, user?._id, user?.id, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump]);
     const routeConversation = useMemo(() => {
         if (!id || id === 'new' || !routeState) return null;
         return {
@@ -442,27 +588,48 @@ export default function ConversationScreen() {
         recently_active: (other.account_deleted || accountDeleted === '1') ? false : (typeof other.recently_active === 'boolean' ? other.recently_active : online === '1'),
     };
     const avatar = profileImage(headerOther);
-    const peerId = String(headerOther.id || headerOther._id || recipientId || '');
+    const peerId = profileId(headerOther) || String(
+        headerOther.id
+        || headerOther._id
+        || (headerOther as { user_id?: string }).user_id
+        || recipientId
+        || '',
+    );
+
+    const openPeerProfile = () => {
+        if (headerOther.account_deleted) return;
+        if (!peerId) {
+            toast.show(t('profile_unavailable', 'Profile unavailable'), 'info');
+            return;
+        }
+        lightImpact();
+        setProfileSheetOpen(true);
+    };
+
+    const profileSheetProfile = useMemo(() => ({
+        ...headerOther,
+        id: peerId,
+        _id: peerId,
+    }), [headerOther, peerId]);
     const peerDeleted = !!headerOther.account_deleted;
     const isRequest = activeConversation?.state === 'request_pending';
     const isSentRequest = isRequest && activeConversation?.requestRole === 'sent';
     const isEnded = activeConversation?.state === 'ended';
     const canCompose = !peerDeleted && (id === 'new' || activeConversation?.state === 'active');
 
-    const handleListContentSizeChange = useCallback(() => {
-        if (
-            pendingInitialScrollRef.current &&
-            initialScrollConversationRef.current === id &&
-            !loadingMore
-        ) {
-            scrollToBottom(false);
-            setTimeout(() => {
-                if (initialScrollConversationRef.current === id) {
-                    pendingInitialScrollRef.current = false;
-                }
-            }, 500);
+    const handleListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        // Inverted list: offset near 0 means we're pinned to the newest message.
+        const { contentOffset, layoutMeasurement } = event.nativeEvent;
+        const y = contentOffset.y;
+        const nearBottom = y <= CHAT_NEAR_BOTTOM_THRESHOLD;
+        isNearBottomRef.current = nearBottom;
+        // Show the jump-to-latest button once scrolled up at least one screen.
+        setShowScrollDown(y > layoutMeasurement.height);
+        // Back at the bottom: surface any messages that arrived while scrolled up.
+        if (nearBottom && pendingSeenRef.current) {
+            markConversationSeen();
         }
-    }, [id, loadingMore, scrollToBottom]);
+    }, [isNearBottomRef, markConversationSeen]);
 
     const loadMore = async () => {
         if (!nextCursor || loadingMore || id === 'new') return;
@@ -502,6 +669,7 @@ export default function ConversationScreen() {
             reactions: [],
             pending: true,
         };
+        animateIdsRef.current.add(tempId);
         setItems((current) => [...current, temp]);
         setContent('');
         setReplyTo(null);
@@ -543,6 +711,7 @@ export default function ConversationScreen() {
 
         if (res.success && res.message) {
             const normalized = normalizeMessage(res.message);
+            if (normalized.id) animateIdsRef.current.add(normalized.id);
             setItems((current) => current.some((item) => item.id === normalized.id) ? current : [...current, normalized]);
             if (id === 'new' && res.conversationId) {
                 router.replace(`/conversation/${res.conversationId}` as any);
@@ -574,6 +743,10 @@ export default function ConversationScreen() {
             toast.show(t('send_text_first', 'Send a text message first, then attach media.'), 'info');
             return;
         }
+
+        // Close the keyboard before opening the picker so that, after sending,
+        // the composer returns to rest and the new image isn't hidden behind it.
+        KeyboardController.dismiss();
 
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!permission.granted) {
@@ -850,9 +1023,9 @@ export default function ConversationScreen() {
         );
     };
 
-    const openViewOnce = async (message: ChatMessage) => {
-        if (viewOnceLoading || !message.id) return;
-        setViewOnceLoading(true);
+    const openViewOnce = useCallback(async (message: ChatMessage) => {
+        if (viewOnceLoadingId || !message.id) return;
+        setViewOnceLoadingId(message.id);
         const res = await chatService.fetchViewOnce(message.id);
         if (res.success && (res.url || res.data?.url)) {
             setViewOnce({
@@ -863,8 +1036,8 @@ export default function ConversationScreen() {
         } else {
             Alert.alert(t('error', 'Error'), apiMessage(res.message || 'photo_expired'));
         }
-        setViewOnceLoading(false);
-    };
+        setViewOnceLoadingId(null);
+    }, [viewOnceLoadingId]);
 
     const markViewOnceLoaded = async () => {
         if (!viewOnce?.messageId) return;
@@ -881,10 +1054,10 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
-    const beginReply = (message: ChatMessage) => {
+    const beginReply = useCallback((message: ChatMessage) => {
         setReplyTo(message);
         setSelectedMessage(null);
-    };
+    }, []);
 
     const copySelectedMessage = async () => {
         if (!selectedMessage || messageActionBusy) return;
@@ -962,112 +1135,125 @@ export default function ConversationScreen() {
 
     return (
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? keyboardVerticalOffset : 0}
-                style={styles.screen}
-            >
+            <View style={styles.screen}>
                 <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                     <Pressable onPress={() => router.replace('/(tabs)/messages' as any)} style={styles.headerIcon}>
                         <ArrowLeft size={scale(21)} color={colors.text} strokeWidth={2.7} />
                     </Pressable>
                     <Pressable
-                        disabled={!peerId || headerOther.account_deleted}
-                        onPress={() => setProfileSheetOpen(true)}
-                        style={({ pressed }) => [styles.headerProfileTarget, pressed && { opacity: 0.72 }]}
+                        disabled={headerOther.account_deleted}
+                        onPress={openPeerProfile}
+                        accessibilityRole="button"
+                        accessibilityLabel={peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
+                        hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                        style={({ pressed }) => [
+                            styles.headerProfileTarget,
+                            pressed && !headerOther.account_deleted && { opacity: 0.72 },
+                        ]}
                     >
-                        <View style={styles.headerProfileContent}>
-                            <View style={[styles.headerAvatar, { backgroundColor: colors.surface }]}>
+                        <View pointerEvents="box-none" style={styles.headerProfileContent}>
+                            <View pointerEvents="none" style={[styles.headerAvatar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                 {avatar ? (
                                     <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" />
                                 ) : (
                                     <Image source={PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
                                 )}
                             </View>
-                            <View style={styles.headerText} pointerEvents="none">
+                            <View pointerEvents="none" style={styles.headerText}>
                                 <RNText numberOfLines={1} style={[styles.headerNameText, { color: colors.text }]}>
                                     {peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
                                 </RNText>
                                 {(activeConversation || name) && (
-                                    <View style={styles.headerStatusRow}>
-                                        <View style={[styles.headerStatusDot, { backgroundColor: headerOther.recently_active ? '#22C55E' : colors.muted }]} />
-                                        <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted }]}>
-                                            {headerOther.account_deleted
+                                    <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted }]}>
+                                        {headerOther.account_deleted
                                             ? t('chat:account_deleted', 'Account deleted')
-                                                : headerOther.recently_active
+                                            : headerOther.recently_active
                                                 ? t('chat:online', 'Online')
                                                 : t('chat:offline', 'Offline')}
-                                        </RNText>
-                                    </View>
+                                    </RNText>
                                 )}
                             </View>
                         </View>
                     </Pressable>
+                    <View style={styles.headerSpacer} pointerEvents="none" />
                     <Pressable
                         onPress={() => setMenuOpen(true)}
-                        style={[styles.headerIcon, styles.headerMenuButton]}
+                        style={styles.headerIcon}
                     >
                         <MoreVertical size={scale(21)} color={colors.text} strokeWidth={2.7} />
                     </Pressable>
                 </View>
 
-                <FlatList
-                    ref={listRef}
-                    data={listItems}
-                    keyExtractor={(item) => item.id}
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{ paddingHorizontal: scale(12), paddingTop: scale(18), paddingBottom: scale(18), flexGrow: 1 }}
-                    onContentSizeChange={handleListContentSizeChange}
-                    onStartReached={loadMore}
-                    onStartReachedThreshold={0.15}
-                    ListHeaderComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: scale(10) }} /> : null}
-                    ListEmptyComponent={
-                        <View style={styles.empty}>
-                            <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
-                                {t('no_messages_yet', 'No messages yet')}
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }) => {
-                        if (item.kind === 'date') {
-                            return (
-                                <View style={styles.dateWrap}>
-                                    <Text variant="caption" className="font-body-bold" style={[styles.dateLabel, { backgroundColor: colors.card, color: colors.muted }]}>
-                                        {item.label}
-                                    </Text>
-                                </View>
-                            );
-                        }
-                        const message = item.message;
-                        const mine = String(message.sender) === String(user?._id || user?.id);
-                        return (
-                        <MessageBubble
-                            message={message}
-                            mine={mine}
-                            colors={colors}
-                            userId={String(user?._id || user?.id || '')}
-                            onOpenImage={setImagePreview}
-                            onOpenViewOnce={openViewOnce}
-                            viewOnceLoading={viewOnceLoading}
-                            onOpenMenu={setSelectedMessage}
-                            onSwipeReply={beginReply}
-                            onReplyClick={(replyId) => {
-                                const index = listItems.findIndex((entry) => entry.kind === 'message' && entry.message.id === replyId);
-                                if (index >= 0) {
-                                    try {
-                                        listRef.current?.scrollToIndex({ index, animated: true });
-                                    } catch {
-                                        listRef.current?.scrollToEnd({ animated: true });
-                                    }
+                <ChatKeyboardAvoider>
+                <View style={styles.messageListWrap}>
+                    <FlatList
+                        ref={listRef}
+                        style={{ flex: 1 }}
+                        inverted={invertedItems.length > 0}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="interactive"
+                        scrollEventThrottle={16}
+                        onScroll={handleListScroll}
+                        data={invertedItems}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{
+                            paddingHorizontal: scale(12),
+                            paddingTop: scale(8),
+                            paddingBottom: scale(18),
+                            flexGrow: 1,
+                        }}
+                        onEndReached={loadMore}
+                        onEndReachedThreshold={0.2}
+                        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                        removeClippedSubviews={Platform.OS === 'android'}
+                        initialNumToRender={12}
+                        maxToRenderPerBatch={10}
+                        windowSize={11}
+                        updateCellsBatchingPeriod={50}
+                        onScrollToIndexFailed={(info) => {
+                            requestAnimationFrame(() => {
+                                try {
+                                    listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+                                } catch {
+                                    listRef.current?.scrollToOffset({ offset: 0, animated: true });
                                 }
-                            }}
-                        />
-                        );
-                    }}
-                />
+                            });
+                        }}
+                        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: scale(10) }} /> : null}
+                        ListEmptyComponent={
+                            <View style={styles.empty}>
+                                <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
+                                    {t('no_messages_yet', 'No messages yet')}
+                                </Text>
+                            </View>
+                        }
+                        renderItem={renderMessageItem}
+                    />
+                    <ChatScrollDownButton
+                        visible={showScrollDown}
+                        unreadCount={unseenWhileAway}
+                        colors={colors}
+                        label={t('chat:scroll_to_latest', 'Scroll to latest')}
+                        onPress={() => {
+                            scrollToBottom(true);
+                            setShowScrollDown(false);
+                            markConversationSeen();
+                        }}
+                    />
+                </View>
 
+                <ChatComposerBar
+                    backgroundColor={colors.card}
+                    borderTopColor={colors.border}
+                    onLayout={(event) => {
+                        const nextHeight = event.nativeEvent.layout.height;
+                        if (nextHeight > 0 && Math.abs(nextHeight - chatFooterHeight) > 1) {
+                            setChatFooterHeight(nextHeight);
+                        }
+                    }}
+                >
                 {isRequest && activeConversation && !peerDeleted && (
-                    <View style={[styles.requestBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, scale(12)) }]}>
+                    <View style={[styles.requestBar, { backgroundColor: colors.card }]}>
                         <Text variant="caption" className="font-body-semi" align="center" style={[styles.requestHint, { color: colors.muted }]}>
                             {isSentRequest
                                 ? t('chat:waiting_for_request_acceptance', 'Waiting for this request to be accepted.')
@@ -1096,7 +1282,7 @@ export default function ConversationScreen() {
                 )}
 
                 {peerDeleted && (
-                    <View style={[styles.endedBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+                    <View style={[styles.endedBar, { backgroundColor: colors.card }]}>
                         <Text variant="body-sm" className="font-body-semi" align="center" style={{ color: colors.muted }}>
                             {t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')}
                         </Text>
@@ -1104,7 +1290,7 @@ export default function ConversationScreen() {
                 )}
 
                 {isEnded && (
-                    <View style={[styles.endedBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+                    <View style={[styles.endedBar, { backgroundColor: colors.card }]}>
                         <Text variant="body-sm" className="font-body-semi" align="center" style={{ color: colors.muted }}>
                             {translateChatText('conversation_ended', 'Conversation ended')}
                         </Text>
@@ -1112,30 +1298,19 @@ export default function ConversationScreen() {
                 )}
 
                 {canCompose && !isEnded && (
-                    <View
-                        style={[
-                            styles.composer,
-                            {
-                                backgroundColor: colors.card,
-                                borderTopColor: colors.border,
-                                paddingBottom: keyboardOpen
-                                    ? scale(7)
-                                    : Math.max(insets.bottom, scale(10)),
-                            },
-                        ]}
-                    >
+                    <View style={styles.composer}>
                         {replyTo && (
-                            <View style={[styles.replyComposerBar, { backgroundColor: colors.surface, borderLeftColor: colors.primary }]}>
-                                <View style={styles.replyComposerText}>
+                            <View style={[styles.replyComposerBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                                <View style={[styles.replyComposerQuote, { borderLeftColor: colors.primary }]}>
                                     <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
                                         {t('chat:reply', 'Reply')}
                                     </Text>
-                                    <Text variant="caption" numberOfLines={1} style={{ color: colors.muted }}>
+                                    <Text variant="caption" numberOfLines={2} style={{ color: colors.muted }}>
                                         {replyPreview(replyTo)}
                                     </Text>
                                 </View>
                                 <Pressable onPress={() => setReplyTo(null)} style={styles.replyComposerClose}>
-                                    <X size={scale(16)} color={colors.muted} strokeWidth={2.5} />
+                                    <X size={scale(14)} color={colors.muted} strokeWidth={2.5} />
                                 </Pressable>
                             </View>
                         )}
@@ -1154,137 +1329,69 @@ export default function ConversationScreen() {
                             />
                         ) : (
                             <View style={styles.composerRow}>
-                                <Pressable
+                                <PressableScale
                                     onPress={pickAndUploadImage}
                                     disabled={uploadingMedia || recordingBusy || voiceSending}
-                                    style={styles.toolButton}
+                                    style={[styles.toolButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                                 >
                                     {uploadingMedia ? <ActivityIndicator color={colors.primary} /> : <ImageIcon size={scale(20)} color={colors.muted} />}
-                                </Pressable>
+                                </PressableScale>
                                 <TextInput
                                     value={content}
                                     onChangeText={(value) => setContent(value.slice(0, 5000))}
                                     onFocus={() => {
-                                        setTimeout(() => {
-                                            listRef.current?.scrollToEnd({ animated: true });
-                                        }, 120);
+                                        if (isNearBottomRef.current) {
+                                            scrollToBottom(false);
+                                        }
                                     }}
-                                    placeholder={t('chat:message_placeholder', 'Message...')}
-                                    placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
-                                    style={[styles.input, { color: colors.text, backgroundColor: colors.surface, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                    placeholder={t('chat:message_placeholder', 'Type a message...')}
+                                    placeholderTextColor={colors.subtle}
+                                    style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                     multiline
                                 />
                                 {content.trim() ? (
-                                    <Pressable onPress={send} disabled={sending} style={styles.send}>
+                                    <PressableScale onPress={send} disabled={sending} style={[styles.send, { backgroundColor: colors.primary }]}>
                                         {sending ? <ActivityIndicator color={colors.inverse} /> : <Send size={scale(18)} color={colors.inverse} />}
-                                    </Pressable>
+                                    </PressableScale>
                                 ) : (
-                                    <Pressable
+                                    <PressableScale
                                         onPress={startRecording}
                                         disabled={recordingBusy || voiceSending}
-                                        style={styles.toolButton}
+                                        style={[styles.toolButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                                     >
                                         {recordingBusy ? <ActivityIndicator color={colors.primary} /> : <Mic size={scale(20)} color={colors.muted} />}
-                                    </Pressable>
+                                    </PressableScale>
                                 )}
                             </View>
                         )}
                     </View>
                 )}
-            </KeyboardAvoidingView>
+                </ChatComposerBar>
+                </ChatKeyboardAvoider>
+            </View>
 
-            <Modal visible={!!imageAttachment} transparent animationType="fade" onRequestClose={closeImageAttachment}>
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={0}
-                    style={[
-                        styles.attachmentOverlay,
-                        Platform.OS === 'android' && keyboardOpen
-                            ? { paddingBottom: Math.max(scale(10), keyboardHeight > 0 ? scale(10) : 0) }
-                            : null,
-                    ]}
-                >
-                    <View
-                        style={[
-                            styles.attachmentCard,
-                            {
-                                backgroundColor: colors.card,
-                                borderColor: colors.border,
-                                marginTop: insets.top + scale(12),
-                                marginBottom: Math.max(insets.bottom, scale(12)),
-                            },
-                        ]}
-                    >
-                        <View style={[styles.attachmentHeader, { borderBottomColor: colors.border }]}>
-                            <Text variant="body-sm" className="font-body-bold" style={{ color: colors.text }}>
-                                {translateChatText('photo', 'Photo')}
-                            </Text>
-                            <Pressable onPress={closeImageAttachment} disabled={uploadingMedia} style={styles.attachmentClose}>
-                                <X size={scale(18)} color={colors.text} strokeWidth={2.6} />
-                            </Pressable>
-                        </View>
-
-                        {!!imageAttachment && (
-                            <View style={styles.attachmentImageFrame}>
-                                <RNImage source={{ uri: imageAttachment.uri }} style={styles.attachmentImage} resizeMode="contain" />
-                            </View>
-                        )}
-
-                        <View style={styles.attachmentCaptionWrap}>
-                            <TextInput
-                                value={imageCaption}
-                                onChangeText={(value) => setImageCaption(value.slice(0, IMAGE_CAPTION_LIMIT))}
-                                editable={!uploadingMedia}
-                                maxLength={IMAGE_CAPTION_LIMIT}
-                                placeholder={translateChatText('caption_placeholder', 'Add a caption...')}
-                                placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
-                                style={[
-                                    styles.attachmentCaptionInput,
-                                    {
-                                        color: colors.text,
-                                        backgroundColor: colors.surface,
-                                        borderColor: colors.border,
-                                        fontFamily: inputFontFamily,
-                                        textAlign: isRTL ? 'right' : 'left',
-                                    },
-                                ]}
-                                multiline
-                            />
-                            <Text variant="caption" style={[styles.attachmentCaptionCount, { color: colors.muted }]}>
-                                {imageCaption.length}/{IMAGE_CAPTION_LIMIT}
-                            </Text>
-                        </View>
-
-                        <View style={[styles.attachmentFooter, { borderTopColor: colors.border }]}>
-                            <Pressable
-                                onPress={() => !uploadingMedia && setImageViewOnce((value) => !value)}
-                                disabled={uploadingMedia}
-                                style={[
-                                    styles.attachmentViewOnceToggle,
-                                    {
-                                        backgroundColor: imageViewOnce ? colors.primaryTint : colors.surface,
-                                        borderColor: imageViewOnce ? colors.primaryRing : colors.border,
-                                    },
-                                ]}
-                            >
-                                {imageViewOnce
-                                    ? <Eye size={scale(15)} color={colors.primary} fill={colors.primary} />
-                                    : <EyeOff size={scale(15)} color={colors.muted} />}
-                                <Text variant="caption" className="font-body-semi" style={{ color: imageViewOnce ? colors.primary : colors.muted }}>
-                                    {translateChatText('view_once_toggle', 'View once photo')}
-                                </Text>
-                            </Pressable>
-
-                            <Pressable onPress={sendImageAttachment} disabled={uploadingMedia || !imageAttachment} style={[styles.attachmentSend, (uploadingMedia || !imageAttachment) && styles.disabledButton]}>
-                                {uploadingMedia ? <ActivityIndicator color={colors.inverse} size="small" /> : <Send size={scale(16)} color={colors.inverse} />}
-                                <Text variant="caption" className="font-body-bold" style={{ color: colors.inverse }}>
-                                    {uploadingMedia ? translateChatText('sending', 'Sending...') : translateChatText('send', 'Send')}
-                                </Text>
-                            </Pressable>
-                        </View>
-                    </View>
-                </KeyboardAvoidingView>
-            </Modal>
+            <ImageAttachmentComposer
+                visible={!!imageAttachment}
+                uri={imageAttachment?.uri ?? null}
+                caption={imageCaption}
+                viewOnce={imageViewOnce}
+                uploading={uploadingMedia}
+                colors={colors}
+                inputFontFamily={inputFontFamily}
+                isRTL={isRTL}
+                labels={{
+                    captionPlaceholder: translateChatText('caption_placeholder', 'Add a caption (optional)'),
+                    closeA11y: translateChatText('close', 'Close'),
+                    viewOnceA11y: translateChatText('view_once_toggle', 'View once photo'),
+                    sendA11y: uploadingMedia
+                        ? translateChatText('sending', 'Sending...')
+                        : translateChatText('send', 'Send'),
+                }}
+                onChangeCaption={setImageCaption}
+                onToggleViewOnce={() => !uploadingMedia && setImageViewOnce((value) => !value)}
+                onClose={closeImageAttachment}
+                onSend={sendImageAttachment}
+            />
 
             <Modal visible={!!imagePreview} transparent animationType="fade" onRequestClose={() => setImagePreview(null)}>
                 <View style={styles.previewModal}>
@@ -1426,7 +1533,7 @@ export default function ConversationScreen() {
             <UserProfileSheet
                 visible={profileSheetOpen && Boolean(peerId)}
                 userId={peerId}
-                initialProfile={headerOther}
+                initialProfile={profileSheetProfile}
                 onClose={() => setProfileSheetOpen(false)}
             />
         </SafeAreaView>
@@ -1642,11 +1749,105 @@ function VoicePreviewPlayer({
     );
 }
 
-function MessageBubble({
+// Pressable that springs down slightly while pressed (used for composer buttons
+// and image bubbles) for a tactile micro-interaction.
+function PressableScale({
+    children,
+    onPress,
+    disabled,
+    style,
+    accessibilityLabel,
+    accessibilityRole,
+    activeScale = 0.9,
+    onLongPress,
+    delayLongPress,
+}: {
+    children: React.ReactNode;
+    onPress?: () => void;
+    disabled?: boolean;
+    style?: StyleProp<ViewStyle>;
+    accessibilityLabel?: string;
+    accessibilityRole?: 'button' | 'image';
+    activeScale?: number;
+    onLongPress?: () => void;
+    delayLongPress?: number;
+}) {
+    const scaleValue = useSharedValue(1);
+    const animStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scaleValue.value }],
+    }));
+    return (
+        <Pressable
+            onPress={onPress}
+            onLongPress={onLongPress}
+            delayLongPress={delayLongPress}
+            disabled={disabled}
+            accessibilityLabel={accessibilityLabel}
+            accessibilityRole={accessibilityRole}
+            onPressIn={() => { scaleValue.value = withSpring(activeScale, { damping: 16, stiffness: 320 }); }}
+            onPressOut={() => { scaleValue.value = withSpring(1, { damping: 16, stiffness: 320 }); }}
+        >
+            <Reanimated.View style={[style, animStyle]}>
+                {children}
+            </Reanimated.View>
+        </Pressable>
+    );
+}
+
+// Scroll-to-latest button: always mounted, fades + scales in/out so it doesn't
+// pop. Driven by the `visible` flag.
+function ChatScrollDownButton({
+    visible,
+    unreadCount,
+    colors,
+    label,
+    onPress,
+}: {
+    visible: boolean;
+    unreadCount: number;
+    colors: Record<string, string>;
+    label: string;
+    onPress: () => void;
+}) {
+    const progress = useSharedValue(0);
+    useEffect(() => {
+        progress.value = withTiming(visible ? 1 : 0, { duration: 180 });
+    }, [visible, progress]);
+    const animStyle = useAnimatedStyle(() => ({
+        opacity: progress.value,
+        transform: [{ scale: 0.8 + progress.value * 0.2 }],
+    }));
+    return (
+        <Reanimated.View
+            pointerEvents={visible ? 'auto' : 'none'}
+            style={[styles.scrollDownButton, { backgroundColor: colors.card, borderColor: colors.border }, animStyle]}
+        >
+            <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                onPress={onPress}
+                style={styles.scrollDownPress}
+            >
+                <ChevronDown size={scale(22)} color={colors.text} strokeWidth={2.4} />
+                {unreadCount > 0 && (
+                    <UnreadBadge
+                        count={unreadCount}
+                        variant="sm"
+                        borderColor={colors.card}
+                        style={styles.scrollDownBadge}
+                    />
+                )}
+            </Pressable>
+        </Reanimated.View>
+    );
+}
+
+function MessageBubbleComponent({
     message,
     mine,
     colors,
     userId,
+    animateIn,
     onOpenImage,
     onOpenViewOnce,
     viewOnceLoading,
@@ -1658,6 +1859,7 @@ function MessageBubble({
     mine: boolean;
     colors: Record<string, string>;
     userId: string;
+    animateIn: boolean;
     onOpenImage: (url: string) => void;
     onOpenViewOnce: (message: ChatMessage) => void;
     viewOnceLoading: boolean;
@@ -1737,7 +1939,10 @@ function MessageBubble({
     });
 
     return (
-        <View style={[styles.bubbleRow, mine ? styles.bubbleRight : styles.bubbleLeft]}>
+        <Reanimated.View
+            style={[styles.bubbleRow, mine ? styles.bubbleRight : styles.bubbleLeft]}
+            entering={animateIn ? FadeInDown.duration(240) : undefined}
+        >
             <View style={styles.swipeReplyWrap}>
                 <Animated.View
                     style={[
@@ -1759,7 +1964,15 @@ function MessageBubble({
                         <View style={[
                             styles.bubble,
                             mine ? styles.mineBubble : styles.theirBubble,
-                            { backgroundColor: mine ? colors.primaryTint : colors.card, borderColor: mine ? colors.primaryRing : colors.border },
+                            {
+                                backgroundColor: mine ? colors.primaryTint : colors.card,
+                                borderColor: mine ? colors.primaryRing : colors.border,
+                                shadowColor: '#0D1B12',
+                                shadowOpacity: mine ? 0.04 : 0.08,
+                                shadowRadius: scale(3),
+                                shadowOffset: { width: 0, height: 1 },
+                                elevation: mine ? 0 : 1,
+                            },
                         ]}>
                             {replyTo && (
                                 <Pressable
@@ -1791,7 +2004,9 @@ function MessageBubble({
                             style={[styles.viewOnceButton, { backgroundColor: mine ? colors.primaryTint : colors.surface }]}
                         >
                             <View style={styles.viewOnceIconBadge}>
-                                {viewOnceLoading ? <ActivityIndicator color={colors.primary} size="small" /> : <Eye size={scale(17)} color={colors.primary} fill={colors.primary} />}
+                                {viewOnceLoading
+                                    ? <ActivityIndicator color={colors.primary} size="small" />
+                                    : <ViewOnceIcon size={scale(28)} color={colors.primary} active={true} />}
                             </View>
                             <View style={styles.viewOnceTextWrap}>
                                 <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={{ color: colors.text }}>
@@ -1847,19 +2062,26 @@ function MessageBubble({
                             const emoji = reactionEmoji(reaction);
                             if (!emoji) return null;
                             return (
-                                <View key={`${reaction.user || 'reaction'}-${emoji}-${index}`} style={[styles.reactionPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                                <Reanimated.View
+                                    key={`${reaction.user || 'reaction'}-${emoji}-${index}`}
+                                    entering={ZoomIn.springify().damping(14)}
+                                    exiting={ZoomOut.duration(150)}
+                                    style={[styles.reactionPill, { backgroundColor: colors.card, borderColor: colors.border }]}
+                                >
                                     <Text style={styles.reactionText}>{emoji}</Text>
-                                </View>
+                                </Reanimated.View>
                             );
                         })}
                     </View>
                 )}
                 </View>
-        </View>
+        </Reanimated.View>
     );
 }
 
-function CachedImageMessage({
+const MessageBubble = React.memo(MessageBubbleComponent);
+
+function CachedImageMessageComponent({
     message,
     media,
     userId,
@@ -1921,18 +2143,20 @@ function CachedImageMessage({
     };
 
     return (
-        <Pressable onPress={open} style={styles.mediaWrap}>
-            <Image source={{ uri: displayUri }} style={styles.mediaImage} contentFit="cover" />
+        <PressableScale onPress={open} style={styles.mediaWrap}>
+            <Image source={{ uri: displayUri }} style={styles.mediaImage} contentFit="cover" transition={150} />
             {(!cachedUri || loading) && (
                 <View style={styles.mediaDownloadOverlay}>
                     {loading ? <ActivityIndicator color={palette.chrome.common.inverseText} /> : <Download size={scale(18)} color={palette.chrome.common.inverseText} />}
                 </View>
             )}
-        </Pressable>
+        </PressableScale>
     );
 }
 
-function VoiceMessage({
+const CachedImageMessage = React.memo(CachedImageMessageComponent);
+
+function VoiceMessageComponent({
     message,
     media,
     mine,
@@ -2054,6 +2278,8 @@ function VoiceMessage({
     );
 }
 
+const VoiceMessage = React.memo(VoiceMessageComponent);
+
 function formatDuration(seconds: number) {
     const safe = Math.max(0, Math.round(seconds || 0));
     const m = Math.floor(safe / 60);
@@ -2063,43 +2289,87 @@ function formatDuration(seconds: number) {
 
 const styles = StyleSheet.create({
     screen: { flex: 1 },
+    messageListWrap: { flex: 1, backgroundColor: 'transparent' },
+    scrollDownButton: {
+        position: 'absolute',
+        right: scale(14),
+        bottom: scale(14),
+        width: scale(42),
+        height: scale(42),
+        borderRadius: scale(21),
+        borderWidth: StyleSheet.hairlineWidth,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000000',
+        shadowOpacity: 0.18,
+        shadowRadius: scale(6),
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 4,
+    },
+    scrollDownPress: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    scrollDownBadge: {
+        position: 'absolute',
+        top: -scale(4),
+        right: -scale(4),
+    },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     header: {
-        height: scale(56),
+        minHeight: scale(56),
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'stretch',
         paddingHorizontal: scale(8),
+        paddingVertical: scale(8),
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    headerIcon: { width: scale(38), height: scale(40), borderRadius: scale(20), alignItems: 'center', justifyContent: 'center' },
+    headerIcon: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'center',
+    },
     headerProfileTarget: {
         flex: 1,
+        maxWidth: '72%',
         minWidth: 0,
+        alignSelf: 'stretch',
         justifyContent: 'center',
-        paddingVertical: scale(6),
-        paddingRight: scale(8),
+        paddingVertical: scale(2),
+        paddingHorizontal: scale(4),
     },
     headerProfileContent: {
         flex: 1,
-        width: '100%',
-        minWidth: 0,
         flexDirection: 'row',
         alignItems: 'center',
+        alignSelf: 'stretch',
+        minWidth: 0,
+        width: '100%',
     },
-    headerAvatar: { width: scale(38), height: scale(38), borderRadius: scale(19), overflow: 'hidden', marginRight: scale(10) },
+    headerAvatar: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
+        borderWidth: StyleSheet.hairlineWidth,
+        overflow: 'hidden',
+        marginRight: scale(12),
+    },
     headerText: { flex: 1, minWidth: scale(90), justifyContent: 'center' },
     headerNameText: { fontSize: scale(15), lineHeight: scale(18), fontWeight: '700', includeFontPadding: false, textAlignVertical: 'center' },
-    headerStatusRow: { marginTop: scale(3), flexDirection: 'row', alignItems: 'center' },
-    headerStatusDot: { width: scale(6), height: scale(6), borderRadius: scale(3), marginRight: scale(5) },
-    headerStatusText: { flexShrink: 1, fontSize: scale(11), lineHeight: scale(13), fontWeight: '400', includeFontPadding: false },
-    headerMenuButton: { marginLeft: 'auto' },
+    headerStatusText: { marginTop: scale(2), fontSize: scale(12), lineHeight: scale(14), fontWeight: '400', includeFontPadding: false },
+    headerSpacer: { flex: 1, minWidth: 0, alignSelf: 'stretch' },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: scale(80) },
     dateWrap: { alignItems: 'center', marginVertical: scale(8) },
     dateLabel: { paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden', textTransform: 'uppercase' },
     bubbleRow: { width: '100%', marginBottom: scale(14) },
     bubbleLeft: { alignItems: 'flex-start' },
     bubbleRight: { alignItems: 'flex-end' },
-    swipeReplyWrap: { position: 'relative', maxWidth: '82%' },
+    swipeReplyWrap: { position: 'relative', maxWidth: '78%' },
     swipeReplyBubble: { zIndex: 2 },
     swipeReplyHint: {
         position: 'absolute',
@@ -2180,33 +2450,60 @@ const styles = StyleSheet.create({
     waveBar: { flex: 1, maxWidth: scale(4), borderRadius: scale(2) },
     voiceDurationRow: { minWidth: scale(36), flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
     voiceDuration: { minWidth: scale(28), textAlign: 'right', fontSize: scale(11), lineHeight: scale(14) },
-    requestBar: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(14), paddingTop: scale(10), borderTopWidth: StyleSheet.hairlineWidth },
+    requestBar: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(14), paddingTop: scale(10) },
     requestHint: { marginBottom: scale(9), fontSize: scale(12), lineHeight: scale(15) },
     requestActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(10) },
     requestButton: { minWidth: scale(110), height: scale(36), borderRadius: scale(18), paddingHorizontal: scale(16), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6) },
     requestPrimary: { backgroundColor: PRIMARY },
     requestNeutral: { backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#CBD5E1' },
     disabledButton: { opacity: 0.62 },
-    endedBar: { padding: scale(13), borderTopWidth: StyleSheet.hairlineWidth },
-    composer: { paddingHorizontal: scale(10), paddingTop: scale(7), borderTopWidth: StyleSheet.hairlineWidth },
-    composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: scale(8) },
+    endedBar: { padding: scale(13) },
+    composer: {},
+    composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: scale(8), paddingHorizontal: scale(8), paddingVertical: scale(8) },
     replyComposerBar: {
-        minHeight: scale(46),
-        borderLeftWidth: scale(3),
-        borderRadius: scale(12),
-        paddingLeft: scale(10),
-        paddingRight: scale(6),
-        paddingVertical: scale(7),
-        marginBottom: scale(8),
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
+        gap: scale(8),
+        paddingHorizontal: scale(12),
+        paddingVertical: scale(8),
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    replyComposerText: { flex: 1, minWidth: 0 },
-    replyComposerClose: { width: scale(32), height: scale(32), borderRadius: scale(16), alignItems: 'center', justifyContent: 'center' },
-    toolButton: { width: scale(40), height: scale(40), borderRadius: scale(20), alignItems: 'center', justifyContent: 'center' },
+    replyComposerQuote: {
+        flex: 1,
+        minWidth: 0,
+        borderLeftWidth: scale(3),
+        paddingLeft: scale(8),
+        gap: scale(2),
+    },
+    replyComposerClose: { width: scale(28), height: scale(28), borderRadius: scale(14), alignItems: 'center', justifyContent: 'center' },
+    toolButton: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
+        borderWidth: StyleSheet.hairlineWidth,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     recordingButton: { backgroundColor: PRIMARY },
-    input: { flex: 1, minHeight: scale(38), maxHeight: scale(104), borderRadius: scale(19), paddingHorizontal: scale(14), paddingTop: scale(8), paddingBottom: scale(7), fontSize: scale(14) },
-    send: { width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' },
+    input: {
+        flex: 1,
+        minHeight: scale(40),
+        maxHeight: scale(120),
+        borderRadius: scale(18),
+        borderWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: scale(12),
+        paddingTop: scale(9),
+        paddingBottom: scale(8),
+        fontSize: scale(14),
+        lineHeight: scale(18),
+    },
+    send: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     voiceRecorderPanel: { gap: scale(9), paddingTop: scale(2) },
     voiceRecorderHeader: { minHeight: scale(32), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     voiceRecorderTimer: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
@@ -2263,81 +2560,6 @@ const styles = StyleSheet.create({
         gap: scale(7),
     },
     voiceRecorderPrimaryText: { color: '#FFFFFF' },
-    attachmentOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        paddingHorizontal: scale(14),
-        backgroundColor: 'rgba(15,23,42,0.72)',
-    },
-    attachmentCard: {
-        width: '100%',
-        maxHeight: '92%',
-        borderRadius: scale(14),
-        borderWidth: StyleSheet.hairlineWidth,
-        overflow: 'hidden',
-        shadowColor: '#000000',
-        shadowOpacity: 0.22,
-        shadowRadius: scale(24),
-        shadowOffset: { width: 0, height: scale(14) },
-        elevation: 18,
-    },
-    attachmentHeader: {
-        height: scale(48),
-        paddingLeft: scale(16),
-        paddingRight: scale(7),
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    attachmentClose: { width: scale(36), height: scale(36), borderRadius: scale(18), alignItems: 'center', justifyContent: 'center' },
-    attachmentImageFrame: { paddingHorizontal: scale(12), paddingTop: scale(12), alignItems: 'center' },
-    attachmentImage: { width: '100%', height: scale(320), borderRadius: scale(10), backgroundColor: '#0F172A' },
-    attachmentCaptionWrap: { paddingHorizontal: scale(12), paddingTop: scale(12), gap: scale(4) },
-    attachmentCaptionInput: {
-        minHeight: scale(44),
-        maxHeight: scale(92),
-        borderRadius: scale(11),
-        borderWidth: StyleSheet.hairlineWidth,
-        paddingHorizontal: scale(12),
-        paddingTop: scale(10),
-        paddingBottom: scale(9),
-        fontSize: scale(14),
-        lineHeight: scale(18),
-    },
-    attachmentCaptionCount: { alignSelf: 'flex-end', fontSize: scale(10), lineHeight: scale(13) },
-    attachmentFooter: {
-        marginTop: scale(8),
-        minHeight: scale(58),
-        paddingHorizontal: scale(12),
-        paddingVertical: scale(9),
-        borderTopWidth: StyleSheet.hairlineWidth,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: scale(10),
-    },
-    attachmentViewOnceToggle: {
-        minHeight: scale(34),
-        borderRadius: scale(17),
-        borderWidth: StyleSheet.hairlineWidth,
-        paddingHorizontal: scale(11),
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: scale(6),
-        flexShrink: 1,
-    },
-    attachmentSend: {
-        minWidth: scale(92),
-        height: scale(40),
-        borderRadius: scale(20),
-        paddingHorizontal: scale(15),
-        backgroundColor: PRIMARY,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: scale(7),
-    },
     previewModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', alignItems: 'center', justifyContent: 'center' },
     modalClose: { position: 'absolute', right: scale(16), zIndex: 5, width: scale(42), height: scale(42), borderRadius: scale(21), backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
     countdown: { position: 'absolute', left: scale(16), zIndex: 5, paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), backgroundColor: 'rgba(255,255,255,0.12)' },

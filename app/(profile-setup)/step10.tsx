@@ -109,7 +109,7 @@ export default function Step10() {
     async function refreshGallery(showLoading = false) {
         if (showLoading) setLoadingGallery(true);
         const res = await galleryService.fetchMe();
-        if (res.privacy) setPrivacy(canUsePrivateGallery ? res.privacy : 'public');
+        if (res.privacy) setPrivacy(canUsePrivateGallery || res.privacy === 'private' ? res.privacy : 'public');
         if (Array.isArray(res.gallery)) setGallery(res.gallery);
         if (showLoading) setLoadingGallery(false);
         return res;
@@ -276,12 +276,8 @@ export default function Step10() {
     }
 
     async function togglePrivacy() {
-        if (!canUsePrivateGallery) {
-            setPrivacy('public');
-            return;
-        }
-
         const next = privacy === 'private' ? 'public' : 'private';
+        if (next === 'private' && !canUsePrivateGallery) return;
         const previous = privacy;
         setPrivacy(next);
         setUpdatingPrivacy(true);
@@ -410,7 +406,7 @@ export default function Step10() {
                         </Text>
                     )}
 
-                    {canUsePrivateGallery && (
+                    {(canUsePrivateGallery || privacy === 'private') && (
                         <View style={[styles.privacyRow, { borderColor, backgroundColor: inputBackground }]}>
                             <View style={[styles.privacyIcon, { backgroundColor: colors.brand.bg.surface }]}>
                                 {privacy === 'private' ? (

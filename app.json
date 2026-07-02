@@ -25,8 +25,8 @@
     "android": {
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon/icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/icon/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/icon/adaptive-icon-background.png"
       },
       "package": "com.tonikah.app"
     },

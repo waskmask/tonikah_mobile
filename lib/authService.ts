@@ -34,6 +34,10 @@ export interface UserSession {
     clientType?: string;
     clientPlatform?: string;
     ip?: string;
+    locationCountryCode?: string;
+    locationCity?: string;
+    locationRegion?: string;
+    privateLocation?: boolean;
     createdAt?: string;
     lastUsedAt?: string;
     expiresAt?: string;

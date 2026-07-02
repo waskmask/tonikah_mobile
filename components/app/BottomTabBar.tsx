@@ -4,7 +4,6 @@ import { Bookmark, Compass, History, Send, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
-import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
@@ -85,11 +84,27 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
         return () => subscription.remove();
     }, [refreshUnreadCount]);
 
+    // Re-sync whenever the active tab changes (e.g. returning from a conversation
+    // after reading it) so the badge reflects the latest server state.
+    useEffect(() => {
+        refreshUnreadCount();
+    }, [activeRouteName, refreshUnreadCount]);
+
+    // Stable handlers: useChatSocket lists its callbacks as effect deps, so inline
+    // arrows would tear down and reconnect the socket every render and miss the
+    // `chat:unread` events that drive this badge.
+    const handleUnread = useCallback((payload: any) => {
+        setUnreadCount(unreadFromResponse(payload));
+    }, []);
+    const handleUnreadRefresh = useCallback(() => {
+        refreshUnreadCount();
+    }, [refreshUnreadCount]);
+
     useChatSocket({
         enabled: true,
-        onUnread: (payload) => setUnreadCount(unreadFromResponse(payload)),
-        onMessage: () => refreshUnreadCount(),
-        onConversationChanged: () => refreshUnreadCount(),
+        onUnread: handleUnread,
+        onMessage: handleUnreadRefresh,
+        onConversationChanged: handleUnreadRefresh,
     });
 
     const visibleRoutes = useMemo(
@@ -159,18 +174,21 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                         <ActivityIndicator size="small" color={color} />
                                     ) : (
                                         <item.Icon
-                                            size={scale(22)}
+                                            size={scale(20)}
                                             color={color}
                                             strokeWidth={isActive ? ACTIVE_STROKE : INACTIVE_STROKE}
                                             fill={fill}
                                         />
                                     )}
                                     {badge > 0 ? (
-                                        <UnreadBadge
-                                            count={badge}
-                                            variant="md"
-                                            borderColor={tabChrome.background}
-                                            style={styles.tabBadge}
+                                        <View
+                                            style={[
+                                                styles.tabDot,
+                                                {
+                                                    backgroundColor: colors.chrome.badge.background,
+                                                    borderColor: tabChrome.background,
+                                                },
+                                            ]}
                                         />
                                     ) : null}
                                 </View>
@@ -184,7 +202,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                         styles.label,
                                         {
                                             color,
-                                            fontSize: scale(10),
+                                            fontSize: scale(8),
                                             lineHeight: scale(12),
                                             fontFamily: labelFontFamily,
                                         },
@@ -204,7 +222,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
 const styles = StyleSheet.create({
     container: {
         borderTopWidth: StyleSheet.hairlineWidth,
-        paddingTop: scale(7),
+        paddingTop: 5,
         paddingHorizontal: scale(16),
         shadowOpacity: 0.06,
         shadowRadius: scale(16),
@@ -226,7 +244,7 @@ const styles = StyleSheet.create({
         minHeight: scale(52),
         alignItems: 'center',
         justifyContent: 'center',
-        gap: scale(5),
+        gap: scale(5) + 2,
         paddingHorizontal: 0,
     },
     itemPressed: {
@@ -247,10 +265,14 @@ const styles = StyleSheet.create({
         minHeight: scale(28),
         maxWidth: scale(62),
     },
-    tabBadge: {
+    tabDot: {
         position: 'absolute',
-        top: -scale(4),
-        right: -scale(10),
+        top: -scale(2),
+        right: -scale(4),
+        width: scale(9),
+        height: scale(9),
+        borderRadius: scale(5),
+        borderWidth: scale(1.5),
     },
     labelWrap: {
         width: '100%',

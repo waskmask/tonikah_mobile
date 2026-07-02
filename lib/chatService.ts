@@ -127,7 +127,13 @@ const withQuery = (endpoint: string, params?: Record<string, string | number | b
 
 export function normalizeConversation(raw: any, requestRole?: 'incoming' | 'sent' | null): Conversation {
     const isSent = requestRole === 'sent';
-    const otherUser = raw?.otherUser || (isSent ? raw?.to : raw?.from) || {};
+    const rawOther = raw?.otherUser || (isSent ? raw?.to : raw?.from) || {};
+    const otherId = String(rawOther?.id || rawOther?._id || rawOther?.user_id || rawOther?.userId || '');
+    const otherUser: ConversationOtherUser = {
+        ...rawOther,
+        id: otherId,
+        _id: rawOther?._id || otherId || undefined,
+    };
     return {
         id: String(raw?.id || raw?._id || ''),
         _id: raw?._id,

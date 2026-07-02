@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { UserProfileView, UserProfileViewProps } from '@/components/profile/UserProfileView';
 import { ToastProvider } from '@/hooks/useToast';
 
@@ -26,7 +27,7 @@ export function UserProfileSheet({
             onRequestClose={onClose}
         >
             {visible && resolvedUserId ? (
-                <>
+                <GestureHandlerRootView style={{ flex: 1 }}>
                     <UserProfileView
                         {...profileProps}
                         userId={String(resolvedUserId)}
@@ -36,7 +37,7 @@ export function UserProfileSheet({
                         onClose={onClose}
                     />
                     <ToastProvider />
-                </>
+                </GestureHandlerRootView>
             ) : null}
         </Modal>
     );

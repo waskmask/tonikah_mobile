@@ -68,7 +68,8 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
         if (showLoader) setLoading(true);
         const res = await galleryService.fetchMe();
         if (res.success) {
-            const nextPrivacy = canUsePrivateGallery ? (res.privacy || 'public') : 'public';
+            const responsePrivacy = res.privacy || 'public';
+            const nextPrivacy = canUsePrivateGallery || responsePrivacy === 'private' ? responsePrivacy : 'public';
             const nextGallery = normalizeGallery(res.gallery || []);
             setPrivacy(nextPrivacy);
             setGallery(nextGallery);
@@ -170,8 +171,9 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
     };
 
     const togglePrivacy = async () => {
-        if (!canUsePrivateGallery || privacyBusy) return;
+        if (privacyBusy) return;
         const next = privacy === 'private' ? 'public' : 'private';
+        if (next === 'private' && !canUsePrivateGallery) return;
         const previous = privacy;
         setPrivacy(next);
         setPrivacyBusy(true);
@@ -260,7 +262,7 @@ export function EditProfileMediaEditor({ canUsePrivateGallery, initialGallery = 
                 </View>
             )}
 
-            {canUsePrivateGallery ? (
+            {canUsePrivateGallery || privacy === 'private' ? (
                 <View style={[styles.privacyRow, { borderColor, backgroundColor: mutedSurface }]}>
                     <View style={[styles.privacyIcon, { backgroundColor: surface }]}>
                         {privacy === 'private' ? <Lock size={scale(18)} color={colors.brand.text.subtitle} /> : <Unlock size={scale(18)} color={colors.brand.text.subtitle} />}
