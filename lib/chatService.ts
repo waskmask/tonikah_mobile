@@ -23,6 +23,15 @@ export type ConversationOtherUser = {
     recently_active?: boolean;
 };
 
+export type GalleryRevealStatus = {
+    canReveal: boolean;
+    viewerId: string;
+    myGrant: {
+        id: string;
+        expiresAt?: string | null;
+    } | null;
+};
+
 export type Conversation = {
     id: string;
     _id?: string;
@@ -38,6 +47,7 @@ export type Conversation = {
     to?: ConversationOtherUser;
     createdAt?: string;
     requestExpiresAt?: string;
+    galleryReveal?: GalleryRevealStatus | null;
 };
 
 export type MessageReaction = {
@@ -149,6 +159,7 @@ export function normalizeConversation(raw: any, requestRole?: 'incoming' | 'sent
         to: raw?.to,
         createdAt: raw?.createdAt,
         requestExpiresAt: raw?.requestExpiresAt,
+        galleryReveal: raw?.galleryReveal ?? null,
     };
 }
 

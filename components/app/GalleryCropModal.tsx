@@ -276,14 +276,14 @@ export function GalleryCropModal({
                             accessibilityRole="button"
                             accessibilityLabel={labels.title}
                         >
-                            <ChevronLeft size={scale(25)} color="#0A0D14" />
+                            <ChevronLeft size={scale(25)} color="#201B15" />
                         </Pressable>
                     </View>
                     <View style={styles.headerText}>
                         <Text variant="body" className="font-body-bold" align="center">
                             {labels.title}
                         </Text>
-                        <Text variant="caption" align="center" style={{ color: '#64748B' }}>
+                        <Text variant="caption" align="center" style={{ color: '#7D7266' }}>
                             {labels.subtitle}
                         </Text>
                     </View>
@@ -292,7 +292,7 @@ export function GalleryCropModal({
 
                 <View style={styles.cropArea}>
                     <View
-                        style={[styles.cropFrame, { backgroundColor: '#F1F5F9' }]}
+                        style={[styles.cropFrame, { backgroundColor: '#F4EEE6' }]}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
                             setFrame({ width, height });
@@ -323,7 +323,7 @@ export function GalleryCropModal({
                         ) : (
                             <View style={styles.preparing}>
                                 <ActivityIndicator color="#F34B6F" />
-                                <Text variant="caption" style={{ marginTop: scale(8), color: '#475569' }}>
+                                <Text variant="caption" style={{ marginTop: scale(8), color: '#5C5348' }}>
                                     {labels.preparing}
                                 </Text>
                             </View>
@@ -342,7 +342,7 @@ export function GalleryCropModal({
                         onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
                         {...sliderPanResponder.panHandlers}
                     >
-                        <View style={[styles.zoomTrack, { backgroundColor: '#E2E8F0' }]}>
+                        <View style={[styles.zoomTrack, { backgroundColor: '#E8E1D6' }]}>
                             <View style={[styles.zoomFill, { width: `${zoomPercent}%` }]} />
                             <View
                                 style={[
@@ -361,7 +361,7 @@ export function GalleryCropModal({
                         style={styles.rotateButton}
                         accessibilityLabel={labels.rotate}
                     >
-                        <RotateCw size={scale(21)} color="#0A0D14" />
+                        <RotateCw size={scale(21)} color="#201B15" />
                     </Pressable>
                 </View>
 
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
         height: scale(44),
         borderRadius: scale(22),
         borderWidth: 1,
-        borderColor: '#E2E8F0',
+        borderColor: '#E8E1D6',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
         borderRadius: scale(11),
         borderWidth: 1,
         backgroundColor: '#FFFFFF',
-        shadowColor: '#0F172A',
+        shadowColor: '#141210',
         shadowOpacity: 0.14,
         shadowRadius: 4,
         shadowOffset: { width: 0, height: 2 },

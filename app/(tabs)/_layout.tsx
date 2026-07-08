@@ -1,14 +1,20 @@
 import { Tabs } from "expo-router";
 import { BottomTabBar } from "@/components/app/BottomTabBar";
+import { LegalConsentGate } from "@/components/app/LegalConsentGate";
 import { usePeriodicLocationRefresh } from "@/hooks/usePeriodicLocationRefresh";
 
 export default function TabsLayout() {
     usePeriodicLocationRefresh();
 
     return (
+        <>
+        <LegalConsentGate />
         <Tabs
             screenOptions={{
                 headerShown: false,
+                sceneStyle: { flex: 1 },
+                // Cross-fade between tab scenes instead of a hard cut
+                animation: "fade",
             }}
             tabBar={(props) => <BottomTabBar {...props} />}
         >
@@ -56,5 +62,6 @@ export default function TabsLayout() {
             <Tabs.Screen name="faith" options={{ href: null }} />
             <Tabs.Screen name="partner-preference" options={{ href: null }} />
         </Tabs>
+        </>
     );
 }

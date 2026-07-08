@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#e9e4dc;font-family:'Plus Jakarta Sans',system-ui,sans-serif}
+  a{color:#c25a4a}
+  a:hover{color:#a8493b}
+  .dv-turn{padding:44px 48px 36px}
+  .dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+  .dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+  .dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}
+  .dv-sub{font:400 12.5px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5);margin:0 0 26px;max-width:640px}
+  .dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+  .dv-opt{flex:none;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+  .dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+  .dv-olabel{display:flex;flex-direction:column;gap:3px;max-width:300px}
+  .dv-oname{display:flex;align-items:center;gap:8px;font:700 13px/1.2 'Bricolage Grotesque',sans-serif;color:#1a1a1a}
+  .dv-odesc{font:400 11.5px/1.45 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+  .dv-opt:target .dv-oid{background:#c25a4a;color:#fff}
+  .dv-next{margin:30px 0 0;font:12px/1.6 system-ui,sans-serif;color:rgba(0,0,0,.5);max-width:720px}
+  .ph{width:302px;height:640px;background:#0b0b0d;border-radius:46px;padding:8px;box-shadow:0 34px 70px -30px rgba(30,20,15,.5),0 3px 10px rgba(0,0,0,.25)}
+  .scr{width:100%;height:100%;border-radius:38px;overflow:hidden;position:relative}
+  .gear{display:none}
+  .home{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:34%;height:5px;border-radius:999px;z-index:6}
+  .cta{height:54px;border-radius:999px;display:flex;align-items:center;justify-content:center;position:relative;color:#fff;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:17px;background:linear-gradient(105deg,#FF9C74,#F76A82 58%,#EF5A86);box-shadow:0 13px 26px -10px rgba(240,90,110,.6),inset 0 1px 0 rgba(255,255,255,.25)}
+  .cta svg{position:absolute;right:22px}
+  .dot{height:7px;border-radius:999px}
+  @keyframes cfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t2">
+  <div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Geometric Arch in Plus Jakarta Sans — light + dark</span></div>
+  <p class="dv-sub"><a class="dv-oid" href="#1a">1a</a> with the headline set in Plus Jakarta Sans (800) instead of Bricolage. Same arch + lattice vectors. Shown in both modes so you can see the dark palette.</p>
+  <div class="dv-opts">
+
+    <!-- ============ 2a — Arch · Plus Jakarta · Light ============ -->
+    <div class="dv-opt" id="2a">
+      <div class="dv-olabel"><div class="dv-oname"><a class="dv-oid" href="#2a">2a</a>Plus Jakarta · Light</div><div class="dv-odesc">Cleaner, more neutral headline. Reads a touch more app-like and modern.</div></div>
+      <div class="ph"><div class="scr" style="background:#FBF6F0">
+        <div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 32%,rgba(255,150,120,.16),transparent 62%)"></div>
+        <svg viewBox="0 0 300 640" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <defs><pattern id="a2-lat" width="64" height="64" patternUnits="userSpaceOnUse"><g fill="none" stroke="rgba(120,80,60,.09)" stroke-width="1"><rect x="18" y="18" width="28" height="28"/><rect x="18" y="18" width="28" height="28" transform="rotate(45 32 32)"/></g></pattern></defs>
+          <rect width="300" height="640" fill="url(#a2-lat)"/>
+        </svg>
+        <div style="position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);height:66%;opacity:.6;animation:cfloat 7s ease-in-out infinite">
+          <svg viewBox="0 0 300 400" style="height:100%;width:auto;overflow:visible" fill="none" stroke="rgba(96,64,52,.32)" stroke-width="2.4" stroke-linecap="round">
+            <path d="M40,398 L40,168 C40,78 88,28 150,28 C212,28 260,78 260,168 L260,398"/>
+            <path d="M64,398 L64,172 C64,94 106,50 150,50 C194,50 236,94 236,172 L236,398"/>
+            <rect x="112" y="86" width="76" height="76" rx="8"/><rect x="112" y="86" width="76" height="76" rx="8" transform="rotate(45 150 124)"/>
+            <circle cx="150" cy="124" r="12"/>
+          </svg>
+        </div>
+        <div class="gear" style="background:rgba(20,18,30,.06)"><svg width="17" height="17" viewBox="0 0 24 24" fill="rgba(20,18,30,.45)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.5-.42H10.6a.49.49 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.8 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88L2.92 14.52a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7 7 0 0 0 1.62.94l.36 2.54a.49.49 0 0 0 .5.42h3.84a.49.49 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.61ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:64px 26px 26px;text-align:center;z-index:4">
+          <div style="flex:1">
+            <div style="font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#A2968B;font-weight:600;margin-bottom:14px">A Platform</div>
+            <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:30px;line-height:1.08;letter-spacing:-.02em;color:#141826;margin:0 0 22px">Only for Marriage</h1>
+            <p style="margin:0 0 16px;font-size:13.5px;line-height:1.5;color:rgba(32,28,40,.64)">We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.</p>
+            <p style="margin:0;font-size:13.5px;line-height:1.5;color:rgba(32,28,40,.64)">No casual swiping. No non-serious connections. Every feature respects your intention, your family, and your deen.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+            <div class="cta" style="width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">Next<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div style="display:flex;gap:7px"><span class="dot" style="width:7px;background:rgba(20,18,30,.16)"></span><span class="dot" style="width:22px;background:linear-gradient(105deg,#FF9C74,#EF5A86)"></span><span class="dot" style="width:7px;background:rgba(20,18,30,.16)"></span></div>
+          </div>
+        </div>
+        <div class="home" style="background:rgba(20,18,30,.3)"></div>
+      </div></div>
+    </div>
+
+    <!-- ============ 2b — Arch · Plus Jakarta · Dark ============ -->
+    <div class="dv-opt" id="2b">
+      <div class="dv-olabel"><div class="dv-oname"><a class="dv-oid" href="#2b">2b</a>Plus Jakarta · Dark</div><div class="dv-odesc">Warm charcoal bg, cream text, ivory-tinted vectors. Coral gradient CTA stays identical.</div></div>
+      <div class="ph"><div class="scr" style="background:#141210">
+        <div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 32%,rgba(255,120,110,.18),transparent 62%)"></div>
+        <svg viewBox="0 0 300 640" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <defs><pattern id="b2-lat" width="64" height="64" patternUnits="userSpaceOnUse"><g fill="none" stroke="rgba(255,220,200,.07)" stroke-width="1"><rect x="18" y="18" width="28" height="28"/><rect x="18" y="18" width="28" height="28" transform="rotate(45 32 32)"/></g></pattern></defs>
+          <rect width="300" height="640" fill="url(#b2-lat)"/>
+        </svg>
+        <div style="position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);height:66%;opacity:.7;animation:cfloat 7s ease-in-out infinite">
+          <svg viewBox="0 0 300 400" style="height:100%;width:auto;overflow:visible" fill="none" stroke="rgba(255,220,200,.24)" stroke-width="2.4" stroke-linecap="round">
+            <path d="M40,398 L40,168 C40,78 88,28 150,28 C212,28 260,78 260,168 L260,398"/>
+            <path d="M64,398 L64,172 C64,94 106,50 150,50 C194,50 236,94 236,172 L236,398"/>
+            <rect x="112" y="86" width="76" height="76" rx="8"/><rect x="112" y="86" width="76" height="76" rx="8" transform="rotate(45 150 124)"/>
+            <circle cx="150" cy="124" r="12"/>
+          </svg>
+        </div>
+        <div class="gear" style="background:rgba(255,245,235,.08)"><svg width="17" height="17" viewBox="0 0 24 24" fill="rgba(255,245,235,.58)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.5-.42H10.6a.49.49 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.8 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88L2.92 14.52a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7 7 0 0 0 1.62.94l.36 2.54a.49.49 0 0 0 .5.42h3.84a.49.49 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.61ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:64px 26px 26px;text-align:center;z-index:4">
+          <div style="flex:1">
+            <div style="font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:#B7A99A;font-weight:600;margin-bottom:14px">A Platform</div>
+            <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:30px;line-height:1.08;letter-spacing:-.02em;color:#F4EEE6;margin:0 0 22px">Only for Marriage</h1>
+            <p style="margin:0 0 16px;font-size:13.5px;line-height:1.5;color:rgba(244,238,230,.64)">We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.</p>
+            <p style="margin:0;font-size:13.5px;line-height:1.5;color:rgba(244,238,230,.64)">No casual swiping. No non-serious connections. Every feature respects your intention, your family, and your deen.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+            <div class="cta" style="width:100%;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">Next<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div style="display:flex;gap:7px"><span class="dot" style="width:7px;background:rgba(255,245,235,.2)"></span><span class="dot" style="width:22px;background:linear-gradient(105deg,#FF9C74,#EF5A86)"></span><span class="dot" style="width:7px;background:rgba(255,245,235,.2)"></span></div>
+          </div>
+        </div>
+        <div class="home" style="background:rgba(255,245,235,.38)"></div>
+      </div></div>
+    </div>
+
+  </div>
+  <p class="dv-next">Try next: "build <a class="dv-oid" href="#2a">2a</a> as the full interactive flow" · "make the arch bolder / thicker line" · "try the headline in Cormorant too"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Onboarding — vector art directions</span></div>
+  <p class="dv-sub">Same copy on every concept (shown on the "Only for Marriage" screen). Each is a different vector language replacing the photo. Pick a direction and I'll build the full 3-screen flow (with light/dark + tablet).</p>
+  <div class="dv-opts">
+
+    <!-- ============ 1a — Geometric Arch ============ -->
+    <div class="dv-opt" id="1a">
+      <div class="dv-olabel"><div class="dv-oname"><a class="dv-oid" href="#1a">1a</a>Geometric Arch</div><div class="dv-odesc">Moorish arch + 8-point star lattice. Architectural, rooted, the current system refined.</div></div>
+      <div class="ph"><div class="scr" style="background:#FBF6F0">
+        <div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 32%,rgba(255,150,120,.16),transparent 62%)"></div>
+        <svg viewBox="0 0 300 640" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <defs><pattern id="a-lat" width="64" height="64" patternUnits="userSpaceOnUse"><g fill="none" stroke="rgba(120,80,60,.09)" stroke-width="1"><rect x="18" y="18" width="28" height="28"/><rect x="18" y="18" width="28" height="28" transform="rotate(45 32 32)"/></g></pattern></defs>
+          <rect width="300" height="640" fill="url(#a-lat)"/>
+        </svg>
+        <div style="position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);height:66%;opacity:.6;animation:cfloat 7s ease-in-out infinite">
+          <svg viewBox="0 0 300 400" style="height:100%;width:auto;overflow:visible" fill="none" stroke="rgba(96,64,52,.32)" stroke-width="2.4" stroke-linecap="round">
+            <path d="M40,398 L40,168 C40,78 88,28 150,28 C212,28 260,78 260,168 L260,398"/>
+            <path d="M64,398 L64,172 C64,94 106,50 150,50 C194,50 236,94 236,172 L236,398"/>
+            <rect x="112" y="86" width="76" height="76" rx="8"/><rect x="112" y="86" width="76" height="76" rx="8" transform="rotate(45 150 124)"/>
+            <circle cx="150" cy="124" r="12"/>
+          </svg>
+        </div>
+        <div class="gear" style="background:rgba(20,18,30,.06)"><svg width="17" height="17" viewBox="0 0 24 24" fill="rgba(20,18,30,.45)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.5-.42H10.6a.49.49 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.8 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88L2.92 14.52a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7 7 0 0 0 1.62.94l.36 2.54a.49.49 0 0 0 .5.42h3.84a.49.49 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.61ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:64px 26px 26px;text-align:center;z-index:4">
+          <div style="flex:1">
+            <div style="font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#A2968B;font-weight:600;margin-bottom:14px">A Platform</div>
+            <h1 style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:31px;line-height:1.02;letter-spacing:-.02em;color:#141826;margin:0 0 22px">Only for Marriage</h1>
+            <p style="margin:0 0 16px;font-size:13.5px;line-height:1.5;color:rgba(32,28,40,.64)">We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.</p>
+            <p style="margin:0;font-size:13.5px;line-height:1.5;color:rgba(32,28,40,.64)">No casual swiping. No non-serious connections. Every feature respects your intention, your family, and your deen.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:20px">
+            <div class="cta" style="width:100%">Next<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div style="display:flex;gap:7px"><span class="dot" style="width:7px;background:rgba(20,18,30,.16)"></span><span class="dot" style="width:22px;background:linear-gradient(105deg,#FF9C74,#EF5A86)"></span><span class="dot" style="width:7px;background:rgba(20,18,30,.16)"></span></div>
+          </div>
+        </div>
+        <div class="home" style="background:rgba(20,18,30,.3)"></div>
+      </div></div>
+    </div>
+
+    <!-- ============ 1b — Crescent Dawn ============ -->
+    <div class="dv-opt" id="1b">
+      <div class="dv-olabel"><div class="dv-oname"><a class="dv-oid" href="#1b">1b</a>Crescent Dawn</div><div class="dv-odesc">A single thin crescent + spark on a dawn wash. Calm, spiritual, lots of air — serif headline.</div></div>
+      <div class="ph"><div class="scr" style="background:linear-gradient(180deg,#FFF3EA 0%,#FDEEF1 60%,#FBE8EE 100%)">
+        <div style="position:absolute;top:52px;left:50%;transform:translateX(-52%);width:146px;height:146px;opacity:.85;animation:cfloat 8s ease-in-out infinite">
+          <svg viewBox="0 0 200 200" fill="none" stroke="rgba(214,120,110,.55)" stroke-width="2">
+            <path d="M118 22a80 80 0 1 0 40 148 96 96 0 1 1-40-148Z"/>
+          </svg>
+        </div>
+        <div style="position:absolute;top:48px;left:70px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(214,120,110,.6)" stroke-width="1.6"><path d="M12 3l1.6 6.4L20 11l-6.4 1.6L12 19l-1.6-6.4L4 11l6.4-1.6z"/></svg>
+        </div>
+        <div class="gear" style="background:rgba(180,90,70,.08)"><svg width="17" height="17" viewBox="0 0 24 24" fill="rgba(160,80,60,.5)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.5-.42H10.6a.49.49 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.8 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88L2.92 14.52a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7 7 0 0 0 1.62.94l.36 2.54a.49.49 0 0 0 .5.42h3.84a.49.49 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.61ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:120px 30px 24px;text-align:center;z-index:4">
+          <div style="flex:1;min-height:0">
+            <div style="font-size:10.5px;letter-spacing:.34em;text-transform:uppercase;color:#B98A72;font-weight:600;margin-bottom:12px">A Platform</div>
+            <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:33px;line-height:1.02;letter-spacing:0;color:#3A2A24;margin:0 0 16px">Only for Marriage</h1>
+            <p style="margin:0 0 13px;font-size:13px;line-height:1.5;color:rgba(70,48,40,.68)">We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.</p>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:rgba(70,48,40,.68)">No casual swiping. No non-serious connections. Every feature respects your intention, your family, and your deen.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px">
+            <div style="width:100%;height:54px;border-radius:999px;display:flex;align-items:center;justify-content:center;position:relative;color:#C25A4A;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:16px;border:1.6px solid rgba(214,120,110,.55);background:rgba(255,255,255,.35)">Next<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C25A4A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:22px"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div style="display:flex;gap:7px"><span class="dot" style="width:7px;background:rgba(160,80,60,.2)"></span><span class="dot" style="width:22px;background:#D6786E"></span><span class="dot" style="width:7px;background:rgba(160,80,60,.2)"></span></div>
+          </div>
+        </div>
+        <div class="home" style="background:rgba(120,60,50,.3)"></div>
+      </div></div>
+    </div>
+
+    <!-- ============ 1c — Kufic Band ============ -->
+    <div class="dv-opt" id="1c">
+      <div class="dv-olabel"><div class="dv-oname"><a class="dv-oid" href="#1c">1c</a>Kufic Band</div><div class="dv-odesc">A square-kufic pattern rail down the edge; bold left-aligned type. Editorial, modern, confident.</div></div>
+      <div class="ph"><div class="scr" style="background:#F7F3EC">
+        <div style="position:absolute;top:0;bottom:0;left:0;width:76px;background:#141C34;overflow:hidden">
+          <svg viewBox="0 0 76 640" style="width:100%;height:100%">
+            <defs><pattern id="c-kufic" width="38" height="38" patternUnits="userSpaceOnUse"><g fill="rgba(247,120,110,.85)"><rect x="6" y="6" width="10" height="10"/><rect x="22" y="6" width="10" height="26"/><rect x="6" y="22" width="10" height="10"/></g></pattern></defs>
+            <rect width="76" height="640" fill="url(#c-kufic)" opacity=".9"/>
+          </svg>
+        </div>
+        <div class="gear" style="background:rgba(20,18,30,.06)"><svg width="17" height="17" viewBox="0 0 24 24" fill="rgba(20,18,30,.45)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.5-.42H10.6a.49.49 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.8 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88L2.92 14.52a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7 7 0 0 0 1.62.94l.36 2.54a.49.49 0 0 0 .5.42h3.84a.49.49 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.61ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:70px 26px 26px 100px;text-align:left;z-index:4">
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#E1674F;font-weight:600;margin-bottom:14px">A Platform</div>
+            <h1 style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:34px;line-height:.98;letter-spacing:-.025em;color:#141C34;margin:0 0 22px">Only for<br>Marriage</h1>
+            <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:rgba(20,28,52,.6)">We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.</p>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:rgba(20,28,52,.6)">No casual swiping. No non-serious connections. Every feature respects your intention, family, and deen.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:stretch;gap:18px">
+            <div class="cta" style="width:100%">Next<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div style="display:flex;gap:7px"><span class="dot" style="width:7px;background:rgba(20,28,52,.2)"></span><span class="dot" style="width:22px;background:linear-gradient(105deg,#FF9C74,#EF5A86)"></span><span class="dot" style="width:7px;background:rgba(20,28,52,.2)"></span></div>
+          </div>
+        </div>
+        <div class="home" style="background:rgba(20,28,52,.3)"></div>
+      </div></div>
+    </div>
+
+    <!-- ============ 1d — Layered Petals ============ -->
+    <div class="dv-opt" id="1d">
+      <div class="dv-olabel"><div class="dv-oname"><a class="dv-oid" href="#1d">1d</a>Layered Petals</div><div class="dv-odesc">Two overlapping petals form a union emblem — soft paper-cut layers. Warm, tender, organic.</div></div>
+      <div class="ph"><div class="scr" style="background:#FDF6F0">
+        <div style="position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:230px;height:300px;animation:cfloat 8.5s ease-in-out infinite">
+          <svg viewBox="0 0 230 300" style="width:100%;height:100%">
+            <g transform="translate(115,150)">
+              <path d="M0,-120 C58,-70 58,70 0,120 C-58,70 -58,-70 0,-120 Z" fill="rgba(247,106,130,.16)" transform="rotate(-24)"/>
+              <path d="M0,-120 C58,-70 58,70 0,120 C-58,70 -58,-70 0,-120 Z" fill="rgba(255,156,116,.18)" transform="rotate(24)"/>
+              <path d="M0,-108 C46,-64 46,64 0,108 C-46,64 -46,-64 0,-108 Z" fill="none" stroke="rgba(239,90,134,.4)" stroke-width="1.6"/>
+              <circle cx="0" cy="0" r="8" fill="rgba(239,90,134,.5)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="gear" style="background:rgba(20,18,30,.06)"><svg width="17" height="17" viewBox="0 0 24 24" fill="rgba(20,18,30,.45)"><path d="M19.14 12.94a7.5 7.5 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.49.49 0 0 0-.5-.42H10.6a.49.49 0 0 0-.5.42l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.8 8.87a.5.5 0 0 0 .12.61l2.03 1.58a7.5 7.5 0 0 0 0 1.88L2.92 14.52a.5.5 0 0 0-.12.61l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96a7 7 0 0 0 1.62.94l.36 2.54a.49.49 0 0 0 .5.42h3.84a.49.49 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.61ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z"/></svg></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:64px 28px 26px;text-align:center;z-index:4">
+          <div style="flex:1">
+            <div style="font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#C98C7A;font-weight:600;margin-bottom:14px">A Platform</div>
+            <h1 style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:31px;line-height:1.02;letter-spacing:-.02em;color:#2E211C;margin:0 0 20px">Only for Marriage</h1>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end">
+            <p style="margin:0 0 15px;font-size:13.5px;line-height:1.55;color:rgba(60,40,34,.66)">We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.</p>
+            <p style="margin:0 0 24px;font-size:13.5px;line-height:1.55;color:rgba(60,40,34,.66)">No casual swiping. No non-serious connections. Every feature respects your intention, family, and deen.</p>
+            <div class="cta" style="width:100%">Next<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+            <div style="display:flex;gap:7px;justify-content:center;margin-top:20px"><span class="dot" style="width:7px;background:rgba(60,40,34,.18)"></span><span class="dot" style="width:22px;background:linear-gradient(105deg,#FF9C74,#EF5A86)"></span><span class="dot" style="width:7px;background:rgba(60,40,34,.18)"></span></div>
+          </div>
+        </div>
+        <div class="home" style="background:rgba(60,40,34,.3)"></div>
+      </div></div>
+    </div>
+
+  </div>
+  <p class="dv-next">Try next: "build out <a class="dv-oid" href="#1c">1c</a> as the full flow" · "combine <a class="dv-oid" href="#1b">1b</a>'s crescent with <a class="dv-oid" href="#1a">1a</a>'s layout" · "make <a class="dv-oid" href="#1d">1d</a> in dark mode" · "new directions"</p>
+</section>
+</x-dc>
+</body>
+</html>

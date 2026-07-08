@@ -1,8 +1,13 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, AuthResponse, GoogleAuthRequest, SignupRequest, User } from '@/lib/authService';
 import { api } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleSignIn';
 import { registerForPushNotifications, removeRegisteredPushToken } from '@/lib/pushNotifications';
+
+// Last known user, persisted so a returning user starts instantly and the
+// fresh /me fetch happens in the background instead of blocking the splash.
+const USER_CACHE_KEY = 'tonikah-user-cache';
 
 interface AuthState {
     user: User | null;
@@ -140,8 +145,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const { accessToken } = await api.getTokens();
 
             if (!accessToken) {
+                await AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => undefined);
                 set({ isRestoringSession: false, isAuthenticated: false, user: null });
                 return;
+            }
+
+            // Fast path: cached user unblocks the splash without a network
+            // round-trip; /me refreshes (or logs out) in the background.
+            const cached = await AsyncStorage.getItem(USER_CACHE_KEY).catch(() => null);
+            if (cached) {
+                try {
+                    const cachedUser = JSON.parse(cached) as User;
+                    set({ user: cachedUser, isAuthenticated: true, isRestoringSession: false });
+                    registerForPushNotifications().catch(() => { });
+                    authService.me()
+                        .then((result) => {
+                            if (result.success && result.user) {
+                                set({ user: result.user, isAuthenticated: true });
+                            } else {
+                                void api.clearTokens();
+                                void AsyncStorage.removeItem(USER_CACHE_KEY);
+                                set({ user: null, isAuthenticated: false });
+                            }
+                        })
+                        .catch(() => {
+                            // Network failure: keep the cached session, retry next launch
+                        });
+                    return;
+                } catch {
+                    // Corrupt cache — fall through to the blocking fetch
+                }
             }
 
             const result = await authService.me();
@@ -161,3 +194,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 }));
+
+// Persist the user on every change (login, refresh, background /me) and clear
+// it on logout — single hook covers all code paths.
+useAuthStore.subscribe((state, prevState) => {
+    if (state.user === prevState.user) return;
+    if (state.user) {
+        void AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(state.user)).catch(() => undefined);
+    } else {
+        void AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => undefined);
+    }
+});

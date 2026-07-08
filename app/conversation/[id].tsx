@@ -31,7 +31,7 @@ import {
     useAudioRecorderState,
 } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Bell, BellOff, Check, CheckCheck, ChevronDown, Copy, Download, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
+import { ArrowLeft, Bell, BellOff, Camera, Check, CheckCheck, ChevronDown, Copy, Download, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import {
@@ -54,13 +54,18 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { useChatScrollAnchor, CHAT_NEAR_BOTTOM_THRESHOLD } from '@/hooks/useChatScrollAnchor';
 import { loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
 import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode';
+import { BRAND_PRIMARY } from '@/constants/Colors';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { KeyboardController } from 'react-native-keyboard-controller';
 import Reanimated, {
+    Easing,
     FadeInDown,
+    type SharedValue,
     ZoomIn,
     ZoomOut,
     useAnimatedStyle,
     useSharedValue,
+    withRepeat,
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
@@ -70,6 +75,7 @@ import { Typography } from '@/constants/typography';
 import { cacheChatMedia, deleteCachedChatMediaForMessage, getCachedChatMedia } from '@/lib/chatMediaCache';
 import { translateChatText } from '@/lib/chatDisplay';
 import { ImageAttachmentComposer } from '@/components/chat/ImageAttachmentComposer';
+import { GalleryRevealControl } from '@/components/chat/GalleryRevealControl';
 import { ChatKeyboardAvoider, ChatComposerBar } from '@/components/chat/ChatKeyboardFooter';
 import { ViewOnceIcon } from '@/components/chat/ViewOnceIcon';
 import { UnreadBadge } from '@/components/ui/UnreadBadge';
@@ -77,7 +83,7 @@ import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
 
-const PRIMARY = '#F34B6F';
+const PRIMARY = BRAND_PRIMARY;
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const UNSEND_WINDOW_MIN = 15;
 const VOICE_WAVE_BAR_COUNT = 28;
@@ -213,7 +219,11 @@ export default function ConversationScreen() {
     const { isNearBottomRef } = useChatScrollAnchor<ListItem>();
     // Holds the live socket API so scroll/seen helpers stay referentially stable
     // (the socket object is recreated on render).
-    const socketRef = useRef<{ markSeen: (id?: string | null) => void } | null>(null);
+    const socketRef = useRef<{
+        markSeen: (id?: string | null) => void;
+        sendTyping: (recipientId?: string | null) => void;
+        stopTyping: (recipientId?: string | null) => void;
+    } | null>(null);
     // True when messages arrived from the peer while the user was scrolled up;
     // we defer marking them seen until they're actually brought into view.
     const pendingSeenRef = useRef(false);
@@ -248,6 +258,10 @@ export default function ConversationScreen() {
     const [messageActionBusy, setMessageActionBusy] = useState(false);
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
     const prevListLengthRef = useRef(0);
+    const [peerTyping, setPeerTyping] = useState(false);
+    const peerTypingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const typingActiveRef = useRef(false);
+    const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const colors = useMemo(() => ({
         bg: palette.brand.bg.surface,
@@ -266,7 +280,15 @@ export default function ConversationScreen() {
         success: palette.chrome.common.successStrong,
         waveMuted: palette.brand.bg.border,
         blueAction: palette.chrome.common.blueAction,
+        seenTick: palette.chrome.common.seenTick,
     }), [palette]);
+
+    // Preserves the swipe-back/slide animation when we arrived from messages;
+    // falls back to replace for deep-link / push-notification entries with no history.
+    const goBackToMessages = useCallback(() => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/(tabs)/messages' as any);
+    }, []);
 
     // Inverted list: the newest message lives at offset 0 (the visual bottom),
     // so "scroll to latest" is just a jump to offset 0 — instant and reliable.
@@ -409,6 +431,18 @@ export default function ConversationScreen() {
             : message));
     }, []);
 
+    const handleSocketTyping = useCallback(() => {
+        setPeerTyping(true);
+        if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
+        // Safety net: hide the indicator if the peer's stop event never arrives.
+        peerTypingClearRef.current = setTimeout(() => setPeerTyping(false), 6000);
+    }, []);
+
+    const handleSocketStopTyping = useCallback(() => {
+        if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
+        setPeerTyping(false);
+    }, []);
+
     const socket = useChatSocket({
         conversationId: id !== 'new' ? id : null,
         enabled: Boolean(user && id && id !== 'new'),
@@ -419,6 +453,8 @@ export default function ConversationScreen() {
         onSeen: handleSocketSeen,
         onDelivered: handleSocketDelivered,
         onViewOnceViewed: handleViewOnceViewed,
+        onTyping: handleSocketTyping,
+        onStopTyping: handleSocketStopTyping,
     });
 
     useEffect(() => {
@@ -530,6 +566,27 @@ export default function ConversationScreen() {
         }
     }, []);
 
+    const openViewOnce = useCallback(async (message: ChatMessage) => {
+        if (viewOnceLoadingId || !message.id) return;
+        setViewOnceLoadingId(message.id);
+        const res = await chatService.fetchViewOnce(message.id);
+        if (res.success && (res.url || res.data?.url)) {
+            setViewOnce({
+                url: res.url || res.data!.url,
+                messageId: message.id,
+                seconds: res.expiresIn || res.data?.expiresIn || 30,
+            });
+        } else {
+            Alert.alert(t('error', 'Error'), apiMessage(res.message || 'photo_expired'));
+        }
+        setViewOnceLoadingId(null);
+    }, [viewOnceLoadingId]);
+
+    const beginReply = useCallback((message: ChatMessage) => {
+        setReplyTo(message);
+        setSelectedMessage(null);
+    }, []);
+
     const renderMessageItem = useCallback(({ item }: { item: ListItem }) => {
         if (item.kind === 'date') {
             return (
@@ -638,6 +695,41 @@ export default function ConversationScreen() {
         setLoadingMore(false);
     };
 
+    const emitStopTyping = useCallback(() => {
+        if (typingStopTimerRef.current) {
+            clearTimeout(typingStopTimerRef.current);
+            typingStopTimerRef.current = null;
+        }
+        if (typingActiveRef.current) {
+            typingActiveRef.current = false;
+            socketRef.current?.stopTyping(peerId);
+        }
+    }, [peerId]);
+
+    const handleComposerChange = (value: string) => {
+        setContent(value.slice(0, 5000));
+        if (!peerId || id === 'new') return;
+        if (!typingActiveRef.current) {
+            typingActiveRef.current = true;
+            socketRef.current?.sendTyping(peerId);
+        }
+        if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+        typingStopTimerRef.current = setTimeout(() => {
+            typingActiveRef.current = false;
+            socketRef.current?.stopTyping(peerId);
+        }, 2500);
+    };
+
+    // Reset typing state when leaving or switching conversations.
+    useEffect(() => {
+        return () => {
+            if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+            if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
+            typingActiveRef.current = false;
+            setPeerTyping(false);
+        };
+    }, [id]);
+
     const send = async () => {
         if (!requireVerified('chat')) return;
         if (peerDeleted) {
@@ -672,6 +764,7 @@ export default function ConversationScreen() {
         animateIdsRef.current.add(tempId);
         setItems((current) => [...current, temp]);
         setContent('');
+        emitStopTyping();
         setReplyTo(null);
         scrollToBottom(true);
 
@@ -731,18 +824,33 @@ export default function ConversationScreen() {
         setImageViewOnce(false);
     };
 
-    const pickAndUploadImage = async () => {
-        if (!requireVerified('chat')) return;
+    const canAttachMedia = () => {
+        if (!requireVerified('chat')) return false;
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
                 : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
-            return;
+            return false;
         }
         if (id === 'new') {
             toast.show(t('send_text_first', 'Send a text message first, then attach media.'), 'info');
-            return;
+            return false;
         }
+        return true;
+    };
+
+    const stageImageAsset = (asset: ImagePicker.ImagePickerAsset) => {
+        setImageAttachment({
+            uri: asset.uri,
+            name: asset.fileName || `chat-photo-${Date.now()}.jpg`,
+            type: asset.mimeType || 'image/jpeg',
+        });
+        setImageCaption('');
+        setImageViewOnce(false);
+    };
+
+    const pickAndUploadImage = async () => {
+        if (!canAttachMedia()) return;
 
         // Close the keyboard before opening the picker so that, after sending,
         // the composer returns to rest and the new image isn't hidden behind it.
@@ -761,15 +869,28 @@ export default function ConversationScreen() {
             exif: false,
         });
         if (result.canceled || !result.assets[0]) return;
+        stageImageAsset(result.assets[0]);
+    };
 
-        const asset = result.assets[0];
-        setImageAttachment({
-            uri: asset.uri,
-            name: asset.fileName || `chat-photo-${Date.now()}.jpg`,
-            type: asset.mimeType || 'image/jpeg',
+    const captureAndAttachPhoto = async () => {
+        if (!canAttachMedia()) return;
+
+        KeyboardController.dismiss();
+
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+            toast.show(t('camera_permission_required', 'Camera permission is required.'), 'error');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            quality: 0.9,
+            allowsEditing: false,
+            exif: false,
         });
-        setImageCaption('');
-        setImageViewOnce(false);
+        if (result.canceled || !result.assets[0]) return;
+        stageImageAsset(result.assets[0]);
     };
 
     const sendImageAttachment = async () => {
@@ -945,7 +1066,7 @@ export default function ConversationScreen() {
             });
             await load('replace');
         }
-        else router.replace('/(tabs)/messages' as any);
+        else goBackToMessages();
     };
 
     const toggleMute = async () => {
@@ -1016,28 +1137,12 @@ export default function ConversationScreen() {
                         }
                         setMenuOpen(false);
                         toast.show(translateChatText('chat_hidden', 'Chat hidden'), 'success');
-                        router.replace('/(tabs)/messages' as any);
+                        goBackToMessages();
                     },
                 },
             ],
         );
     };
-
-    const openViewOnce = useCallback(async (message: ChatMessage) => {
-        if (viewOnceLoadingId || !message.id) return;
-        setViewOnceLoadingId(message.id);
-        const res = await chatService.fetchViewOnce(message.id);
-        if (res.success && (res.url || res.data?.url)) {
-            setViewOnce({
-                url: res.url || res.data!.url,
-                messageId: message.id,
-                seconds: res.expiresIn || res.data?.expiresIn || 30,
-            });
-        } else {
-            Alert.alert(t('error', 'Error'), apiMessage(res.message || 'photo_expired'));
-        }
-        setViewOnceLoadingId(null);
-    }, [viewOnceLoadingId]);
 
     const markViewOnceLoaded = async () => {
         if (!viewOnce?.messageId) return;
@@ -1053,11 +1158,6 @@ export default function ConversationScreen() {
         if (messageActionBusy) return;
         setSelectedMessage(null);
     };
-
-    const beginReply = useCallback((message: ChatMessage) => {
-        setReplyTo(message);
-        setSelectedMessage(null);
-    }, []);
 
     const copySelectedMessage = async () => {
         if (!selectedMessage || messageActionBusy) return;
@@ -1137,7 +1237,7 @@ export default function ConversationScreen() {
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
             <View style={styles.screen}>
                 <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-                    <Pressable onPress={() => router.replace('/(tabs)/messages' as any)} style={styles.headerIcon}>
+                    <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
                         <ArrowLeft size={scale(21)} color={colors.text} strokeWidth={2.7} />
                     </Pressable>
                     <Pressable
@@ -1176,6 +1276,14 @@ export default function ConversationScreen() {
                         </View>
                     </Pressable>
                     <View style={styles.headerSpacer} pointerEvents="none" />
+                    {conversation?.state === 'active' && !headerOther.account_deleted && id && id !== 'new' ? (
+                        <GalleryRevealControl
+                            conversationId={id}
+                            otherName={peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
+                            status={conversation.galleryReveal}
+                            onChanged={refreshCurrentConversation}
+                        />
+                    ) : null}
                     <Pressable
                         onPress={() => setMenuOpen(true)}
                         style={styles.headerIcon}
@@ -1220,6 +1328,7 @@ export default function ConversationScreen() {
                             });
                         }}
                         ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: scale(10) }} /> : null}
+                        ListHeaderComponent={peerTyping ? <TypingIndicatorBubble colors={colors} /> : null}
                         ListEmptyComponent={
                             <View style={styles.empty}>
                                 <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
@@ -1329,38 +1438,60 @@ export default function ConversationScreen() {
                             />
                         ) : (
                             <View style={styles.composerRow}>
-                                <PressableScale
-                                    onPress={pickAndUploadImage}
-                                    disabled={uploadingMedia || recordingBusy || voiceSending}
-                                    style={[styles.toolButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                >
-                                    {uploadingMedia ? <ActivityIndicator color={colors.primary} /> : <ImageIcon size={scale(20)} color={colors.muted} />}
-                                </PressableScale>
-                                <TextInput
-                                    value={content}
-                                    onChangeText={(value) => setContent(value.slice(0, 5000))}
-                                    onFocus={() => {
-                                        if (isNearBottomRef.current) {
-                                            scrollToBottom(false);
-                                        }
-                                    }}
-                                    placeholder={t('chat:message_placeholder', 'Type a message...')}
-                                    placeholderTextColor={colors.subtle}
-                                    style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
-                                    multiline
-                                />
-                                {content.trim() ? (
-                                    <PressableScale onPress={send} disabled={sending} style={[styles.send, { backgroundColor: colors.primary }]}>
-                                        {sending ? <ActivityIndicator color={colors.inverse} /> : <Send size={scale(18)} color={colors.inverse} />}
-                                    </PressableScale>
-                                ) : (
+                                <View style={[styles.inputPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                     <PressableScale
-                                        onPress={startRecording}
-                                        disabled={recordingBusy || voiceSending}
-                                        style={[styles.toolButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                        onPress={captureAndAttachPhoto}
+                                        disabled={uploadingMedia || recordingBusy || voiceSending}
+                                        accessibilityLabel={translateChatText('camera', 'Camera')}
+                                        style={styles.pillIcon}
                                     >
-                                        {recordingBusy ? <ActivityIndicator color={colors.primary} /> : <Mic size={scale(20)} color={colors.muted} />}
+                                        <Camera size={scale(21)} color={colors.muted} strokeWidth={2.2} />
                                     </PressableScale>
+                                    <TextInput
+                                        value={content}
+                                        onChangeText={handleComposerChange}
+                                        onFocus={() => {
+                                            if (isNearBottomRef.current) {
+                                                scrollToBottom(false);
+                                            }
+                                        }}
+                                        placeholder={t('chat:message_placeholder', 'Type a message...')}
+                                        placeholderTextColor={colors.subtle}
+                                        style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                        multiline
+                                    />
+                                    {!content.trim() && (
+                                        <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)} style={styles.pillIconCluster}>
+                                            <PressableScale
+                                                onPress={startRecording}
+                                                disabled={recordingBusy || voiceSending}
+                                                accessibilityLabel={translateChatText('voice_message', 'Voice message')}
+                                                style={styles.pillIcon}
+                                            >
+                                                {recordingBusy ? <ActivityIndicator color={colors.primary} size="small" /> : <Mic size={scale(21)} color={colors.muted} strokeWidth={2.2} />}
+                                            </PressableScale>
+                                            <PressableScale
+                                                onPress={pickAndUploadImage}
+                                                disabled={uploadingMedia || recordingBusy || voiceSending}
+                                                accessibilityLabel={translateChatText('attach_photo', 'Attach photo')}
+                                                style={styles.pillIcon}
+                                            >
+                                                {uploadingMedia ? <ActivityIndicator color={colors.primary} size="small" /> : <ImageIcon size={scale(21)} color={colors.muted} strokeWidth={2.2} />}
+                                            </PressableScale>
+                                        </Reanimated.View>
+                                    )}
+                                </View>
+                                {!!content.trim() && (
+                                    <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)}>
+                                        <PressableScale
+                                            onPress={send}
+                                            disabled={sending}
+                                            accessibilityLabel={translateChatText('send', 'Send')}
+                                            style={[styles.send, { backgroundColor: colors.primary }]}
+                                        >
+                                            {sending ? <ActivityIndicator color={colors.inverse} /> : <Send size={scale(18)} color={colors.inverse} />}
+                                        </PressableScale>
+                                    </Reanimated.View>
                                 )}
                             </View>
                         )}
@@ -1751,46 +1882,34 @@ function VoicePreviewPlayer({
 
 // Pressable that springs down slightly while pressed (used for composer buttons
 // and image bubbles) for a tactile micro-interaction.
-function PressableScale({
-    children,
-    onPress,
-    disabled,
-    style,
-    accessibilityLabel,
-    accessibilityRole,
-    activeScale = 0.9,
-    onLongPress,
-    delayLongPress,
-}: {
-    children: React.ReactNode;
-    onPress?: () => void;
-    disabled?: boolean;
-    style?: StyleProp<ViewStyle>;
-    accessibilityLabel?: string;
-    accessibilityRole?: 'button' | 'image';
-    activeScale?: number;
-    onLongPress?: () => void;
-    delayLongPress?: number;
-}) {
-    const scaleValue = useSharedValue(1);
-    const animStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scaleValue.value }],
-    }));
+// Three pulsing dots shown at the visual bottom of the (inverted) list while
+// the peer is typing.
+function TypingDot({ progress, index, color }: { progress: SharedValue<number>; index: number; color: string }) {
+    const animated = useAnimatedStyle(() => {
+        const phase = (progress.value + index / 3) % 1;
+        const lift = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+        return {
+            opacity: 0.35 + lift * 0.65,
+            transform: [{ translateY: -lift * scale(3) }],
+        };
+    });
+    return <Reanimated.View style={[styles.typingDot, { backgroundColor: color }, animated]} />;
+}
+
+function TypingIndicatorBubble({ colors }: { colors: Record<string, string> }) {
+    const progress = useSharedValue(0);
+    useEffect(() => {
+        progress.value = withRepeat(withTiming(1, { duration: 900, easing: Easing.linear }), -1, false);
+        return () => { progress.value = 0; };
+    }, [progress]);
     return (
-        <Pressable
-            onPress={onPress}
-            onLongPress={onLongPress}
-            delayLongPress={delayLongPress}
-            disabled={disabled}
-            accessibilityLabel={accessibilityLabel}
-            accessibilityRole={accessibilityRole}
-            onPressIn={() => { scaleValue.value = withSpring(activeScale, { damping: 16, stiffness: 320 }); }}
-            onPressOut={() => { scaleValue.value = withSpring(1, { damping: 16, stiffness: 320 }); }}
-        >
-            <Reanimated.View style={[style, animStyle]}>
-                {children}
-            </Reanimated.View>
-        </Pressable>
+        <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)} style={styles.typingRow}>
+            <View style={[styles.typingBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {[0, 1, 2].map((index) => (
+                    <TypingDot key={index} progress={progress} index={index} color={colors.muted} />
+                ))}
+            </View>
+        </Reanimated.View>
     );
 }
 
@@ -1868,6 +1987,32 @@ function MessageBubbleComponent({
     onReplyClick: (messageId: string) => void;
 }) {
     if (message.type === 'system') {
+        const systemContent = String(message.content || '').trim().toLowerCase().replace(/\s+/g, '_');
+        const isGalleryAccessSystem = systemContent === 'gallery_access_granted' || systemContent === 'gallery_access_revoked';
+        if (isGalleryAccessSystem) {
+            // Centered privacy-safe pill with a camera emoji; the "revealed" pill
+            // opens the owner's profile so the viewer can see the photos.
+            const canOpenGalleryOwner = systemContent === 'gallery_access_granted'
+                && message.sender
+                && message.sender !== '000000000000000000000000';
+            return (
+                <View style={styles.systemWrap}>
+                    <Pressable
+                        disabled={!canOpenGalleryOwner}
+                        onPress={() => {
+                            if (!canOpenGalleryOwner) return;
+                            if (mine) router.push('/(tabs)/profile');
+                            else router.push(`/user/${message.sender}`);
+                        }}
+                        style={[styles.systemPillRow, { backgroundColor: colors.card }]}
+                    >
+                        <Text variant="caption" className="font-body-semi" style={{ color: colors.muted }}>
+                            {'\u{1F4F7} '}{translateChatText(systemContent, systemContent === 'gallery_access_granted' ? 'Photos revealed' : 'Photo access ended')}
+                        </Text>
+                    </Pressable>
+                </View>
+            );
+        }
         return (
             <View style={styles.systemWrap}>
                 <Text variant="caption" className="font-body-semi" style={[styles.systemText, { backgroundColor: colors.card, color: colors.muted }]}>
@@ -1967,7 +2112,7 @@ function MessageBubbleComponent({
                             {
                                 backgroundColor: mine ? colors.primaryTint : colors.card,
                                 borderColor: mine ? colors.primaryRing : colors.border,
-                                shadowColor: '#0D1B12',
+                                shadowColor: '#1A130D',
                                 shadowOpacity: mine ? 0.04 : 0.08,
                                 shadowRadius: scale(3),
                                 shadowOffset: { width: 0, height: 1 },
@@ -2039,7 +2184,7 @@ function MessageBubbleComponent({
                                 </Text>
                                 {mine && !message.pending && (
                                     message.seenAt
-                                        ? <CheckCheck size={scale(12)} color="#38BDF8" />
+                                        ? <CheckCheck size={scale(12)} color={colors.seenTick} />
                                         : message.deliveredAt
                                             ? <CheckCheck size={scale(12)} color={colors.muted} />
                                             : <Check size={scale(12)} color={colors.muted} />
@@ -2400,8 +2545,9 @@ const styles = StyleSheet.create({
     timeRow: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: scale(4), marginTop: scale(6), minHeight: scale(14) },
     systemWrap: { alignItems: 'center', marginVertical: scale(7) },
     systemText: { paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden' },
+    systemPillRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden' },
     unsentBubble: { borderWidth: StyleSheet.hairlineWidth, borderStyle: 'dashed', borderRadius: scale(14), paddingHorizontal: scale(12), paddingVertical: scale(8) },
-    mediaWrap: { overflow: 'hidden', borderRadius: scale(9), marginBottom: scale(5), backgroundColor: '#E2E8F0' },
+    mediaWrap: { overflow: 'hidden', borderRadius: scale(9), marginBottom: scale(5), backgroundColor: '#E8E1D6' },
     mediaImage: { width: scale(220), height: scale(220) },
     viewOnceButton: {
         minWidth: scale(210),
@@ -2414,7 +2560,7 @@ const styles = StyleSheet.create({
         paddingVertical: scale(8),
         marginBottom: scale(4),
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(148,163,184,0.24)',
+        borderColor: 'rgba(160, 146, 128,0.24)',
     },
     viewOnceIconBadge: {
         width: scale(34),
@@ -2432,7 +2578,7 @@ const styles = StyleSheet.create({
         width: scale(34),
         height: scale(34),
         borderRadius: scale(17),
-        backgroundColor: 'rgba(15,23,42,0.70)',
+        backgroundColor: 'rgba(24, 19, 14,0.70)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2455,11 +2601,40 @@ const styles = StyleSheet.create({
     requestActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(10) },
     requestButton: { minWidth: scale(110), height: scale(36), borderRadius: scale(18), paddingHorizontal: scale(16), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6) },
     requestPrimary: { backgroundColor: PRIMARY },
-    requestNeutral: { backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#CBD5E1' },
+    requestNeutral: { backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#D8CFC2' },
     disabledButton: { opacity: 0.62 },
     endedBar: { padding: scale(13) },
     composer: {},
-    composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: scale(8), paddingHorizontal: scale(8), paddingVertical: scale(8) },
+    typingRow: { paddingVertical: scale(4), alignItems: 'flex-start' },
+    typingBubble: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
+        paddingHorizontal: scale(14),
+        paddingVertical: scale(12),
+        borderRadius: scale(16),
+        borderBottomLeftRadius: scale(5),
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+    typingDot: { width: scale(7), height: scale(7), borderRadius: scale(4) },
+    // Equal top/bottom padding so the input sits centered in the bar
+    composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: scale(8), paddingHorizontal: scale(12), paddingVertical: scale(8) },
+    inputPill: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        minHeight: scale(44),
+        borderRadius: scale(22),
+        borderWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: scale(4),
+    },
+    pillIcon: {
+        width: scale(38),
+        height: scale(44),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pillIconCluster: { flexDirection: 'row', alignItems: 'flex-end' },
     replyComposerBar: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -2487,20 +2662,19 @@ const styles = StyleSheet.create({
     recordingButton: { backgroundColor: PRIMARY },
     input: {
         flex: 1,
-        minHeight: scale(40),
+        minHeight: scale(44),
         maxHeight: scale(120),
-        borderRadius: scale(18),
-        borderWidth: StyleSheet.hairlineWidth,
-        paddingHorizontal: scale(12),
-        paddingTop: scale(9),
-        paddingBottom: scale(8),
+        paddingHorizontal: scale(6),
+        // Equal vertical padding keeps text centered in the pill
+        paddingTop: scale(12),
+        paddingBottom: scale(12),
         fontSize: scale(14),
-        lineHeight: scale(18),
+        lineHeight: scale(19),
     },
     send: {
-        width: scale(40),
-        height: scale(40),
-        borderRadius: scale(20),
+        width: scale(44),
+        height: scale(44),
+        borderRadius: scale(22),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -2578,7 +2752,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(15,23,42,0.28)',
+        backgroundColor: 'rgba(24, 19, 14,0.28)',
     },
     conversationMenu: {
         position: 'absolute',
@@ -2633,7 +2807,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
     conversationMenuItemPressed: {
-        backgroundColor: 'rgba(148,163,184,0.12)',
+        backgroundColor: 'rgba(160, 146, 128,0.12)',
     },
     conversationMenuLinks: {
         paddingHorizontal: scale(10),
@@ -2651,7 +2825,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(15,23,42,0.35)',
+        backgroundColor: 'rgba(24, 19, 14,0.35)',
     },
     messageMenuSheet: {
         borderTopLeftRadius: scale(18),
@@ -2673,7 +2847,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(5),
         paddingVertical: scale(5),
         marginBottom: scale(8),
-        backgroundColor: 'rgba(148,163,184,0.12)',
+        backgroundColor: 'rgba(160, 146, 128,0.12)',
     },
     quickReactionButton: {
         width: scale(42),
@@ -2682,7 +2856,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    quickReactionPressed: { backgroundColor: 'rgba(148,163,184,0.18)' },
+    quickReactionPressed: { backgroundColor: 'rgba(160, 146, 128,0.18)' },
     quickReactionText: { fontSize: scale(22), lineHeight: scale(26) },
     messageActionItem: {
         width: '100%',
@@ -2704,7 +2878,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(14), lineHeight: scale(18), fontWeight: '400' },
-    messageActionPressed: { backgroundColor: 'rgba(148,163,184,0.12)' },
+    messageActionPressed: { backgroundColor: 'rgba(160, 146, 128,0.12)' },
     replyQuote: {
         borderLeftWidth: scale(3),
         borderRadius: scale(8),

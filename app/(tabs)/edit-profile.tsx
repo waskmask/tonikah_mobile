@@ -60,6 +60,7 @@ import {
   translateCountry,
 } from "@/lib/profileDisplay";
 import { profileService } from "@/lib/profileService";
+import { extractModerationRejection } from "@/lib/textModeration";
 import {
   BIO_MAX,
   cleanHeadlineTextForSave,
@@ -103,12 +104,12 @@ const NOT_SET = "Not set";
 const PRIMARY = "#F34B6F";
 
 const themeColors = (isDark: boolean) => ({
-  background: isDark ? "#020617" : "#F8FAFC",
-  surface: isDark ? "#0F172A" : "#FFFFFF",
-  card: isDark ? "#111827" : "#F8FAFC",
-  border: isDark ? "#334155" : "#E2E8F0",
-  text: isDark ? "#F8FAFC" : "#17211D",
-  muted: isDark ? "#94A3B8" : "#64748B",
+  background: isDark ? "#0E0C09" : "#F7F3ED",
+  surface: isDark ? "#141210" : "#FFFFFF",
+  card: isDark ? "#1B1713" : "#F7F3ED",
+  border: isDark ? "#3A332B" : "#E8E1D6",
+  text: isDark ? "#F7F3ED" : "#201B15",
+  muted: isDark ? "#A99C8D" : "#7D7266",
   primary: PRIMARY,
 });
 
@@ -936,6 +937,16 @@ export default function EditProfileScreen() {
             : {}),
         };
         const response = await profileService.updateProfile(payload);
+        if (response.success === false) {
+          const rejection = extractModerationRejection(response);
+          if (rejection) {
+            setErrors((current) => ({ ...current, ...rejection.fieldErrors }));
+            toast.show(rejection.userMessage, "error");
+          } else {
+            toast.show(apiMessage(String(response.message || ""), t("profile.update_error", "Could not update profile.")), "error");
+          }
+          return;
+        }
         const nextProfile = response.profile || response.user?.profile || { ...(profile || {}), ...payload };
         setProfile(nextProfile);
         await refreshUser();

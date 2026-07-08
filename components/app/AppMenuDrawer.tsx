@@ -59,11 +59,11 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     const { isDark, theme, setTheme } = useTheme();
     const { logout, isLoading } = useAuthStore();
 
-    const surfaceColor = isDark ? '#111827' : '#FFFFFF';
-    const borderColor = isDark ? '#334155' : '#E8E8E6';
-    const headingColor = isDark ? '#E2E8F0' : '#25322B';
-    const mutedColor = isDark ? '#94A3B8' : '#6F746F';
-    const overlayColor = isDark ? 'rgba(2, 6, 23, 0.58)' : 'rgba(15, 23, 42, 0.45)';
+    const surfaceColor = isDark ? '#1B1713' : '#FFFFFF';
+    const borderColor = isDark ? '#3A332B' : '#E8E8E6';
+    const headingColor = isDark ? '#E8E1D6' : '#241E17';
+    const mutedColor = isDark ? '#A99C8D' : '#6F746F';
+    const overlayColor = isDark ? 'rgba(2, 6, 23, 0.58)' : 'rgba(24, 19, 14, 0.45)';
 
     const navigate = (href: Href) => {
         onClose();
@@ -135,7 +135,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                             <Text variant="body-sm" className="font-body-semi" style={[styles.themeLabel, { color: mutedColor }]}>
                                 {textValue(t('theme'), 'Theme')}
                             </Text>
-                            <View style={[styles.themeSegment, { backgroundColor: isDark ? '#1E293B' : '#F3F3F1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.themeSegment, { backgroundColor: isDark ? '#211D18' : '#F3F3F1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 <ThemeButton active={theme === 'light'} icon={Sun} onPress={() => setTheme('light')} />
                                 <ThemeButton active={theme === 'dark'} icon={Moon} onPress={() => setTheme('dark')} />
                                 <ThemeButton active={theme === 'system'} icon={Monitor} onPress={() => setTheme('system')} />
@@ -156,7 +156,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
 
 function ThemeButton({ active, icon: Icon, onPress }: { active: boolean; icon: LucideIcon; onPress: () => void }) {
     const { isDark } = useTheme();
-    const iconColor = active ? (isDark ? '#E2E8F0' : '#25322B') : isDark ? '#94A3B8' : '#6F746F';
+    const iconColor = active ? (isDark ? '#E8E1D6' : '#241E17') : isDark ? '#A99C8D' : '#6F746F';
 
     return (
         <Pressable
@@ -164,7 +164,7 @@ function ThemeButton({ active, icon: Icon, onPress }: { active: boolean; icon: L
             style={[
                 styles.themeButton,
                 active && {
-                    backgroundColor: isDark ? '#334155' : '#FFFFFF',
+                    backgroundColor: isDark ? '#3A332B' : '#FFFFFF',
                     shadowColor: '#000000',
                     shadowOpacity: isDark ? 0 : 0.08,
                     shadowRadius: scale(8),
@@ -191,7 +191,7 @@ function MenuRow({
 }) {
     const { isDark } = useTheme();
     const { currentLanguage, isRTL } = useLanguage();
-    const color = danger ? '#E64E67' : isDark ? '#E2E8F0' : '#25322B';
+    const color = danger ? '#E64E67' : isDark ? '#E8E1D6' : '#241E17';
     const fontFamily = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.semi;
 
     return (

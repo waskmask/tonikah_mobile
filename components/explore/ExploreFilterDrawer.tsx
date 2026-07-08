@@ -344,10 +344,10 @@ function RangeRow({
                 <View style={[styles.sliderThumb, { left: `${maxPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
             </View>
             <View style={styles.rangeValues}>
-                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : mutedColor }}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#A99C8D' : mutedColor }}>
                     {formatValue ? formatValue(min) : String(min)}
                 </Text>
-                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#94A3B8' : mutedColor }}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#A99C8D' : mutedColor }}>
                     {formatValue ? formatValue(max) : String(max)}
                 </Text>
             </View>

@@ -1,16 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text } from '@/components/ui/Text';
+import { Compass } from 'lucide-react-native';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
 import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
 import { ExploreActionBar } from '@/components/explore/ExploreActionBar';
-import { ExploreDeckCard } from '@/components/explore/ExploreDeckCard';
 import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
+import { SwipeableDeck, SwipeableDeckHandle, SwipeDirection } from '@/components/explore/SwipeableDeck';
 import { ExploreTopOverlay } from '@/components/explore/ExploreTopOverlay';
 import { ExploreTourModal } from '@/components/explore/ExploreTourModal';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { scale } from '@/hooks/useResponsive';
+import { useColors } from '@/hooks/useColors';
 import { useTheme } from '@/hooks/useTheme';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/store/authStore';
@@ -22,8 +25,9 @@ import {
     describeDroppedFilters,
     resetExploreFilters,
 } from '@/lib/exploreFilters';
-import { profileId } from '@/lib/exploreProfile';
+import { firstProfileImage, profileId } from '@/lib/exploreProfile';
 import { profileCoordinates } from '@/lib/exploreProfile';
+import { Image } from 'expo-image';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { usersService } from '@/lib/usersService';
 
@@ -46,6 +50,7 @@ function normalizeDroppedFilters(droppedFilters: any[] = []) {
 
 export default function ExploreScreen() {
     const { isDark } = useTheme();
+    const palette = useColors();
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const user = useAuthStore((state) => state.user);
@@ -53,7 +58,6 @@ export default function ExploreScreen() {
     const [profiles, setProfiles] = useState<any[]>([]);
     const [filters, setFilters] = useState<ExploreFilterState>(() => resetExploreFilters());
     const [loading, setLoading] = useState(true);
-    const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [detailOpen, setDetailOpen] = useState(false);
@@ -69,6 +73,10 @@ export default function ExploreScreen() {
     const seenRef = useRef<Set<string>>(new Set());
     const filtersRef = useRef(filters);
     const exploreModeRef = useRef<ExploreMode>('fresh');
+    const deckRef = useRef<SwipeableDeckHandle>(null);
+    // Whether the last response displayed already-viewed (skipped) profiles —
+    // drives the notice toast; never fed back into request params.
+    const wasShowingSkippedRef = useRef(false);
 
     const current = profiles[0] || null;
     const currentId = current ? profileId(current) : '';
@@ -81,7 +89,12 @@ export default function ExploreScreen() {
     ) => {
         const reset = options.reset ?? true;
         const allowDroppedRetry = options.allowDroppedRetry ?? true;
-        let mode = options.mode ?? exploreModeRef.current;
+        // `mode=skipped` is only sent when explicitly requested (review-skipped
+        // button, deck-exhausted fallback) or when paginating an explicit skipped
+        // browse — never because a previous *response* happened to show skipped
+        // profiles. A reset without a mode always restarts fresh (parity with
+        // the Next.js skippedOnlyRef behavior).
+        let mode = options.mode ?? (reset ? 'fresh' : exploreModeRef.current);
         if (isFetchingRef.current) return;
 
         if (!reset && !hasMoreRef.current) {
@@ -102,6 +115,7 @@ export default function ExploreScreen() {
             exploreModeRef.current = mode;
             seenRef.current = new Set();
             filtersRef.current = nextFilters;
+            if (mode === 'fresh') wasShowingSkippedRef.current = false;
         }
 
         const params = buildExploreParams(nextFilters);
@@ -114,10 +128,15 @@ export default function ExploreScreen() {
         });
 
         if (res.success) {
-            const responseMode: ExploreMode = res.mode === 'skipped' || res.showingSkipped ? 'skipped' : mode;
-            exploreModeRef.current = responseMode;
+            const showingSkipped = res.mode === 'skipped'
+                || res.showingSkipped === true
+                || res.notice === 'showing_already_viewed_profiles';
+            if (showingSkipped && !wasShowingSkippedRef.current) {
+                toast.show(t('showing_already_viewed_profiles', 'Showing profiles you have already viewed.'), 'info', 4000);
+            }
+            wasShowingSkippedRef.current = showingSkipped;
 
-            const droppedFilters = responseMode === 'fresh' && Array.isArray(res.droppedFilters)
+            const droppedFilters = mode === 'fresh' && !showingSkipped && Array.isArray(res.droppedFilters)
                 ? res.droppedFilters
                 : [];
             if (droppedFilters.length > 0) {
@@ -158,7 +177,8 @@ export default function ExploreScreen() {
             setProfiles((items) => reset ? uniqueItems : [...items, ...uniqueItems]);
 
             const shouldTrySkipped =
-                responseMode === 'fresh' &&
+                mode === 'fresh' &&
+                !showingSkipped &&
                 uniqueItems.length === 0 &&
                 !hasMoreRef.current;
 
@@ -210,37 +230,49 @@ export default function ExploreScreen() {
         setHistory([]);
     };
 
-    const skip = async () => {
-        if (!current || !currentId) return;
-        if (!emailVerified) {
-            setVerificationReason('save_or_skip');
-            return;
-        }
-        setBusy(true);
-        const res = await usersService.skip(currentId);
-        setBusy(false);
-        if (res.success) advance({ action: 'skip', profile: current });
-        else if (res.message === 'email_verification_required') setVerificationReason('save_or_skip');
-        else Alert.alert(t('error', 'Error'), apiMessage(res.message));
+    // Optimistic swipe: advance the deck immediately, sync with the API in the
+    // background, and put the card back if the request fails.
+    const rollbackSwipe = (profile: any, message?: string) => {
+        const id = profileId(profile);
+        setProfiles((items) => [profile, ...items.filter((item) => profileId(item) !== id)]);
+        setHistory((items) => items.filter((entry) => entry.profile !== profile));
+        if (message === 'email_verification_required') setVerificationReason('save_or_skip');
+        else Alert.alert(t('error', 'Error'), apiMessage(message));
     };
 
-    const favorite = async () => {
-        if (!current || !currentId) return;
+    const handleSwiped = (direction: SwipeDirection) => {
+        const profile = current;
+        const id = currentId;
+        if (!profile || !id) return;
+        const action = direction === 'right' ? 'favorite' : 'skip';
+        advance({ action, profile });
+        if (action === 'favorite') toast.show(t('saved', 'Saved'), 'success', 3000);
+        const request = action === 'favorite' ? usersService.favorite(id) : usersService.skip(id);
+        request
+            .then((res) => {
+                if (!res.success) rollbackSwipe(profile, res.message);
+            })
+            .catch(() => rollbackSwipe(profile));
+    };
+
+    const canSwipe = (_direction: SwipeDirection) => {
         if (!emailVerified) {
             setVerificationReason('save_or_skip');
-            return;
+            return false;
         }
-        setBusy(true);
-        const res = await usersService.favorite(currentId);
-        setBusy(false);
-        if (res.success) {
-            advance({ action: 'favorite', profile: current });
-            toast.show(t('saved', 'Saved'), 'success', 3000);
-        } else if (res.message === 'email_verification_required') {
-            setVerificationReason('save_or_skip');
-        } else {
-            Alert.alert(t('error', 'Error'), apiMessage(res.message));
-        }
+        return true;
+    };
+
+    const skip = () => {
+        if (!current || !currentId) return;
+        if (!canSwipe('left')) return;
+        deckRef.current?.swipe('left');
+    };
+
+    const favorite = () => {
+        if (!current || !currentId) return;
+        if (!canSwipe('right')) return;
+        deckRef.current?.swipe('right');
     };
 
     const deckLocked = detailOpen || profileSheetClosing;
@@ -282,11 +314,25 @@ export default function ExploreScreen() {
         if (profiles.length <= PREFETCH_THRESHOLD) void load(filtersRef.current, { reset: false });
     }, [load, loading, profiles.length]);
 
+    // Warm the next cards' photos while the current one is on screen so the
+    // deck never shows a loading image (Tinder-style).
+    useEffect(() => {
+        for (const profile of profiles.slice(1, 4)) {
+            const uri = firstProfileImage(profile);
+            if (uri) void Image.prefetch(uri);
+        }
+    }, [profiles]);
+
     return (
-        <View style={[styles.root, { backgroundColor: isDark ? '#0F172A' : '#F8FAFC', paddingTop: insets.top }]}>
+        <View style={[styles.root, { backgroundColor: palette.chrome.explore.screen, paddingTop: insets.top }]}>
             {loading ? (
-                <View style={styles.center}>
-                    <ActivityIndicator size="large" color="#F34B6F" />
+                <View style={{ flex: 1, padding: scale(12), gap: scale(14) }}>
+                    <Skeleton width="100%" height={undefined} borderRadius={scale(22)} style={{ flex: 1 }} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: scale(18), paddingBottom: scale(8) }}>
+                        {[0, 1, 2].map((index) => (
+                            <Skeleton key={index} width={scale(52)} height={scale(52)} borderRadius={scale(26)} />
+                        ))}
+                    </View>
                 </View>
             ) : current ? (
                 <>
@@ -315,16 +361,19 @@ export default function ExploreScreen() {
                         </View>
                     ) : null}
                     <View style={styles.deckArea} pointerEvents={deckLocked ? 'none' : 'auto'}>
-                        <ExploreDeckCard
-                            profile={current}
+                        <SwipeableDeck
+                            ref={deckRef}
+                            profiles={profiles}
                             viewerLat={viewerCoordinates?.lat}
                             viewerLng={viewerCoordinates?.lng}
-                            onPress={viewProfile}
+                            onPressCard={viewProfile}
+                            onSwiped={handleSwiped}
+                            canSwipe={canSwipe}
                         />
                     </View>
                     <ExploreActionBar
                         canUndo={history.length > 0}
-                        busy={busy || deckLocked}
+                        busy={deckLocked}
                         onUndo={undo}
                         onSkip={skip}
                         onFavorite={favorite}
@@ -341,24 +390,15 @@ export default function ExploreScreen() {
                             message={t('verify_email_browse_limit_message', 'You can browse your first profiles now. Verify your email to continue exploring more matches.')}
                         />
                     ) : null}
-                    <Text variant="h3" align="center">
-                        {message || t('explore_no_profiles_title', 'No matches right now')}
-                    </Text>
-                    <Text variant="body-sm" align="center" style={{ color: isDark ? '#94A3B8' : '#64748B', marginTop: scale(8) }}>
-                        {t('explore_no_profiles', 'Expand your filters to see more profiles.')}
-                    </Text>
-                    <View style={styles.emptyActions}>
-                        <Pressable onPress={refreshSkippedProfiles} style={styles.emptyButton}>
-                            <Text variant="body-sm" className="font-body-semi" style={{ color: '#FFFFFF' }}>
-                                {t('refresh', 'Refresh')}
-                            </Text>
-                        </Pressable>
-                        <Pressable onPress={() => setFiltersOpen(true)} style={[styles.emptyButton, styles.emptyButtonSecondary]}>
-                            <Text variant="body-sm" className="font-body-semi" style={{ color: '#F34B6F' }}>
-                                {t('filters', 'Filters')}
-                            </Text>
-                        </Pressable>
-                    </View>
+                    <EmptyState
+                        icon={<Compass size={scale(30)} color={palette.chrome.primary} strokeWidth={1.8} />}
+                        title={message || t('explore_no_profiles_title', 'No matches right now')}
+                        description={t('explore_no_profiles', 'Expand your filters to see more profiles.')}
+                        actions={[
+                            { label: t('refresh', 'Refresh'), onPress: refreshSkippedProfiles },
+                            { label: t('filters', 'Filters'), onPress: () => setFiltersOpen(true), variant: 'secondary' },
+                        ]}
+                    />
                 </View>
             )}
 
@@ -397,21 +437,4 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: scale(24) },
-    emptyActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: scale(10),
-        marginTop: scale(18),
-    },
-    emptyButton: {
-        borderRadius: scale(999),
-        backgroundColor: '#F34B6F',
-        paddingHorizontal: scale(18),
-        paddingVertical: scale(11),
-    },
-    emptyButtonSecondary: {
-        backgroundColor: 'transparent',
-        borderWidth: 1,
-        borderColor: '#F34B6F',
-    },
 });

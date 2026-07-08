@@ -9,6 +9,7 @@ export interface UserListResponse extends ApiResponse {
     droppedFilters?: string[];
     showingSkipped?: boolean;
     mode?: 'fresh' | 'skipped';
+    notice?: string;
     skippedFallbackAvailable?: boolean;
 }
 

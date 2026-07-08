@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bookmark, Lock, MapPin, ShieldCheck, X } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
+import { PressableScale } from '@/components/ui/PressableScale';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
@@ -73,6 +75,7 @@ export function ProfileListCard({
 }: ProfileListCardProps) {
     const { isRTL } = useLanguage();
     const colors = useColors();
+    const { lightImpact } = useHaptics();
     const common = colors.chrome.common;
     const { width } = useWindowDimensions();
     const image = profileImage(item);
@@ -88,8 +91,9 @@ export function ProfileListCard({
     const showOverlayAction = onFavorite && actionPlacement !== 'footer';
 
     return (
-        <Pressable
+        <PressableScale
             onPress={onPress}
+            activeScale={0.97}
             style={[
                 styles.card,
                 {
@@ -102,7 +106,7 @@ export function ProfileListCard({
             <View style={[styles.imageWrap, { backgroundColor: common.cardAlt }]}>
                 <Image source={image ? { uri: image } : PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
                 <LinearGradient
-                    colors={['rgba(15,23,42,0.04)', 'rgba(15,23,42,0.18)', 'rgba(15,23,42,0.82)']}
+                    colors={['rgba(24, 19, 14,0.04)', 'rgba(24, 19, 14,0.18)', 'rgba(24, 19, 14,0.82)']}
                     locations={[0, 0.48, 1]}
                     style={StyleSheet.absoluteFill}
                 />
@@ -128,6 +132,7 @@ export function ProfileListCard({
                         disabled={actionLoading}
                         onPress={(event) => {
                             event.stopPropagation();
+                            lightImpact();
                             onFavorite();
                         }}
                         style={[
@@ -183,7 +188,7 @@ export function ProfileListCard({
                     {onFavorite && (
                         <Pressable
                             disabled={actionLoading}
-                            onPress={onFavorite}
+                            onPress={() => { lightImpact(); onFavorite(); }}
                             style={[
                                 styles.actionButton,
                                 {
@@ -205,7 +210,7 @@ export function ProfileListCard({
                     )}
                 </View>
             )}
-        </Pressable>
+        </PressableScale>
     );
 }
 
@@ -244,7 +249,7 @@ const styles = StyleSheet.create({
         width: scale(24),
         height: scale(24),
         borderRadius: scale(12),
-        backgroundColor: 'rgba(15,23,42,0.76)',
+        backgroundColor: 'rgba(24, 19, 14,0.76)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -274,7 +279,7 @@ const styles = StyleSheet.create({
         top: scale(10),
         minHeight: scale(32),
         borderRadius: scale(999),
-        backgroundColor: 'rgba(15,23,42,0.54)',
+        backgroundColor: 'rgba(24, 19, 14,0.54)',
         paddingHorizontal: scale(12),
         alignItems: 'center',
         justifyContent: 'center',
@@ -305,7 +310,7 @@ const styles = StyleSheet.create({
     },
     location: {
         flex: 1,
-        color: '#E2E8F0',
+        color: '#E8E1D6',
         fontSize: scale(11),
         lineHeight: scale(15),
         fontWeight: '600',
@@ -319,7 +324,7 @@ const styles = StyleSheet.create({
         maxWidth: '100%',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.24)',
-        backgroundColor: 'rgba(15,23,42,0.34)',
+        backgroundColor: 'rgba(24, 19, 14,0.34)',
         borderRadius: scale(999),
         paddingHorizontal: scale(8),
         paddingVertical: scale(3),

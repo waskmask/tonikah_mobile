@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +21,7 @@ export default function Step3() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
     const { gender, setProfileData } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const [maritalStatus, setMaritalStatus] = useState('');
     const [hasChildren, setHasChildren] = useState('');
@@ -118,10 +119,21 @@ export default function Step3() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={3} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={3}
                         title={t('step_3.title', { defaultValue: 'Relationship Status' })}
@@ -130,19 +142,16 @@ export default function Step3() {
 
                     {fields.map((field) => (
                         <View key={field.key}>
-                            <FieldLabel text={field.label} required />
-                            <SelectField
+                            <SelectField required
                                 value={field.value ? field.options.find((o) => o.value === field.value)?.label || '' : ''}
-                                placeholder={t('select', { defaultValue: 'Select' })}
+                                placeholder={field.label}
                                 onPress={() => setActiveSheet(field.sheet)}
                                 icon={field.icon}
                                 hasError={!!errors[field.key]}
                             />
                             {errors[field.key] && <ErrorText text={errors[field.key]} />}
                         </View>
-                    ))}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    ))}            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 

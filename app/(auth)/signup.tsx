@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { View, KeyboardAvoidingView, ScrollView, Platform, Pressable } from 'react-native';
+import { View, Pressable, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
+import { EmailSuggestionInput } from '@/components/ui/EmailSuggestionInput';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { Checkbox } from '@/components/ui/Checkbox';
-import { LanguagePicker } from '@/components/ui/LanguagePicker';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { AuthTopBar } from '@/components/auth/AuthTopBar';
+import { PressableScale } from '@/components/ui/PressableScale';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { scale } from '@/hooks/useResponsive';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -65,31 +70,42 @@ function getConsentParts(consentStatement: string) {
 }
 
 export default function SignupScreen() {
-    const { t, isRTL, currentLanguage } = useLanguage();
-    const { isDark } = useTheme();
+    const { t, currentLanguage } = useLanguage();
+    const colors = useColors();
+    const reduceMotion = useReducedMotion();
+    const iconMuted = colors.brand.text.muted;
     const { signup, googleAuth } = useAuthStore();
     const toast = useToast();
 
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isGoogleLoading, setGoogleLoading] = useState(false);
+    // Consent modal shown when Google is tapped before the terms box is ticked
+    const [consentModalOpen, setConsentModalOpen] = useState(false);
+    const [modalAgreed, setModalAgreed] = useState(false);
+    const [modalMarketing, setModalMarketing] = useState(false);
     const consentParts = getConsentParts(String(t('consent_statement')));
 
     const {
         control,
         handleSubmit,
         setError,
-        formState: { errors, isValid, isSubmitting },
+        setValue,
+        formState: { errors, isSubmitting },
         watch,
     } = useForm<SignupForm>({
         resolver: zodResolver(signupSchema),
-        mode: 'onChange',
+        // Validate on blur first; revalidate on change once a field has erred
+        mode: 'onTouched',
         reValidateMode: 'onChange',
         defaultValues: {
             agreed: false,
             marketingOptIn: false,
         }
     });
+
+    const entering = (delay: number) =>
+        reduceMotion ? undefined : FadeInDown.duration(350).delay(delay);
 
     const onSignup = async (data: SignupForm) => {
         const result = await signup({
@@ -123,11 +139,11 @@ export default function SignupScreen() {
         toast.show(errorMsg, 'error');
     };
 
-    const handleGoogleSignIn = async () => {
+    const startGoogleAuth = async (marketingOptIn: boolean) => {
         setGoogleLoading(true);
         const result = await googleAuth({
             agreed: true,
-            marketing_opt_in: !!watch('marketingOptIn'),
+            marketing_opt_in: marketingOptIn,
             lang: currentLanguage,
         });
         setGoogleLoading(false);
@@ -148,229 +164,359 @@ export default function SignupScreen() {
         toast.show(errorMsg, 'error');
     };
 
+    const handleGooglePress = () => {
+        // Terms already accepted on the page → no modal needed
+        if (watch('agreed')) {
+            void startGoogleAuth(!!watch('marketingOptIn'));
+            return;
+        }
+        setModalAgreed(false);
+        setModalMarketing(!!watch('marketingOptIn'));
+        setConsentModalOpen(true);
+    };
+
+    const confirmConsent = () => {
+        // Reflect the modal choices back into the page checkboxes
+        setValue('agreed', true, { shouldValidate: true });
+        setValue('marketingOptIn', modalMarketing);
+        setConsentModalOpen(false);
+        void startGoogleAuth(modalMarketing);
+    };
+
     const openTerms = () => WebBrowser.openBrowserAsync(Config.TERMS_URL);
     const openPrivacy = () => WebBrowser.openBrowserAsync(Config.PRIVACY_URL);
 
+    // Shared between the page checkbox and the Google consent modal
+    const consentLabel = (
+        <>
+            <Text variant="body-sm" style={{ color: colors.brand.text.subtitle }}>
+                {consentParts.beforeTerms}
+            </Text>
+            {consentParts.termsLabel ? (
+                <Pressable onPress={openTerms} hitSlop={5}>
+                    <Text variant="body-sm" className="font-body-semi underline mx-1" style={{ color: colors.brand.accent.link }}>
+                        {consentParts.termsLabel}
+                    </Text>
+                </Pressable>
+            ) : null}
+            <Text variant="body-sm" className="mt-1" style={{ color: colors.brand.text.subtitle }}>
+                {consentParts.betweenLinks}
+            </Text>
+            {consentParts.privacyLabel ? (
+                <Pressable onPress={openPrivacy} hitSlop={5}>
+                    <Text variant="body-sm" className="font-body-semi underline mx-1" style={{ color: colors.brand.accent.link }}>
+                        {consentParts.privacyLabel}
+                    </Text>
+                </Pressable>
+            ) : null}
+            <Text variant="body-sm" className="mt-1" style={{ color: colors.brand.text.subtitle }}>
+                {consentParts.afterPrivacy}
+            </Text>
+        </>
+    );
+
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
-            >
-                <ScrollView
+        <SafeAreaView className="flex-1" style={{ backgroundColor: colors.brand.bg.primary }}>
+                <KeyboardAwareScrollView
+                    style={{ flex: 1 }}
                     contentContainerStyle={{ flexGrow: 1 }}
                     keyboardShouldPersistTaps="handled"
+                    bottomOffset={scale(24)}
                 >
-                    {/* Header Row */}
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: scale(20), paddingTop: scale(16) }}>
-                        <LanguagePicker />
-                    </View>
+                    <AuthTopBar
+                        leftLabel={t('login')}
+                        onLeftPress={() => router.push('/(auth)/login')}
+                    />
 
                     {/* Content Area */}
-                    <View className="px-6 items-center flex-1">
-                        <Text variant="h2" className="mt-4 text-center">
-                            {t('join_tonikah')}
-                        </Text>
-                        <Text variant="body" className="mt-1 text-gray-500 dark:text-gray-400 text-center">
-                            {t('singup_desc')}
-                        </Text>
+                    <View className="px-8 items-center flex-1 pb-10">
+                        {/* Header */}
+                        <Animated.View entering={entering(0)} style={{ width: '100%', alignItems: 'center' }}>
+                            <Text variant="h2" className="mt-8 text-center">
+                                {t('join_tonikah')}
+                            </Text>
+                            <Text
+                                variant="body-sm"
+                                className="mt-2 text-center"
+                                style={{ color: colors.brand.text.subtitle }}
+                            >
+                                {t('singup_desc')}
+                            </Text>
+                        </Animated.View>
 
-                        {/* Email Field */}
-                        <View className="w-full mt-6">
-                            <Controller
-                                control={control}
-                                name="email"
-                                render={({ field: { onChange, onBlur, value } }) => (
-                                    <Input
-                                        placeholder={t('enter_email')}
-                                        leftIcon={<Mail size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                        autoComplete="email"
-                                        textContentType="emailAddress"
-                                        value={value}
-                                        onChangeText={onChange}
-                                        onBlur={onBlur}
-                                        error={errors.email?.message ? t(errors.email.message as any) : undefined}
-                                    />
+                        {/* Google first: the fastest path for a brand-new user */}
+                        <Animated.View entering={entering(80)} style={{ width: '100%', alignItems: 'center' }}>
+                            {/* Static style: function-form Pressable styles lose backgrounds
+                                under the NativeWind interop */}
+                            <PressableScale
+                                onPress={handleGooglePress}
+                                disabled={isGoogleLoading}
+                                activeScale={0.98}
+                                containerStyle={{ width: '100%', marginTop: scale(32) }}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '100%',
+                                    height: scale(40),
+                                    borderRadius: scale(20),
+                                    borderWidth: 1,
+                                    borderColor: colors.brand.bg.border,
+                                    backgroundColor: colors.chrome.common.card,
+                                }}
+                            >
+                                {isGoogleLoading ? (
+                                    <Text variant="body" style={{ fontSize: scale(15) }}>
+                                        {t('please_wait')}
+                                    </Text>
+                                ) : (
+                                    <>
+                                        <Image
+                                            source={require('@/assets/images/google-icon.png')}
+                                            style={{ width: scale(18), height: scale(18) }}
+                                        />
+                                        <Text variant="body" className="ms-3 font-body-semi" style={{ fontSize: scale(15) }}>
+                                            {t('sign_in_with_google')}
+                                        </Text>
+                                    </>
                                 )}
-                            />
-                        </View>
+                            </PressableScale>
 
-                        {/* Password Field */}
-                        <View className="w-full mt-4">
-                            <Controller
-                                control={control}
-                                name="password"
-                                render={({ field: { onChange, onBlur, value } }) => (
-                                    <Input
-                                        placeholder={t('password')}
-                                        leftIcon={<Lock size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
-                                        rightIcon={
-                                            <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
-                                                {showPassword ? (
-                                                    <EyeOff size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                                                ) : (
-                                                    <Eye size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                                                )}
-                                            </Pressable>
-                                        }
-                                        secureTextEntry={!showPassword}
-                                        autoComplete="password"
-                                        textContentType="newPassword"
-                                        value={value}
-                                        onChangeText={onChange}
-                                        onBlur={onBlur}
-                                        error={errors.password?.message ? t(errors.password.message as any) : undefined}
-                                    />
-                                )}
-                            />
-                        </View>
+                            {/* No fine print here: the terms checkbox below is the single
+                                consent statement for this screen */}
 
-                        {/* Confirm Password Field */}
-                        <View className="w-full mt-4">
-                            <Controller
-                                control={control}
-                                name="confirmPassword"
-                                render={({ field: { onChange, onBlur, value } }) => (
-                                    <Input
-                                        placeholder={t('confirm_password')}
-                                        leftIcon={<Lock size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />}
-                                        rightIcon={
-                                            <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={10}>
-                                                {showConfirmPassword ? (
-                                                    <EyeOff size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                                                ) : (
-                                                    <Eye size={scale(20)} color={isDark ? '#9CA3AF' : '#6B7280'} />
-                                                )}
-                                            </Pressable>
-                                        }
-                                        secureTextEntry={!showConfirmPassword}
-                                        autoComplete="password"
-                                        textContentType="password"
-                                        value={value}
-                                        onChangeText={onChange}
-                                        onBlur={onBlur}
-                                        error={errors.confirmPassword?.message ? t(errors.confirmPassword.message as any) : undefined}
-                                    />
-                                )}
-                            />
-                        </View>
+                            {/* Divider */}
+                            <View className="flex-row items-center gap-4 mt-8 w-full">
+                                <View className="flex-1 h-px" style={{ backgroundColor: colors.brand.bg.border }} />
+                                <Text variant="body-sm" style={{ color: colors.brand.text.subtitle }}>
+                                    {t('or')}
+                                </Text>
+                                <View className="flex-1 h-px" style={{ backgroundColor: colors.brand.bg.border }} />
+                            </View>
+                        </Animated.View>
 
-                        {/* Terms Checkbox */}
-                        <View className="mt-5 w-full">
-                            <Controller
-                                control={control}
-                                name="agreed"
-                                render={({ field: { onChange, value } }) => (
+                        {/* Email form — zIndex keeps the suggestion dropdown above later sections */}
+                        <Animated.View entering={entering(160)} style={{ width: '100%', zIndex: 30 }}>
+                            {/* Email Field — suggestion dropdown must overlay the password field */}
+                            <View className="w-full mt-6" style={{ zIndex: 30 }}>
+                                <Controller
+                                    control={control}
+                                    name="email"
+                                    render={({ field: { onChange, onBlur, value } }) => (
+                                        <EmailSuggestionInput
+                                            placeholder={t('enter_email')}
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                            autoComplete="email"
+                                            textContentType="emailAddress"
+                                            value={value}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            error={errors.email?.message ? t(errors.email.message as any) : undefined}
+                                        />
+                                    )}
+                                />
+                            </View>
+
+                            {/* Password Field */}
+                            <View className="w-full mt-2">
+                                <Controller
+                                    control={control}
+                                    name="password"
+                                    render={({ field: { onChange, onBlur, value } }) => (
+                                        <Input
+                                            placeholder={t('password')}
+                                            rightIcon={
+                                                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
+                                                    {showPassword ? (
+                                                        <EyeOff size={scale(20)} color={iconMuted} />
+                                                    ) : (
+                                                        <Eye size={scale(20)} color={iconMuted} />
+                                                    )}
+                                                </Pressable>
+                                            }
+                                            secureTextEntry={!showPassword}
+                                            autoComplete="password"
+                                            textContentType="newPassword"
+                                            value={value}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            error={errors.password?.message ? t(errors.password.message as any) : undefined}
+                                        />
+                                    )}
+                                />
+                            </View>
+
+                            {/* Confirm Password Field */}
+                            <View className="w-full mt-2">
+                                <Controller
+                                    control={control}
+                                    name="confirmPassword"
+                                    render={({ field: { onChange, onBlur, value } }) => (
+                                        <Input
+                                            placeholder={t('confirm_password')}
+                                            rightIcon={
+                                                <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={10}>
+                                                    {showConfirmPassword ? (
+                                                        <EyeOff size={scale(20)} color={iconMuted} />
+                                                    ) : (
+                                                        <Eye size={scale(20)} color={iconMuted} />
+                                                    )}
+                                                </Pressable>
+                                            }
+                                            secureTextEntry={!showConfirmPassword}
+                                            autoComplete="password"
+                                            textContentType="password"
+                                            value={value}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            error={errors.confirmPassword?.message ? t(errors.confirmPassword.message as any) : undefined}
+                                        />
+                                    )}
+                                />
+                            </View>
+
+                            {/* Terms Checkbox */}
+                            <View className="mt-5 w-full">
+                                <Controller
+                                    control={control}
+                                    name="agreed"
+                                    render={({ field: { onChange, value } }) => (
+                                        <Checkbox
+                                            checked={value}
+                                            onChange={onChange}
+                                            error={errors.agreed?.message ? t(errors.agreed.message as any) : undefined}
+                                            label={consentLabel}
+                                        />
+                                    )}
+                                />
+                            </View>
+
+                            {/* Marketing Checkbox */}
+                            <View className="mt-4 w-full">
+                                <Controller
+                                    control={control}
+                                    name="marketingOptIn"
+                                    render={({ field: { onChange, value } }) => (
+                                        <Checkbox
+                                            checked={value ?? false}
+                                            onChange={onChange}
+                                            label={t('marketing_opt_statement')}
+                                        />
+                                    )}
+                                />
+                            </View>
+
+                            {/* Submit Button */}
+                            <View className="w-full mt-6 items-center">
+                                <GradientButton
+                                    title={t('sign_up')}
+                                    onPress={handleSubmit(onSignup)}
+                                    loading={isSubmitting}
+                                    disabled={isSubmitting}
+                                    widthMode="full"
+                                    height={40}
+                                    textSize={15}
+                                />
+                            </View>
+                        </Animated.View>
+
+                    </View>
+                </KeyboardAwareScrollView>
+
+            {/* Google consent modal — shown when the terms box isn't ticked yet */}
+            <Modal
+                visible={consentModalOpen}
+                transparent
+                animationType="none"
+                statusBarTranslucent
+                hardwareAccelerated
+                onRequestClose={() => setConsentModalOpen(false)}
+            >
+                <Animated.View entering={FadeIn.duration(120)} style={modalStyles.overlay}>
+                    <Pressable style={modalStyles.backdrop} onPress={() => setConsentModalOpen(false)}>
+                        <Animated.View entering={FadeInDown.duration(180)} style={{ width: '100%', alignItems: 'center' }}>
+                            <Pressable
+                                onPress={() => undefined}
+                                style={[
+                                    modalStyles.card,
+                                    {
+                                        backgroundColor: colors.chrome.common.card,
+                                        borderColor: colors.brand.bg.border,
+                                    },
+                                ]}
+                            >
+                                <Text variant="heading-sm" className="text-center">
+                                    {t('consent_required')}
+                                </Text>
+
+                                <View style={{ marginTop: scale(18) }}>
                                     <Checkbox
-                                        checked={value}
-                                        onChange={onChange}
-                                        error={errors.agreed?.message ? t(errors.agreed.message as any) : undefined}
-                                        label={
-                                            <>
-                                                <Text variant="body-sm" className="text-gray-700 dark:text-gray-300">
-                                                    {consentParts.beforeTerms}
-                                                </Text>
-                                                {consentParts.termsLabel ? (
-                                                    <Pressable onPress={openTerms} hitSlop={5}>
-                                                        <Text variant="body-sm" className="text-[#4B68C4] font-body-semi underline mx-1">
-                                                            {consentParts.termsLabel}
-                                                        </Text>
-                                                    </Pressable>
-                                                ) : null}
-                                                <Text variant="body-sm" className="text-gray-700 dark:text-gray-300 mt-1">
-                                                    {consentParts.betweenLinks}
-                                                </Text>
-                                                {consentParts.privacyLabel ? (
-                                                    <Pressable onPress={openPrivacy} hitSlop={5}>
-                                                        <Text variant="body-sm" className="text-[#4B68C4] font-body-semi underline mx-1">
-                                                            {consentParts.privacyLabel}
-                                                        </Text>
-                                                    </Pressable>
-                                                ) : null}
-                                                <Text variant="body-sm" className="text-gray-700 dark:text-gray-300 mt-1">
-                                                    {consentParts.afterPrivacy}
-                                                </Text>
-                                            </>
-                                        }
+                                        checked={modalAgreed}
+                                        onChange={setModalAgreed}
+                                        label={consentLabel}
                                     />
-                                )}
-                            />
-                        </View>
+                                </View>
 
-                        {/* Marketing Checkbox */}
-                        <View className="mt-4 w-full">
-                            <Controller
-                                control={control}
-                                name="marketingOptIn"
-                                render={({ field: { onChange, value } }) => (
+                                <View style={{ marginTop: scale(14) }}>
                                     <Checkbox
-                                        checked={value ?? false}
-                                        onChange={onChange}
+                                        checked={modalMarketing}
+                                        onChange={setModalMarketing}
                                         label={t('marketing_opt_statement')}
                                     />
-                                )}
-                            />
-                        </View>
+                                </View>
 
-                        {/* Submit Button */}
-                        <View className="w-full mt-6 items-center">
-                            <GradientButton
-                                title={t('sign_up')}
-                                onPress={handleSubmit(onSignup)}
-                                loading={isSubmitting}
-                                disabled={!isValid || isSubmitting}
-                                widthMode="full"
-                            />
-                        </View>
-
-                        {/* Divider */}
-                        <View className="flex-row items-center gap-4 mt-6 w-full">
-                            <View className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
-                            <Text variant="body-sm" className="text-gray-500 dark:text-gray-400">
-                                {t('or')}
-                            </Text>
-                            <View className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
-                        </View>
-
-                        {/* Google Sign In */}
-                        <Pressable
-                            onPress={handleGoogleSignIn}
-                            disabled={isGoogleLoading}
-                            className="flex-row items-center justify-center w-full h-14 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 mt-6"
-                        >
-                            {isGoogleLoading ? (
-                                <Text variant="body" className="text-gray-900 dark:text-white">
-                                    {t('please_wait')}
-                                </Text>
-                            ) : (
-                                <>
-                                    <Image
-                                        source={require('@/assets/images/google-icon.png')}
-                                        style={{ width: scale(24), height: scale(24) }}
+                                <View style={{ marginTop: scale(22), width: '100%' }}>
+                                    <GradientButton
+                                        title={t('continue')}
+                                        onPress={confirmConsent}
+                                        disabled={!modalAgreed}
+                                        widthMode="full"
+                                        height={40}
+                                        textSize={15}
                                     />
-                                    <Text variant="body" className="ms-3 text-gray-900 dark:text-white font-body-semi">
-                                        {t('sign_in_with_google')}
-                                    </Text>
-                                </>
-                            )}
-                        </Pressable>
+                                </View>
 
-                        {/* Footer */}
-                        <View className="flex-row justify-center items-center gap-1 mt-auto pb-8 pt-4">
-                            <Text variant="body">
-                                {t('already_have_an_account')}
-                            </Text>
-                            <Pressable onPress={() => router.push('/(auth)/login')}>
-                                <Text variant="body" className="text-[#4B68C4] font-body-semi">
-                                    {t('login_here')}
-                                </Text>
+                                <Pressable
+                                    hitSlop={10}
+                                    onPress={() => setConsentModalOpen(false)}
+                                    style={{ marginTop: scale(14), alignSelf: 'center' }}
+                                >
+                                    <Text variant="body-sm" className="font-body-medium" style={{ color: colors.brand.text.subtitle }}>
+                                        {t('cancel')}
+                                    </Text>
+                                </Pressable>
                             </Pressable>
-                        </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                        </Animated.View>
+                    </Pressable>
+                </Animated.View>
+            </Modal>
         </SafeAreaView>
     );
 }
+
+const modalStyles = StyleSheet.create({
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    backdrop: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: scale(24),
+    },
+    card: {
+        width: '100%',
+        maxWidth: scale(360),
+        borderRadius: scale(18),
+        borderWidth: 1,
+        paddingHorizontal: scale(20),
+        paddingVertical: scale(22),
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 12,
+    },
+});

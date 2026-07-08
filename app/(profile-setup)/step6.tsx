@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -51,7 +52,7 @@ export default function Step6() {
     const { t, i18n } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const [sect, setSect] = useState('');
     const [maslak, setMaslak] = useState('');
@@ -168,36 +169,40 @@ export default function Step6() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={6} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={6}
                         title={t('step_6.title', { defaultValue: 'Religious Beliefs and Practices' })}
                         subtitle={t('step_6.subtitle', { defaultValue: 'Provide information about your religious values and practices.' })}
                     />
 
-                    <FieldLabel text={t('sect', { defaultValue: 'Sect' })} required />
-                    <SelectField value={sect ? getLabel(sect, sectOpts) : ''} placeholder={t('select_sect', { defaultValue: 'Select sect' })} onPress={() => setActiveSheet('sect')} icon={<BookOpen size={scale(18)} color={iconColor} />} hasError={!!errors.sect} />
+                    <SelectField required value={sect ? getLabel(sect, sectOpts) : ''} placeholder={t('select_sect', { defaultValue: 'Select sect' })} onPress={() => setActiveSheet('sect')} icon={<BookOpen size={scale(18)} color={iconColor} />} hasError={!!errors.sect} />
                     {errors.sect && <ErrorText text={errors.sect} />}
 
-                    <FieldLabel text={t('maslak_school', { defaultValue: 'Maslak / School of Thought' })} required />
-                    <SelectField value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder={t('select_maslak', { defaultValue: 'Select' })} onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
+                    <SelectField required value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder={t('maslak', { defaultValue: 'Maslak' })} onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
                     {errors.maslak && <ErrorText text={errors.maslak} />}
 
-                    <FieldLabel text={t('following_movement', { defaultValue: 'Following / Movement' })} />
-                    <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder={t('select_optional', { defaultValue: 'Select (optional)' })} onPress={() => setActiveSheet('following')} icon={<Star size={scale(18)} color={iconColor} />} />
+                    <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder={t('following', { defaultValue: 'Following' })} onPress={() => setActiveSheet('following')} icon={<Star size={scale(18)} color={iconColor} />} />
 
-                    <FieldLabel text={t('how_practising', { defaultValue: 'How Practising Are You?' })} required />
-                    <SelectField value={isPractising ? getLabel(isPractising, practisingOptions) : ''} placeholder={t('select_practising', { defaultValue: 'Select level' })} onPress={() => setActiveSheet('practising')} icon={<Sparkles size={scale(18)} color={iconColor} />} hasError={!!errors.isPractising} />
+                    <SelectField required value={isPractising ? getLabel(isPractising, practisingOptions) : ''} placeholder={t('practising_label', { defaultValue: 'Practising Level' })} onPress={() => setActiveSheet('practising')} icon={<Sparkles size={scale(18)} color={iconColor} />} hasError={!!errors.isPractising} />
                     {errors.isPractising && <ErrorText text={errors.isPractising} />}
 
-                    <FieldLabel text={t('prayers_title', { defaultValue: 'Prayer Habit' })} required />
-                    <SelectField value={prayers ? getLabel(prayers, prayerOptions) : ''} placeholder={t('select_prayer', { defaultValue: 'Select' })} onPress={() => setActiveSheet('prayers')} icon={<HandHeart size={scale(18)} color={iconColor} />} hasError={!!errors.prayers} />
-                    {errors.prayers && <ErrorText text={errors.prayers} />}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    <SelectField required value={prayers ? getLabel(prayers, prayerOptions) : ''} placeholder={t('prayers_title', { defaultValue: 'Prayer Habit' })} onPress={() => setActiveSheet('prayers')} icon={<HandHeart size={scale(18)} color={iconColor} />} hasError={!!errors.prayers} />
+                    {errors.prayers && <ErrorText text={errors.prayers} />}            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 

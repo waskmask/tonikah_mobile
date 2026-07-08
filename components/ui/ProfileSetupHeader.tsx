@@ -17,16 +17,6 @@ export function ProfileSetupHeader({ title, subtitle, step, totalSteps = 10 }: P
 
     return (
         <View style={styles.container}>
-            {typeof step === 'number' ? (
-                <Text
-                    variant="caption"
-                    align="center"
-                    className="font-body-semi"
-                    style={{ color: colors.chrome.primary, marginBottom: space('xs') }}
-                >
-                    {`Step ${step} / ${totalSteps}`}
-                </Text>
-            ) : null}
             <Text variant="heading-sm" align="center" style={styles.title}>
                 {title}
             </Text>

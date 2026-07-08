@@ -95,15 +95,17 @@ export default function ProfileScreen() {
     }
 
     return (
-        <UserProfileView
-            initialProfile={viewProfile}
-            mode="screen"
-            showClose={false}
-            isOwnProfile
-            onEditProfile={() => router.push('/(tabs)/edit-profile')}
-            refreshing={refreshing}
-            onRefresh={refresh}
-        />
+        <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+            <UserProfileView
+                initialProfile={viewProfile}
+                mode="screen"
+                showClose={false}
+                isOwnProfile
+                onEditProfile={() => router.push('/(tabs)/edit-profile')}
+                refreshing={refreshing}
+                onRefresh={refresh}
+            />
+        </View>
     );
 }
 

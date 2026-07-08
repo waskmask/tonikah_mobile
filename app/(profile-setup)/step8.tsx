@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
@@ -8,7 +9,7 @@ import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
-import { FieldLabel } from '@/components/ui/FormField';
+import { ErrorText } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
@@ -248,25 +249,28 @@ export default function Step8() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={8} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                bottomOffset={scale(100)}
+            >
                     <ProfileSetupHeader
                         step={8}
                         title={t('location_title', { defaultValue: 'Current location' })}
                         subtitle={t('location_desc', { defaultValue: 'Enter your present residing city and country.' })}
                     />
 
-                    <FieldLabel text={t('current_location', { defaultValue: 'Current location' })} required />
                     <Pressable
                         onPress={detectCurrentLocation}
                         disabled={detectingLocation}
                         style={[
                             styles.locationButton,
                             {
-                                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                                borderColor: errors.city ? '#EF4444' : isDark ? '#334155' : '#E2E8F0',
+                                borderBottomColor: errors.city ? '#EF4444' : isDark ? '#3A332B' : '#E8E1D6',
                                 opacity: detectingLocation ? 0.65 : 1,
                             },
                         ]}
@@ -275,7 +279,8 @@ export default function Step8() {
                             variant="body-sm"
                             numberOfLines={2}
                             style={{
-                                color: city ? (isDark ? '#E2E8F0' : '#0A0D14') : (isDark ? '#64748B' : '#9CA3AF'),
+                                // Same pair as Input placeholders / values
+                                color: city ? (isDark ? '#E8E1D6' : '#201B15') : (isDark ? '#A99C8D' : '#5C5348'),
                                 flex: 1,
                             }}
                         >
@@ -287,13 +292,8 @@ export default function Step8() {
                             <LocateFixed size={scale(18)} color="#F34B6F" />
                         )}
                     </Pressable>
-                    {errors.city ? (
-                        <Text variant="caption" style={{ color: '#EF4444', marginTop: scale(-8), marginLeft: scale(4) }}>
-                            {errors.city}
-                        </Text>
-                    ) : null}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    {errors.city ? <ErrorText text={errors.city} /> : null}
+            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
         </SafeAreaView>
@@ -302,11 +302,12 @@ export default function Step8() {
 
 const styles = StyleSheet.create({
     footer: { padding: scale(20), paddingBottom: scale(10) },
+    // Underline style, matching the app's inputs
     locationButton: {
-        minHeight: scale(54),
-        borderWidth: 1,
-        borderRadius: scale(12),
-        paddingHorizontal: scale(16),
+        minHeight: scale(48),
+        borderBottomWidth: 1,
+        backgroundColor: 'transparent',
+        paddingHorizontal: scale(6),
         marginBottom: scale(16),
         flexDirection: 'row',
         alignItems: 'center',

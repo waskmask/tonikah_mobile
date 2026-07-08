@@ -76,7 +76,7 @@ export default function MyHobbiesScreen() {
             <Text variant="body-sm" style={{ color: colors.brand.text.subtitle, marginBottom: scale(18) }}>
                 {t('click_add_hobbies', 'Click here to add Hobbies')}
             </Text>
-            <Pressable onPress={() => setSheetOpen(true)} style={{ minHeight: scale(120), borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF' }}>
+            <Pressable onPress={() => setSheetOpen(true)} style={{ minHeight: scale(120), borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#1B1713' : '#FFFFFF' }}>
                 <Text variant="body">{selectedLabels.length ? selectedLabels.join(', ') : t('select', 'Select')}</Text>
             </Pressable>
             <GradientButton title={t('save', 'Save')} onPress={save} loading={saving} disabled={saving} widthMode="full" containerStyle={{ marginTop: scale(20) }} />

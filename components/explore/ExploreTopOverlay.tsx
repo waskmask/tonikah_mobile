@@ -21,7 +21,7 @@ export function ExploreTopOverlay({
 
     return (
         <View style={[styles.root, { backgroundColor: colors.chrome.header.background, borderBottomColor: colors.chrome.common.hairline }]}>
-            <TouchableOpacity activeOpacity={0.82} onPress={onOpenFilters} style={[styles.filterButton, { backgroundColor: colors.chrome.primary, borderColor: colors.chrome.primary, shadowColor: colors.chrome.primary }]}>
+            <TouchableOpacity activeOpacity={0.82} onPress={onOpenFilters} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={[styles.filterButton, { backgroundColor: colors.chrome.primary, borderColor: colors.chrome.primary, shadowColor: colors.chrome.primary }]}>
                 <SlidersHorizontal size={scale(17)} color={colors.chrome.common.inverseText} strokeWidth={2.5} />
                 <RNText style={[styles.filterText, { color: colors.chrome.common.inverseText }]}>{t('filters', 'Filters')}</RNText>
                 {filterCount > 0 ? (
@@ -47,6 +47,8 @@ function IconButton({ children, onPress }: { children: React.ReactNode; onPress:
     return (
         <Pressable
             onPress={onPress}
+            // Visual size stays 34pt; hitSlop brings the touch target to ~44pt
+            hitSlop={6}
             style={({ pressed }) => [
                 styles.button,
                 { backgroundColor: colors.chrome.header.iconBackground, borderColor: colors.brand.bg.border },

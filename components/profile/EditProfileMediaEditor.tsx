@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scale(3),
         borderRadius: scale(999),
-        backgroundColor: 'rgba(15,23,42,0.72)',
+        backgroundColor: 'rgba(24, 19, 14,0.72)',
         paddingHorizontal: scale(7),
         paddingVertical: scale(4),
     },
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFill,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15,23,42,0.48)',
+        backgroundColor: 'rgba(24, 19, 14,0.48)',
     },
     slotActions: {
         position: 'absolute',
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
         borderRadius: scale(15),
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15,23,42,0.72)',
+        backgroundColor: 'rgba(24, 19, 14,0.72)',
     },
     deleteAction: {
         backgroundColor: '#E11D48',

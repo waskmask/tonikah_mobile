@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -37,7 +38,7 @@ export default function Step2() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const isFemale = gender === 'female';
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const languageOptions = useMemo(() => {
         return LANGUAGE_OPTIONS.map((key) => ({
@@ -101,37 +102,42 @@ export default function Step2() {
     const getLabel = (v: string, opts: SelectOption[]) => opts.find((o) => o.value === v)?.label || '';
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={2} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={2}
                         title={t('common:step_2.title', { defaultValue: 'Personal and Cultural Background' })}
                         subtitle={t('common:step_2.subtitle', { defaultValue: 'Tell us more about your cultural identity, language skills, and preferences.' })}
                     />
 
-                    <FieldLabel text={t('common:step_2.mother_tongue')} required />
-                    <SelectField value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder={t('common:select_limit_1_language', { defaultValue: 'Select language' })} onPress={() => setShowMotherTongueSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
+                    <SelectField required value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder={t('common:step_2.mother_tongue', { defaultValue: 'Mother Tongue' })} onPress={() => setShowMotherTongueSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
                     {errors.motherTongue && <ErrorText text={errors.motherTongue} />}
 
-                    <FieldLabel text={t('common:step_2.born_muslim')} required />
-                    <SelectField value={bornMuslim ? getLabel(bornMuslim, bornMuslimOptions) : ''} placeholder={t('common:select', { defaultValue: 'Select' })} onPress={() => setShowBornMuslimSheet(true)} icon={<BookOpenCheck size={scale(18)} color={iconColor} />} hasError={!!errors.bornMuslim} />
+                    <SelectField required value={bornMuslim ? getLabel(bornMuslim, bornMuslimOptions) : ''} placeholder={t('common:step_2.born_muslim', { defaultValue: 'Born Muslim?' })} onPress={() => setShowBornMuslimSheet(true)} icon={<BookOpenCheck size={scale(18)} color={iconColor} />} hasError={!!errors.bornMuslim} />
                     {errors.bornMuslim && <ErrorText text={errors.bornMuslim} />}
 
-                    <FieldLabel text={t('common:step_2.languages_spoken')} required />
-                    <SelectField value={languagesSpoken.length > 0 ? languagesSpoken.map((l) => getLabel(l, languageOptions)).join(', ') : ''} placeholder={t('common:select_limit_5_languages', { defaultValue: 'Select languages (max 5)' })} onPress={() => setShowLanguagesSheet(true)} icon={<MessageCircle size={scale(18)} color={iconColor} />} hasError={!!errors.languagesSpoken} />
+                    <SelectField required value={languagesSpoken.length > 0 ? languagesSpoken.map((l) => getLabel(l, languageOptions)).join(', ') : ''} placeholder={t('common:select_limit_5_languages', { defaultValue: 'Select languages (max 5)' })} onPress={() => setShowLanguagesSheet(true)} icon={<MessageCircle size={scale(18)} color={iconColor} />} hasError={!!errors.languagesSpoken} />
                     {errors.languagesSpoken && <ErrorText text={errors.languagesSpoken} />}
 
                     {isFemale && (
                         <>
-                            <FieldLabel text={t('common:step_2.dress')} required />
-                            <SelectField value={dress ? getLabel(dress, dressOptions) : ''} placeholder={t('common:select', { defaultValue: 'Select' })} onPress={() => setShowDressSheet(true)} icon={<Shirt size={scale(18)} color={iconColor} />} hasError={!!errors.dress} />
+                            <SelectField required value={dress ? getLabel(dress, dressOptions) : ''} placeholder={t('common:step_2.dress', { defaultValue: 'How Do You Usually Dress?' })} onPress={() => setShowDressSheet(true)} icon={<Shirt size={scale(18)} color={iconColor} />} hasError={!!errors.dress} />
                             {errors.dress && <ErrorText text={errors.dress} />}
                         </>
-                    )}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    )}            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 

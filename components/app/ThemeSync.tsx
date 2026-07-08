@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { useColorScheme as useSystemColorScheme } from "react-native";
 import { useColorScheme } from "nativewind";
 import { useThemeStore } from "@/store/themeStore";
+import { useSystemColorScheme } from "@/hooks/useSystemColorScheme";
 
 /** Keeps NativeWind `dark:` classes aligned with the Zustand theme store. */
 export function ThemeSync() {

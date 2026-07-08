@@ -15,6 +15,8 @@ import { Archive, Bell, BellOff, Check, MessageCircle, Search, Send, UserRoundPl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { UnreadBadge } from '@/components/ui/UnreadBadge';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import {
     chatService,
     Conversation,
@@ -105,12 +107,12 @@ export default function MessagesScreen() {
     const [notificationBannerBusy, setNotificationBannerBusy] = useState(false);
 
     const colors = {
-        bg: isDark ? '#0F172A' : '#FFFFFF',
-        card: isDark ? '#111827' : '#FFFFFF',
-        text: isDark ? '#E2E8F0' : '#17211D',
-        muted: isDark ? '#94A3B8' : '#64748B',
-        border: isDark ? '#1F2937' : '#E2E8F0',
-        input: isDark ? '#1E293B' : '#F1F5F9',
+        bg: palette.brand.bg.primary,
+        card: palette.chrome.common.card,
+        text: palette.chrome.common.textStrong,
+        muted: palette.chrome.common.textSubtle,
+        border: palette.brand.bg.border,
+        input: palette.chrome.common.cardAlt,
     };
 
     const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
@@ -251,8 +253,16 @@ export default function MessagesScreen() {
     if (loading) {
         return (
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
-                <View style={styles.center}>
-                    <ActivityIndicator color={primary} />
+                <View style={{ paddingHorizontal: scale(14), paddingTop: scale(16) }}>
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: scale(12), paddingVertical: scale(12) }}>
+                            <Skeleton width={scale(48)} height={scale(48)} borderRadius={scale(24)} />
+                            <View style={{ flex: 1, gap: scale(8) }}>
+                                <Skeleton width="55%" height={scale(13)} />
+                                <Skeleton width="80%" height={scale(11)} />
+                            </View>
+                        </View>
+                    ))}
                 </View>
             </SafeAreaView>
         );
@@ -296,15 +306,15 @@ export default function MessagesScreen() {
                         value={search}
                         onChangeText={setSearch}
                         placeholder={t('chat:search_placeholder', 'Search messages...')}
-                        placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
+                        placeholderTextColor={palette.brand.text.muted}
                         style={[styles.searchInput, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                     />
                 </View>
             </View>
 
             {notificationBannerVisible && (
-                <View style={[styles.notificationBanner, { backgroundColor: isDark ? '#172033' : '#FFF1F5', borderColor: isDark ? '#334155' : '#FEC9D5' }]}>
-                    <View style={styles.notificationBannerIcon}>
+                <View style={[styles.notificationBanner, { backgroundColor: palette.chrome.common.primaryTint, borderColor: palette.chrome.common.primaryRing }]}>
+                    <View style={[styles.notificationBannerIcon, { backgroundColor: palette.chrome.common.card }]}>
                         <Bell size={scale(15)} color={primary} strokeWidth={2.5} />
                     </View>
                     <View style={styles.notificationBannerText}>
@@ -315,7 +325,7 @@ export default function MessagesScreen() {
                             {t('chat:notification_banner_desc', 'Get alerts when a message or request arrives.')}
                         </Text>
                     </View>
-                    <Pressable disabled={notificationBannerBusy} onPress={enableNotificationsFromBanner} style={styles.notificationBannerAction}>
+                    <Pressable disabled={notificationBannerBusy} onPress={enableNotificationsFromBanner} hitSlop={8} style={styles.notificationBannerAction}>
                         <Text variant="caption" className="font-body-bold" style={{ color: primary }}>
                             {t('chat:notification_banner_enable', 'Enable')}
                         </Text>
@@ -328,7 +338,7 @@ export default function MessagesScreen() {
 
             {slots?.total ? (
                 <View style={styles.slotsRow}>
-                    <View style={styles.onlineDot} />
+                    <View style={[styles.onlineDot, { backgroundColor: palette.chrome.common.successStrong }]} />
                     <Text variant="caption" className="font-body-semi" style={{ color: colors.muted }}>
                         {`${slots.used || 0}/${slots.total} ${t('chat:active_conversations', 'active conversations')}`}
                     </Text>
@@ -345,24 +355,36 @@ export default function MessagesScreen() {
                 onEndReachedThreshold={0.45}
                 ListEmptyComponent={
                     <View style={styles.empty}>
-                        <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
-                            {activeTab === 'requests'
+                        <EmptyState
+                            icon={(() => {
+                                const Icon = activeTab === 'requests'
+                                    ? UserRoundPlus
+                                    : activeTab === 'sent'
+                                        ? Send
+                                        : activeTab === 'closed'
+                                            ? Archive
+                                            : MessageCircle;
+                                return <Icon size={scale(30)} color={primary} strokeWidth={1.8} />;
+                            })()}
+                            title={activeTab === 'requests'
                                 ? t('chat:no_requests_title', 'No new requests')
                                 : activeTab === 'sent'
                                     ? t('chat:no_sent_requests_title', 'No sent requests')
                                     : activeTab === 'closed'
                                         ? t('chat:no_closed_title', 'No closed chats')
                                         : t('chat:no_chats_title', 'No active chats')}
-                        </Text>
-                        <Text variant="body-sm" align="center" style={{ color: colors.muted, marginTop: scale(6) }}>
-                            {activeTab === 'requests'
+                            description={activeTab === 'requests'
                                 ? t('chat:no_requests_desc', 'Incoming chat requests appear here.')
                                 : activeTab === 'sent'
                                     ? t('chat:no_sent_requests_desc', 'Requests you sent are listed here.')
                                     : activeTab === 'closed'
                                         ? t('chat:no_closed_desc', 'Ended conversations show up here.')
                                         : t('chat:no_chats_desc', 'Your conversations will appear here.')}
-                        </Text>
+                            actions={activeTab === 'chats' ? [{
+                                label: t('explore', 'Explore'),
+                                onPress: () => router.push('/(tabs)/search'),
+                            }] : undefined}
+                        />
                     </View>
                 }
                 ListFooterComponent={loadingMore ? <ActivityIndicator color={primary} style={{ paddingVertical: scale(16) }} /> : null}
@@ -483,11 +505,11 @@ function ActionPill({ label, icon: Icon, tone, onPress }: { label: string; icon:
                 styles.actionPill,
                 isPrimary
                     ? { backgroundColor: palette.chrome.primary }
-                    : styles.actionNeutral,
+                    : { backgroundColor: palette.chrome.common.card, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.brand.bg.border },
             ]}
         >
-            <Icon size={scale(12)} color={isPrimary ? '#FFFFFF' : '#475569'} strokeWidth={2.8} />
-            <Text variant="caption" className="font-body-bold" style={{ color: isPrimary ? '#FFFFFF' : '#475569' }}>
+            <Icon size={scale(12)} color={isPrimary ? palette.chrome.common.inverseText : palette.chrome.header.icon} strokeWidth={2.8} />
+            <Text variant="caption" className="font-body-bold" style={{ color: isPrimary ? palette.chrome.common.inverseText : palette.chrome.header.icon }}>
                 {label}
             </Text>
         </Pressable>
@@ -565,13 +587,12 @@ const styles = StyleSheet.create({
         borderRadius: scale(14),
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#FFFFFF',
     },
     notificationBannerText: { flex: 1, minWidth: 0 },
     notificationBannerAction: { minHeight: scale(28), justifyContent: 'center', paddingHorizontal: scale(4) },
     notificationBannerClose: { minHeight: scale(28), justifyContent: 'center' },
-    onlineDot: { width: scale(8), height: scale(8), borderRadius: scale(4), backgroundColor: '#22C55E' },
-    empty: { flex: 1, paddingHorizontal: scale(30), paddingTop: scale(110), alignItems: 'center' },
+    onlineDot: { width: scale(8), height: scale(8), borderRadius: scale(4) },
+    empty: { flex: 1, paddingTop: scale(80), alignItems: 'center' },
     rowWrap: { borderBottomWidth: StyleSheet.hairlineWidth },
     row: { flexDirection: 'row', alignItems: 'center', gap: scale(12), paddingHorizontal: scale(14), paddingVertical: scale(12) },
     avatar: { width: scale(48), height: scale(48), borderRadius: scale(24), overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
@@ -584,5 +605,4 @@ const styles = StyleSheet.create({
     rowMeta: { flexDirection: 'row', alignItems: 'center', gap: scale(5) },
     actions: { flexDirection: 'row', alignItems: 'center', gap: scale(8), paddingLeft: scale(74), paddingBottom: scale(12) },
     actionPill: { height: scale(28), borderRadius: scale(14), paddingHorizontal: scale(12), flexDirection: 'row', alignItems: 'center', gap: scale(5) },
-    actionNeutral: { backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#CBD5E1' },
 });

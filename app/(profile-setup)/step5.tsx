@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -23,7 +24,7 @@ export default function Step5() {
     const { t, i18n } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const [education, setEducation] = useState('');
     const [occupation, setOccupation] = useState('');
@@ -128,49 +129,57 @@ export default function Step5() {
     const designationOpts = toOpts('designation');
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={5} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={5}
                         title={t('step_5.title', { defaultValue: 'Education and Career' })}
                         subtitle={t('step_5.subtitle', { defaultValue: 'Highlight academic background and current job details.' })}
                     />
 
-                    <FieldLabel text={t('education', { defaultValue: 'Education' })} required />
-                    <SelectField value={education ? getLabel(education, educationOpts) : ''} placeholder={t('select_education', { defaultValue: 'Select education' })} onPress={() => setActiveSheet('education')} icon={<GraduationCap size={scale(18)} color={iconColor} />} hasError={!!errors.education} />
+                    <SelectField required value={education ? getLabel(education, educationOpts) : ''} placeholder={t('select_education', { defaultValue: 'Select education' })} onPress={() => setActiveSheet('education')} icon={<GraduationCap size={scale(18)} color={iconColor} />} hasError={!!errors.education} />
                     {errors.education && <ErrorText text={errors.education} />}
 
-                    <FieldLabel text={t('occupation', { defaultValue: 'Occupation' })} required />
-                    <SelectField value={occupation ? getLabel(occupation, occupationOpts) : ''} placeholder={t('select_occupation', { defaultValue: 'Select occupation' })} onPress={() => setActiveSheet('occupation')} icon={<Briefcase size={scale(18)} color={iconColor} />} hasError={!!errors.occupation} />
+                    <SelectField required value={occupation ? getLabel(occupation, occupationOpts) : ''} placeholder={t('select_occupation', { defaultValue: 'Select occupation' })} onPress={() => setActiveSheet('occupation')} icon={<Briefcase size={scale(18)} color={iconColor} />} hasError={!!errors.occupation} />
                     {errors.occupation && <ErrorText text={errors.occupation} />}
 
-                    <FieldLabel text={t('designation', { defaultValue: 'Designation' })} />
-                    <SelectField value={designation ? getLabel(designation, designationOpts) : ''} placeholder={t('select_designation', { defaultValue: 'Select designation' })} onPress={() => setActiveSheet('designation')} icon={<Award size={scale(18)} color={iconColor} />} hasError={!!errors.designation} />
+                    <SelectField value={designation ? getLabel(designation, designationOpts) : ''} placeholder={t('designation', { defaultValue: 'Designation' })} onPress={() => setActiveSheet('designation')} icon={<Award size={scale(18)} color={iconColor} />} hasError={!!errors.designation} />
                     {errors.designation && <ErrorText text={errors.designation} />}
 
-                    <FieldLabel text={t('company_name', { defaultValue: 'Company name' })} />
                     <Input
-                        placeholder={t('company', { defaultValue: 'Company' })}
+                        placeholder={t('company_name', { defaultValue: 'Company name' })}
+                        containerStyle="mb-0 mt-5"
                         value={companyName}
                         onChangeText={(value) => {
                             setCompanyName(value);
                             if (errors.company) setErrors((current) => ({ ...current, company: '' }));
                         }}
-                        leftIcon={<Building2 size={scale(18)} color={iconColor} />}
+                        rightIcon={<Building2 size={scale(18)} color={iconColor} />}
                         error={errors.company}
                         maxLength={80}
                     />
 
-                    <FieldLabel text={t('annual_income', { defaultValue: 'Annual income' })} />
-                    <View style={{ flexDirection: 'row', gap: scale(8) }}>
-                        <View style={{ width: scale(100) }}>
-                            <SelectField value={currency} placeholder={t('select_currency', { defaultValue: 'Select currency' })} onPress={() => setActiveSheet('currency')} icon={<DollarSign size={scale(16)} color={iconColor} />} />
+                    <View style={{ flexDirection: 'row', gap: scale(8), alignItems: 'flex-end' }}>
+                        <View style={{ width: scale(110) }}>
+                            <SelectField value={currency} placeholder={t('currency', { defaultValue: 'Currency' })} onPress={() => setActiveSheet('currency')} icon={<DollarSign size={scale(16)} color={iconColor} />} />
                         </View>
                         <View style={{ flex: 1 }}>
                             <Input
-                                placeholder={t('amount', { defaultValue: 'Amount' })}
+                                placeholder={t('annual_income', { defaultValue: 'Annual income' })}
+                                containerStyle="mb-0 mt-5"
                                 value={annualIncome}
                                 onChangeText={(value) => {
                                     setAnnualIncome(formatAmount(value));
@@ -181,9 +190,7 @@ export default function Step5() {
                                 maxLength={12}
                             />
                         </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    </View>            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 

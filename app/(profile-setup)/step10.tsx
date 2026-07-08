@@ -10,6 +10,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -31,6 +32,7 @@ import { Typography } from '@/constants/typography';
 import { profileService } from '@/lib/profileService';
 import { galleryService, GalleryItem, GalleryPrivacy } from '@/lib/galleryService';
 import { translateApiError } from '@/lib/apiErrorTranslator';
+import { extractModerationRejection } from '@/lib/textModeration';
 import { BIO_MAX, HEADLINE_MAX, cleanHeadlineTextForSave, cleanProfileTextForSave, countNonSpace, isAllowedProfileText, normalizeProfileText, trimToNonSpaceLimit } from '@/lib/profileValidation';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
@@ -311,7 +313,13 @@ export default function Step10() {
             reset();
             router.replace('/(tabs)/search');
         } else {
-            Alert.alert(t('error'), translated(t, res.message || 'something_went_wrong', 'Something went wrong.'));
+            const rejection = extractModerationRejection(res);
+            if (rejection) {
+                setErrors((current) => ({ ...current, ...rejection.fieldErrors }));
+                Alert.alert(t('error'), rejection.userMessage);
+            } else {
+                Alert.alert(t('error'), translated(t, res.message || 'something_went_wrong', 'Something went wrong.'));
+            }
         }
 
         setSubmitting(false);
@@ -323,13 +331,14 @@ export default function Step10() {
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={10} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView
+                <KeyboardAwareScrollView
+                    style={{ flex: 1 }}
                     contentContainerStyle={ProfileSetupTokens.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
+                    bottomOffset={scale(100)}
                 >
                     <ProfileSetupHeader
                         step={10}
@@ -452,7 +461,6 @@ export default function Step10() {
                         </View>
                     )}
 
-                    <FieldLabel text={t('profile_headline')} />
                     <TextInput
                         value={headline}
                         onChangeText={(value) => {
@@ -466,8 +474,8 @@ export default function Step10() {
                             styles.input,
                             {
                                 color: colors.brand.text.body,
-                                backgroundColor: inputBackground,
-                                borderColor: errors.headline ? colors.brand.accent.error : borderColor,
+                                backgroundColor: 'transparent',
+                                borderBottomColor: errors.headline ? colors.brand.accent.error : borderColor,
                                 fontFamily: inputFontFamily,
                             },
                         ]}
@@ -477,7 +485,6 @@ export default function Step10() {
                         {countNonSpace(headline)}/{HEADLINE_MAX}
                     </Text>
 
-                    <FieldLabel text={t('bio')} />
                     <TextInput
                         value={bio}
                         onChangeText={(value) => {
@@ -493,8 +500,8 @@ export default function Step10() {
                             styles.textArea,
                             {
                                 color: colors.brand.text.body,
-                                backgroundColor: inputBackground,
-                                borderColor: errors.bio ? colors.brand.accent.error : borderColor,
+                                backgroundColor: 'transparent',
+                                borderBottomColor: errors.bio ? colors.brand.accent.error : borderColor,
                                 fontFamily: inputFontFamily,
                             },
                         ]}
@@ -503,8 +510,7 @@ export default function Step10() {
                     <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
                         {countNonSpace(bio)}/{BIO_MAX}
                     </Text>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                </KeyboardAwareScrollView>
 
             <View style={styles.footer}>
                 <GradientButton
@@ -572,7 +578,7 @@ const styles = StyleSheet.create({
     },
     busyOverlay: {
         ...StyleSheet.absoluteFill,
-        backgroundColor: 'rgba(15,23,42,0.55)',
+        backgroundColor: 'rgba(24, 19, 14,0.55)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -591,7 +597,7 @@ const styles = StyleSheet.create({
         borderRadius: scale(14),
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15,23,42,0.78)',
+        backgroundColor: 'rgba(24, 19, 14,0.78)',
     },
     slotTopButton: {
         position: 'absolute',
@@ -644,7 +650,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#0F172A',
+        shadowColor: '#141210',
         shadowOpacity: 0.16,
         shadowRadius: 4,
         shadowOffset: { width: 0, height: 2 },
@@ -653,19 +659,22 @@ const styles = StyleSheet.create({
     privacySwitchThumbOn: {
         transform: [{ translateX: scale(22) }],
     },
+    // Underline style, matching the app's inputs (labels removed — the top
+    // margin keeps the form rhythm)
     input: {
-        minHeight: scale(50),
-        borderWidth: 1,
-        borderRadius: scale(12),
-        paddingHorizontal: scale(14),
+        minHeight: scale(44),
+        marginTop: scale(22),
+        borderBottomWidth: 1,
+        paddingHorizontal: scale(6),
+        paddingVertical: 0,
         fontSize: scale(14),
     },
     textArea: {
-        minHeight: scale(132),
-        borderWidth: 1,
-        borderRadius: scale(12),
-        paddingHorizontal: scale(14),
-        paddingVertical: scale(12),
+        minHeight: scale(120),
+        marginTop: scale(22),
+        borderBottomWidth: 1,
+        paddingHorizontal: scale(6),
+        paddingVertical: scale(10),
         fontSize: scale(14),
     },
     footer: {

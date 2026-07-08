@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Text } from '@/components/ui/Text';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { space } from '@/constants/uiTokens';
@@ -12,11 +11,11 @@ interface ProgressBarProps {
     showLabel?: boolean;
 }
 
-export function ProgressBar({ currentStep, totalSteps = 10, showLabel = true }: ProgressBarProps) {
+// Segments only — no step text anywhere in the flow by design
+export function ProgressBar({ currentStep, totalSteps = 10 }: ProgressBarProps) {
     const colors = useColors();
     const track = colors.brand.bg.border;
-    const gradient = [colors.chrome.primary, colors.chrome.primaryEnd] as [string, string];
-    const percent = Math.round((currentStep / totalSteps) * 100);
+    const gradient = [colors.brand.gradient.start, colors.brand.gradient.end] as [string, string];
 
     return (
         <View style={styles.wrapper}>
@@ -46,15 +45,6 @@ export function ProgressBar({ currentStep, totalSteps = 10, showLabel = true }: 
                     );
                 })}
             </View>
-            {showLabel ? (
-                <Text
-                    variant="caption"
-                    align="center"
-                    style={[styles.label, { color: colors.brand.text.subtitle }]}
-                >
-                    {`Step ${currentStep} of ${totalSteps} · ${percent}%`}
-                </Text>
-            ) : null}
         </View>
     );
 }
@@ -75,9 +65,5 @@ const styles = StyleSheet.create({
         height: scale(4),
         borderRadius: scale(2),
         overflow: 'hidden',
-    },
-    label: {
-        fontSize: scale(12),
-        lineHeight: scale(16),
     },
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +23,7 @@ export default function Step4() {
     const { t, i18n } = useTranslation(['common', 'ethnic_groups']);
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const [height, setHeight] = useState('');
     const [complexion, setComplexion] = useState('');
@@ -98,29 +99,35 @@ export default function Step4() {
     const ethnicOpts = toOpts('ethnic_group');
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={4} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={4}
                         title={t('common:step_4.title', { defaultValue: 'Appearance' })}
                         subtitle={t('common:step_4.subtitle', { defaultValue: 'These details help others understand physical attributes respectfully.' })}
                     />
 
-                    <FieldLabel text={t('common:height', { defaultValue: 'Height' })} required />
-                    <SelectField value={height ? getLabel(height, heightOpts) : ''} placeholder={t('common:select_height', { defaultValue: 'Select height' })} onPress={() => setActiveSheet('height')} icon={<Ruler size={scale(18)} color={iconColor} />} hasError={!!errors.height} />
+                    <SelectField required value={height ? getLabel(height, heightOpts) : ''} placeholder={t('common:select_height', { defaultValue: 'Select height' })} onPress={() => setActiveSheet('height')} icon={<Ruler size={scale(18)} color={iconColor} />} hasError={!!errors.height} />
                     {errors.height && <ErrorText text={errors.height} />}
 
-                    <FieldLabel text={t('common:complexion', { defaultValue: 'Complexion' })} required />
-                    <SelectField value={complexion ? getLabel(complexion, complexionOpts) : ''} placeholder={t('common:select_complexion', { defaultValue: 'Select complexion' })} onPress={() => setActiveSheet('complexion')} icon={<Palette size={scale(18)} color={iconColor} />} hasError={!!errors.complexion} />
+                    <SelectField required value={complexion ? getLabel(complexion, complexionOpts) : ''} placeholder={t('common:select_complexion', { defaultValue: 'Select complexion' })} onPress={() => setActiveSheet('complexion')} icon={<Palette size={scale(18)} color={iconColor} />} hasError={!!errors.complexion} />
                     {errors.complexion && <ErrorText text={errors.complexion} />}
 
-                    <FieldLabel text={t('common:ethnic_group', { defaultValue: 'Ethnic Group' })} required />
-                    <SelectField value={ethnicGroup.length > 0 ? ethnicGroup.map((e) => getLabel(e, ethnicOpts)).join(', ') : ''} placeholder={t('common:select_limit_2_ethnicity', { defaultValue: 'Select ethnic group (max 2)' })} onPress={() => setActiveSheet('ethnic')} icon={<Users2 size={scale(18)} color={iconColor} />} hasError={!!errors.ethnicGroup} />
-                    {errors.ethnicGroup && <ErrorText text={errors.ethnicGroup} />}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    <SelectField required value={ethnicGroup.length > 0 ? ethnicGroup.map((e) => getLabel(e, ethnicOpts)).join(', ') : ''} placeholder={t('common:select_limit_2_ethnicity', { defaultValue: 'Select ethnic group (max 2)' })} onPress={() => setActiveSheet('ethnic')} icon={<Users2 size={scale(18)} color={iconColor} />} hasError={!!errors.ethnicGroup} />
+                    {errors.ethnicGroup && <ErrorText text={errors.ethnicGroup} />}            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 

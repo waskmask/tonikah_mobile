@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +21,7 @@ export default function Step7() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const [smoking, setSmoking] = useState('');
     const [alcohol, setAlcohol] = useState('');
@@ -73,25 +74,32 @@ export default function Step7() {
     const getLabel = (v: string, opts: SelectOption[]) => opts.find((o) => o.value === v)?.label || '';
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={7} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={7}
                         title={t('step_7.title', { defaultValue: 'Lifestyle & Habits' })}
                         subtitle={t('step_7.subtitle', { defaultValue: 'Help others understand your day-to-day habits and choices.' })}
                     />
 
-                    <FieldLabel text={t('smoking')} required />
-                    <SelectField value={smoking ? getLabel(smoking, smokingOptions) : ''} placeholder={t('select')} onPress={() => setActiveSheet('smoking')} icon={<Cigarette size={scale(18)} color={iconColor} />} hasError={!!errors.smoking} />
+                    <SelectField required value={smoking ? getLabel(smoking, smokingOptions) : ''} placeholder={t('smoking')} onPress={() => setActiveSheet('smoking')} icon={<Cigarette size={scale(18)} color={iconColor} />} hasError={!!errors.smoking} />
                     {errors.smoking && <ErrorText text={errors.smoking} />}
 
-                    <FieldLabel text={t('alcohol')} required />
-                    <SelectField value={alcohol ? getLabel(alcohol, alcoholOptions) : ''} placeholder={t('select')} onPress={() => setActiveSheet('alcohol')} icon={<Wine size={scale(18)} color={iconColor} />} hasError={!!errors.alcohol} />
-                    {errors.alcohol && <ErrorText text={errors.alcohol} />}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    <SelectField required value={alcohol ? getLabel(alcohol, alcoholOptions) : ''} placeholder={t('alcohol')} onPress={() => setActiveSheet('alcohol')} icon={<Wine size={scale(18)} color={iconColor} />} hasError={!!errors.alcohol} />
+                    {errors.alcohol && <ErrorText text={errors.alcohol} />}            </KeyboardAwareScrollView>
 
             <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
 

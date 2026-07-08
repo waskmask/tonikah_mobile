@@ -1,9 +1,9 @@
 import { useThemeStore } from "@/store/themeStore";
-import { useColorScheme } from "react-native";
+import { useSystemColorScheme } from "@/hooks/useSystemColorScheme";
 
 export const useTheme = () => {
     const { mode, setMode, toggleMode } = useThemeStore();
-    const systemColorScheme = useColorScheme();
+    const systemColorScheme = useSystemColorScheme();
 
     // Compute isDark based on mode and system preference
     const isDark =

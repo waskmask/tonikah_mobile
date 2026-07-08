@@ -28,4 +28,9 @@ export const galleryService = {
     reorder: (uuids: string[]): Promise<ApiResponse> => api.patch('/gallery/reorder', { uuids }),
     makePrimary: (uuid: string): Promise<ApiResponse> => api.patch(`/gallery/${uuid}`, { isPrimary: true }),
     updatePrivacy: (privacy: GalleryPrivacy): Promise<ApiResponse> => api.patch('/gallery/privacy', { privacy }),
+    // Owner-driven private gallery reveal (see improvements/private-gallery-chat-reveal-plan.md).
+    createGrant: (body: { viewerId: string; conversationId?: string; scope?: 'all' | 'uuids'; uuids?: string[]; ttlHours?: number; noExpiry?: boolean }): Promise<ApiResponse> =>
+        api.post('/gallery/grants', { scope: 'all', ...body }),
+    revokeGrant: (grantId: string, conversationId?: string): Promise<ApiResponse> =>
+        api.delete(`/gallery/grants/${encodeURIComponent(grantId)}${conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''}`),
 };

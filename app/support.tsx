@@ -7,13 +7,13 @@ import { apiMessage, t } from '@/lib/profileDisplay';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
 import { useToast } from '@/hooks/useToast';
 
 export default function SupportScreen() {
-    const { isDark } = useTheme();
+    const palette = useColors();
     const { currentLanguage } = useLanguage();
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
@@ -47,17 +47,18 @@ export default function SupportScreen() {
     };
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }} contentContainerStyle={{ padding: scale(18), paddingBottom: scale(120) }}>
+        <ScrollView style={{ flex: 1, backgroundColor: palette.chrome.explore.screen }} contentContainerStyle={{ padding: scale(18), paddingBottom: scale(120) }}>
             <Text variant="h2">{t('report_issue', 'Report issue')}</Text>
-            <Field label={t('support_type', 'Support type')} value={type} onChangeText={setType} isDark={isDark} />
-            <Field label={t('subject', 'Subject')} value={subject} onChangeText={setSubject} isDark={isDark} />
-            <Field label={t('message', 'Message')} value={message} onChangeText={setMessage} multiline isDark={isDark} />
+            <Field label={t('support_type', 'Support type')} value={type} onChangeText={setType} />
+            <Field label={t('subject', 'Subject')} value={subject} onChangeText={setSubject} />
+            <Field label={t('message', 'Message')} value={message} onChangeText={setMessage} multiline />
             <GradientButton title={t('send_message', 'Send Message')} onPress={submit} loading={saving} disabled={saving || subject.trim().length < 3 || message.trim().length < 10} widthMode="full" containerStyle={{ marginTop: scale(20) }} />
         </ScrollView>
     );
 }
 
-function Field({ label, isDark, ...props }: any) {
+function Field({ label, ...props }: any) {
+    const palette = useColors();
     const { currentLanguage } = useLanguage();
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
 
@@ -66,8 +67,8 @@ function Field({ label, isDark, ...props }: any) {
             <Text variant="body-sm" style={{ marginBottom: scale(6) }}>{label}</Text>
             <TextInput
                 {...props}
-                placeholderTextColor={isDark ? '#64748B' : '#9CA3AF'}
-                style={[styles.input, props.multiline && styles.textArea, { color: isDark ? '#E2E8F0' : '#0A0D14', backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0', fontFamily: inputFontFamily }]}
+                placeholderTextColor={palette.brand.text.muted}
+                style={[styles.input, props.multiline && styles.textArea, { color: palette.brand.text.body, backgroundColor: palette.chrome.common.card, borderColor: palette.brand.bg.border, fontFamily: inputFontFamily }]}
                 textAlignVertical={props.multiline ? 'top' : 'center'}
             />
         </View>

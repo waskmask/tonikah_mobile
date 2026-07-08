@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -35,7 +36,7 @@ export default function Step9() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData } = useProfileSetupStore();
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     const [profileManager, setProfileManager] = useState('');
     const [loading, setLoading] = useState(false);
@@ -70,27 +71,35 @@ export default function Step9() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={9} />
-            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                <ScrollView contentContainerStyle={ProfileSetupTokens.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView
+
+                style={{ flex: 1 }}
+
+                contentContainerStyle={ProfileSetupTokens.scrollContent}
+
+                keyboardShouldPersistTaps="handled"
+
+                showsVerticalScrollIndicator={false}
+
+                bottomOffset={scale(100)}
+
+            >
                     <ProfileSetupHeader
                         step={9}
                         title={t('profile_m_title', { defaultValue: 'Who Is Creating This Profile?' })}
                         subtitle={t('profile_m_desc', { defaultValue: 'Let us know who is operating this profile — yourself or someone on your behalf.' })}
                     />
 
-                    <FieldLabel text={t('profile_manager')} required />
-                    <SelectField
+                    <SelectField required
                         value={profileManager ? options.find((o) => o.value === profileManager)?.label || '' : ''}
                         placeholder={t('pm_placeholder')}
                         onPress={() => setShowSheet(true)}
                         icon={<UserCircle size={scale(18)} color={iconColor} />}
                         hasError={!!errors.profileManager}
                     />
-                    {errors.profileManager && <ErrorText text={errors.profileManager} />}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    {errors.profileManager && <ErrorText text={errors.profileManager} />}            </KeyboardAwareScrollView>
 
             <View style={styles.footer}>
                 <GradientButton

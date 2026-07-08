@@ -52,16 +52,16 @@ export default function MembershipsScreen() {
             <Text variant="body-sm" style={{ color: colors.brand.text.subtitle, marginBottom: scale(16) }}>
                 {t('web_handoff_required', 'Paid checkout will use secure web handoff after the one-time session endpoint is implemented.')}
             </Text>
-            <View style={{ borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF', marginBottom: scale(14) }}>
+            <View style={{ borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#1B1713' : '#FFFFFF', marginBottom: scale(14) }}>
                 <Text variant="body" className="font-body-semi">{t('current_membership', 'Current membership')}</Text>
-                <Text variant="body-sm" style={{ color: isDark ? '#94A3B8' : '#64748B', marginTop: scale(4) }}>
+                <Text variant="body-sm" style={{ color: isDark ? '#A99C8D' : '#7D7266', marginTop: scale(4) }}>
                     {membership?.active ? t('active', 'Active') : t('not_set', 'Not set')}
                 </Text>
             </View>
             {plans.map((plan) => (
-                <View key={plan.slug || plan.id || plan._id} style={{ borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#111827' : '#FFFFFF', marginBottom: scale(12) }}>
+                <View key={plan.slug || plan.id || plan._id} style={{ borderRadius: scale(16), padding: scale(14), backgroundColor: isDark ? '#1B1713' : '#FFFFFF', marginBottom: scale(12) }}>
                     <Text variant="h3">{plan.name || plan.title || plan.slug}</Text>
-                    <Text variant="body-sm" style={{ color: isDark ? '#94A3B8' : '#64748B', marginVertical: scale(8) }}>
+                    <Text variant="body-sm" style={{ color: isDark ? '#A99C8D' : '#7D7266', marginVertical: scale(8) }}>
                         {plan.price?.formatted || plan.formatted || plan.description || ''}
                     </Text>
                     <GradientButton title={t('start_free_trial', 'Start free trial')} onPress={() => startTrial(plan)} loading={starting} disabled={starting} widthMode="full" />

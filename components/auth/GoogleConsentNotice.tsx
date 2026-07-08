@@ -36,7 +36,7 @@ export function GoogleConsentNotice() {
 
     return (
         <View style={[styles.wrap, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap' }]}>
-            <Text variant="caption" align="center" className="text-gray-500 dark:text-gray-400" style={styles.text}>
+            <Text variant="caption" align="center" className="text-brand-text-subtitle" style={styles.text}>
                 {parts.beforeTerms}
             </Text>
             {parts.termsLabel ? (
@@ -47,7 +47,7 @@ export function GoogleConsentNotice() {
                 </Pressable>
             ) : null}
             {parts.betweenLinks ? (
-                <Text variant="caption" align="center" className="text-gray-500 dark:text-gray-400" style={styles.text}>
+                <Text variant="caption" align="center" className="text-brand-text-subtitle" style={styles.text}>
                     {parts.betweenLinks}
                 </Text>
             ) : null}
@@ -59,7 +59,7 @@ export function GoogleConsentNotice() {
                 </Pressable>
             ) : null}
             {parts.afterPrivacy ? (
-                <Text variant="caption" align="center" className="text-gray-500 dark:text-gray-400" style={styles.text}>
+                <Text variant="caption" align="center" className="text-brand-text-subtitle" style={styles.text}>
                     {parts.afterPrivacy}
                 </Text>
             ) : null}

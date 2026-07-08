@@ -30,7 +30,7 @@ export const Modal: React.FC<ModalProps> = ({ visible, onClose, title, children 
                     <View className="flex-row items-center justify-between px-6 py-5 border-b border-brand-bg-border">
                         <Text variant="h3">{title}</Text>
                         <TouchableOpacity onPress={onClose} className="p-1">
-                            <X size={scale(24)} stroke="#94A3B8" />
+                            <X size={scale(24)} stroke="#A99C8D" />
                         </TouchableOpacity>
                     </View>
 

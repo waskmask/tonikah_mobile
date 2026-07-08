@@ -4,26 +4,28 @@
 
 @layer base {
   :root {
-    --brand-text-heading: #000000;
-    --brand-text-body: #0A0D14;
-    --brand-text-subtitle: #6B7280;
-    --brand-text-muted: #9CA3AF;
+    --brand-text-heading: #1A1512;
+    --brand-text-body: #201B15;
+    --brand-text-subtitle: #7D7266;
+    --brand-text-muted: #A99C8D;
     --brand-bg-primary: #FFFFFF;
-    --brand-bg-surface: #F8FAFC;
-    --brand-bg-border: #E2E8F0;
-    --brand-pagination-active: #00163F;
-    --brand-pagination-inactive: #CFD2D9;
+    --brand-bg-surface: #F7F3ED;
+    --brand-bg-border: #E8E1D6;
+    --brand-pagination-active: #221B14;
+    --brand-pagination-inactive: #D9D2C7;
   }
 
-  .dark {
-    --brand-text-heading: #F1F5F9;
-    --brand-text-body: #E2E8F0;
-    --brand-text-subtitle: #94A3B8;
-    --brand-text-muted: #64748B;
-    --brand-bg-primary: #0F172A;
-    --brand-bg-surface: #1E293B;
-    --brand-bg-border: #334155;
-    --brand-pagination-active: #F1F5F9;
-    --brand-pagination-inactive: #334155;
+  /* NativeWind resolves variable overrides on the root; `.dark:root` is the
+     selector it matches in class mode (plain `.dark` never applies on native) */
+  .dark:root {
+    --brand-text-heading: #F4EEE6;
+    --brand-text-body: #E8E1D6;
+    --brand-text-subtitle: #A99C8D;
+    --brand-text-muted: #7D7266;
+    --brand-bg-primary: #141210;
+    --brand-bg-surface: #211D18;
+    --brand-bg-border: #3A332B;
+    --brand-pagination-active: #F4EEE6;
+    --brand-pagination-inactive: #3A332B;
   }
 }

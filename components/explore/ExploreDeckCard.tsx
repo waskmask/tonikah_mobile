@@ -1,9 +1,10 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { StyleSheet, Text as RNText, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Crown, MapPin, ShieldCheck } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { scale } from '@/hooks/useResponsive';
 import {
     flagEmoji,
@@ -18,6 +19,7 @@ import {
     profileTags,
 } from '@/lib/exploreProfile';
 import { t } from '@/lib/profileDisplay';
+import { useLanguage } from '@/hooks/useLanguage';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 
 export function ExploreDeckCard({
@@ -31,6 +33,7 @@ export function ExploreDeckCard({
     viewerLng?: number | null;
     onPress: () => void;
 }) {
+    const { isRTL } = useLanguage();
     const image = firstProfileImage(profile);
     const name = profileName(profile) || t('not_set', 'Not set');
     const age = profileAge(profile);
@@ -43,11 +46,11 @@ export function ExploreDeckCard({
     const tags = profileTags(profile);
 
     return (
-        <Pressable onPress={onPress} style={styles.card}>
+        <PressableScale onPress={onPress} activeScale={0.985} containerStyle={{ flex: 1 }} style={styles.card}>
             <Image source={image ? { uri: image } : PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
             <LinearGradient
-                colors={['rgba(5,8,15,0.16)', 'rgba(5,8,15,0.08)', 'rgba(5,8,15,0.92)']}
-                locations={[0, 0.45, 1]}
+                colors={['rgba(5,8,15,0.14)', 'rgba(5,8,15,0.0)', 'rgba(5,8,15,0.45)', 'rgba(5,8,15,0.96)']}
+                locations={[0, 0.42, 0.72, 1]}
                 style={StyleSheet.absoluteFill}
             />
             <View style={styles.badges}>
@@ -62,20 +65,20 @@ export function ExploreDeckCard({
                     </View>
                 ) : null}
             </View>
-            <View style={styles.info}>
+            <View style={[styles.info, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
                 {profile?.recently_active ? (
-                    <View style={styles.activeChip}>
+                    <View style={[styles.activeChip, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={styles.activeDot} />
                         <Text variant="caption" className="font-body-semi" style={{ color: '#FFFFFF' }}>
                             {t('recently_active', 'Recently active')}
                         </Text>
                     </View>
                 ) : null}
-                <Text variant="h2" style={styles.name}>
+                <Text variant="h2" numberOfLines={1} style={[styles.name, { textAlign: isRTL ? 'right' : 'left' }]}>
                     {name}{age ? `, ${age}` : ''}
                 </Text>
                 {location ? (
-                    <View style={styles.location}>
+                    <View style={[styles.location, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         {flag ? <RNText style={styles.flag}>{flag}</RNText> : <MapPin size={scale(15)} color="#FFFFFF" />}
                         <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: '#FFFFFF', flexShrink: 1 }}>
                             {location}
@@ -88,16 +91,21 @@ export function ExploreDeckCard({
                     </View>
                 ) : null}
                 {tags.length > 0 ? (
-                    <View style={styles.tags}>
-                        {tags.map((tag, index) => (
+                    <View style={[styles.tags, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        {tags.slice(0, 2).map((tag, index) => (
                             <View key={`${index}-${tag}`} style={styles.tag}>
                                 <Text variant="caption" className="font-body-semi" numberOfLines={1} style={{ color: '#FFFFFF' }}>{tag}</Text>
                             </View>
                         ))}
+                        {tags.length > 2 ? (
+                            <View style={styles.tag}>
+                                <Text variant="caption" className="font-body-semi" style={{ color: '#FFFFFF' }}>+{tags.length - 2}</Text>
+                            </View>
+                        ) : null}
                     </View>
                 ) : null}
             </View>
-        </Pressable>
+        </PressableScale>
     );
 }
 
@@ -168,9 +176,10 @@ const styles = StyleSheet.create({
     distance: { color: 'rgba(255,255,255,0.78)' },
     tags: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
+        overflow: 'hidden',
         gap: scale(7),
-        marginTop: scale(12),
+        marginTop: scale(10),
     },
     tag: {
         maxWidth: '100%',

@@ -7,6 +7,7 @@ import {
     Alert,
     StyleSheet,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -103,8 +104,13 @@ export default function Step1() {
         if (!gender) e.gender = 'Required';
         if (!dob) e.dob = 'Required';
         else {
-            const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-            if (age < 18) e.dob = 'Must be at least 18 years old';
+            // Calendar-accurate age — the old 365.25-day float math failed for
+            // people born exactly 18 years ago (leap-day drift)
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
+            if (age < 18) e.dob = t('common:age_must_be_18', { defaultValue: 'You must be at least 18 years old to use toNikah.' });
         }
         if (nationality.length === 0) e.nationality = 'Required';
         if (!grewUpIn) e.grewUpIn = 'Required';
@@ -155,8 +161,11 @@ export default function Step1() {
         );
     };
 
+    // Latest selectable birthday: 18 years ago minus one day, so picking the
+    // default always passes the 18+ check
     const maxDate = new Date();
     maxDate.setFullYear(maxDate.getFullYear() - 18);
+    maxDate.setDate(maxDate.getDate() - 1);
 
     const handleDateValueChange = (_event: unknown, selectedDate: Date) => {
         setShowDatePicker(false);
@@ -169,20 +178,18 @@ export default function Step1() {
     const getDisplayLabel = (value: string, opts: SelectOption[]) =>
         opts.find((o) => o.value === value)?.label || '';
 
-    const iconColor = isDark ? '#94A3B8' : '#6B7280';
+    const iconColor = isDark ? '#A99C8D' : '#7D7266';
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <SafeAreaView className="flex-1 bg-brand-bg-primary">
             <ProgressBar currentStep={1} />
 
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-                <ScrollView
+                <KeyboardAwareScrollView
+                    style={{ flex: 1 }}
                     contentContainerStyle={ProfileSetupTokens.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
+                    bottomOffset={scale(100)}
                 >
                     <ProfileSetupHeader
                         step={1}
@@ -191,8 +198,10 @@ export default function Step1() {
                     />
 
                     {/* Profile Name */}
-                    <FieldLabel text={t('common:step_1.profile_name', { defaultValue: 'Name' })} required />
-                    <Input
+                    <Input required
+                        // Input has its own bottom margin; SelectField below adds 22 top —
+                        // cancel ours so every field gap in the form is equal
+                        containerStyle="mb-0"
                         placeholder={t('common:step_1.profile_name_placeholder', { defaultValue: 'Profile name' })}
                         value={profileName}
                         onChangeText={(text) => {
@@ -201,12 +210,11 @@ export default function Step1() {
                         }}
                         maxLength={16}
                         error={errors.profileName}
-                        leftIcon={<User size={scale(18)} color={iconColor} />}
+                        rightIcon={<User size={scale(18)} color={iconColor} />}
                     />
 
                     {/* Gender */}
-                    <FieldLabel text={t('common:step_1.gender', { defaultValue: 'Gender' })} required />
-                    <SelectField
+                    <SelectField required
                         value={gender ? getDisplayLabel(gender, genderOptions) : ''}
                         placeholder={t('common:step_1.select_gender', { defaultValue: 'Select your gender' })}
                         onPress={() => setShowGenderSheet(true)}
@@ -216,8 +224,7 @@ export default function Step1() {
                     {errors.gender && <ErrorText text={errors.gender} />}
 
                     {/* Date of Birth */}
-                    <FieldLabel text={t('common:step_1.dob', { defaultValue: 'Date of Birth' })} required />
-                    <SelectField
+                    <SelectField required
                         value={dob ? formatDate(dob) : ''}
                         placeholder={t('common:step_1.select_dob', { defaultValue: formatDate(maxDate) })}
                         onPress={() => setShowDatePicker(true)}
@@ -238,8 +245,7 @@ export default function Step1() {
                     )}
 
                     {/* Nationality */}
-                    <FieldLabel text={t('common:step_1.nationality', { defaultValue: 'Nationality' })} required />
-                    <SelectField
+                    <SelectField required
                         value={
                             nationality.length > 0
                                 ? nationality.map((n) => getDisplayLabel(n, nationalityOptions)).join(', ')
@@ -253,8 +259,7 @@ export default function Step1() {
                     {errors.nationality && <ErrorText text={errors.nationality} />}
 
                     {/* Where Did You Grow Up */}
-                    <FieldLabel text={t('common:step_1.grew_up_in', { defaultValue: 'Where did you grow up?' })} required />
-                    <SelectField
+                    <SelectField required
                         value={grewUpIn ? getDisplayLabel(grewUpIn, countryOptions) : ''}
                         placeholder={t('common:step_1.select_country', { defaultValue: 'Where Did You Grow Up?' })}
                         onPress={() => setShowCountrySheet(true)}
@@ -262,8 +267,7 @@ export default function Step1() {
                         hasError={!!errors.grewUpIn}
                     />
                     {errors.grewUpIn && <ErrorText text={errors.grewUpIn} />}
-                </ScrollView>
-            </KeyboardAvoidingView>
+                </KeyboardAwareScrollView>
 
             {/* Next Button */}
             <View style={styles.footer}>

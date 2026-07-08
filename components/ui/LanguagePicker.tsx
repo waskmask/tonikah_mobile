@@ -3,16 +3,17 @@ import {
     View,
     Pressable,
     Modal,
-    FlatList,
+    ScrollView,
     StyleSheet,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Text } from './Text';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useTheme } from '@/hooks/useTheme';
+import { useColors } from '@/hooks/useColors';
+import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
-import { ChevronDown, Check } from 'lucide-react-native';
+import { ChevronDown, Check, Languages } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 const LANGUAGES = [
     { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -28,12 +29,18 @@ const LANGUAGES = [
     { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
 ];
 
-export function LanguagePicker() {
-    const { currentLanguage, changeLanguage } = useLanguage();
-    const { isDark } = useTheme();
+type LanguagePickerProps = {
+    variant?: 'default' | 'icon';
+};
+
+export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
+    const { currentLanguage, changeLanguage, t } = useLanguage();
+    const colors = useColors();
+    const { lightImpact } = useHaptics();
     const [visible, setVisible] = useState(false);
 
     const current = LANGUAGES.find(l => l.code === currentLanguage) || LANGUAGES[0];
+    const isIcon = variant === 'icon';
 
     const handleSelect = async (code: string) => {
         setVisible(false);
@@ -42,129 +49,153 @@ export function LanguagePicker() {
         }
     };
 
+    const openPicker = () => {
+        lightImpact();
+        setVisible(true);
+    };
+
+    const iconChipBg = colors.brand.bg.surface;
+    const iconChipBorder = colors.brand.bg.border;
+    // header.icon: #5C5348 light / #D8CFC2 dark — darker than text.subtitle in light mode
+    const iconColor = colors.chrome.header.icon;
+
     return (
         <>
-            {/* Trigger */}
             <Pressable
-                onPress={() => setVisible(true)}
-                style={[
-                    styles.trigger,
-                    {
-                        backgroundColor: isDark ? 'rgba(30,41,59,0.8)' : 'rgba(248,250,252,0.9)',
-                        borderColor: isDark ? '#334155' : '#E2E8F0',
-                    },
+                onPress={openPicker}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('language', 'Language')}
+                style={({ pressed }) => [
+                    isIcon ? styles.iconTrigger : styles.trigger,
+                    isIcon
+                        ? {
+                            backgroundColor: pressed ? colors.chrome.common.primaryTint : iconChipBg,
+                            borderColor: iconChipBorder,
+                        }
+                        : {
+                            backgroundColor: pressed
+                                ? colors.chrome.common.primaryTint
+                                : colors.brand.bg.surface,
+                            borderColor: colors.brand.bg.border,
+                        },
                 ]}
             >
-                <Text style={{ fontSize: scale(18) }}>{current.flag}</Text>
-                <Text
-                    variant="body-sm"
-                    className="font-body-medium"
-                    style={{ marginHorizontal: scale(6) }}
-                >
-                    {current.code.toUpperCase()}
-                </Text>
-                <ChevronDown
-                    size={scale(14)}
-                    color={isDark ? '#94A3B8' : '#6B7280'}
-                />
+                {isIcon ? (
+                    <Languages size={scale(18)} color={iconColor} strokeWidth={1.75} />
+                ) : (
+                    <>
+                        <Text style={{ fontSize: scale(18) }}>{current.flag}</Text>
+                        <Text
+                            variant="body-sm"
+                            className="font-body-medium"
+                            style={{ marginHorizontal: scale(6) }}
+                        >
+                            {current.code.toUpperCase()}
+                        </Text>
+                        <ChevronDown size={scale(14)} color={colors.brand.text.muted} />
+                    </>
+                )}
             </Pressable>
 
-            {/* Dropdown Modal */}
+            {/* animationType="none": the native modal animation adds ~150-300ms
+                of latency on Android before anything appears. We mount instantly
+                and run our own quick fades instead. */}
             <Modal
                 visible={visible}
                 transparent
-                animationType="fade"
+                animationType="none"
                 statusBarTranslucent
+                hardwareAccelerated
                 onRequestClose={() => setVisible(false)}
             >
-                <Pressable
-                    style={styles.overlay}
-                    onPress={() => setVisible(false)}
-                >
+                <Animated.View entering={FadeIn.duration(120)} style={styles.overlayFill}>
                     <Pressable
-                        style={[
-                            styles.dropdown,
-                            {
-                                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                                borderColor: isDark ? '#334155' : '#E2E8F0',
-                            },
-                        ]}
-                        onPress={() => { }} // Prevent closing when tapping inside
+                        style={styles.overlay}
+                        onPress={() => setVisible(false)}
                     >
-                        {/* Header */}
-                        <View style={styles.dropdownHeader}>
-                            <Text
-                                variant="body-sm"
-                                className="font-body-semi"
-                                style={{ color: isDark ? '#94A3B8' : '#6B7280' }}
+                        <Animated.View entering={FadeInDown.duration(160)} style={styles.dropdownWrap}>
+                            <Pressable
+                                style={[
+                                    styles.dropdown,
+                                    {
+                                        backgroundColor: colors.chrome.common.card,
+                                        borderColor: colors.brand.bg.border,
+                                    },
+                                ]}
+                                onPress={() => { }}
                             >
-                                Select Language
-                            </Text>
-                        </View>
-
-                        {/* Language List */}
-                        <FlatList
-                            data={LANGUAGES}
-                            keyExtractor={(item) => item.code}
-                            showsVerticalScrollIndicator={false}
-                            style={{ maxHeight: scale(380) }}
-                            renderItem={({ item }) => {
-                                const isActive = item.code === currentLanguage;
-                                return (
-                                    <Pressable
-                                        onPress={() => handleSelect(item.code)}
-                                        style={[
-                                            styles.option,
-                                            isActive && {
-                                                backgroundColor: isDark
-                                                    ? 'rgba(243,75,111,0.1)'
-                                                    : 'rgba(243,75,111,0.08)',
-                                            },
-                                        ]}
+                                <View style={styles.dropdownHeader}>
+                                    <Text
+                                        variant="body-sm"
+                                        className="font-body-semi"
+                                        style={{ color: colors.brand.text.subtitle }}
                                     >
-                                        <Text style={{ fontSize: scale(20) }}>
-                                            {item.flag}
-                                        </Text>
-                                        <Text
-                                            variant="body"
-                                            className={isActive ? 'font-body-semi' : ''}
-                                            style={[
-                                                { flex: 1, marginLeft: scale(12) },
-                                                isActive && { color: '#F34B6F' },
-                                            ]}
-                                        >
-                                            {item.name}
-                                        </Text>
-                                        {isActive && (
-                                            <View style={styles.checkCircle}>
-                                                <LinearGradient
-                                                    colors={['#F34B6F', '#E8447A']}
-                                                    start={{ x: 0, y: 0 }}
-                                                    end={{ x: 1, y: 1 }}
-                                                    style={StyleSheet.absoluteFill}
-                                                />
-                                                <Check
-                                                    size={scale(12)}
-                                                    color="#FFFFFF"
-                                                    strokeWidth={3}
-                                                />
-                                            </View>
-                                        )}
-                                    </Pressable>
-                                );
-                            }}
-                            ItemSeparatorComponent={() => (
-                                <View
-                                    style={{
-                                        height: StyleSheet.hairlineWidth,
-                                        backgroundColor: isDark ? '#334155' : '#F1F5F9',
-                                        marginHorizontal: scale(16),
-                                    }}
-                                />
-                            )}
-                        />
+                                        {t('language', 'Language')}
+                                    </Text>
+                                </View>
+
+                                <ScrollView
+                                    showsVerticalScrollIndicator={false}
+                                    style={{ maxHeight: scale(380) }}
+                                >
+                                    {LANGUAGES.map((item, index) => {
+                                        const isActive = item.code === currentLanguage;
+                                        return (
+                                            <React.Fragment key={item.code}>
+                                                {index > 0 ? (
+                                                    <View
+                                                        style={{
+                                                            height: StyleSheet.hairlineWidth,
+                                                            backgroundColor: colors.brand.bg.border,
+                                                            marginHorizontal: scale(16),
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                <Pressable
+                                                    onPress={() => handleSelect(item.code)}
+                                                    style={[
+                                                        styles.option,
+                                                        isActive && { backgroundColor: colors.chrome.common.primaryTint },
+                                                    ]}
+                                                >
+                                                    <Text style={{ fontSize: scale(20) }}>
+                                                        {item.flag}
+                                                    </Text>
+                                                    <Text
+                                                        variant="body"
+                                                        className={isActive ? 'font-body-semi' : ''}
+                                                        style={[
+                                                            { flex: 1, marginLeft: scale(12) },
+                                                            isActive && { color: colors.chrome.primary },
+                                                        ]}
+                                                    >
+                                                        {item.name}
+                                                    </Text>
+                                                    {isActive && (
+                                                        <View style={styles.checkCircle}>
+                                                            <LinearGradient
+                                                                colors={[colors.brand.gradient.start, colors.brand.gradient.end]}
+                                                                start={{ x: 0, y: 0 }}
+                                                                end={{ x: 1, y: 0 }}
+                                                                style={StyleSheet.absoluteFill}
+                                                            />
+                                                            <Check
+                                                                size={scale(12)}
+                                                                color="#FFFFFF"
+                                                                strokeWidth={3}
+                                                            />
+                                                        </View>
+                                                    )}
+                                                </Pressable>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </Pressable>
+                        </Animated.View>
                     </Pressable>
-                </Pressable>
+                </Animated.View>
             </Modal>
         </>
     );
@@ -179,12 +210,27 @@ const styles = StyleSheet.create({
         borderRadius: scale(12),
         borderWidth: 1,
     },
-    overlay: {
+    iconTrigger: {
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+    overlayFill: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    overlay: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: scale(24),
+    },
+    dropdownWrap: {
+        width: '100%',
+        alignItems: 'center',
     },
     dropdown: {
         width: '100%',

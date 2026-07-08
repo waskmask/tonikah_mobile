@@ -3,8 +3,10 @@ import { View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { AuthTopBar } from '@/components/auth/AuthTopBar';
 import { Mail, RefreshCw } from 'lucide-react-native';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { router, useLocalSearchParams } from 'expo-router';
 import { authService } from '@/lib/authService';
@@ -13,6 +15,8 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function VerifyEmailScreen() {
     const { t } = useLanguage();
+    const colors = useColors();
+    const link = colors.brand.accent.link;
     const toast = useToast();
     const { email } = useLocalSearchParams<{ email: string }>();
     const { refreshUser, user } = useAuthStore();
@@ -57,22 +61,25 @@ export default function VerifyEmailScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white dark:bg-slate-900 justify-center items-center px-6">
+        <SafeAreaView className="flex-1" style={{ backgroundColor: colors.brand.bg.primary }}>
+            <AuthTopBar />
 
-            <View className="items-center justify-center p-6 bg-[#F34B6F]/10 rounded-full mb-6">
-                <Mail size={scale(64)} color="#F34B6F" strokeWidth={1.5} />
+            <View className="flex-1 justify-center items-center px-6">
+
+            <View className="items-center justify-center p-6 rounded-full mb-6" style={{ backgroundColor: colors.chrome.common.primaryTint }}>
+                <Mail size={scale(64)} color={colors.chrome.primary} strokeWidth={1.5} />
             </View>
 
             <Text variant="h3" className="text-center mt-2">
                 {t('auth.verify_title')}
             </Text>
 
-            <Text variant="body" className="text-center text-gray-500 dark:text-gray-400 mt-4 leading-6 px-4">
+            <Text variant="body" className="text-center mt-4 leading-6 px-4" style={{ color: colors.brand.text.subtitle }}>
                 {t('auth.verify_body')}
             </Text>
 
-            <View className="bg-gray-100 dark:bg-slate-800 px-4 py-2 rounded-full mt-6">
-                <Text variant="body-sm" className="font-body-semi text-center text-gray-900 dark:text-white">
+            <View className="px-4 py-2 rounded-full mt-6" style={{ backgroundColor: colors.brand.bg.surface }}>
+                <Text variant="body-sm" className="font-body-semi text-center">
                     {email || 'your-email@example.com'}
                 </Text>
             </View>
@@ -93,8 +100,8 @@ export default function VerifyEmailScreen() {
                     className="flex-row justify-center items-center mt-5 pt-2 pb-2"
                     style={{ gap: scale(8) }}
                 >
-                    <RefreshCw size={scale(16)} color={isRefreshing ? '#9CA3AF' : '#4B68C4'} />
-                    <Text variant="body" className={`text-center font-body-semi ${isRefreshing ? 'text-gray-400' : 'text-[#4B68C4]'}`}>
+                    <RefreshCw size={scale(16)} color={isRefreshing ? colors.brand.text.muted : link} />
+                    <Text variant="body" className="text-center font-body-semi" style={{ color: isRefreshing ? colors.brand.text.muted : link }}>
                         {isRefreshing ? t('please_wait') : t('verify_email')}
                     </Text>
                 </Pressable>
@@ -102,7 +109,7 @@ export default function VerifyEmailScreen() {
 
             <View className="mt-8">
                 {cooldown > 0 ? (
-                    <Text variant="body" className="text-gray-400 dark:text-gray-500 text-center">
+                    <Text variant="body" className="text-center" style={{ color: colors.brand.text.muted }}>
                         {t('auth.resend_cooldown', { seconds: cooldown })}
                     </Text>
                 ) : (
@@ -112,13 +119,14 @@ export default function VerifyEmailScreen() {
                         hitSlop={10}
                         className="flex-row justify-center items-center pt-2 pb-2"
                     >
-                        <Text variant="body" className={`text-center font-body-semi ${isResending ? 'text-gray-400' : 'text-[#4B68C4]'}`}>
+                        <Text variant="body" className="text-center font-body-semi" style={{ color: isResending ? colors.brand.text.muted : link }}>
                             {t('auth.resend_verification')}
                         </Text>
                     </Pressable>
                 )}
             </View>
 
+            </View>
         </SafeAreaView>
     );
 }

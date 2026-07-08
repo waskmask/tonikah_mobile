@@ -14,7 +14,6 @@ import {
 import { Gesture, GestureDetector, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import Animated, {
     runOnJS,
-    useAnimatedScrollHandler,
     useAnimatedStyle,
     useSharedValue,
     withSpring,
@@ -62,6 +61,7 @@ import { scale, wp } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
+import { useChatSocket } from '@/hooks/useChatSocket';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
@@ -90,8 +90,8 @@ import {
     profileName,
 } from '@/lib/exploreProfile';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
-
-const AnimatedScrollView = Animated.createAnimatedComponent(GHScrollView);
+import { formatProfileManagerBadge } from '@/lib/profileManager';
+import { ProfileManagerBadge } from '@/components/profile/ProfileManagerBadge';
 
 type Fact = { icon: LucideIcon; label: string; value: string };
 type PendingProfileToast = {
@@ -306,6 +306,16 @@ export function UserProfileView({
         if (resolvedUserId) void load();
     }, [load, resolvedUserId]);
 
+    // Refetch when the viewed owner grants/revokes private gallery access so
+    // private photos appear or hide in real time.
+    useChatSocket({
+        enabled: Boolean(resolvedUserId) && !isOwnProfile,
+        onGalleryAccessChanged: (payload: any) => {
+            if (!payload?.ownerId || String(payload.ownerId) !== String(resolvedUserId)) return;
+            void load();
+        },
+    });
+
     useEffect(() => {
         if (messageSheetOpen || !pendingProfileToast) return;
         const timer = setTimeout(() => {
@@ -347,18 +357,14 @@ export function UserProfileView({
 
     const scrollY = useSharedValue(0);
     const dragY = useSharedValue(0);
-    const setScrollOffset = useCallback((value: number) => {
-        scrollOffsetRef.current = value;
-    }, []);
 
-    const scrollHandler = useAnimatedScrollHandler({
-        onScroll: (event) => {
-            scrollY.value = event.contentOffset.y;
-            runOnJS(setScrollOffset)(event.contentOffset.y);
-        },
-    });
+    const handleProfileScroll = useCallback((offsetY: number) => {
+        scrollOffsetRef.current = offsetY;
+        scrollY.value = offsetY;
+    }, [scrollY]);
 
-    const modalDismissGesture = useMemo(() => Gesture.Pan()
+    // Swipe-to-dismiss only on the header — wrapping the whole sheet blocks ScrollView on Android.
+    const headerDismissGesture = useMemo(() => Gesture.Pan()
         .enabled(mode === 'modal')
         .activeOffsetY(8)
         .failOffsetX([-32, 32])
@@ -375,12 +381,6 @@ export function UserProfileView({
             }
             dragY.value = withSpring(0);
         }), [mode, close]);
-
-    const modalScrollGesture = useMemo(() => Gesture.Native(), []);
-    const modalGesture = useMemo(
-        () => Gesture.Simultaneous(modalDismissGesture, modalScrollGesture),
-        [modalDismissGesture, modalScrollGesture],
-    );
 
     const modalSheetStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: mode === 'modal' ? dragY.value : 0 }],
@@ -597,9 +597,12 @@ export function UserProfileView({
         );
     }
 
-    return (
-        <GestureDetector gesture={mode === 'modal' ? modalGesture : Gesture.Native()}>
-            <Animated.View style={[{ flex: 1, backgroundColor: colors.brand.bg.surface }, modalSheetStyle]}>
+    const ProfileRootComponent = mode === 'modal' ? Animated.View : View;
+    const profileRootStyle = mode === 'modal'
+        ? [{ flex: 1, backgroundColor: colors.brand.bg.surface }, modalSheetStyle]
+        : [{ flex: 1, backgroundColor: colors.brand.bg.surface }];
+
+    const headerBar = (
             <View
                 style={[
                     styles.header,
@@ -645,11 +648,20 @@ export function UserProfileView({
                     </>
                 )}
             </View>
+    );
 
-            <AnimatedScrollView
+    return (
+            <ProfileRootComponent style={profileRootStyle}>
+            {mode === 'modal' ? (
+                <GestureDetector gesture={headerDismissGesture}>{headerBar}</GestureDetector>
+            ) : headerBar}
+
+            <GHScrollView
+                style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
-                onScroll={scrollHandler}
+                nestedScrollEnabled
                 scrollEventThrottle={16}
+                onScroll={(event) => handleProfileScroll(event.nativeEvent.contentOffset.y)}
                 refreshControl={onRefresh ? (
                     <RefreshControl
                         refreshing={refreshing}
@@ -674,6 +686,7 @@ export function UserProfileView({
                     countryFlag={countryFlag}
                     verified={verified}
                     activeMembership={activeMembership}
+                    profileManagerLabel={formatProfileManagerBadge(profile?.profile_manager)}
                     onOpenPhoto={(index) => setLightboxIndex(index)}
                     isDark={isDark}
                 />
@@ -755,7 +768,7 @@ export function UserProfileView({
                     </View>
                 </View>
                 ) : null}
-            </AnimatedScrollView>
+            </GHScrollView>
 
             <ImageLightbox
                 photos={photos}
@@ -798,8 +811,7 @@ export function UserProfileView({
                 }}
                 onConfirm={confirmBlockUser}
             />
-            </Animated.View>
-        </GestureDetector>
+            </ProfileRootComponent>
     );
 }
 
@@ -1083,6 +1095,7 @@ function ProfileGallery({
     countryFlag,
     verified,
     activeMembership,
+    profileManagerLabel,
     onOpenPhoto,
     isDark,
 }: {
@@ -1095,17 +1108,26 @@ function ProfileGallery({
     countryFlag: string;
     verified: boolean;
     activeMembership: boolean;
+    profileManagerLabel?: string | null;
     onOpenPhoto: (index: number) => void;
     isDark: boolean;
 }) {
     const palette = useColors();
+    const { isRTL } = useLanguage();
     const slots = [0, 1, 2].map((index) => photos[index] || '');
     const slideWidth = Math.round(SCREEN_WIDTH * 0.68);
     const showPrivateBadge = privateGallery && photos.length > 0;
 
     return (
         <View style={[styles.gallery, { backgroundColor: palette.chrome.common.card }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={slideWidth} decelerationRate="fast">
+            <GHScrollView
+                horizontal
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={slideWidth}
+                decelerationRate="fast"
+                directionalLockEnabled
+            >
                 {slots.map((src, index) => (
                     <Pressable
                         key={`${src}-${index}`}
@@ -1120,30 +1142,47 @@ function ProfileGallery({
                         />
                     </Pressable>
                 ))}
-            </ScrollView>
-            <LinearGradient colors={['rgba(15,23,42,0.02)', 'rgba(15,23,42,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
+            </GHScrollView>
+            <LinearGradient colors={['rgba(24, 19, 14,0.02)', 'rgba(24, 19, 14,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
             <View style={styles.galleryBadges}>
-                {showPrivateBadge ? (
-                    <View style={styles.privateBadge} accessibilityLabel={t('gallery_isprivate', 'User gallery is private')}>
-                        <Lock size={scale(18)} color={palette.chrome.common.inverseText} />
-                    </View>
-                ) : null}
                 {photos.length > 0 ? (
                     <View style={styles.photoCount}>
                         <Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>{photos.length}</Text>
                     </View>
                 ) : null}
             </View>
-            <View style={styles.galleryIdentity} pointerEvents="none">
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(8), flexWrap: 'wrap' }}>
-                    <Text variant="h2" numberOfLines={2} style={{ color: palette.chrome.common.inverseText, fontSize: scale(23), lineHeight: scale(28), flexShrink: 1 }}>
+            <View style={styles.galleryIdentity} pointerEvents="box-none">
+                {(verified || activeMembership || showPrivateBadge || profileManagerLabel) ? (
+                    <View style={[styles.trustRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} pointerEvents="box-none">
+                        {verified ? (
+                            <TrustChip
+                                icon={<ShieldCheck size={scale(13)} color={palette.chrome.common.inverseText} fill="#3D63F3" />}
+                                label={t('badge_verified', 'Verified')}
+                            />
+                        ) : null}
+                        {activeMembership ? (
+                            <TrustChip
+                                icon={<Sparkles size={scale(13)} color={palette.chrome.common.inverseText} />}
+                                label={t('badge_member', 'Member')}
+                            />
+                        ) : null}
+                        {profileManagerLabel ? <ProfileManagerBadge label={profileManagerLabel} onDark /> : null}
+                        {showPrivateBadge ? (
+                            <TrustChip
+                                icon={<Lock size={scale(13)} color={palette.chrome.common.inverseText} />}
+                                label={t('badge_private_gallery', 'Private gallery')}
+                                accessibilityLabel={t('gallery_isprivate', 'User gallery is private')}
+                            />
+                        ) : null}
+                    </View>
+                ) : null}
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: scale(8), flexWrap: 'wrap' }} pointerEvents="none">
+                    <Text variant="h2" numberOfLines={2} style={{ color: palette.chrome.common.inverseText, fontSize: scale(23), lineHeight: scale(28), flexShrink: 1, textAlign: isRTL ? 'right' : 'left' }}>
                         {name}{age ? `, ${age}` : ''}
                     </Text>
-                    {verified ? <ShieldCheck size={scale(22)} color={palette.chrome.common.inverseText} fill="#3D63F3" /> : null}
-                    {activeMembership ? <View style={styles.membershipBadge}><Text variant="caption" style={{ color: palette.chrome.common.inverseText }}>M</Text></View> : null}
                 </View>
                 {location ? (
-                    <View style={styles.heroLocationRow}>
+                    <View style={[styles.heroLocationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         {countryFlag ? <Text variant="body-sm" style={styles.heroLocationFlag}>{countryFlag}</Text> : <MapPin size={scale(15)} color={palette.chrome.common.inverseText} />}
                         <Text variant="body-sm" numberOfLines={1} style={{ color: palette.chrome.common.inverseText, flexShrink: 1 }}>
                             {location}
@@ -1151,6 +1190,19 @@ function ProfileGallery({
                     </View>
                 ) : null}
             </View>
+        </View>
+    );
+}
+
+/** Small translucent pill used in the gallery hero trust row. */
+function TrustChip({ icon, label, accessibilityLabel }: { icon: React.ReactNode; label: string; accessibilityLabel?: string }) {
+    const palette = useColors();
+    return (
+        <View style={styles.trustChip} accessibilityLabel={accessibilityLabel || label}>
+            {icon}
+            <Text variant="caption" className="font-body-bold" numberOfLines={1} style={{ color: palette.chrome.common.inverseText, flexShrink: 1 }}>
+                {label}
+            </Text>
         </View>
     );
 }
@@ -1431,19 +1483,28 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scale(8),
     },
-    privateBadge: {
-        width: scale(32),
-        height: scale(32),
-        borderRadius: scale(16),
-        backgroundColor: 'rgba(15,23,42,0.62)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    photoCount: { minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(15,23,42,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
+    photoCount: { minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(24, 19, 14,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
     galleryIdentity: { position: 'absolute', left: scale(18), right: scale(18), bottom: scale(18) },
+    trustRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: scale(6),
+        marginBottom: scale(8),
+    },
+    trustChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
+        borderRadius: scale(999),
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.25)',
+        backgroundColor: 'rgba(0,0,0,0.38)',
+        paddingHorizontal: scale(10),
+        paddingVertical: scale(5),
+    },
     heroLocationRow: { flexDirection: 'row', alignItems: 'center', gap: scale(6), marginTop: scale(5) },
     heroLocationFlag: { lineHeight: scale(18) },
-    membershipBadge: { width: scale(22), height: scale(22), borderRadius: scale(11), backgroundColor: '#F34B6F', alignItems: 'center', justifyContent: 'center' },
     section: {
         borderTopWidth: 1,
         paddingHorizontal: scale(18),
@@ -1456,7 +1517,7 @@ const styles = StyleSheet.create({
         gap: scale(12),
         marginBottom: scale(14),
     },
-    sectionTitle: { textTransform: 'uppercase', letterSpacing: 2, color: '#1F2A24', fontSize: scale(13), flexShrink: 1 },
+    sectionTitle: { textTransform: 'uppercase', letterSpacing: 2, color: '#241E17', fontSize: scale(13), flexShrink: 1 },
     sectionAction: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1472,7 +1533,7 @@ const styles = StyleSheet.create({
     partnerAbout: { lineHeight: scale(24), marginBottom: scale(14) },
     factRow: { alignItems: 'flex-start', gap: scale(12) },
     factIcon: { width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: 'rgba(243,75,111,0.08)', alignItems: 'center', justifyContent: 'center' },
-    factLabel: { color: '#7A8480', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: scale(3) },
+    factLabel: { color: '#8A8073', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: scale(3) },
     chipWrap: { flexWrap: 'wrap', gap: scale(8) },
     chip: { borderWidth: 1, borderRadius: scale(999), paddingHorizontal: scale(12), paddingVertical: scale(8) },
     emojiChip: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
@@ -1525,7 +1586,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(15,23,42,0.28)',
+        backgroundColor: 'rgba(24, 19, 14,0.28)',
     },
     profileMenu: {
         position: 'absolute',
@@ -1586,7 +1647,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
     profileMenuItemPressed: {
-        backgroundColor: 'rgba(148,163,184,0.12)',
+        backgroundColor: 'rgba(160, 146, 128,0.12)',
     },
     confirmLayer: {
         flex: 1,
@@ -1600,7 +1661,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(15,23,42,0.42)',
+        backgroundColor: 'rgba(24, 19, 14,0.42)',
     },
     confirmCard: {
         width: '100%',
@@ -1651,7 +1712,7 @@ const styles = StyleSheet.create({
     messageOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: 'rgba(15,23,42,0.35)',
+        backgroundColor: 'rgba(24, 19, 14,0.35)',
     },
     messageBackdrop: {
         ...StyleSheet.absoluteFill,

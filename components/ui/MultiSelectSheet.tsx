@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     View,
     Pressable,
@@ -9,8 +9,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     Dimensions,
-    Animated,
 } from 'react-native';
+import Animated, { FadeIn, SlideInDown, SlideInLeft, SlideInRight } from 'react-native-reanimated';
 import { Text } from './Text';
 import { GradientButton } from './GradientButton';
 import { useTheme } from '@/hooks/useTheme';
@@ -47,8 +47,6 @@ const normalizeSearchText = (value: string) =>
         .trim()
         .toLowerCase();
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export function MultiSelectSheet({
     visible,
     onClose,
@@ -70,39 +68,9 @@ export function MultiSelectSheet({
     const [localSelected, setLocalSelected] = useState<string[]>(initialSelected);
     const resolvedPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
     const isDrawer = resolvedPresentation === 'drawer';
-    const drawerStartX = isRTL ? -Dimensions.get('window').width : Dimensions.get('window').width;
-    const drawerX = useRef(new Animated.Value(drawerStartX)).current;
-    const sheetY = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-    const overlayOpacity = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        if (!visible) return;
-
-        if (isDrawer) {
-            drawerX.setValue(drawerStartX);
-            Animated.timing(drawerX, {
-                toValue: 0,
-                duration: 240,
-                useNativeDriver: true,
-            }).start();
-            return;
-        }
-
-        overlayOpacity.setValue(0);
-        sheetY.setValue(Dimensions.get('window').height);
-        Animated.parallel([
-            Animated.timing(overlayOpacity, {
-                toValue: 1,
-                duration: 180,
-                useNativeDriver: true,
-            }),
-            Animated.timing(sheetY, {
-                toValue: 0,
-                duration: 240,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, [drawerStartX, drawerX, isDrawer, overlayOpacity, sheetY, visible]);
+    // Reanimated `entering` starts when the view mounts inside the modal
+    // window — effect-driven animations race the window and look stuck.
+    const drawerEntering = isRTL ? SlideInLeft.duration(220) : SlideInRight.duration(220);
 
     // Sync when initial changes
     React.useEffect(() => {
@@ -146,34 +114,34 @@ export function MultiSelectSheet({
     return (
         <Modal
             visible={visible}
-            transparent={resolvedPresentation === 'sheet'}
+            // transparent always: an opaque modal window flashes white before
+            // the first frame paints
+            transparent
             animationType="none"
             statusBarTranslucent
+            hardwareAccelerated
             onRequestClose={handleClose}
         >
             <View style={isDrawer ? styles.drawerOverlay : styles.modalRoot}>
                 {!isDrawer && (
-                    <AnimatedPressable
-                        style={[styles.backdrop, { opacity: overlayOpacity }]}
-                        onPress={handleClose}
-                    />
+                    <Animated.View entering={FadeIn.duration(140)} style={styles.backdrop}>
+                        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+                    </Animated.View>
                 )}
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={isDrawer ? styles.drawerWrapper : styles.sheetWrapper}
                     pointerEvents="box-none"
                 >
-                    <AnimatedPressable
+                    <Animated.View
+                        entering={isDrawer ? drawerEntering : SlideInDown.duration(240)}
                         style={[
                             isDrawer ? styles.drawer : styles.sheet,
                             { backgroundColor: palette.chrome.common.card },
-                            isDrawer && {
-                                paddingTop: insets.top + 18,
-                                transform: [{ translateX: drawerX }],
-                            },
-                            !isDrawer && { transform: [{ translateY: sheetY }] },
+                            // Footer button sits at the same height as the page CTA
+                            isDrawer && { paddingTop: insets.top + 18, paddingBottom: insets.bottom + scale(10) },
+                            !isDrawer && { paddingBottom: insets.bottom + scale(16) },
                         ]}
-                        onPress={() => { }}
                     >
                         {!isDrawer && (
                             <View style={styles.handleBar}>
@@ -186,7 +154,7 @@ export function MultiSelectSheet({
                             </View>
                         )}
 
-                        {/* Header */}
+                        {/* Header: back arrow + centered title */}
                         <View style={[styles.header, isDrawer && styles.drawerHeader]}>
                             {isDrawer && (
                                 <Pressable onPress={handleClose} hitSlop={12} style={styles.backButton}>
@@ -197,27 +165,16 @@ export function MultiSelectSheet({
                                     )}
                                 </Pressable>
                             )}
-                            <View style={{ flex: 1 }}>
-                                <Text
-                                    variant="body-sm"
-                                    className="font-body-bold"
-                                    style={[styles.drawerTitle, !isDrawer && styles.sheetTitle]}
-                                >
-                                    {title}
-                                </Text>
-                                {maxSelections && (
-                                    <Text
-                                        variant="body-sm"
-                                        style={{
-                                            color: palette.brand.text.muted,
-                                            marginTop: scale(2),
-                                        }}
-                                    >
-                                        {localSelected.length}/{maxSelections} {t('selected', 'selected')}
-                                    </Text>
-                                )}
-                            </View>
-                            {!isDrawer && (
+                            <Text
+                                variant="body-sm"
+                                className="font-body-bold"
+                                style={[styles.drawerTitle, !isDrawer && styles.sheetTitle]}
+                            >
+                                {title}
+                            </Text>
+                            {isDrawer ? (
+                                <View style={styles.headerSpacer} />
+                            ) : (
                                 <Pressable onPress={handleClose} hitSlop={12}>
                                     <X size={scale(20)} color={palette.brand.text.subtitle} />
                                 </Pressable>
@@ -229,10 +186,7 @@ export function MultiSelectSheet({
                             <View
                                 style={[
                                     styles.searchContainer,
-                                    {
-                                        backgroundColor: palette.brand.bg.surface,
-                                        borderColor: palette.brand.bg.border,
-                                    },
+                                    { borderBottomColor: palette.brand.bg.border },
                                 ]}
                             >
                                 <Search size={scale(16)} color={palette.brand.text.muted} />
@@ -265,6 +219,8 @@ export function MultiSelectSheet({
                             showsVerticalScrollIndicator={false}
                             style={isDrawer ? styles.drawerList : { maxHeight: scale(350) }}
                             keyboardShouldPersistTaps="handled"
+                            initialNumToRender={16}
+                            removeClippedSubviews
                             renderItem={({ item }) => {
                                 const isChecked = localSelected.includes(item.value);
                                 const isMaxed = !isChecked && maxSelections
@@ -305,7 +261,8 @@ export function MultiSelectSheet({
                                         <Text
                                             variant="body"
                                             style={[
-                                                { flex: 1, marginLeft: scale(12) },
+                                                // Dark ink in light mode, warm white in dark mode
+                                                { flex: 1, marginLeft: scale(12), color: palette.brand.text.body },
                                                 isChecked && { color: palette.chrome.primary },
                                             ]}
                                         >
@@ -323,15 +280,24 @@ export function MultiSelectSheet({
                             }
                         />
 
-                        {/* Done button */}
+                        {/* Selection count + Done button */}
                         <View style={styles.footer}>
+                            <Text
+                                variant="caption"
+                                align="center"
+                                style={[styles.countText, { color: palette.brand.text.muted }]}
+                            >
+                                {maxSelections
+                                    ? `${localSelected.length}/${maxSelections} ${t('selected', 'selected')}`
+                                    : `${localSelected.length} ${t('selected', 'selected')}`}
+                            </Text>
                             <GradientButton
-                                title={`${t('done', 'Done')}${localSelected.length > 0 ? ` (${localSelected.length})` : ''}`}
+                                title={t('done', 'Done')}
                                 onPress={handleDone}
                                 disabled={localSelected.length === 0}
                             />
                         </View>
-                    </AnimatedPressable>
+                    </Animated.View>
                 </KeyboardAvoidingView>
             </View>
         </Modal>
@@ -390,16 +356,20 @@ const styles = StyleSheet.create({
         paddingVertical: scale(12),
     },
     drawerHeader: {
-        justifyContent: 'flex-start',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         gap: 8,
         paddingTop: 4,
         paddingBottom: 14,
         paddingHorizontal: 18,
     },
     drawerTitle: {
-        fontSize: 14,
-        lineHeight: 18,
+        flex: 1,
+        fontSize: scale(16),
+        lineHeight: scale(21),
+        textAlign: 'center',
+    },
+    headerSpacer: {
+        width: 34,
     },
     sheetTitle: {
         fontSize: 14,
@@ -413,15 +383,15 @@ const styles = StyleSheet.create({
         marginLeft: -8,
         marginTop: -3,
     },
+    // Underline style, matching the app's inputs
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         marginHorizontal: scale(20),
         marginBottom: scale(10),
-        paddingHorizontal: scale(12),
-        height: scale(46),
-        borderRadius: scale(12),
-        borderWidth: 1,
+        paddingHorizontal: scale(6),
+        height: scale(44),
+        borderBottomWidth: 1,
         gap: scale(8),
     },
     searchInput: {
@@ -438,16 +408,23 @@ const styles = StyleSheet.create({
     drawerList: {
         flex: 1,
     },
+    // Same size + stroke as the single-select radio
     checkbox: {
-        width: scale(22),
-        height: scale(22),
+        width: scale(20),
+        height: scale(20),
         borderRadius: scale(6),
-        borderWidth: 2,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
     },
     footer: {
         paddingHorizontal: scale(20),
-        paddingTop: scale(12),
+        paddingTop: scale(6),
+        paddingBottom: scale(10),
+    },
+    countText: {
+        fontSize: scale(11),
+        lineHeight: scale(15),
+        marginBottom: scale(8),
     },
 });

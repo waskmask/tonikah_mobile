@@ -10,7 +10,7 @@ export default function ProfileSetupLayout() {
                 headerShown: false,
                 animation: 'slide_from_right',
                 contentStyle: {
-                    backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+                    backgroundColor: isDark ? '#141210' : '#FFFFFF',
                 },
                 gestureEnabled: true,
             }}

@@ -84,8 +84,8 @@ function Field({ label, isDark, style, ...props }: any) {
             <Text variant="body-sm" style={{ marginBottom: scale(6) }}>{label}</Text>
             <TextInput
                 {...props}
-                placeholderTextColor={isDark ? '#64748B' : '#9CA3AF'}
-                style={[styles.input, props.multiline && styles.textArea, { color: isDark ? '#E2E8F0' : '#0A0D14', backgroundColor: isDark ? '#111827' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0', fontFamily: inputFontFamily }]}
+                placeholderTextColor={isDark ? '#7D7266' : '#A99C8D'}
+                style={[styles.input, props.multiline && styles.textArea, { color: isDark ? '#E8E1D6' : '#201B15', backgroundColor: isDark ? '#1B1713' : '#FFFFFF', borderColor: isDark ? '#3A332B' : '#E8E1D6', fontFamily: inputFontFamily }]}
                 textAlignVertical={props.multiline ? 'top' : 'center'}
             />
         </View>

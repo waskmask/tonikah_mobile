@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-native';
 import { Bookmark, Compass, History, Send, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -47,12 +47,25 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     const insets = useSafeAreaInsets();
     const { lightImpact } = useHaptics();
     const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+    // Spinner only appears when a tab switch takes noticeably long; instant
+    // switches keep the icon so there is no one-frame spinner flash.
+    const [spinnerRoute, setSpinnerRoute] = useState<string | null>(null);
+    const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const activeRouteName = state.routes[state.index]?.name;
 
     useEffect(() => {
         setPendingRoute(null);
+        setSpinnerRoute(null);
+        if (spinnerTimerRef.current) {
+            clearTimeout(spinnerTimerRef.current);
+            spinnerTimerRef.current = null;
+        }
     }, [activeRouteName]);
+
+    useEffect(() => () => {
+        if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
+    }, []);
 
     const refreshUnreadCount = useCallback(async () => {
         try {
@@ -153,6 +166,8 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                         if (isFocused || event.defaultPrevented) return;
                         lightImpact();
                         setPendingRoute(item.name);
+                        if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
+                        spinnerTimerRef.current = setTimeout(() => setSpinnerRoute(item.name), 250);
                         navigation.navigate(item.route.name, item.route.params);
                     }
 
@@ -170,11 +185,11 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                         >
                             <View style={styles.iconSlot}>
                                 <View style={styles.iconWrap}>
-                                    {pending ? (
+                                    {spinnerRoute === item.name && !isFocused ? (
                                         <ActivityIndicator size="small" color={color} />
                                     ) : (
                                         <item.Icon
-                                            size={scale(20)}
+                                            size={scale(23)}
                                             color={color}
                                             strokeWidth={isActive ? ACTIVE_STROKE : INACTIVE_STROKE}
                                             fill={fill}
@@ -202,8 +217,8 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                         styles.label,
                                         {
                                             color,
-                                            fontSize: scale(8),
-                                            lineHeight: scale(12),
+                                            fontSize: scale(10),
+                                            lineHeight: scale(13),
                                             fontFamily: labelFontFamily,
                                         },
                                     ]}

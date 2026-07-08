@@ -67,7 +67,7 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
             >
                 {/* Checkbox Box */}
                 <Animated.View
-                    className="w-6 h-6 rounded-md border-2 items-center justify-center overflow-hidden bg-white dark:bg-slate-800"
+                    className="w-6 h-6 rounded-md border-2 items-center justify-center overflow-hidden bg-white dark:bg-brand-bg-surface"
                     style={[boxStyle, { marginTop: scale(2) }]}
                 >
                     {checked && (
@@ -88,7 +88,7 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
                 {/* Label */}
                 <View className="flex-1">
                     {typeof label === 'string' ? (
-                        <Text variant="body-sm" className="leading-5 text-gray-700 dark:text-gray-300 flex-wrap text-left">
+                        <Text variant="body-sm" className="leading-5 text-brand-text-subtitle flex-wrap text-left">
                             {label}
                         </Text>
                     ) : (

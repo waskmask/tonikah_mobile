@@ -1,20 +1,13 @@
-import { Platform } from "react-native";
-
-const iosSystemFont = undefined;
-const androidBody = {
-    regular: "Inter_400Regular",
-    medium: "Inter_500Medium",
-    semi: "Inter_600SemiBold",
-    bold: "Inter_700Bold",
+// Single brand family: Plus Jakarta Sans for all Latin text on BOTH platforms
+// (closest open match to the web app's Proxima Nova). Hierarchy comes from
+// weight + size, not family switching. Arabic always uses Noto Sans Arabic.
+const jakarta = {
+    regular: "PlusJakartaSans_400Regular",
+    medium: "PlusJakartaSans_500Medium",
+    semi: "PlusJakartaSans_600SemiBold",
+    bold: "PlusJakartaSans_700Bold",
+    extra: "PlusJakartaSans_800ExtraBold",
 };
-const androidHeading = {
-    extra: "Manrope_800ExtraBold",
-    bold: "Manrope_700Bold",
-    semi: "Manrope_600SemiBold",
-    medium: "Manrope_500Medium",
-};
-
-const platformFont = (androidFont: string) => (Platform.OS === "ios" ? iosSystemFont : androidFont);
 
 export const Typography = {
     size: {
@@ -27,20 +20,18 @@ export const Typography = {
         "3xl": 30,
         "4xl": 36,
     },
-    // iOS uses the native SF Pro system font by leaving fontFamily unset.
-    // Android uses bundled Inter/Manrope. Arabic always uses Noto Sans Arabic.
     font: {
         heading: {
-            extra: platformFont(androidHeading.extra),
-            bold: platformFont(androidHeading.bold),
-            semi: platformFont(androidHeading.semi),
-            medium: platformFont(androidHeading.medium),
+            extra: jakarta.extra,
+            bold: jakarta.bold,
+            semi: jakarta.semi,
+            medium: jakarta.medium,
         },
         body: {
-            regular: platformFont(androidBody.regular),
-            medium: platformFont(androidBody.medium),
-            semi: platformFont(androidBody.semi),
-            bold: platformFont(androidBody.bold),
+            regular: jakarta.regular,
+            medium: jakarta.medium,
+            semi: jakarta.semi,
+            bold: jakarta.bold,
         },
         arabic: {
             regular: "NotoSansArabic_400Regular",

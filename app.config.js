@@ -17,6 +17,7 @@ module.exports = ({ config }) => {
             ...(config.plugins || []),
             '@react-native-community/datetimepicker',
             'expo-font',
+            'expo-asset',
             'expo-image',
             'expo-audio',
             'expo-notifications',

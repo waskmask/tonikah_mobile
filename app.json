@@ -26,7 +26,8 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon/adaptive-icon-foreground.png",
-        "backgroundImage": "./assets/icon/adaptive-icon-background.png"
+        "backgroundImage": "./assets/icon/adaptive-icon-background.png",
+        "backgroundColor": "#F34B6F"
       },
       "package": "com.tonikah.app"
     },
@@ -54,10 +55,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/icon/adaptive-icon.png",
-          "imageWidth": 120,
+          "image": "./assets/icon/heart-white.png",
+          "imageWidth": 96,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#F34B6F"
         }
       ]
     ],

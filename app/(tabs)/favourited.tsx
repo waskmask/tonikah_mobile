@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
-import { Text } from '@/components/ui/Text';
+import { router } from 'expo-router';
+import { Heart } from 'lucide-react-native';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ProfileListCard } from '@/components/app/ProfileListCard';
 import { TabTitleBar } from '@/components/app/TabTitleBar';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
@@ -87,11 +89,16 @@ export default function FavouritedScreen() {
                     onEndReachedThreshold={0.35}
                     ListFooterComponent={loadingMore ? <View style={{ paddingVertical: scale(18) }}><ActivityIndicator color={primary} /></View> : null}
                     ListEmptyComponent={
-                        <View style={{ paddingTop: scale(60), paddingHorizontal: scale(24) }}>
-                            <Text variant="h3" align="center">{t('no_favourites', 'No favourites yet')}</Text>
-                            <Text variant="body-sm" align="center" style={{ color: colors.brand.text.subtitle, marginTop: scale(8) }}>
-                                {t('no_favourites_hint', 'Profiles you save while exploring will appear here.')}
-                            </Text>
+                        <View style={{ paddingTop: scale(70), alignItems: 'center' }}>
+                            <EmptyState
+                                icon={<Heart size={scale(30)} color={primary} strokeWidth={1.8} />}
+                                title={t('no_favourites', 'No favourites yet')}
+                                description={t('no_favourites_hint', 'Profiles you save while exploring will appear here.')}
+                                actions={[{
+                                    label: t('explore', 'Explore'),
+                                    onPress: () => router.push('/(tabs)/search'),
+                                }]}
+                            />
                         </View>
                     }
                     renderItem={({ item }) => (

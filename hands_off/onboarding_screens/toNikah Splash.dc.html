@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  @keyframes tn-pop{0%{transform:scale(.55);opacity:0}55%{opacity:1}100%{transform:scale(1);opacity:1}}
+  @keyframes tn-fadeup{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  @keyframes tn-floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+  @keyframes tn-breathe{0%,100%{opacity:.55}50%{opacity:.9}}
+  @keyframes tn-enter{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;width:100%;display:grid;place-items:center;padding:3vh 3vw">
+
+  <div style="height:92vh;aspect-ratio:var(--ar,384 / 832);max-width:var(--maxw,440px);--ar:{{ar}};--maxw:{{maxw}};--bezel-r:{{bezelR}};--screen-r:{{screenR}};--bg:{{t.bg}};--glow:{{t.glow}};--fg:{{t.fg}};--eyebrow:{{t.eyebrow}};--muted:{{t.muted}};--wordmark:{{t.wordmark}};--line:{{t.line}};--lattice:{{t.lattice}};--statusbar:{{t.statusbar}};--gearbg:{{t.gearBg}};--gearic:{{t.gearIcon}};--dot:{{t.dot}};--terms:{{t.terms}};--home:{{t.homeInd}};--grad:{{grad}};--arto:{{artO}};--tj:{{topJust}};--tp:{{topPad}}">
+
+    <!-- Device bezel -->
+    <div style="height:100%;width:100%;padding:min(1.4cqh,12px);border-radius:var(--bezel-r,46px);background:#0b0b0d;box-shadow:0 40px 80px -30px rgba(20,15,10,.55),0 4px 14px rgba(0,0,0,.25);position:relative">
+
+      <!-- Screen -->
+      <div style="position:relative;height:100%;width:100%;border-radius:var(--screen-r,38px);overflow:hidden;background:var(--bg,#FBF6F0);container-type:size;container-name:scr">
+
+        <!-- Ambient warm glow -->
+        <div style="position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 34%, var(--glow,rgba(255,150,120,.14)), transparent 62%)"></div>
+
+        <!-- Geometric lattice watermark -->
+        <svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;opacity:.9" aria-hidden="true">
+          <defs>
+            <pattern id="tn-star" width="86" height="86" patternUnits="userSpaceOnUse" patternTransform="rotate(0)">
+              <g fill="none" stroke="var(--lattice,rgba(120,80,60,.1))" stroke-width="1.1">
+                <rect x="24" y="24" width="38" height="38"/>
+                <rect x="24" y="24" width="38" height="38" transform="rotate(45 43 43)"/>
+              </g>
+            </pattern>
+          </defs>
+          <rect x="0" y="0" width="400" height="800" fill="url(#tn-star)"/>
+        </svg>
+
+        <!-- Vector arch medallion (replaces the photo) -->
+        <div style="position:absolute;left:50%;bottom:-3cqh;transform:translateX(-50%);height:66cqh;opacity:var(--arto,.7);animation:tn-floaty 7.5s ease-in-out infinite" aria-hidden="true">
+          <svg viewBox="0 0 300 400" style="height:100%;width:auto;overflow:visible">
+            <g fill="none" stroke="var(--line,rgba(90,60,50,.3))" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M40,398 L40,168 C40,78 88,28 150,28 C212,28 260,78 260,168 L260,398"/>
+              <path d="M64,398 L64,172 C64,94 106,50 150,50 C194,50 236,94 236,172 L236,398"/>
+              <rect x="112" y="86" width="76" height="76" rx="8"/>
+              <rect x="112" y="86" width="76" height="76" rx="8" transform="rotate(45 150 124)"/>
+              <circle cx="150" cy="124" r="12"/>
+              <path d="M150,210 L150,398" stroke-dasharray="2 14"/>
+            </g>
+            <circle cx="150" cy="30" r="4.5" fill="var(--line,rgba(90,60,50,.3))" stroke="none"/>
+          </svg>
+        </div>
+
+        <!-- Status bar -->
+        <div style="position:absolute;top:0;left:0;right:0;height:6.2cqh;display:flex;align-items:center;justify-content:space-between;padding:0 7.5%;color:var(--statusbar,#141826);z-index:5">
+          <span style="font-weight:600;font-size:1.95cqh;letter-spacing:.01em">9:41</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="display:flex;align-items:flex-end;gap:1.6px;height:1.5cqh">
+              <span style="width:2.4px;height:35%;background:currentColor;border-radius:1px"></span>
+              <span style="width:2.4px;height:58%;background:currentColor;border-radius:1px"></span>
+              <span style="width:2.4px;height:80%;background:currentColor;border-radius:1px"></span>
+              <span style="width:2.4px;height:100%;background:currentColor;border-radius:1px"></span>
+            </div>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M1.5 4.4C3.4 2.9 5.6 2 8 2s4.6.9 6.5 2.4"/><path d="M3.9 6.9C5.1 6 6.5 5.5 8 5.5s2.9.5 4.1 1.4"/><path d="M6.2 9.3C6.7 9 7.3 8.8 8 8.8s1.3.2 1.8.5"/></svg>
+            <div style="display:flex;align-items:center;gap:2px"><div style="width:15px;height:8px;border:1.4px solid currentColor;border-radius:2.5px;padding:1px;display:flex"><div style="width:72%;height:100%;background:currentColor;border-radius:1px"></div></div><div style="width:1.4px;height:3.5px;background:currentColor;border-radius:1px"></div></div>
+          </div>
+        </div>
+
+        <!-- Content column -->
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:9cqh 8.5% 3.6cqh;z-index:4">
+
+          <!-- Top region -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:var(--tj,center);padding-top:var(--tp,0);min-height:0">
+
+            <sc-if value="{{ isSplash }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:2.6cqh">
+                <div style="height:22cqh;animation:tn-pop .75s cubic-bezier(.2,.8,.2,1)">
+                  <svg viewBox="0 0 102.36 100" style="height:100%;width:auto">
+                    <defs>
+                      <linearGradient id="tn-heart" x1="0" y1="50" x2="102.36" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="{{ a0 }}"/>
+                        <stop offset=".83" stop-color="{{ a2 }}"/>
+                      </linearGradient>
+                    </defs>
+                    <path d="M60.82,58.07c-4.75,5.75-9.6,10.63-16.7,12.38,2.63,2.64,5.15,5.17,7.85,7.88,3.47-3.95,7.05-7.91,10.51-11.97,5.32-6.24,10.64-12.49,15.82-18.86,3.9-4.79,5.47-10.39,4.21-16.47-1.27-6.08-5.02-10.26-11.17-11.6-6.51-1.42-12.1.68-16.37,5.81-2.81,3.38-4.39,7.29-4.07,11.8-3.6-.2-6.53-2.89-7.4-6.69-1.97-8.58,2.57-19.41,10.49-25.04,12.69-9.02,30.01-6.3,40.21,6.32,11.67,14.43,10.84,34.82-2.59,48.46-13.28,13.48-27.05,26.48-40.84,39.91-1.73-1.74-4.14-4.14-6.53-6.55-11.51-11.59-23.23-22.97-34.47-34.82C-3.68,44.44-3.14,22.28,10.73,9.1,19.09,1.14,29-1.63,40.9,1.4c-8.1,3.89-14.76,8.82-18.27,16.86-3.54,8.1-3.38,16.34.48,24.29,5.66,11.64,19.45,20.03,37.7,15.52Z" fill="url(#tn-heart)"/>
+                  </svg>
+                </div>
+                <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:8.6cqh;letter-spacing:-.03em;color:var(--wordmark,#111C3A);animation:tn-fadeup .7s">toNikah</div>
+                <div style="font-size:1.85cqh;letter-spacing:.34em;text-transform:uppercase;color:var(--eyebrow,#9A8F86);font-weight:600;animation:tn-fadeup .7s">Halal · Sincere · For Marriage</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isContent }}" hint-placeholder-val="{{ true }}">
+              <div style="width:100%;max-width:min(92cqw,560px)">
+                <div style="font-size:1.85cqh;letter-spacing:.3em;text-transform:uppercase;color:var(--eyebrow,#9A8F86);font-weight:600;margin-bottom:2cqh">{{ s.eyebrow }}</div>
+                <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:6cqh;line-height:1.06;letter-spacing:-.02em;color:var(--fg,#141826);margin:0 0 3.4cqh">{{ s.title }}</h1>
+                <div style="display:flex;flex-direction:column;gap:2.4cqh">
+                  <sc-for list="{{ s.paras }}" as="p" hint-placeholder-count="2">
+                    <p style="margin:0;font-size:2.25cqh;line-height:1.5;color:var(--muted,rgba(30,28,40,.66));text-wrap:pretty">{{ p }}</p>
+                  </sc-for>
+                  <sc-if value="{{ s.terms }}" hint-placeholder-val="{{ false }}">
+                    <p style="margin:0;font-size:2.25cqh;line-height:1.5;color:var(--muted,rgba(30,28,40,.66))">By continuing, I agree to the <a href="#" style="color:var(--terms,#141826);font-weight:600;text-decoration:underline;text-underline-offset:3px">Terms of Use</a></p>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+
+          <!-- Bottom region: CTA + dots -->
+          <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3cqh;pointer-events:auto">
+            <button onClick="{{ next }}" style="width:100%;height:8cqh;border:none;border-radius:999px;background:var(--grad);color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:2.6cqh;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px -10px rgba(240,90,110,.6),inset 0 1px 0 rgba(255,255,255,.25)">
+              <span>{{ s.cta }}</span>
+              <svg width="2.4cqh" height="2.4cqh" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;right:7%"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <sc-for list="{{ dots }}" as="d" hint-placeholder-count="3">
+                <button onClick="{{ d.go }}" style="border:none;padding:0;cursor:pointer;height:8px;border-radius:999px;transition:width .35s ease,background .35s ease;width:{{ d.w }};background:{{ d.bg }}"></button>
+              </sc-for>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Home indicator -->
+        <div style="position:absolute;bottom:1cqh;left:50%;transform:translateX(-50%);width:34%;height:5px;border-radius:999px;background:var(--home,rgba(20,18,30,.35));z-index:6"></div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;phone&quot;,&quot;tablet&quot;],&quot;default&quot;:&quot;phone&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[[&quot;#FF9C74&quot;,&quot;#F76A82&quot;,&quot;#EF5A86&quot;],[&quot;#F5A15A&quot;,&quot;#EF6D64&quot;,&quot;#E14B6A&quot;],[&quot;#5FAE93&quot;,&quot;#3E9B85&quot;,&quot;#2E7D6E&quot;],[&quot;#8E7BF0&quot;,&quot;#7A6BEA&quot;,&quot;#6355E0&quot;]],&quot;default&quot;:[&quot;#FF9C74&quot;,&quot;#F76A82&quot;,&quot;#EF5A86&quot;],&quot;tsType&quot;:&quot;string[]&quot;,&quot;section&quot;:&quot;Appearance&quot;}}">
+class Component extends DCLogic {
+  state = { screen: 0 };
+
+  themes() {
+    return {
+      light: {
+        bg:'#FBF6F0', glow:'rgba(255,150,120,0.16)', fg:'#141826',
+        eyebrow:'#A2968B', muted:'rgba(32,28,40,0.64)', wordmark:'#111C3A',
+        line:'rgba(96,64,52,0.32)', lattice:'rgba(120,80,60,0.10)',
+        statusbar:'#141826', gearBg:'rgba(20,18,30,0.06)', gearIcon:'rgba(20,18,30,0.48)',
+        dot:'rgba(20,18,30,0.16)', terms:'#141826', homeInd:'rgba(20,18,30,0.32)'
+      },
+      dark: {
+        bg:'#141210', glow:'rgba(255,120,110,0.18)', fg:'#F4EEE6',
+        eyebrow:'#B7A99A', muted:'rgba(244,238,230,0.64)', wordmark:'#FDF6EE',
+        line:'rgba(255,220,200,0.24)', lattice:'rgba(255,220,200,0.07)',
+        statusbar:'#F4EEE6', gearBg:'rgba(255,245,235,0.08)', gearIcon:'rgba(255,245,235,0.58)',
+        dot:'rgba(255,245,235,0.20)', terms:'#F4EEE6', homeInd:'rgba(255,245,235,0.38)'
+      }
+    };
+  }
+
+  screens() {
+    return [
+      { splash:true, cta:'Start' },
+      {
+        eyebrow:'A PLATFORM', title:'Only for Marriage', cta:'Next',
+        paras:[
+          'We created toNikah for one reason — to help sincere Muslims find their life partner through a halal and meaningful path.',
+          'No casual swiping. No non-serious connections. Every feature is designed to respect your intention, your family, and your deen.'
+        ]
+      },
+      {
+        eyebrow:'MY INTENTION', title:'Before I Begin', cta:'Bismillah', terms:true,
+        paras:[
+          'I am here to find my life partner for the sake of Allah, through a path that is halal and meaningful.',
+          'I commit to treating every person on toNikah with honesty, dignity, and respect.'
+        ]
+      }
+    ];
+  }
+
+  applyBackdrop() {
+    const dark = this.props.theme === 'dark';
+    document.body.style.background = dark
+      ? 'radial-gradient(circle at 50% 28%, #201d18, #100f0d)'
+      : 'radial-gradient(circle at 50% 28%, #f3eee7, #e3ddd3)';
+  }
+  componentDidMount(){ this.applyBackdrop(); }
+  componentDidUpdate(){ this.applyBackdrop(); }
+
+  goTo(i){
+    if (i === this.state.screen) return;
+    this.setState({ screen:i });
+  }
+
+  renderVals() {
+    const t = this.themes()[this.props.theme === 'dark' ? 'dark' : 'light'];
+    let accent = this.props.accent;
+    if (!Array.isArray(accent) || accent.length < 2) accent = ['#FF9C74','#F76A82','#EF5A86'];
+    const a0 = accent[0], a1 = accent[1] || accent[0], a2 = accent[2] || accent[1] || accent[0];
+    const grad = `linear-gradient(105deg, ${a0} 0%, ${a1} 58%, ${a2} 100%)`;
+
+    const isTablet = this.props.device === 'tablet';
+    const screens = this.screens();
+    const idx = this.state.screen;
+    const s = screens[idx];
+    const isSplash = !!s.splash;
+
+    const dots = screens.map((_, i) => ({
+      w: i === idx ? '26px' : '8px',
+      bg: i === idx ? grad : t.dot,
+      go: () => this.goTo(i)
+    }));
+
+    return {
+      t, grad, a0, a1, a2,
+      screenKey: 'scr' + idx,
+      ar: isTablet ? '3 / 4' : '384 / 832',
+      maxw: isTablet ? '760px' : '440px',
+      bezelR: isTablet ? '30px' : '46px',
+      screenR: isTablet ? '22px' : '38px',
+      s, isSplash, isContent: !isSplash,
+      artO: isSplash ? 0.5 : 0.85,
+      topJust: isSplash ? 'center' : 'flex-start',
+      topPad: isSplash ? '0' : '4cqh',
+      dots,
+      next: () => this.goTo((idx + 1) % screens.length)
+    };
+  }
+}
+</script>
+</body>
+</html>

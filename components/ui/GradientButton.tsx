@@ -23,6 +23,10 @@ interface GradientButtonProps {
     // ✅ new
     widthMode?: "auto" | "full";
     containerStyle?: ViewStyle;
+    /** Button height in design pt (scaled per screen). Defaults to 50 (48 outline). */
+    height?: number;
+    /** Title font size in design pt (scaled per screen). Defaults to the text variant size. */
+    textSize?: number;
 }
 
 export const GradientButton: React.FC<GradientButtonProps> = ({
@@ -36,6 +40,8 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
     className = "",
     widthMode = "auto",
     containerStyle,
+    height,
+    textSize,
 }) => {
     const { isRTL } = useLanguage();
     const palette = useColors();
@@ -47,7 +53,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
         variant === "outline"
             ? (["transparent", "transparent"] as [string, string])
             : variant === "primary"
-                ? ([palette.chrome.primary, palette.chrome.primaryEnd] as [string, string])
+                ? ([palette.brand.gradient.start, palette.brand.gradient.end] as [string, string])
                 : ([palette.brand.bg.surface, palette.brand.bg.border] as [string, string]);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -86,7 +92,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                     className={`overflow-hidden ${variant === 'outline' ? 'rounded-xl' : 'rounded-full'} ${disabled ? "opacity-50" : ""} ${className}`}
                     style={[
                         {
-                            height: scale(variant === 'outline' ? 48 : 50),
+                            height: scale(height ?? (variant === 'outline' ? 48 : 50)),
                             width: "100%",
                         },
                         variant === 'outline' && {
@@ -111,7 +117,18 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                             <ActivityIndicator color={variant === 'outline' ? palette.chrome.primary : '#FFFFFF'} />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: variant === 'outline' ? 'space-between' : 'center', width: '100%', paddingHorizontal: variant === 'outline' ? 4 : 0 }}>
-                                <Text variant={variant === 'outline' ? 'body-sm' : 'button'} className={variant === 'outline' ? 'font-body text-brand-text-body' : 'text-white font-body-semi text-center'} numberOfLines={1} style={variant === 'outline' ? { flex: 1 } : undefined}>
+                                <Text
+                                    variant={variant === 'outline' ? 'body-sm' : 'button'}
+                                    className={variant === 'outline' ? 'font-body text-brand-text-body' : 'text-white font-body-semi text-center'}
+                                    numberOfLines={1}
+                                    style={[
+                                        variant === 'outline' ? { flex: 1 } : undefined,
+                                        textSize ? { fontSize: scale(textSize) } : undefined,
+                                        // Android adds asymmetric font padding that pushes the
+                                        // label up inside compact buttons
+                                        { includeFontPadding: false, textAlignVertical: 'center' },
+                                    ]}
+                                >
                                     {title}
                                 </Text>
 

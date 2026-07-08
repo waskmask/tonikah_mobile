@@ -1,168 +1,187 @@
-import React, { useState, useRef } from "react";
-import { View, FlatList, Dimensions, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Animated } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+    Dimensions,
+    FlatList,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Pressable,
+    StyleSheet,
+    Text as RNText,
+    View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useTheme } from "@/hooks/useTheme";
 import { useFirstLaunch } from "@/hooks/useFirstLaunch";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { Text } from "@/components/ui/Text";
 import { GradientButton } from "@/components/ui/GradientButton";
-import { PaginationDots } from "@/components/ui/PaginationDots";
-import { scale, wp, hp } from "@/hooks/useResponsive";
-import { router } from "expo-router";
-import { Image } from "expo-image";
-import * as WebBrowser from "expo-web-browser";
-import { useTheme } from "@/hooks/useTheme";
+import { PressableScale } from "@/components/ui/PressableScale";
+import { OnboardingBackground } from "@/components/onboarding/OnboardingBackground";
+import { HeartLogo } from "@/components/onboarding/HeartLogo";
+import { scale, wp, hp, isTablet } from "@/hooks/useResponsive";
+import { Typography } from "@/constants/typography";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Design-handoff tokens (hands_off/onboarding_screens) — warm cream / warm
+// charcoal palette local to onboarding; the coral accent stays shared.
+const TOKENS = {
+    light: {
+        bg: "#FBF6F0",
+        glowColor: "#FF9678",
+        glowOpacity: 0.09,
+        fg: "#141826",
+        eyebrow: "#A2968B",
+        muted: "rgba(32,28,40,0.64)",
+        wordmark: "#111C3A",
+        line: "rgba(96,64,52,0.32)",
+        lattice: "rgba(120,80,60,0.10)",
+        dot: "rgba(26, 22, 17,0.16)",
+        terms: "#141826",
+        contrastBtnBg: "#141826",
+        contrastBtnText: "#FFFFFF",
+    },
+    dark: {
+        bg: "#141210",
+        glowColor: "#FF786E",
+        glowOpacity: 0.05,
+        fg: "#F4EEE6",
+        eyebrow: "#B7A99A",
+        muted: "rgba(244,238,230,0.64)",
+        wordmark: "#FDF6EE",
+        line: "rgba(255,220,200,0.24)",
+        lattice: "rgba(255,220,200,0.07)",
+        dot: "rgba(255,245,235,0.20)",
+        terms: "#F4EEE6",
+        contrastBtnBg: "#F4EEE6",
+        contrastBtnText: "#141826",
+    },
+};
+
+// Active-dot gradient matches GradientButton's brand gradient so the CTA pill
+// and the page indicator read as one system.
+const CORAL_GRADIENT = ["#FF927B", "#F97078", "#F34B6F"] as const;
+
+type SlideType = "welcome" | "marriage" | "intention";
 
 export default function OnboardingScreen() {
     const { t, isRTL } = useLanguage();
     const { completeOnboarding } = useFirstLaunch();
     const { isDark } = useTheme();
+    const reduceMotion = useReducedMotion();
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const insets = useSafeAreaInsets();
+    const tokens = isDark ? TOKENS.dark : TOKENS.light;
 
-    // Setup fade animation for button text
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-
-    const onboardingData = [
-        {
-            id: "1",
-            type: "welcome",
-            title: "toNikah",
-        },
-        {
-            id: "2",
-            type: "marriage",
-            subtitle: t("onboarding.screen2_subtitle"),
-            title: t("onboarding.screen2_title"),
-            body1: t("onboarding.screen2_body1"),
-            body2: t("onboarding.screen2_body2"),
-        },
-        {
-            id: "3",
-            type: "intention",
-            subtitle: t("onboarding.screen3_subtitle"),
-            title: t("onboarding.screen3_title"),
-            body1: t("onboarding.screen3_body1"),
-            body2: t("onboarding.screen3_body2"),
-        },
+    const onboardingData: Array<{ id: string; type: SlideType }> = [
+        { id: "1", type: "welcome" },
+        { id: "2", type: "marriage" },
+        { id: "3", type: "intention" },
     ];
 
     const displayData = isRTL ? [...onboardingData].reverse() : onboardingData;
     const initialIndex = isRTL ? onboardingData.length - 1 : 0;
+    const realIndex = isRTL ? onboardingData.length - 1 - activeIndex : activeIndex;
 
-    const handleNext = () => {
-        const nextIndex = isRTL ? activeIndex - 1 : activeIndex + 1;
-        if (isRTL ? nextIndex >= 0 : nextIndex < onboardingData.length) {
-            flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-        } else {
-            completeOnboarding();
-            router.replace("/(auth)/register");
-        }
+    const goToReal = (real: number) => {
+        const listIndex = isRTL ? onboardingData.length - 1 - real : real;
+        flatListRef.current?.scrollToIndex({ index: listIndex, animated: true });
     };
 
-    const updateActiveIndexWithAnimation = (newIndex: number) => {
-        if (newIndex !== activeIndex) {
-            // Fade out
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: true,
-            }).start(() => {
-                // Change index
-                setActiveIndex(newIndex);
-                // Fade in
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 150,
-                    useNativeDriver: true,
-                }).start();
-            });
-        }
+    const handleNext = () => {
+        if (realIndex < onboardingData.length - 1) goToReal(realIndex + 1);
+    };
+
+    const finish = (target: "/(auth)/login" | "/(auth)/signup") => {
+        completeOnboarding();
+        router.replace(target);
     };
 
     const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const newIndex = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-        updateActiveIndexWithAnimation(newIndex);
+        if (newIndex !== activeIndex) setActiveIndex(newIndex);
     };
 
-    const openTerms = () => {
-        WebBrowser.openBrowserAsync("https://tonikah.com/terms");
-    };
+    const contentMaxWidth = isTablet ? 560 : wp(83);
+    const entering = (delay: number) =>
+        reduceMotion ? undefined : FadeInUp.duration(550).delay(delay);
 
-    const renderItem = ({ item }: { item: any }) => {
+    const renderItem = ({ item }: { item: { id: string; type: SlideType } }) => {
         if (item.type === "welcome") {
             return (
-                <View style={[styles.slide, { width: SCREEN_WIDTH }]} className="bg-white dark:bg-slate-900">
-                    <Image
-                        source={require("@/assets/images/couple-illustration.png")}
-                        style={[StyleSheet.absoluteFill, { opacity: isDark ? 0.14 : 0.22 }]}
-                        contentFit="cover"
-                        contentPosition="bottom"
-                    />
-                    <View style={styles.centerContent}>
-                        <Image
-                            source={isDark ? require("@/assets/images/logo-dark.png") : require("@/assets/images/logo-light.png")}
-                            style={{ width: wp(50), height: wp(50), marginBottom: scale(60) }} // Push logo up slightly to balance empty bottom space
-                            contentFit="contain"
-                        />
-                    </View>
+                <View style={[styles.slide, styles.slideCentered, { width: SCREEN_WIDTH }]}>
+                    <Animated.View
+                        entering={reduceMotion ? undefined : ZoomIn.duration(650).springify().damping(13)}
+                    >
+                        <HeartLogo height={scale(118)} />
+                    </Animated.View>
+                    <Animated.View entering={entering(120)} style={{ alignItems: "center" }}>
+                        <RNText
+                            style={[
+                                styles.wordmark,
+                                { color: tokens.wordmark, fontFamily: Typography.font.heading.extra },
+                            ]}
+                        >
+                            toNikah
+                        </RNText>
+                        <Text
+                            variant="body-sm"
+                            className="font-body-semi"
+                            style={[styles.tagline, { color: tokens.eyebrow }]}
+                        >
+                            {t("onboarding.splash_tagline")}
+                        </Text>
+                    </Animated.View>
                 </View>
             );
         }
 
+        const isIntention = item.type === "intention";
+        const prefix = isIntention ? "onboarding.screen3" : "onboarding.screen2";
+
         return (
-            <View style={[styles.slide, { width: SCREEN_WIDTH }]} className="bg-white dark:bg-slate-900">
-                <Image
-                    source={require("@/assets/images/couple-illustration.png")}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    contentPosition="bottom"
-                />
-                <View style={[styles.textOverlay, { paddingTop: insets.top + scale(24) }]}>
-                    <Text variant="subtitle" align="center" className="uppercase tracking-widest">
-                        {item.subtitle}
+            <View style={[styles.slide, { width: SCREEN_WIDTH, paddingTop: insets.top + hp(7) }]}>
+                <View style={{ width: "100%", maxWidth: contentMaxWidth, alignSelf: "center" }}>
+                    <Text
+                        variant="body-sm"
+                        className="font-body-semi"
+                        align="center"
+                        style={[styles.eyebrow, { color: tokens.eyebrow }]}
+                    >
+                        {t(`${prefix}_subtitle`)}
                     </Text>
-                    <Text variant="h2" align="center" className="mt-2">
-                        {item.title}
+                    <Text
+                        variant="h2"
+                        className="font-heading-extra"
+                        align="center"
+                        style={[styles.headline, { color: tokens.fg }]}
+                    >
+                        {t(`${prefix}_title`)}
                     </Text>
-                    <Text variant="body" align="center" className="mt-6 leading-6">
-                        {item.body1}
+                    <Text variant="body" align="center" style={[styles.para, { color: tokens.muted }]}>
+                        {t(`${prefix}_body1`)}
                     </Text>
-                    <Text variant="body" align="center" className="mt-4 leading-6">
-                        {item.body2}
+                    <Text variant="body" align="center" style={[styles.para, { color: tokens.muted }]}>
+                        {t(`${prefix}_body2`)}
                     </Text>
 
-                    {item.type === "intention" && (
-                        <View className="mt-4 flex-row flex-wrap justify-center">
-                            <Text variant="body" align="center">
-                                {t("onboarding.screen3_terms_prefix")}{" "}
-                            </Text>
-                            <Pressable onPress={openTerms}>
-                                <Text variant="body" className="text-[#4B68C4] underline">
-                                    {t("onboarding.screen3_terms_link")}
-                                </Text>
-                            </Pressable>
-                        </View>
-                    )}
                 </View>
             </View>
         );
     };
 
-    // Calculate current button text
-    const realIndex = isRTL ? onboardingData.length - 1 - activeIndex : activeIndex;
-    let buttonText = t("onboarding.next");
-    if (onboardingData[realIndex].type === "welcome") {
-        buttonText = t("onboarding.start");
-    } else if (onboardingData[realIndex].type === "intention") {
-        buttonText = t("onboarding.bismillah");
-    }
-
     return (
-        <View style={{ flex: 1 }} className="bg-white dark:bg-slate-900">
-            {/* Sliding Content */}
+        <View style={{ flex: 1, backgroundColor: tokens.bg }}>
+            <OnboardingBackground
+                tokens={tokens}
+                medallionOpacity={realIndex === 0 ? 0.5 : 0.85}
+            />
+
             <FlatList
                 ref={flatListRef}
                 data={displayData}
@@ -180,23 +199,72 @@ export default function OnboardingScreen() {
                 })}
             />
 
-            {/* STATIC BOTTOM BAR */}
-            <View
-                style={[
-                    styles.bottomBar,
-                    { paddingBottom: insets.bottom + scale(20) },
-                ]}
-            >
-                <Animated.View style={{ opacity: fadeAnim, width: "100%", alignItems: "center" }}>
-                    <GradientButton
-                        title={buttonText}
-                        onPress={handleNext}
-                        showChevron
-                    />
-                </Animated.View>
+            {/* Static bottom bar: CTA + page dots */}
+            <View style={[styles.bottomBar, { paddingBottom: insets.bottom + hp(1.6) }]}>
+                <View style={{ width: "100%", maxWidth: contentMaxWidth, alignSelf: "center" }}>
+                    {realIndex === onboardingData.length - 1 ? (
+                        <View style={styles.ctaRow}>
+                            {/* Dark contrast button (light in dark mode) */}
+                            <View style={styles.ctaHalf}>
+                                <PressableScale
+                                    onPress={() => finish("/(auth)/login")}
+                                    activeScale={0.97}
+                                    containerStyle={{ width: "100%" }}
+                                    // Static style: function-form Pressable styles lose
+                                    // backgrounds under the NativeWind interop
+                                    style={[styles.contrastButton, { backgroundColor: tokens.contrastBtnBg }]}
+                                >
+                                    <RNText
+                                        style={[
+                                            styles.contrastButtonText,
+                                            { color: tokens.contrastBtnText, fontFamily: Typography.font.body.bold },
+                                        ]}
+                                    >
+                                        {t("login")}
+                                    </RNText>
+                                </PressableScale>
+                            </View>
+                            <View style={styles.ctaHalf}>
+                                <GradientButton
+                                    title={t("sign_up")}
+                                    onPress={() => finish("/(auth)/signup")}
+                                    widthMode="full"
+                                    height={52}
+                                    textSize={16}
+                                />
+                            </View>
+                        </View>
+                    ) : (
+                        <GradientButton
+                            title={realIndex === 0 ? t("onboarding.start") : t("onboarding.next")}
+                            onPress={handleNext}
+                            widthMode="full"
+                            height={52}
+                            textSize={16}
+                            showChevron
+                        />
+                    )}
+                </View>
 
-                <View style={{ marginTop: scale(16) }}>
-                    <PaginationDots total={3} activeIndex={realIndex} />
+                {/* Page dots: active = coral gradient pill */}
+                <View style={styles.dotsRow}>
+                    {onboardingData.map((_, index) => {
+                        const active = index === realIndex;
+                        return (
+                            <Pressable key={index} onPress={() => goToReal(index)} hitSlop={8}>
+                                {active ? (
+                                    <LinearGradient
+                                        colors={[CORAL_GRADIENT[0], CORAL_GRADIENT[1], CORAL_GRADIENT[2]]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={styles.dotActive}
+                                    />
+                                ) : (
+                                    <View style={[styles.dot, { backgroundColor: tokens.dot }]} />
+                                )}
+                            </Pressable>
+                        );
+                    })}
                 </View>
             </View>
         </View>
@@ -206,15 +274,44 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
     slide: {
         flex: 1,
+        paddingHorizontal: wp(8.5),
+        // Leave room for the bottom bar
+        paddingBottom: hp(16),
     },
-    centerContent: {
-        flex: 1,
+    slideCentered: {
         alignItems: "center",
         justifyContent: "center",
+        gap: scale(20),
     },
-    textOverlay: {
-        paddingHorizontal: 24,
-        alignItems: "center",
+    wordmark: {
+        fontSize: scale(46),
+        letterSpacing: -1.2,
+        includeFontPadding: false,
+        textAlign: "center",
+    },
+    tagline: {
+        fontSize: scale(11),
+        letterSpacing: 3.6,
+        textTransform: "uppercase",
+        textAlign: "center",
+        marginTop: scale(10),
+    },
+    eyebrow: {
+        fontSize: scale(11),
+        letterSpacing: 3.2,
+        textTransform: "uppercase",
+        marginBottom: scale(14),
+    },
+    headline: {
+        fontSize: scale(31),
+        lineHeight: scale(34),
+        letterSpacing: -0.6,
+        marginBottom: scale(22),
+    },
+    para: {
+        fontSize: scale(14.5),
+        lineHeight: scale(22),
+        marginTop: scale(14),
     },
     bottomBar: {
         position: "absolute",
@@ -222,9 +319,45 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         alignItems: "center",
-        paddingHorizontal: 16,
-        // Ensure it sits above the FlatList content
+        paddingHorizontal: wp(8.5),
         zIndex: 10,
         elevation: 10,
+    },
+    ctaRow: {
+        flexDirection: "row",
+        gap: scale(12),
+        width: "100%",
+    },
+    ctaHalf: {
+        flex: 1,
+        minWidth: 0,
+    },
+    contrastButton: {
+        width: "100%",
+        height: scale(52),
+        // Half of height — huge radii can fail to paint on some Android versions
+        borderRadius: scale(26),
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    contrastButtonText: {
+        fontSize: scale(16),
+        includeFontPadding: false,
+    },
+    dotsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: scale(8),
+        marginTop: scale(20),
+    },
+    dot: {
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
+    },
+    dotActive: {
+        width: scale(26),
+        height: scale(8),
+        borderRadius: scale(4),
     },
 });

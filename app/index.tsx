@@ -1,61 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Redirect } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
 import { useAuthStore } from "@/store/authStore";
 import { useFirstLaunch } from "@/hooks/useFirstLaunch";
 import { useProfileSetupStore } from "@/store/profileSetupStore";
-import { profileService } from "@/lib/profileService";
-import { useColors } from "@/hooks/useColors";
+import { AppLoadingScreen } from "@/components/app/AppLoadingScreen";
 
 export default function Index() {
-    const colors = useColors();
-    const { isAuthenticated, isRestoringSession, setUser } = useAuthStore();
+    const { isAuthenticated, isRestoringSession, user } = useAuthStore();
     const { isFirstLaunch } = useFirstLaunch();
     const { getIncompleteStep, setGender } = useProfileSetupStore();
 
-    const [profileChecked, setProfileChecked] = useState(false);
-    const [incompleteStep, setIncompleteStep] = useState(0);
+    // restoreSession already fetched (or cached) the user with the same /me
+    // endpoint — no second network round-trip here.
+    const profile = isAuthenticated ? user?.profile : undefined;
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            setProfileChecked(true);
-            return;
-        }
-
-        // Fetch fresh profile data from API
-        (async () => {
-            try {
-                const res = await profileService.fetchMe();
-                if (res.success && res.user) {
-                    setUser(res.user);
-
-                    const profile = res.user.profile;
-                    if (!profile) {
-                        setIncompleteStep(1);
-                    } else {
-                        const step = getIncompleteStep(profile);
-                        setIncompleteStep(step);
-                        if (profile.gender) setGender(profile.gender);
-                    }
-                } else {
-                    // No user data → step 1
-                    setIncompleteStep(1);
-                }
-            } catch {
-                setIncompleteStep(1);
-            } finally {
-                setProfileChecked(true);
-            }
-        })();
-    }, [isAuthenticated]);
+        if (profile?.gender) setGender(profile.gender);
+    }, [profile?.gender, setGender]);
 
     // Wait until session is restored
-    if (isRestoringSession || !profileChecked) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.chrome.loader.background }}>
-                <ActivityIndicator size="large" color={colors.chrome.loader.spinner} />
-            </View>
-        );
+    if (isRestoringSession) {
+        return <AppLoadingScreen />;
     }
 
     if (isFirstLaunch) {
@@ -63,6 +28,7 @@ export default function Index() {
     }
 
     if (isAuthenticated) {
+        const incompleteStep = profile ? getIncompleteStep(profile) : 1;
         if (incompleteStep > 0) {
             return <Redirect href={`/(profile-setup)/step${incompleteStep}` as any} />;
         }

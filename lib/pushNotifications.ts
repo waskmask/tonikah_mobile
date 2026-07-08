@@ -23,7 +23,11 @@ function getNotifications() {
 
     try {
         notificationsModule = require('expo-notifications');
-    } catch {
+        if (!notificationsModule?.setNotificationHandler) {
+            notificationsModule = null;
+        }
+    } catch (error) {
+        console.warn('[push] expo-notifications unavailable:', error);
         notificationsModule = null;
     }
 

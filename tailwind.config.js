@@ -2,14 +2,17 @@
 module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
+  // ThemeSync drives the scheme via setColorScheme(); class mode is required
+  // for the `.dark { --vars }` block in global.css to ever apply.
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
         brand: {
           gradient: {
-            start: "#F34B6F",
-            end: "#E8447A",
-            center: "#EE4976",
+            start: "#FF927B",
+            end: "#F34B6F",
+            center: "#F97078",
           },
           text: {
             heading: "var(--brand-text-heading)",
@@ -35,17 +38,17 @@ module.exports = {
         },
         // Mapped for developer convenience
         primary: "#F34B6F",
-        secondary: "#E8447A",
+        secondary: "#FF927B",
       },
       fontFamily: {
-        heading: ["Manrope_700Bold"],
-        "heading-semi": ["Manrope_600SemiBold"],
-        "heading-medium": ["Manrope_500Medium"],
-        "heading-extra": ["Manrope_800ExtraBold"],
-        body: ["Inter_400Regular"],
-        "body-medium": ["Inter_500Medium"],
-        "body-semi": ["Inter_600SemiBold"],
-        "body-bold": ["Inter_700Bold"],
+        heading: ["PlusJakartaSans_700Bold"],
+        "heading-semi": ["PlusJakartaSans_600SemiBold"],
+        "heading-medium": ["PlusJakartaSans_500Medium"],
+        "heading-extra": ["PlusJakartaSans_800ExtraBold"],
+        body: ["PlusJakartaSans_400Regular"],
+        "body-medium": ["PlusJakartaSans_500Medium"],
+        "body-semi": ["PlusJakartaSans_600SemiBold"],
+        "body-bold": ["PlusJakartaSans_700Bold"],
         arabic: ["NotoSansArabic_400Regular"],
         "arabic-semi": ["NotoSansArabic_600SemiBold"],
         "arabic-bold": ["NotoSansArabic_700Bold"],
