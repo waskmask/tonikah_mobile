@@ -20,6 +20,7 @@ interface AuthState {
     googleAuth: (options?: Pick<GoogleAuthRequest, 'agreed' | 'marketing_opt_in' | 'lang'>) => Promise<AuthResponse>;
     logout: () => Promise<void>;
     logoutAllDevices: () => Promise<AuthResponse>;
+    handleUnauthorized: () => void;
     restoreSession: () => Promise<void>;
     refreshUser: () => Promise<AuthResponse>;
     setUser: (user: User) => void;
@@ -129,6 +130,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             set({ isLoading: false });
             return { success: false, message: 'logout_failed' };
         }
+    },
+
+    handleUnauthorized: () => {
+        set({ user: null, isAuthenticated: false, isLoading: false });
     },
 
     refreshUser: async () => {

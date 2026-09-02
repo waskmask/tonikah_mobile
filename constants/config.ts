@@ -1,6 +1,7 @@
 const ENV = {
     dev: {
         API_URL: 'https://devapi.tonikah.com/api',
+        WEB_APP_ORIGIN: 'https://dev.tonikah.com',
         FORGOT_PASSWORD_URL: 'https://dev.tonikah.com/forgot-pass',
         TERMS_URL: 'https://dev.tonikah.com/terms',
         PRIVACY_URL: 'https://dev.tonikah.com/privacy-policy',
@@ -10,6 +11,7 @@ const ENV = {
     },
     staging: {
         API_URL: 'https://devapi.tonikah.com/api',
+        WEB_APP_ORIGIN: 'https://dev.tonikah.com',
         FORGOT_PASSWORD_URL: 'https://dev.tonikah.com/forgot-pass',
         TERMS_URL: 'https://dev.tonikah.com/terms',
         PRIVACY_URL: 'https://dev.tonikah.com/privacy-policy',
@@ -19,6 +21,7 @@ const ENV = {
     },
     prod: {
         API_URL: 'https://api.tonikah.com/api',
+        WEB_APP_ORIGIN: 'https://tonikah.com',
         FORGOT_PASSWORD_URL: 'https://tonikah.com/forgot-pass',
         TERMS_URL: 'https://tonikah.com/terms',
         PRIVACY_URL: 'https://tonikah.com/privacy-policy',

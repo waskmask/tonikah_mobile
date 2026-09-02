@@ -107,12 +107,17 @@ export default function MessagesScreen() {
     const [notificationBannerBusy, setNotificationBannerBusy] = useState(false);
 
     const colors = {
-        bg: palette.brand.bg.primary,
+        // Warm surface so messages matches the unified warm chrome
+        bg: palette.brand.bg.surface,
         card: palette.chrome.common.card,
         text: palette.chrome.common.textStrong,
         muted: palette.chrome.common.textSubtle,
         border: palette.brand.bg.border,
-        input: palette.chrome.common.cardAlt,
+        body: palette.brand.bg.primary,
+        divider: palette.brand.bg.borderStrong,
+        input: palette.chrome.common.card,
+        avatarBg: palette.chrome.common.cardAlt,
+        primary,
     };
 
     const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
@@ -253,7 +258,7 @@ export default function MessagesScreen() {
     if (loading) {
         return (
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
-                <View style={{ paddingHorizontal: scale(14), paddingTop: scale(16) }}>
+                <View style={{ flex: 1, backgroundColor: colors.body, paddingHorizontal: scale(14), paddingTop: scale(16) }}>
                     {[0, 1, 2, 3, 4, 5].map((index) => (
                         <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: scale(12), paddingVertical: scale(12) }}>
                             <Skeleton width={scale(48)} height={scale(48)} borderRadius={scale(24)} />
@@ -270,7 +275,7 @@ export default function MessagesScreen() {
 
     return (
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
-            <View style={[styles.tabs, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={[styles.tabs, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                 {TABS.map(({ key, labelKey, fallback, Icon }) => {
                     const active = key === activeTab;
                     const badge = key === 'requests' ? requests.length : key === 'sent' ? sent.length : 0;
@@ -281,7 +286,7 @@ export default function MessagesScreen() {
                                 <UnreadBadge
                                     count={badge}
                                     variant="sm"
-                                    borderColor={colors.card}
+                                    borderColor={colors.bg}
                                     style={styles.tabBadge}
                                 />
                             </View>
@@ -299,8 +304,9 @@ export default function MessagesScreen() {
                 })}
             </View>
 
+            <View style={{ flex: 1, backgroundColor: colors.body }}>
             <View style={styles.searchWrap}>
-                <View style={[styles.searchBox, { backgroundColor: colors.input }]}>
+                <View style={[styles.searchBox, { backgroundColor: colors.input, borderWidth: 1, borderColor: colors.border }]}>
                     <Search size={scale(16)} color={colors.muted} />
                     <TextInput
                         value={search}
@@ -400,6 +406,7 @@ export default function MessagesScreen() {
                     />
                 )}
             />
+            </View>
         </SafeAreaView>
     );
 }
@@ -430,9 +437,9 @@ function ConversationRow({
     const preview = translateChatText(conversation.lastMessagePreview || (variant === 'requests' ? 'sent_you_a_message' : ''));
 
     return (
-        <View style={[styles.rowWrap, { borderBottomColor: colors.border }]}>
+        <View style={[styles.rowWrap, { borderBottomColor: colors.divider }]}>
             <Pressable onPress={onPress} style={styles.row}>
-                <View style={[styles.avatar, { backgroundColor: colors.input }]}>
+                <View style={[styles.avatar, { backgroundColor: colors.avatarBg }]}>
                     {avatar ? (
                         <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" />
                     ) : (

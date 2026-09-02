@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Bell, LogOut, ShieldCheck, UserRound, FileLock2 } from 'lucide-react-native';
@@ -16,6 +16,7 @@ export default function SettingsScreen() {
     const colors = useColors();
     const primary = colors.chrome.primary;
     const emailVerified = Boolean(user?.email_verified ?? user?.emailVerified);
+    const [verificationBannerVisible, setVerificationBannerVisible] = useState(true);
     const emailNotVerifiedDesc = t(
         'email_not_verified_desc',
         'Please verify your email within {time} to keep your account active and receive important updates.',
@@ -26,13 +27,13 @@ export default function SettingsScreen() {
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('settings', 'Settings')} fallbackHref="/(tabs)/profile" />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
-                {!emailVerified ? (
+                {!emailVerified && verificationBannerVisible ? (
                     <View style={{ marginBottom: scale(14) }}>
                         <EmailVerificationRequiredBanner
                             email={user?.email}
+                            onDismiss={() => setVerificationBannerVisible(false)}
                             title={t('email_not_verified', 'Email not verified')}
                             message={emailNotVerifiedDesc}
-                            actionLabel={t('verify_email', 'Verify Email-address Now')}
                         />
                     </View>
                 ) : null}

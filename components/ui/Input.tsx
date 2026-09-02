@@ -14,6 +14,8 @@ interface InputProps extends TextInputProps {
     containerStyle?: string;
     /** Appends an asterisk to the placeholder (forms drop labels, placeholder carries it) */
     required?: boolean;
+    /** Escape hatch for programmatic focus (e.g. moderation modal "Edit") */
+    inputRef?: React.Ref<TextInput>;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -26,6 +28,7 @@ export const Input: React.FC<InputProps> = ({
     placeholder,
     onFocus,
     onBlur,
+    inputRef,
     ...props
 }) => {
     const [isFocused, setIsFocused] = useState(false);
@@ -50,7 +53,7 @@ export const Input: React.FC<InputProps> = ({
             <View
                 style={[
                     {
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        flexDirection: 'row',
                         alignItems: 'center',
                         // Underline style: bottom border only, transparent fill
                         borderBottomWidth: isFocused ? 1.5 : 1,
@@ -66,12 +69,13 @@ export const Input: React.FC<InputProps> = ({
                 ]}
             >
                 {leftIcon && (
-                    <View style={{ [isRTL ? 'marginLeft' : 'marginRight']: scale(10) }}>
+                    <View style={{ marginEnd: scale(10) }}>
                         {leftIcon}
                     </View>
                 )}
 
                 <TextInput
+                    ref={inputRef}
                     // Darker placeholder for readability; weight stays light via the
                     // regular input font (RN can't style placeholder weight separately)
                     placeholder={required && placeholder ? `${placeholder} *` : placeholder}
@@ -90,7 +94,7 @@ export const Input: React.FC<InputProps> = ({
                         // not just the text line
                         height: '100%',
                         textAlignVertical: 'center',
-                        fontSize: scale(14),
+                        fontSize: scale(15),
                         // Android TextInput ships with default vertical padding that
                         // pushes the text away from the underline
                         paddingVertical: 0,
@@ -103,7 +107,7 @@ export const Input: React.FC<InputProps> = ({
                 />
 
                 {rightIcon && (
-                    <View style={{ [isRTL ? 'marginRight' : 'marginLeft']: scale(10) }}>
+                    <View style={{ marginStart: scale(10) }}>
                         {rightIcon}
                     </View>
                 )}
@@ -121,7 +125,7 @@ export const Input: React.FC<InputProps> = ({
                             left: scale(6),
                             right: scale(6),
                             color: '#EF4444',
-                            fontSize: scale(11),
+                            fontSize: scale(12),
                         }}
                     >
                         {error}

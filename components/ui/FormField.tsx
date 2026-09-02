@@ -10,9 +10,9 @@ import { Typography } from '@/constants/typography';
 export function FieldLabel({ text, required }: { text: string; required?: boolean }) {
     const { isRTL } = useLanguage();
     return (
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', marginBottom: scale(6), marginTop: scale(12) }}>
+        <View style={{ flexDirection: 'row', marginBottom: scale(6), marginTop: scale(12) }}>
             <Text variant="body-sm" className="font-medium">{text}</Text>
-            {required && <Text variant="body-sm" style={{ color: '#EF4444', marginLeft: isRTL ? 0 : 2, marginRight: isRTL ? 2 : 0 }}> *</Text>}
+            {required && <Text variant="body-sm" style={{ color: '#EF4444', marginStart: 2 }}> *</Text>}
         </View>
     );
 }
@@ -32,7 +32,7 @@ export function ErrorText({ text }: { text: string }) {
                     left: scale(6),
                     right: scale(6),
                     color: '#EF4444',
-                    fontSize: scale(11),
+                    fontSize: scale(12),
                     textAlign: isRTL ? 'right' : 'left',
                 }}
             >
@@ -83,7 +83,7 @@ export function SelectField({
             }}
             style={[
                 {
-                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    flexDirection: 'row',
                     alignItems: 'center',
                     // Underline style matching the auth Input: bottom border only
                     borderBottomWidth: 1,
@@ -105,7 +105,7 @@ export function SelectField({
                     {
                         flex: 1,
                         textAlign: isRTL ? 'right' : 'left',
-                        fontSize: scale(14),
+                        fontSize: scale(15),
                         fontFamily: valueFont,
                     },
                     value

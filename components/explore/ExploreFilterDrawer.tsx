@@ -389,7 +389,7 @@ function SelectRow({
         ? values.map((value) => options.find((item) => item.value === value)?.label || value).join(', ')
         : t('no_preference', 'No preference');
     return (
-        <Pressable onPress={onOpen} style={[styles.row, { backgroundColor: cardColor, borderColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Pressable onPress={onOpen} style={[styles.row, { backgroundColor: cardColor, borderColor, flexDirection: 'row' }]}>
             <View style={{ flex: 1 }}>
                 <Text variant="body-sm" className="font-body-bold" style={[styles.selectTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
                 <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? primaryColor : mutedColor, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>

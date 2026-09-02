@@ -54,10 +54,17 @@ export default function ProfileScreen() {
             return;
         }
 
-        const gallery = Array.isArray(galleryRes.gallery) ? normalizeGallery(galleryRes.gallery) : [];
-        const privacy = galleryRes.privacy || 'public';
         setUser(meRes.user);
-        setProfile(mergeProfile(meRes.user, gallery, privacy));
+        setProfile((current) => {
+            const currentGallery = Array.isArray(current?.gallery) ? current.gallery : [];
+            const gallery = galleryRes.success && Array.isArray(galleryRes.gallery)
+                ? normalizeGallery(galleryRes.gallery)
+                : currentGallery;
+            const privacy = galleryRes.success
+                ? galleryRes.privacy || 'public'
+                : current?.privacy || 'public';
+            return mergeProfile(meRes.user, gallery, privacy);
+        });
     }, [setUser]);
 
     useEffect(() => {
@@ -70,8 +77,11 @@ export default function ProfileScreen() {
 
     const refresh = useCallback(async () => {
         setRefreshing(true);
-        await loadProfile();
-        setRefreshing(false);
+        try {
+            await loadProfile();
+        } finally {
+            setRefreshing(false);
+        }
     }, [loadProfile]);
 
     const viewProfile = useMemo(() => profile, [profile]);
@@ -101,9 +111,13 @@ export default function ProfileScreen() {
                 mode="screen"
                 showClose={false}
                 isOwnProfile
-                onEditProfile={() => router.push('/(tabs)/edit-profile')}
+                onEditProfile={() => router.push({
+                    pathname: '/(tabs)/edit-profile',
+                    params: { returnTo: '/(tabs)/profile' },
+                })}
                 refreshing={refreshing}
                 onRefresh={refresh}
+                onReconcile={loadProfile}
             />
         </View>
     );

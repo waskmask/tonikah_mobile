@@ -229,8 +229,8 @@ export default function OnboardingScreen() {
                                     title={t("sign_up")}
                                     onPress={() => finish("/(auth)/signup")}
                                     widthMode="full"
-                                    height={52}
-                                    textSize={16}
+                                    height={40}
+                                    textSize={15}
                                 />
                             </View>
                         </View>
@@ -239,8 +239,8 @@ export default function OnboardingScreen() {
                             title={realIndex === 0 ? t("onboarding.start") : t("onboarding.next")}
                             onPress={handleNext}
                             widthMode="full"
-                            height={52}
-                            textSize={16}
+                            height={40}
+                            textSize={15}
                             showChevron
                         />
                     )}
@@ -332,16 +332,17 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: 0,
     },
+    // Same size as the profile-setup GradientButtons (height 40 / text 15)
     contrastButton: {
         width: "100%",
-        height: scale(52),
+        height: scale(40),
         // Half of height — huge radii can fail to paint on some Android versions
-        borderRadius: scale(26),
+        borderRadius: scale(20),
         alignItems: "center",
         justifyContent: "center",
     },
     contrastButtonText: {
-        fontSize: scale(16),
+        fontSize: scale(15),
         includeFontPadding: false,
     },
     dotsRow: {

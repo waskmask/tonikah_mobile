@@ -1,4 +1,7 @@
 {
+  "validation_required": "مطلوب",
+  "validation_max_16_chars": "16 حرفًا كحد أقصى",
+  "validation_letters_only": "أحرف ومسافات فقط",
   "onboarding": {
     "start": "ابدأ",
     "next": "التالي",
@@ -406,6 +409,9 @@
   "signup_button": "التسجيل مرة أخرى",
   "continue": "متابعة",
   "reset_email_sent_if_exists": "إذا كان هذا البريد الإلكتروني مسجلاً، فقد تم إرسال رابط إعادة تعيين كلمة المرور.",
+  "reset_check_email_title": "تحقق من بريدك الإلكتروني",
+  "resend_reset_link": "لم تستلم البريد الإلكتروني؟ إعادة الإرسال",
+  "resend_cooldown_in": "إعادة الإرسال خلال {{seconds}} ثانية",
   "reset_request_failed": "تعذر طلب إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى.",
   "email_not_found": "لم يتم العثور على حساب بهذا البريد الإلكتروني.",
   "already_have_an_account": "لديك حساب بالفعل؟",
@@ -1101,7 +1107,7 @@
   "education_required": "يرجى اختيار مستواك التعليمي.",
   "occupation_required": "يرجى اختيار وظيفتك.",
   "designation_required": "يرجى اختيار مسماك الوظيفي.",
-  "company_too_long": "يجب ألا يتجاوز اسم الشركة 30 حرفاً.",
+  "company_too_long": "يجب ألا يتجاوز اسم الشركة 50 حرفاً.",
   "annual_income_invalid": "يرجى إدخال مبلغ دخل سنوي صالح.",
   "no_data_ocu": "لا توجد بيانات للوظيفة.",
   "religious_title": "المعتقدات والممارسات الدينية",
@@ -1235,6 +1241,13 @@
   "relative": "قريب",
   "friend": "صديق",
   "profile_manager": "مدير الملف الشخصي",
+  "pm_self_desc": "هذا الملف الشخصي لي وأديره بنفسي.",
+  "pm_father_desc": "أنا والد الشخص صاحب هذا الملف.",
+  "pm_mother_desc": "أنا والدة الشخص صاحب هذا الملف.",
+  "pm_brother_desc": "أنا شقيق الشخص صاحب هذا الملف.",
+  "pm_sister_desc": "أنا شقيقة الشخص صاحب هذا الملف.",
+  "pm_relative_desc": "أنا قريب الشخص صاحب هذا الملف.",
+  "pm_friend_desc": "أنا صديق الشخص صاحب هذا الملف.",
   "finish": "إنهاء",
   "pm_placeholder": "من يدير هذا الملف الشخصي؟",
   "profile_manager_required": "يرجى اختيار من يدير هذا الملف الشخصي.",
@@ -1567,6 +1580,8 @@
   "reauth_verification_failed": "فشل التحقق من إعادة المصادقة",
   "create_password_failed": "فشل إنشاء كلمة المرور",
   "change_email": "تغيير عنوان البريد الإلكتروني",
+  "change_email_short": "تغيير البريد",
+  "resend_email": "إعادة إرسال البريد",
   "update_email": "تحديث عنوان البريد الإلكتروني",
   "email_same_as_current": "هذا العنوان مرتبط بحسابك بالفعل.",
   "change_email_verification_sent": "أرسلنا رابط توثيق إلى بريدك الإلكتروني الجديد. تحقق من بريدك الوارد لتأكيد التغيير.",
@@ -2389,6 +2404,8 @@
   "done": "تم",
   "no_results_found": "لم يتم العثور على نتائج",
   "camera_permission_required": "إذن الكاميرا مطلوب.",
+  "take_photo": "التقاط صورة",
+  "choose_from_gallery": "الاختيار من المعرض",
   "profile.location_edit_from_device": "سيستخدم تعديل الموقع موقع جهازك. سنفتح هذا كشاشة تعديل مخصصة.",
   "data_privacy": "خصوصية البيانات",
   "download_my_data": "تنزيل بياناتي",
@@ -2445,5 +2462,116 @@
   "notifications": "الإشعارات",
   "badge_verified": "موثّق",
   "badge_member": "عضو",
-  "badge_private_gallery": "معرض خاص"
+  "badge_private_gallery": "معرض خاص",
+  "moderation_text_warning_title_bio": "النبذة تحتاج إلى مراجعة",
+  "moderation_text_warning_title_headline": "عنوان الملف الشخصي يحتاج إلى مراجعة",
+  "moderation_text_warning_title_company": "الشركة تحتاج إلى مراجعة",
+  "moderation_text_warning_title_partner_about": "النص عن الشريك يحتاج إلى مراجعة",
+  "moderation_text_warning_body": "وجدنا شيئًا قد يحتاج إلى مراجعة بشرية قبل ظهوره في ملفك الشخصي.",
+  "moderation_text_detected": "تم اكتشاف",
+  "moderation_text_edit_field": "تعديل {field}",
+  "moderation_text_submit_anyway": "إرساله للمراجعة على أي حال",
+  "moderation_text_under_review": "قيد المراجعة",
+  "moderation_text_under_review_hint": "هذا التحديث ينتظر المراجعة. سيرى المستخدمون الآخرون النص السابق المعتمد حتى تتم الموافقة عليه.",
+  "moderation_issue_contact_info": "معلومات تواصل",
+  "moderation_issue_social_handle": "حساب اجتماعي أو رابط",
+  "moderation_issue_inappropriate": "محتوى غير مناسب",
+  "moderation_issue_racist": "محتوى عنصري",
+  "moderation_issue_offensive": "محتوى مسيء",
+  "moderation_issue_non_professional_company": "اسم شركة غير واضح أو غير مهني",
+  "moderation_issue_needs_review": "يحتاج إلى مراجعة بشرية",
+  "moderation_submit_anyway_success": "تم الإرسال للمراجعة.",
+  "private_gallery_requires_image": "يجب تحميل صورة واحدة على الأقل قبل جعل معرضك خاصًا.",
+  "media_guidelines_title": "اختر صورًا واضحة",
+  "media_guidelines_intro": "حمّل صورًا واضحة لك. يلزم وجود صورة واحدة على الأقل لاستخدام التطبيق. يتم فحص الصور قبل أن يتمكن الأعضاء الآخرون من رؤيتها.",
+  "media_guidelines_good_title": "صور مناسبة للملف الشخصي",
+  "media_guidelines_bad_title": "صور لا يمكننا الموافقة عليها",
+  "media_guidelines_private_title": "حافظ على خصوصية معرضك",
+  "media_guidelines_private_message": "يمكنك إخفاء صورك وإظهارها فقط بعد بدء محادثة مع شخص ما.",
+  "media_guidelines_understand": "فهمت",
+  "media_guidelines_reopen": "عرض إرشادات الصور",
+  "media_guidelines_sample_alt": "مثال لصورة الملف الشخصي {number}",
+  "media_guidelines_sample_pending": "ستظهر الصورة النموذجية هنا",
+  "image_moderation_nsfw": "محتوى جنسي أو صريح",
+  "image_moderation_no_human": "لم يتم اكتشاف شخص",
+  "image_moderation_hateful_text": "نص عنصري أو يحض على الكراهية",
+  "image_moderation_contact_info": "معلومات اتصال أو رمز QR",
+  "image_moderation_presentation_mismatch": "قد لا تتطابق الصورة مع جنس الملف الشخصي",
+  "image_moderation_checking": "جارٍ فحص الصورة",
+  "image_moderation_checking_hint": "يجري فحص الأمان التلقائي. يستغرق هذا عادةً بضع ثوانٍ.",
+  "image_moderation_pending_hint": "هذه الصورة بانتظار المراجعة ومخفية عن الأعضاء الآخرين.",
+  "image_moderation_submitted_review": "تم إرسال الصورة للمراجعة.",
+  "image_moderation_approved_toast": "تمت الموافقة على الصورة وأصبحت ظاهرة في ملفك الشخصي.",
+  "image_moderation_review_toast": "تحتاج الصورة إلى مراجعة بشرية وستظل مخفية عن الأعضاء الآخرين.",
+  "image_moderation_warning_title": "الصورة تحتاج إلى مراجعة",
+  "image_moderation_warning_body": "وجدنا شيئًا قد يحتاج إلى مراجعة قبل ظهور هذه الصورة في ملفك الشخصي.",
+  "image_moderation_choose_another": "اختر صورة أخرى",
+  "image_moderation_submit_review": "إرسال للمراجعة",
+  "image_moderation_excessive_body_exposure": "صورة كاشفة أو عارية الصدر",
+  "image_moderation_unavailable": "الفحص التلقائي غير متاح",
+  "image_moderation_needs_review": "تحتاج إلى مراجعة بشرية",
+  "image_moderation_presentation_uncertain": "تعذر تأكيد وجود شخص مطابق",
+  "qualified_photo_required": "يلزم وجود صورة ملف شخصي معتمدة لإرسال الرسائل.",
+  "qualified_photo_required_title": "أضف صورة ملف شخصي معتمدة",
+  "qualified_photo_required_message": "يمكنك تصفح الملفات الشخصية وقراءة المحادثات، لكنك تحتاج إلى صورة واحدة معتمدة لك على الأقل قبل إرسال الرسائل.",
+  "add_profile_photo": "إضافة صورة للملف الشخصي",
+  "profile_photo_required": "أضف صورة ملف شخصي واحدة على الأقل للمتابعة.",
+  "bio_too_short": "يرجى كتابة المزيد عن نفسك.",
+  "checkout_open_failed": "تعذر فتح الدفع الآمن. يرجى المحاولة مرة أخرى.",
+  "delete_photo": "حذف الصورة",
+  "make_primary": "تعيين كصورة رئيسية",
+  "secure_checkout": "دفع آمن",
+  "upload_images_to_profile": "حمّل صورًا إلى ملفك الشخصي",
+  "explore_location_required_title": "الموقع مطلوب للاستكشاف",
+  "explore_location_permission_denied": "اسمح بالوصول إلى الموقع من الإعدادات لاكتشاف الملفات الشخصية المناسبة.",
+  "explore_location_services_disabled": "فعّل خدمات الموقع على الجهاز لاستخدام الاستكشاف.",
+  "explore_location_unavailable": "تعذر تحديد موقعك الحالي. انتقل إلى مكان مفتوح وحاول مرة أخرى.",
+  "explore_location_network_error": "تعذر التحقق من موقعك. تحقق من اتصالك وحاول مرة أخرى.",
+  "open_settings": "فتح الإعدادات",
+  "image_moderation_rejected_toast": "تم رفض الصورة وإزالتها من معرضك."
+  ,"checkout_untrusted_url": "أعاد الدفع الآمن عنوانًا غير صالح."
+  ,"membership_refresh_failed": "تعذر تحديث العضوية. حاول مرة أخرى."
+  ,"refreshing_membership": "جارٍ تحديث العضوية..."
+  ,"payment_may_be_processing": "قد لا تزال عملية الدفع قيد المعالجة. حدّث العضوية قبل بدء دفع آخر."
+  ,"refresh_membership": "تحديث العضوية"
+  ,"choose_payment_method": "اختر طريقة الدفع"
+  ,"pay_with_app_store": "الدفع عبر App Store"
+  ,"pay_with_google_play": "الدفع عبر Google Play"
+  ,"pay_with_card": "الدفع بالبطاقة"
+  ,"app_store_payment_description": "استخدم حساب Apple وطريقة الدفع في App Store."
+  ,"google_play_payment_description": "استخدم حساب Google وطريقة الدفع في Google Play."
+  ,"card_payment_description": "تابع في المتصفح إلى صفحة الدفع الآمنة."
+  ,"payment_choice_ios_note": "تتولى Apple عمليات شراء App Store. تُفتح مدفوعات البطاقة في صفحة دفع آمنة على الويب."
+  ,"payment_choice_android_note": "تتولى Google عمليات شراء Google Play. تُفتح مدفوعات البطاقة في صفحة دفع آمنة على الويب."
+  ,"processing_payment": "جارٍ معالجة الدفع..."
+  ,"membership_purchase_success": "عضويتك نشطة الآن."
+  ,"payment_not_completed": "لم يكتمل الدفع"
+  ,"native_purchase_failed": "تعذر تأكيد عملية الشراء حتى الآن. تحقق من عضويتك قبل المحاولة مرة أخرى، أو تواصل مع الدعم."
+  ,"restore_purchases": "استعادة المشتريات"
+  ,"restoring_purchases": "جارٍ استعادة المشتريات..."
+  ,"purchases_restored": "تمت استعادة عضويتك."
+  ,"no_purchases_to_restore": "لم يتم العثور على شراء عضوية نشط."
+  ,"restore_purchases_failed": "تعذر استعادة المشتريات. يرجى المحاولة مرة أخرى لاحقًا."
+  ,"payment_pending_store": "دفعتك عبر المتجر معلّقة. سيتم تفعيل العضوية بعد التأكيد."
+  ,"error_gift_redeem_failed": "تعذر استخدام بطاقة الهدية. حاول مرة أخرى."
+  ,"error_too_many_attempts": "محاولات كثيرة جدًا. حاول مرة أخرى لاحقًا."
+  ,"free": "مجاني"
+  ,"gift_card_code_label": "رمز بطاقة الهدية"
+  ,"gift_card_helper": "أدخل رمز بطاقة الهدية ورقم PIN المكون من 4 أرقام."
+  ,"gift_card_pin_label": "رقم PIN من 4 أرقام"
+  ,"gift_card_processing": "تم قبول بطاقة الهدية. جارٍ تفعيل العضوية."
+  ,"gift_code_invalid_length": "أدخل رمز بطاقة الهدية المكون من 8 أحرف."
+  ,"gift_pin_invalid_length": "أدخل رقم PIN لبطاقة الهدية المكون من 4 أرقام."
+  ,"gift_redeemed_success": "تم استخدام بطاقة الهدية. عضويتك نشطة."
+  ,"history_load_failed": "تعذر تحميل سجل العضوية."
+  ,"loading_payment_options": "جارٍ تحميل خيارات الدفع..."
+  ,"membership_ends": "تنتهي"
+  ,"membership_history": "سجل العضوية"
+  ,"membership_history_description": "مشتريات عضويتك ومكافآتك."
+  ,"no_membership_history": "لا يوجد سجل عضوية بعد"
+  ,"no_membership_history_description": "ستظهر هنا المشتريات وبطاقات الهدايا والتجارب ومنح الإدارة."
+  ,"payment_not_available_region": "هذه الخطة غير متاحة للشراء في منطقتك بعد."
+  ,"payment_options_unavailable": "تعذر تحميل خيارات الدفع. اسحب لأسفل للمحاولة مرة أخرى."
+  ,"redeem_gift_card": "استخدام بطاقة هدية"
+  ,"redeeming_gift_card": "جارٍ الاستخدام..."
 }

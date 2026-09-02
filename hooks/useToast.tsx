@@ -56,6 +56,21 @@ export function ToastProvider() {
     );
 }
 
+/** Imperative access from event handlers without hook wiring — proxies the
+    same global ref the hook uses. */
+export const toast: ToastHandle = {
+    show: (message, type = 'info', duration = 4000) => {
+        if (globalToastRef) {
+            globalToastRef.show(message, type, duration);
+        } else {
+            console.warn('ToastProvider is not mounted. Cannot show toast:', message);
+        }
+    },
+    hide: () => {
+        if (globalToastRef) globalToastRef.hide();
+    },
+};
+
 export function useToast() {
     const show = useCallback((message: string, type: ToastType = 'info', duration: number = 4000) => {
         if (globalToastRef) {

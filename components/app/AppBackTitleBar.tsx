@@ -8,18 +8,25 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { HeaderTokens } from '@/constants/uiTokens';
 import { scale } from '@/hooks/useResponsive';
+import { useTranslation } from 'react-i18next';
 
 type AppBackTitleBarProps = {
     title: string;
     fallbackHref?: string;
+    onBack?: () => void;
 };
 
-export function AppBackTitleBar({ title, fallbackHref = '/(tabs)/search' }: AppBackTitleBarProps) {
+export function AppBackTitleBar({ title, fallbackHref = '/(tabs)/search', onBack }: AppBackTitleBarProps) {
+    const { t } = useTranslation('common');
     const { isRTL } = useLanguage();
     const chrome = useColors().chrome.header;
     const BackIcon = isRTL ? ChevronRight : ChevronLeft;
 
     const goBack = () => {
+        if (onBack) {
+            onBack();
+            return;
+        }
         if (router.canGoBack()) {
             router.back();
             return;
@@ -38,24 +45,28 @@ export function AppBackTitleBar({ title, fallbackHref = '/(tabs)/search' }: AppB
                 },
             ]}
         >
-            <View style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={styles.topBar}>
                 <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Back"
+                    accessibilityLabel={t('back', 'Back')}
                     onPress={goBack}
                     style={styles.backButton}
                     hitSlop={8}
                 >
-                    <BackIcon size={scale(22)} color={chrome.icon} strokeWidth={2.6} />
+                    <BackIcon size={scale(23)} color={chrome.icon} />
                 </Pressable>
-                <Text
-                    variant="body-sm"
-                    numberOfLines={1}
-                    className="font-body-bold"
-                    style={[styles.title, { color: chrome.title, textAlign: isRTL ? 'right' : 'left' }]}
-                >
-                    {title}
-                </Text>
+                {/* Content-sized title in a flex row hugs the chevron in both
+                    directions — no textAlign (Android flips literal values in RTL) */}
+                <View style={styles.titleWrap}>
+                    <Text
+                        variant="body-sm"
+                        numberOfLines={1}
+                        className="font-body-bold"
+                        style={[styles.title, { color: chrome.title }]}
+                    >
+                        {title}
+                    </Text>
+                </View>
                 <View style={styles.rightSpacer} />
             </View>
         </SafeAreaView>
@@ -68,8 +79,11 @@ const styles = StyleSheet.create({
     },
     topBar: {
         minHeight: HeaderTokens.minHeight,
+        // Native RTL (I18nManager) mirrors 'row' — no manual reversal
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: scale(8),
+        // 5.5 + 8.5 (chevron inset inside its 40pt button) = 14dp edge→icon
+        paddingHorizontal: scale(5.5),
     },
     backButton: {
         width: scale(40),
@@ -78,9 +92,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    title: {
+    titleWrap: {
         flex: 1,
         minWidth: 0,
+        flexDirection: 'row',
+        // 8.5 chevron inset + 3 ≈ 11.5dp icon→title (optical match with conversation header)
+        marginStart: scale(3),
+    },
+    title: {
+        flexShrink: 1,
         fontSize: scale(15),
         lineHeight: scale(20),
     },

@@ -1,4 +1,7 @@
 {
+  "validation_required": "Wajib diisi",
+  "validation_max_16_chars": "Maksimal 16 karakter",
+  "validation_letters_only": "Hanya huruf dan spasi",
   "onboarding": {
     "start": "Mulai",
     "next": "Berikutnya",
@@ -406,6 +409,9 @@
   "signup_button": "Daftar Kembali",
   "continue": "lanjut",
   "reset_email_sent_if_exists": "Jika email ini terdaftar, tautan reset kata sandi telah dikirim.",
+  "reset_check_email_title": "Periksa email Anda",
+  "resend_reset_link": "Tidak menerima email? Kirim ulang",
+  "resend_cooldown_in": "Kirim ulang dalam {{seconds}} detik",
   "reset_request_failed": "Tidak dapat meminta reset kata sandi. Coba lagi.",
   "email_not_found": "Tidak ditemukan akun dengan email ini.",
   "already_have_an_account": "Sudah punya akun?",
@@ -1101,7 +1107,7 @@
   "education_required": "Silakan pilih pendidikan Anda.",
   "occupation_required": "Silakan pilih pekerjaan Anda.",
   "designation_required": "Silakan pilih jabatan pekerjaan Anda.",
-  "company_too_long": "Nama perusahaan maksimal 30 karakter.",
+  "company_too_long": "Nama perusahaan maksimal 50 karakter.",
   "annual_income_invalid": "Masukkan jumlah penghasilan tahunan yang valid.",
   "no_data_ocu": "Tidak ada data pekerjaan.",
   "religious_title": "Keyakinan dan Praktik Agama",
@@ -1235,6 +1241,13 @@
   "relative": "Kerabat",
   "friend": "Teman",
   "profile_manager": "Pengelola Profil",
+  "pm_self_desc": "Profil ini untuk saya dan saya kelola sendiri.",
+  "pm_father_desc": "Saya ayah dari orang di profil ini.",
+  "pm_mother_desc": "Saya ibu dari orang di profil ini.",
+  "pm_brother_desc": "Saya saudara laki-laki dari orang di profil ini.",
+  "pm_sister_desc": "Saya saudara perempuan dari orang di profil ini.",
+  "pm_relative_desc": "Saya kerabat dari orang di profil ini.",
+  "pm_friend_desc": "Saya teman dari orang di profil ini.",
   "finish": "Selesai",
   "pm_placeholder": "Siapa yang mengelola profil ini?",
   "profile_manager_required": "Silakan pilih siapa yang mengelola profil ini.",
@@ -1567,6 +1580,8 @@
   "reauth_verification_failed": "Verifikasi otentikasi ulang gagal",
   "create_password_failed": "Gagal membuat kata sandi",
   "change_email": "Ganti Alamat Email",
+  "change_email_short": "Ganti Email",
+  "resend_email": "Kirim Ulang Email",
   "update_email": "Perbarui Alamat Email",
   "email_same_as_current": "Alamat email ini sudah terhubung dengan akun Anda.",
   "change_email_verification_sent": "Kami telah mengirim tautan verifikasi ke email baru Anda. Periksa kotak masuk untuk mengonfirmasi perubahan.",
@@ -2389,6 +2404,8 @@
   "done": "Selesai",
   "no_results_found": "Tidak ada hasil ditemukan",
   "camera_permission_required": "Izin kamera diperlukan.",
+  "take_photo": "Ambil foto",
+  "choose_from_gallery": "Pilih dari galeri",
   "profile.location_edit_from_device": "Pengeditan lokasi akan menggunakan lokasi perangkat Anda. Kami akan membukanya sebagai layar edit khusus.",
   "data_privacy": "Privasi data",
   "download_my_data": "Unduh data saya",
@@ -2445,5 +2462,116 @@
   "notifications": "Notifikasi",
   "badge_verified": "Terverifikasi",
   "badge_member": "Anggota",
-  "badge_private_gallery": "Galeri privat"
+  "badge_private_gallery": "Galeri privat",
+  "moderation_text_warning_title_bio": "Bio perlu ditinjau",
+  "moderation_text_warning_title_headline": "Judul profil perlu ditinjau",
+  "moderation_text_warning_title_company": "Perusahaan perlu ditinjau",
+  "moderation_text_warning_title_partner_about": "Teks tentang pasangan perlu ditinjau",
+  "moderation_text_warning_body": "Kami menemukan sesuatu yang mungkin perlu ditinjau oleh manusia sebelum muncul di profil Anda.",
+  "moderation_text_detected": "Terdeteksi",
+  "moderation_text_edit_field": "Edit {field}",
+  "moderation_text_submit_anyway": "Tetap kirim untuk ditinjau",
+  "moderation_text_under_review": "Sedang ditinjau",
+  "moderation_text_under_review_hint": "Pembaruan ini sedang menunggu tinjauan. Pengguna lain akan melihat teks lama yang telah disetujui sampai pembaruan ini disetujui.",
+  "moderation_issue_contact_info": "Informasi kontak",
+  "moderation_issue_social_handle": "Akun sosial atau tautan",
+  "moderation_issue_inappropriate": "Konten tidak pantas",
+  "moderation_issue_racist": "Konten rasis",
+  "moderation_issue_offensive": "Konten menyinggung",
+  "moderation_issue_non_professional_company": "Nama perusahaan tidak jelas atau tidak profesional",
+  "moderation_issue_needs_review": "Perlu ditinjau manusia",
+  "moderation_submit_anyway_success": "Dikirim untuk ditinjau.",
+  "private_gallery_requires_image": "Unggah setidaknya satu foto sebelum menjadikan galeri Anda privat.",
+  "media_guidelines_title": "Pilih gambar yang jelas",
+  "media_guidelines_intro": "Unggah gambar diri Anda yang jelas. Setidaknya satu gambar diperlukan untuk menggunakan aplikasi. Gambar diperiksa sebelum dapat dilihat anggota lain.",
+  "media_guidelines_good_title": "Foto profil yang baik",
+  "media_guidelines_bad_title": "Foto yang tidak dapat kami setujui",
+  "media_guidelines_private_title": "Jadikan galeri Anda privat",
+  "media_guidelines_private_message": "Anda dapat menyembunyikan foto dan hanya menampilkannya setelah memulai percakapan.",
+  "media_guidelines_understand": "Saya mengerti",
+  "media_guidelines_reopen": "Lihat panduan foto",
+  "media_guidelines_sample_alt": "Contoh foto profil {number}",
+  "media_guidelines_sample_pending": "Contoh gambar akan muncul di sini",
+  "image_moderation_nsfw": "Konten seksual atau eksplisit",
+  "image_moderation_no_human": "Tidak ada orang terdeteksi",
+  "image_moderation_hateful_text": "Teks rasis atau penuh kebencian",
+  "image_moderation_contact_info": "Informasi kontak atau kode QR",
+  "image_moderation_presentation_mismatch": "Foto mungkin tidak sesuai dengan gender profil",
+  "image_moderation_checking": "Memeriksa foto",
+  "image_moderation_checking_hint": "Pemeriksaan keamanan otomatis sedang berlangsung. Biasanya hanya membutuhkan beberapa detik.",
+  "image_moderation_pending_hint": "Foto ini menunggu peninjauan dan disembunyikan dari anggota lain.",
+  "image_moderation_submitted_review": "Foto dikirim untuk ditinjau.",
+  "image_moderation_approved_toast": "Foto disetujui dan sekarang terlihat di profil Anda.",
+  "image_moderation_review_toast": "Foto memerlukan tinjauan manusia dan tetap disembunyikan dari anggota lain.",
+  "image_moderation_warning_title": "Foto perlu ditinjau",
+  "image_moderation_warning_body": "Kami menemukan sesuatu yang mungkin perlu ditinjau sebelum foto ini tampil di profil Anda.",
+  "image_moderation_choose_another": "Pilih yang lain",
+  "image_moderation_submit_review": "Kirim untuk ditinjau",
+  "image_moderation_excessive_body_exposure": "Foto terbuka atau tanpa baju",
+  "image_moderation_unavailable": "Pemeriksaan otomatis tidak tersedia",
+  "image_moderation_needs_review": "Perlu ditinjau manusia",
+  "image_moderation_presentation_uncertain": "Orang yang sesuai tidak dapat dikonfirmasi",
+  "qualified_photo_required": "Foto profil yang disetujui diperlukan untuk mengirim pesan.",
+  "qualified_photo_required_title": "Tambahkan foto profil yang disetujui",
+  "qualified_photo_required_message": "Anda dapat menjelajah profil dan membaca obrolan, tetapi perlu setidaknya satu foto diri yang disetujui sebelum mengirim pesan.",
+  "add_profile_photo": "Tambahkan foto profil",
+  "profile_photo_required": "Tambahkan setidaknya satu foto profil untuk melanjutkan.",
+  "bio_too_short": "Ceritakan sedikit lebih banyak tentang diri Anda.",
+  "checkout_open_failed": "Tidak dapat membuka pembayaran aman. Silakan coba lagi.",
+  "delete_photo": "Hapus foto",
+  "make_primary": "Jadikan utama",
+  "secure_checkout": "Pembayaran aman",
+  "upload_images_to_profile": "Unggah gambar ke profil Anda",
+  "explore_location_required_title": "Lokasi diperlukan untuk Explore",
+  "explore_location_permission_denied": "Izinkan akses lokasi di Pengaturan untuk menemukan profil yang relevan.",
+  "explore_location_services_disabled": "Aktifkan layanan lokasi perangkat untuk menggunakan Explore.",
+  "explore_location_unavailable": "Kami tidak dapat memperoleh lokasi Anda saat ini. Pindah ke area terbuka lalu coba lagi.",
+  "explore_location_network_error": "Kami tidak dapat memverifikasi lokasi Anda. Periksa koneksi lalu coba lagi.",
+  "open_settings": "Buka Pengaturan",
+  "image_moderation_rejected_toast": "Foto ditolak dan dihapus dari galeri Anda."
+  ,"checkout_untrusted_url": "Checkout aman mengembalikan alamat yang tidak valid."
+  ,"membership_refresh_failed": "Keanggotaan tidak dapat diperbarui. Coba lagi."
+  ,"refreshing_membership": "Memperbarui keanggotaan..."
+  ,"payment_may_be_processing": "Pembayaran mungkin masih diproses. Perbarui sebelum memulai checkout lain."
+  ,"refresh_membership": "Perbarui keanggotaan"
+  ,"choose_payment_method": "Pilih cara membayar"
+  ,"pay_with_app_store": "Bayar dengan App Store"
+  ,"pay_with_google_play": "Bayar dengan Google Play"
+  ,"pay_with_card": "Bayar dengan kartu"
+  ,"app_store_payment_description": "Gunakan akun Apple dan metode pembayaran App Store Anda."
+  ,"google_play_payment_description": "Gunakan akun Google dan metode pembayaran Google Play Anda."
+  ,"card_payment_description": "Lanjutkan di browser dengan pembayaran web yang aman."
+  ,"payment_choice_ios_note": "Pembelian App Store ditangani oleh Apple. Pembayaran kartu membuka pembayaran web yang aman."
+  ,"payment_choice_android_note": "Pembelian Google Play ditangani oleh Google. Pembayaran kartu membuka pembayaran web yang aman."
+  ,"processing_payment": "Memproses pembayaran..."
+  ,"membership_purchase_success": "Keanggotaan Anda aktif."
+  ,"payment_not_completed": "Pembayaran belum selesai"
+  ,"native_purchase_failed": "Kami belum dapat mengonfirmasi pembelian ini. Periksa keanggotaan Anda sebelum mencoba lagi, atau hubungi dukungan."
+  ,"restore_purchases": "Pulihkan pembelian"
+  ,"restoring_purchases": "Memulihkan pembelian..."
+  ,"purchases_restored": "Keanggotaan Anda telah dipulihkan."
+  ,"no_purchases_to_restore": "Tidak ditemukan pembelian keanggotaan aktif."
+  ,"restore_purchases_failed": "Pembelian tidak dapat dipulihkan. Silakan coba lagi nanti."
+  ,"payment_pending_store": "Pembayaran toko Anda tertunda. Keanggotaan aktif setelah dikonfirmasi."
+  ,"error_gift_redeem_failed": "Kartu hadiah tidak dapat ditukarkan. Coba lagi."
+  ,"error_too_many_attempts": "Terlalu banyak percobaan. Coba lagi nanti."
+  ,"free": "Gratis"
+  ,"gift_card_code_label": "Kode kartu hadiah"
+  ,"gift_card_helper": "Masukkan kode kartu hadiah dan PIN 4 digit."
+  ,"gift_card_pin_label": "PIN 4 digit"
+  ,"gift_card_processing": "Kartu hadiah diterima. Keanggotaan sedang diaktifkan."
+  ,"gift_code_invalid_length": "Masukkan kode kartu hadiah 8 karakter."
+  ,"gift_pin_invalid_length": "Masukkan PIN kartu hadiah 4 digit."
+  ,"gift_redeemed_success": "Kartu hadiah ditukarkan. Keanggotaan Anda aktif."
+  ,"history_load_failed": "Riwayat keanggotaan tidak dapat dimuat."
+  ,"loading_payment_options": "Memuat opsi pembayaran..."
+  ,"membership_ends": "Berakhir"
+  ,"membership_history": "Riwayat keanggotaan"
+  ,"membership_history_description": "Pembelian dan hadiah keanggotaan Anda."
+  ,"no_membership_history": "Belum ada riwayat keanggotaan"
+  ,"no_membership_history_description": "Pembelian, kartu hadiah, uji coba, dan pemberian admin akan muncul di sini."
+  ,"payment_not_available_region": "Paket ini belum tersedia untuk dibeli di wilayah Anda."
+  ,"payment_options_unavailable": "Opsi pembayaran tidak dapat dimuat. Tarik ke bawah untuk mencoba lagi."
+  ,"redeem_gift_card": "Tukarkan kartu hadiah"
+  ,"redeeming_gift_card": "Menukarkan..."
 }

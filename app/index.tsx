@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Redirect } from "expo-router";
 import { useAuthStore } from "@/store/authStore";
 import { useFirstLaunch } from "@/hooks/useFirstLaunch";
@@ -6,17 +6,31 @@ import { useProfileSetupStore } from "@/store/profileSetupStore";
 import { AppLoadingScreen } from "@/components/app/AppLoadingScreen";
 
 export default function Index() {
-    const { isAuthenticated, isRestoringSession, user } = useAuthStore();
+    const { isAuthenticated, isRestoringSession, user, refreshUser } = useAuthStore();
     const { isFirstLaunch } = useFirstLaunch();
     const { getIncompleteStep, setGender } = useProfileSetupStore();
 
-    // restoreSession already fetched (or cached) the user with the same /me
-    // endpoint — no second network round-trip here.
+    // restoreSession unblocks with the CACHED user; the background /me can
+    // land after we've already redirected. A stale cache must not decide the
+    // profile-setup resume step, so when it says "incomplete" we hold the
+    // splash until one fresh /me confirms it. Complete profiles skip this.
+    const [freshUserChecked, setFreshUserChecked] = useState(false);
+
     const profile = isAuthenticated ? user?.profile : undefined;
+    const incompleteStep = isAuthenticated ? (profile ? getIncompleteStep(profile) : 1) : 0;
+    const needsFreshCheck = isAuthenticated && !isRestoringSession && incompleteStep > 0 && !freshUserChecked;
 
     useEffect(() => {
         if (profile?.gender) setGender(profile.gender);
     }, [profile?.gender, setGender]);
+
+    useEffect(() => {
+        if (!needsFreshCheck) return;
+        // On failure (offline) fall back to the cached decision.
+        refreshUser()
+            .catch(() => undefined)
+            .finally(() => setFreshUserChecked(true));
+    }, [needsFreshCheck, refreshUser]);
 
     // Wait until session is restored
     if (isRestoringSession) {
@@ -28,8 +42,10 @@ export default function Index() {
     }
 
     if (isAuthenticated) {
-        const incompleteStep = profile ? getIncompleteStep(profile) : 1;
         if (incompleteStep > 0) {
+            if (!freshUserChecked) {
+                return <AppLoadingScreen />;
+            }
             return <Redirect href={`/(profile-setup)/step${incompleteStep}` as any} />;
         }
         return <Redirect href="/(tabs)/search" />;

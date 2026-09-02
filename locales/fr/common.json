@@ -1,4 +1,7 @@
 {
+  "validation_required": "Obligatoire",
+  "validation_max_16_chars": "16 caractères maximum",
+  "validation_letters_only": "Lettres et espaces uniquement",
   "onboarding": {
     "start": "Commencer",
     "next": "Suivant",
@@ -406,6 +409,9 @@
   "signup_button": "S'inscrire à nouveau",
   "continue": "Continuer",
   "reset_email_sent_if_exists": "Si cet e-mail est enregistré, un lien de réinitialisation du mot de passe a été envoyé.",
+  "reset_check_email_title": "Vérifiez votre boîte mail",
+  "resend_reset_link": "Vous n'avez pas reçu l'e-mail ? Renvoyer",
+  "resend_cooldown_in": "Renvoyer dans {{seconds}} s",
   "reset_request_failed": "Impossible de traiter la demande de réinitialisation. Veuillez réessayer.",
   "email_not_found": "Aucun compte trouvé avec cet e-mail.",
   "already_have_an_account": "Vous avez déjà un compte ?",
@@ -1101,7 +1107,7 @@
   "education_required": "Veuillez sélectionner votre niveau d'études.",
   "occupation_required": "Veuillez sélectionner votre profession.",
   "designation_required": "Veuillez sélectionner votre intitulé de poste.",
-  "company_too_long": "Le nom de l'entreprise ne doit pas dépasser 30 caractères.",
+  "company_too_long": "Le nom de l'entreprise ne doit pas dépasser 50 caractères.",
   "annual_income_invalid": "Veuillez entrer un montant de revenu annuel valide.",
   "no_data_ocu": "Aucune donnée sur les professions disponible.",
   "religious_title": "Croyances et pratiques religieuses",
@@ -1235,6 +1241,13 @@
   "relative": "Proche / Parent",
   "friend": "Ami(e)",
   "profile_manager": "Gestionnaire de profil",
+  "pm_self_desc": "Ce profil est pour moi et je le gère moi-même.",
+  "pm_father_desc": "Je suis le père de la personne concernée par ce profil.",
+  "pm_mother_desc": "Je suis la mère de la personne concernée par ce profil.",
+  "pm_brother_desc": "Je suis le frère de la personne concernée par ce profil.",
+  "pm_sister_desc": "Je suis la sœur de la personne concernée par ce profil.",
+  "pm_relative_desc": "Je suis un proche de la personne concernée par ce profil.",
+  "pm_friend_desc": "Je suis un ami de la personne concernée par ce profil.",
   "finish": "Terminer",
   "pm_placeholder": "Qui gère ce profil ?",
   "profile_manager_required": "Veuillez indiquer qui gère ce profil.",
@@ -1567,6 +1580,8 @@
   "reauth_verification_failed": "Échec de la vérification de ré-authentification",
   "create_password_failed": "Échec de la création du mot de passe",
   "change_email": "Changer l'adresse e-mail",
+  "change_email_short": "Changer l’e-mail",
+  "resend_email": "Renvoyer l’e-mail",
   "update_email": "Mettre à jour l'adresse e-mail",
   "email_same_as_current": "Cette adresse e-mail est déjà associée à votre compte.",
   "change_email_verification_sent": "Nous avons envoyé un lien de vérification à votre nouvelle adresse e-mail. Veuillez vérifier votre boîte de réception pour confirmer la modification.",
@@ -2389,6 +2404,8 @@
   "done": "Terminé",
   "no_results_found": "Aucun résultat trouvé",
   "camera_permission_required": "L'autorisation de la caméra est requise.",
+  "take_photo": "Prendre une photo",
+  "choose_from_gallery": "Choisir dans la galerie",
   "profile.location_edit_from_device": "La modification de la localisation utilisera la position de votre appareil. Nous l'ouvrirons dans un écran de modification dédié.",
   "data_privacy": "Confidentialité des données",
   "download_my_data": "Télécharger mes données",
@@ -2445,5 +2462,116 @@
   "notifications": "Notifications",
   "badge_verified": "Vérifié",
   "badge_member": "Membre",
-  "badge_private_gallery": "Galerie privée"
+  "badge_private_gallery": "Galerie privée",
+  "moderation_text_warning_title_bio": "La bio doit être vérifiée",
+  "moderation_text_warning_title_headline": "Le titre doit être vérifié",
+  "moderation_text_warning_title_company": "L'entreprise doit être vérifiée",
+  "moderation_text_warning_title_partner_about": "Le texte sur le partenaire doit être vérifié",
+  "moderation_text_warning_body": "Nous avons détecté un élément qui peut nécessiter une vérification humaine avant d'apparaître sur votre profil.",
+  "moderation_text_detected": "Détecté",
+  "moderation_text_edit_field": "Modifier {field}",
+  "moderation_text_submit_anyway": "Envoyer quand même pour vérification",
+  "moderation_text_under_review": "En cours de vérification",
+  "moderation_text_under_review_hint": "Cette modification attend une vérification. Les autres utilisateurs verront votre ancien texte approuvé jusqu'à son approbation.",
+  "moderation_issue_contact_info": "Coordonnées",
+  "moderation_issue_social_handle": "Identifiant social ou lien",
+  "moderation_issue_inappropriate": "Contenu inapproprié",
+  "moderation_issue_racist": "Contenu raciste",
+  "moderation_issue_offensive": "Contenu offensant",
+  "moderation_issue_non_professional_company": "Nom d'entreprise peu clair ou non professionnel",
+  "moderation_issue_needs_review": "Nécessite une vérification humaine",
+  "moderation_submit_anyway_success": "Envoyé pour vérification.",
+  "private_gallery_requires_image": "Ajoutez au moins une photo avant de rendre votre galerie privée.",
+  "media_guidelines_title": "Choisissez des images claires",
+  "media_guidelines_intro": "Ajoutez des images claires de vous. Au moins une image est requise pour utiliser l’application. Les images sont vérifiées avant d’être visibles par les autres membres.",
+  "media_guidelines_good_title": "Bonnes photos de profil",
+  "media_guidelines_bad_title": "Photos que nous ne pouvons pas approuver",
+  "media_guidelines_private_title": "Gardez votre galerie privée",
+  "media_guidelines_private_message": "Vous pouvez masquer vos photos et ne les dévoiler qu'après avoir commencé une conversation.",
+  "media_guidelines_understand": "J'ai compris",
+  "media_guidelines_reopen": "Voir les règles pour les photos",
+  "media_guidelines_sample_alt": "Exemple de photo de profil {number}",
+  "media_guidelines_sample_pending": "L'image d'exemple apparaîtra ici",
+  "image_moderation_nsfw": "Contenu sexuel ou explicite",
+  "image_moderation_no_human": "Aucune personne détectée",
+  "image_moderation_hateful_text": "Texte raciste ou haineux",
+  "image_moderation_contact_info": "Coordonnées ou code QR",
+  "image_moderation_presentation_mismatch": "La photo peut ne pas correspondre au genre du profil",
+  "image_moderation_checking": "Vérification de la photo",
+  "image_moderation_checking_hint": "La vérification automatique de sécurité est en cours. Cela prend généralement quelques secondes.",
+  "image_moderation_pending_hint": "Cette photo est en attente de vérification et masquée pour les autres membres.",
+  "image_moderation_submitted_review": "Photo envoyée pour vérification.",
+  "image_moderation_approved_toast": "Photo approuvée et désormais visible sur votre profil.",
+  "image_moderation_review_toast": "La photo nécessite une vérification humaine et reste masquée pour les autres membres.",
+  "image_moderation_warning_title": "La photo doit être vérifiée",
+  "image_moderation_warning_body": "Nous avons détecté un élément qui peut nécessiter une vérification avant l'affichage de cette photo sur votre profil.",
+  "image_moderation_choose_another": "Choisir une autre",
+  "image_moderation_submit_review": "Envoyer pour vérification",
+  "image_moderation_excessive_body_exposure": "Photo suggestive ou torse nu",
+  "image_moderation_unavailable": "Vérification automatique indisponible",
+  "image_moderation_needs_review": "Vérification humaine requise",
+  "image_moderation_presentation_uncertain": "Impossible de confirmer une personne correspondante",
+  "qualified_photo_required": "Une photo de profil approuvée est nécessaire pour envoyer des messages.",
+  "qualified_photo_required_title": "Ajoutez une photo de profil approuvée",
+  "qualified_photo_required_message": "Vous pouvez parcourir les profils et lire les discussions, mais vous devez avoir au moins une photo approuvée de vous pour envoyer un message.",
+  "add_profile_photo": "Ajouter une photo de profil",
+  "profile_photo_required": "Ajoutez au moins une photo de profil pour continuer.",
+  "bio_too_short": "Écrivez un peu plus à propos de vous.",
+  "checkout_open_failed": "Impossible d’ouvrir le paiement sécurisé. Veuillez réessayer.",
+  "delete_photo": "Supprimer la photo",
+  "make_primary": "Définir comme principale",
+  "secure_checkout": "Paiement sécurisé",
+  "upload_images_to_profile": "Ajoutez des images à votre profil",
+  "explore_location_required_title": "Votre position est nécessaire pour Explore",
+  "explore_location_permission_denied": "Autorisez l’accès à la position dans les réglages pour découvrir des profils pertinents.",
+  "explore_location_services_disabled": "Activez les services de localisation de l’appareil pour utiliser Explore.",
+  "explore_location_unavailable": "Impossible d’obtenir votre position actuelle. Allez dans un espace ouvert et réessayez.",
+  "explore_location_network_error": "Impossible de vérifier votre position. Vérifiez votre connexion et réessayez.",
+  "open_settings": "Ouvrir les réglages",
+  "image_moderation_rejected_toast": "La photo a été refusée et supprimée de votre galerie."
+  ,"checkout_untrusted_url": "Le paiement sécurisé a renvoyé une adresse non valide."
+  ,"membership_refresh_failed": "Impossible d’actualiser l’adhésion. Réessayez."
+  ,"refreshing_membership": "Actualisation de l’adhésion..."
+  ,"payment_may_be_processing": "Le paiement est peut-être encore en cours. Actualisez avant de lancer un autre paiement."
+  ,"refresh_membership": "Actualiser l'adhésion"
+  ,"choose_payment_method": "Choisir le mode de paiement"
+  ,"pay_with_app_store": "Payer avec l’App Store"
+  ,"pay_with_google_play": "Payer avec Google Play"
+  ,"pay_with_card": "Payer par carte"
+  ,"app_store_payment_description": "Utilisez votre compte Apple et le moyen de paiement de l’App Store."
+  ,"google_play_payment_description": "Utilisez votre compte Google et le moyen de paiement Google Play."
+  ,"card_payment_description": "Continuez dans votre navigateur avec le paiement web sécurisé."
+  ,"payment_choice_ios_note": "Les achats App Store sont gérés par Apple. Les paiements par carte ouvrent le paiement web sécurisé."
+  ,"payment_choice_android_note": "Les achats Google Play sont gérés par Google. Les paiements par carte ouvrent le paiement web sécurisé."
+  ,"processing_payment": "Traitement du paiement..."
+  ,"membership_purchase_success": "Votre adhésion est active."
+  ,"payment_not_completed": "Paiement non terminé"
+  ,"native_purchase_failed": "Nous n’avons pas encore pu confirmer cet achat. Vérifiez votre abonnement avant de réessayer ou contactez l’assistance."
+  ,"restore_purchases": "Restaurer les achats"
+  ,"restoring_purchases": "Restauration des achats..."
+  ,"purchases_restored": "Votre abonnement a été restauré."
+  ,"no_purchases_to_restore": "Aucun achat d’abonnement actif n’a été trouvé."
+  ,"restore_purchases_failed": "Les achats n’ont pas pu être restaurés. Réessayez plus tard."
+  ,"payment_pending_store": "Votre paiement via la boutique est en attente. L’adhésion sera activée après confirmation."
+  ,"error_gift_redeem_failed": "Impossible d’utiliser la carte cadeau. Veuillez réessayer."
+  ,"error_too_many_attempts": "Trop de tentatives. Veuillez réessayer plus tard."
+  ,"free": "Gratuit"
+  ,"gift_card_code_label": "Code de carte cadeau"
+  ,"gift_card_helper": "Saisissez le code de la carte cadeau et le code PIN à 4 chiffres."
+  ,"gift_card_pin_label": "PIN à 4 chiffres"
+  ,"gift_card_processing": "Carte cadeau acceptée. L’abonnement est en cours d’activation."
+  ,"gift_code_invalid_length": "Saisissez le code de carte cadeau de 8 caractères."
+  ,"gift_pin_invalid_length": "Saisissez le code PIN à 4 chiffres de la carte cadeau."
+  ,"gift_redeemed_success": "Carte cadeau utilisée. Votre abonnement est actif."
+  ,"history_load_failed": "Impossible de charger l’historique d’abonnement."
+  ,"loading_payment_options": "Chargement des options de paiement..."
+  ,"membership_ends": "Se termine"
+  ,"membership_history": "Historique d’abonnement"
+  ,"membership_history_description": "Vos achats et récompenses d’abonnement."
+  ,"no_membership_history": "Aucun historique d’abonnement pour le moment"
+  ,"no_membership_history_description": "Les achats, cartes cadeaux, essais et attributions admin apparaîtront ici."
+  ,"payment_not_available_region": "Cette formule n’est pas encore disponible dans votre région."
+  ,"payment_options_unavailable": "Impossible de charger les options de paiement. Faites glisser vers le bas pour réessayer."
+  ,"redeem_gift_card": "Utiliser une carte cadeau"
+  ,"redeeming_gift_card": "Utilisation..."
 }

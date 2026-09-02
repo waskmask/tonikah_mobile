@@ -37,7 +37,7 @@ export function ExploreDeckCard({
     const image = firstProfileImage(profile);
     const name = profileName(profile) || t('not_set', 'Not set');
     const age = profileAge(profile);
-    const location = formatProfileLocation(profile, true);
+    const location = formatProfileLocation(profile);
     const flag = flagEmoji(profile);
     const coordinates = profileCoordinates(profile);
     const distance = formatDistanceKm(viewerLat, viewerLng, coordinates?.lat, coordinates?.lng);
@@ -65,9 +65,9 @@ export function ExploreDeckCard({
                     </View>
                 ) : null}
             </View>
-            <View style={[styles.info, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+            <View style={[styles.info, { alignItems: 'flex-start' }]}>
                 {profile?.recently_active ? (
-                    <View style={[styles.activeChip, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.activeChip, { flexDirection: 'row' }]}>
                         <View style={styles.activeDot} />
                         <Text variant="caption" className="font-body-semi" style={{ color: '#FFFFFF' }}>
                             {t('recently_active', 'Recently active')}
@@ -78,30 +78,25 @@ export function ExploreDeckCard({
                     {name}{age ? `, ${age}` : ''}
                 </Text>
                 {location ? (
-                    <View style={[styles.location, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.location, { flexDirection: 'row' }]}>
                         {flag ? <RNText style={styles.flag}>{flag}</RNText> : <MapPin size={scale(15)} color="#FFFFFF" />}
                         <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: '#FFFFFF', flexShrink: 1 }}>
                             {location}
                         </Text>
                         {distance ? (
                             <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={styles.distance}>
-                                · {distance} {t('away', 'away')}
+                                · {distance}
                             </Text>
                         ) : null}
                     </View>
                 ) : null}
                 {tags.length > 0 ? (
-                    <View style={[styles.tags, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        {tags.slice(0, 2).map((tag, index) => (
+                    <View style={[styles.tags, { flexDirection: 'row' }]}>
+                        {tags.map((tag, index) => (
                             <View key={`${index}-${tag}`} style={styles.tag}>
-                                <Text variant="caption" className="font-body-semi" numberOfLines={1} style={{ color: '#FFFFFF' }}>{tag}</Text>
+                                <Text variant="caption" className="font-body-semi" numberOfLines={1} style={styles.tagText}>{tag}</Text>
                             </View>
                         ))}
-                        {tags.length > 2 ? (
-                            <View style={styles.tag}>
-                                <Text variant="caption" className="font-body-semi" style={{ color: '#FFFFFF' }}>+{tags.length - 2}</Text>
-                            </View>
-                        ) : null}
                     </View>
                 ) : null}
             </View>
@@ -113,8 +108,7 @@ const styles = StyleSheet.create({
     card: {
         flex: 1,
         minHeight: scale(360),
-        borderBottomLeftRadius: scale(12),
-        borderBottomRightRadius: scale(12),
+        borderRadius: scale(22),
         overflow: 'hidden',
         backgroundColor: '#0A0A0A',
     },
@@ -159,7 +153,7 @@ const styles = StyleSheet.create({
     },
     name: {
         color: '#FFFFFF',
-        fontSize: scale(29),
+        fontSize: scale(27),
         lineHeight: scale(34),
     },
     location: {
@@ -174,10 +168,10 @@ const styles = StyleSheet.create({
         lineHeight: scale(18),
     },
     distance: { color: 'rgba(255,255,255,0.78)' },
+    // All tags render; long sets wrap to a second row instead of a +N counter
     tags: {
         flexDirection: 'row',
-        flexWrap: 'nowrap',
-        overflow: 'hidden',
+        flexWrap: 'wrap',
         gap: scale(7),
         marginTop: scale(10),
     },
@@ -189,5 +183,14 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.36)',
         paddingHorizontal: scale(11),
         paddingVertical: scale(6),
+        justifyContent: 'center',
+    },
+    // Android bakes extra ascent into the glyph box (includeFontPadding),
+    // which reads as the text sitting low inside the pill
+    tagText: {
+        color: '#FFFFFF',
+        includeFontPadding: false,
+        lineHeight: scale(14),
+        textAlignVertical: 'center',
     },
 });

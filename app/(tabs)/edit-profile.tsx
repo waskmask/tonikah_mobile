@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import * as Location from "expo-location";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   Baby,
   Banknote,
@@ -34,6 +35,7 @@ import {
 
 import { AppBackTitleBar } from "@/components/app/AppBackTitleBar";
 import { EditProfileMediaEditor } from "@/components/profile/EditProfileMediaEditor";
+import { ProfileSummaryEditor } from "@/components/profile/ProfileSummaryEditor";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { MultiSelectOption, MultiSelectSheet } from "@/components/ui/MultiSelectSheet";
 import { SelectOption, SingleSelectSheet } from "@/components/ui/SingleSelectSheet";
@@ -60,7 +62,16 @@ import {
   translateCountry,
 } from "@/lib/profileDisplay";
 import { profileService } from "@/lib/profileService";
-import { extractModerationRejection } from "@/lib/textModeration";
+import {
+  extractModerationRejection,
+  getTextModerationWarning,
+  moderationCandidateForEditing,
+  pendingModerationCandidate,
+  type TextModerationWarning,
+} from "@/lib/textModeration";
+import { TextModerationWarningModal } from "@/components/app/TextModerationWarningModal";
+import { UnderReviewPill } from "@/components/app/UnderReviewPill";
+import { getTextDirection, localeTextDirection } from "@/lib/textDirection";
 import {
   BIO_MAX,
   cleanHeadlineTextForSave,
@@ -133,8 +144,6 @@ const completionFields = (gender?: string | null) => {
     "relocation_plans",
     "education",
     "occupation",
-    "annual_income",
-    "company",
     "current_location",
     "sect",
     "maslak",
@@ -200,8 +209,6 @@ const localCompletion = (profile: any, gallery: GalleryItem[]): CompletionState 
     relocation_plans: hasValue(profile?.relocation_plans),
     education: hasValue(profile?.education),
     occupation: hasValue(profile?.occupation),
-    annual_income: Boolean(profile?.annual_income?.amount && profile?.annual_income?.currency),
-    company: hasValue(profile?.company),
     current_location: hasValue(profile?.current_location),
     sect: hasValue(profile?.sect),
     maslak: hasValue(profile?.maslak),
@@ -241,7 +248,7 @@ const formatSelect = (value: unknown, fallback: string) =>
 const formatLocation = (location: any, locale: string, fallback: string) => {
   if (!location) return fallback;
   const country = translateCountry(String(location.country || "")) || location.country;
-  const parts = [location.city, location.state].filter(Boolean);
+  const parts = [location.city].filter(Boolean);
   if (country) parts.push(country);
   return parts.length ? parts.join(", ") : fallback;
 };
@@ -348,6 +355,7 @@ async function withLocationTimeout<T>(promise: Promise<T>, timeoutMs = 12000): P
 }
 
 export default function EditProfileScreen() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const { isDark } = useTheme();
   const { currentLanguage, isRTL } = useLanguage();
   const { scale } = useResponsive();
@@ -355,6 +363,19 @@ export default function EditProfileScreen() {
   const toast = useToast();
   const { requireVerified } = useEmailVerificationGuard();
   const refreshUser = useAuthStore((state) => state.refreshUser);
+  const authUser = useAuthStore((state) => state.user);
+  const returnHref = useMemo(() => {
+    const candidate = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+    if (
+      !candidate ||
+      !candidate.startsWith("/") ||
+      candidate.includes("://") ||
+      candidate.includes("edit-profile")
+    ) {
+      return "/(tabs)/profile";
+    }
+    return candidate;
+  }, [returnTo]);
 
   const [profile, setProfile] = useState<any>(null);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
@@ -366,7 +387,6 @@ export default function EditProfileScreen() {
     missingKeys: [],
   });
   const [headline, setHeadline] = useState("");
-  const [bio, setBio] = useState("");
   const [company, setCompany] = useState("");
   const [annualIncomeAmount, setAnnualIncomeAmount] = useState("");
   const [annualIncomeCurrency, setAnnualIncomeCurrency] = useState("USD");
@@ -375,6 +395,8 @@ export default function EditProfileScreen() {
   const [activeSingleField, setActiveSingleField] = useState<string | null>(null);
   const [activeMultiField, setActiveMultiField] = useState<string | null>(null);
   const [showIncomeCurrencySheet, setShowIncomeCurrencySheet] = useState(false);
+  const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
+  const companyInputRef = useRef<TextInput>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
@@ -440,8 +462,8 @@ export default function EditProfileScreen() {
     [],
   );
 
-  const loadProfile = useCallback(async () => {
-    setLoading(true);
+  const loadProfile = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
       const response = await profileService.fetchMe();
       const nextProfile = response.user?.profile || response.profile || {};
@@ -449,9 +471,11 @@ export default function EditProfileScreen() {
       setProfile(nextProfile);
       setGallery(nextGallery);
       setPrivacy(nextProfile.gallery_privacy || nextProfile.galleryPrivacy || "public");
-      setHeadline(cleanProfileText(nextProfile.profile_headline || ""));
-      setBio(cleanProfileMultilineText(nextProfile.bio || ""));
-      setCompany(cleanProfileText(nextProfile.company || ""));
+      // The owner keeps editing their pending/rejected moderation candidate,
+      // not the old approved text other users still see. Headline and bio
+      // prefill lives inside ProfileSummaryEditor.
+      const moderationMeta = nextProfile.contentModeration || {};
+      setCompany(cleanProfileText(moderationCandidateForEditing(moderationMeta.company) || nextProfile.company || ""));
       setAnnualIncomeCurrency(nextProfile.annual_income?.currency || "USD");
       setAnnualIncomeAmount(nextProfile.annual_income?.amount ? formatAmount(String(nextProfile.annual_income.amount)) : "");
       await loadCompletion(nextProfile, nextGallery);
@@ -462,11 +486,13 @@ export default function EditProfileScreen() {
     }
   }, [loadCompletion]);
 
-  useEffect(() => {
-    if (initialLoadStartedRef.current) return;
-    initialLoadStartedRef.current = true;
-    void loadProfile();
-  }, [loadProfile]);
+  useFocusEffect(
+    useCallback(() => {
+      const showLoader = !initialLoadStartedRef.current;
+      initialLoadStartedRef.current = true;
+      void loadProfile(showLoader);
+    }, [loadProfile]),
+  );
 
   const primaryImage = useMemo(() => {
     const sortedGallery = [...gallery].sort((a, b) => {
@@ -890,18 +916,8 @@ export default function EditProfileScreen() {
 
   const validateInlineFields = () => {
     const nextErrors: Record<string, string> = {};
-    const cleanedHeadline = cleanHeadlineTextForSave(headline);
-    const cleanedBio = cleanProfileTextForSave(bio);
     const cleanedCompany = cleanHeadlineTextForSave(company);
     const incomeAmount = parseAmount(annualIncomeAmount);
-    const headlineError =
-      cleanedHeadline && (!isAllowedProfileText(cleanedHeadline) || countNonSpace(cleanedHeadline) > HEADLINE_MAX)
-        ? t("profile.invalid_headline", "Use a shorter headline without links or unsupported characters.")
-        : "";
-    const bioError =
-      cleanedBio && (!isAllowedProfileText(cleanedBio) || countNonSpace(cleanedBio) > BIO_MAX)
-        ? t("profile.invalid_bio", "Use a shorter bio without links or unsupported characters.")
-        : "";
     const companyError =
       cleanedCompany && (!isAllowedProfileText(cleanedCompany) || countNonSpace(cleanedCompany) > COMPANY_MAX)
         ? t("profile.invalid_company", "Use a shorter company name without links or unsupported characters.")
@@ -912,8 +928,6 @@ export default function EditProfileScreen() {
         ? t("annual_income_invalid", "Please enter a valid annual income amount.")
         : "";
 
-    if (headlineError) nextErrors.headline = headlineError;
-    if (bioError) nextErrors.bio = bioError;
     if (companyError) nextErrors.company = companyError;
     if (incomeError) nextErrors.annualIncome = incomeError;
 
@@ -921,7 +935,7 @@ export default function EditProfileScreen() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const saveInlineFields = () => {
+  const saveInlineFields = (submitAnyway = false) => {
     if (!requireVerified("save")) return;
     void (async () => {
       if (!validateInlineFields()) return;
@@ -929,29 +943,43 @@ export default function EditProfileScreen() {
       try {
         const incomeAmount = parseAmount(annualIncomeAmount);
         const payload = {
-          profile_headline: cleanHeadlineTextForSave(headline),
-          bio: cleanProfileTextForSave(bio),
           company: cleanHeadlineTextForSave(company),
           ...(annualIncomeAmount.trim() && Number.isFinite(incomeAmount) && incomeAmount > 0
             ? { annual_income: { currency: annualIncomeCurrency, amount: incomeAmount } }
             : {}),
         };
-        const response = await profileService.updateProfile(payload);
+        const response = await profileService.updateProfile({
+          ...payload,
+          clientLocale: currentLanguage,
+          ...(submitAnyway ? { submitAnyway: true } : {}),
+        });
         if (response.success === false) {
-          const rejection = extractModerationRejection(response);
-          if (rejection) {
-            setErrors((current) => ({ ...current, ...rejection.fieldErrors }));
-            toast.show(rejection.userMessage, "error");
+          const warning = getTextModerationWarning(response);
+          if (warning) {
+            const rejection = extractModerationRejection(response);
+            if (rejection) setErrors((current) => ({ ...current, ...rejection.fieldErrors }));
+            setModerationWarning(warning);
           } else {
             toast.show(apiMessage(String(response.message || ""), t("profile.update_error", "Could not update profile.")), "error");
           }
           return;
         }
+        setModerationWarning(null);
         const nextProfile = response.profile || response.user?.profile || { ...(profile || {}), ...payload };
         setProfile(nextProfile);
         await refreshUser();
+        const savedForReview = Boolean(
+          pendingModerationCandidate(
+            useAuthStore.getState().user?.profile?.contentModeration?.company,
+          ),
+        );
         await loadCompletion(nextProfile, gallery);
-        toast.show(t("profile.profile_updated", "Profile updated."), "success");
+        toast.show(
+          submitAnyway || savedForReview
+            ? t("moderation_submit_anyway_success", "Submitted for review.")
+            : t("profile.profile_updated", "Profile updated."),
+          "success",
+        );
       } catch (error) {
         toast.show(apiMessage(String((error as any)?.message || ""), t("profile.update_error", "Could not update profile.")), "error");
       } finally {
@@ -959,6 +987,15 @@ export default function EditProfileScreen() {
       }
     })();
   };
+
+  const focusModeratedField = () => {
+    // Headline and bio live in ProfileSummaryEditor now; only company remains
+    setTimeout(() => companyInputRef.current?.focus(), 150);
+  };
+
+  const moderationMeta = profile?.contentModeration || {};
+  const companyPending = Boolean(pendingModerationCandidate(moderationMeta.company));
+  const companyDirection = getTextDirection(company, localeTextDirection(currentLanguage));
 
   const mergeUpdatedProfile = useCallback(
     async (payload: Record<string, any>, responseProfile?: any) => {
@@ -1162,7 +1199,11 @@ export default function EditProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppBackTitleBar title={t("edit_profile", "Edit profile")} fallbackHref="/(tabs)/profile" />
+      <AppBackTitleBar
+        title={t("edit_profile", "Edit profile")}
+        fallbackHref="/(tabs)/profile"
+        onBack={() => router.replace(returnHref as any)}
+      />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.container, { paddingHorizontal: scale(20) }]}
@@ -1171,7 +1212,7 @@ export default function EditProfileScreen() {
       <View style={[styles.summary, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Image source={primaryImageSource as any} style={styles.avatar} contentFit="cover" />
         <View style={styles.summaryBody}>
-          <View style={[styles.nameRow, isRTL && styles.rowReverse]}>
+          <View style={[styles.nameRow]}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
               {displayName}
               {age ? `, ${age}` : ""}
@@ -1194,6 +1235,8 @@ export default function EditProfileScreen() {
 
       <EditProfileMediaEditor
         canUsePrivateGallery={String(profile?.gender || "").toLowerCase() === "female"}
+        gender={String(profile?.gender || "").toLowerCase() === "female" ? "female" : "male"}
+        guidelinesIdentity={String(authUser?._id || authUser?.email || "current-user")}
         initialGallery={gallery}
         initialPrivacy={privacy}
         onGalleryChange={onGalleryChange}
@@ -1203,37 +1246,16 @@ export default function EditProfileScreen() {
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           {t("profile.profile_summary", "Profile summary")}
         </Text>
-        <TextInput
-          value={headline}
-          onChangeText={(value) => {
-            setHeadline(value);
-            if (errors.headline) setErrors((current) => ({ ...current, headline: "" }));
-          }}
-          placeholder={t("profile.headline_placeholder", "Write a headline for this profile")}
-          placeholderTextColor={colors.muted}
-          style={[styles.input, { borderColor: colors.border, color: colors.text }]}
-        maxLength={80}
-        />
-        <Text style={[styles.counter, { color: colors.muted }]}>{headline.length}/80</Text>
-        {errors.headline ? <Text style={styles.error}>{errors.headline}</Text> : null}
+        <ProfileSummaryEditor profile={profile} onSaved={loadProfile} />
 
+        <View style={styles.fieldLabelRow}>
+          <Text style={[styles.fieldLabel, { color: colors.text }]}>
+            {t("profile.company", "Company")}
+          </Text>
+          {companyPending ? <UnderReviewPill /> : null}
+        </View>
         <TextInput
-          value={bio}
-          onChangeText={(value) => {
-            setBio(value);
-            if (errors.bio) setErrors((current) => ({ ...current, bio: "" }));
-          }}
-          placeholder={t("profile.bio_placeholder", "Share brief description to help others understand you better.")}
-          placeholderTextColor={colors.muted}
-          style={[styles.textarea, { borderColor: colors.border, color: colors.text }]}
-          multiline
-          maxLength={BIO_MAX}
-          textAlignVertical="top"
-        />
-        <Text style={[styles.counter, { color: colors.muted }]}>{bio.length}/{BIO_MAX}</Text>
-        {errors.bio ? <Text style={styles.error}>{errors.bio}</Text> : null}
-
-        <TextInput
+          ref={companyInputRef}
           value={company}
           onChangeText={(value) => {
             setCompany(value);
@@ -1241,7 +1263,15 @@ export default function EditProfileScreen() {
           }}
           placeholder={t("profile.company", "Company")}
           placeholderTextColor={colors.muted}
-          style={[styles.input, { borderColor: colors.border, color: colors.text }]}
+          style={[
+            styles.input,
+            {
+              borderColor: colors.border,
+              color: colors.text,
+              textAlign: companyDirection === "rtl" ? "right" : "left",
+              writingDirection: companyDirection,
+            },
+          ]}
           maxLength={80}
         />
         {errors.company ? <Text style={styles.error}>{errors.company}</Text> : null}
@@ -1270,12 +1300,23 @@ export default function EditProfileScreen() {
 
         <GradientButton
           title={t("save", "Save")}
-          onPress={saveInlineFields}
+          onPress={() => saveInlineFields()}
           loading={saving}
           containerStyle={styles.saveButton}
           widthMode="full"
         />
       </View>
+
+      <TextModerationWarningModal
+        warning={moderationWarning}
+        submitting={saving}
+        onEdit={() => {
+          setModerationWarning(null);
+          focusModeratedField();
+        }}
+        onClose={() => setModerationWarning(null)}
+        onSubmitAnyway={() => saveInlineFields(true)}
+      />
 
       {rows.map((section) => (
         <View key={section.title} style={[styles.section, { borderColor: colors.border }]}>
@@ -1290,13 +1331,13 @@ export default function EditProfileScreen() {
                 key={row.id}
                 onPress={() => openFieldEditor(row)}
                 disabled={Boolean(savingField)}
-                style={[styles.row, isRTL && styles.rowReverse]}
+                style={[styles.row]}
               >
                 <View style={[styles.iconCircle, { backgroundColor: isDark ? colors.card : "#FFF0F4" }]}>
                   <Icon size={20} color={colors.primary} strokeWidth={2} />
                 </View>
                 <View style={styles.rowContent}>
-                  <View style={[styles.rowTop, isRTL && styles.rowReverse]}>
+                  <View style={[styles.rowTop]}>
                     <Text style={[styles.rowLabel, { color: colors.muted }]}>{row.label}</Text>
                     {gain ? (
                       <Text style={[styles.gain, { color: colors.primary }]}>+{gain}%</Text>
@@ -1398,9 +1439,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
   },
-  rowReverse: {
-    flexDirection: "row-reverse",
-  },
   name: {
     flex: 1,
     fontSize: 18,
@@ -1500,6 +1538,22 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 14,
+  },
+  pendingPillRow: {
+    marginTop: 10,
+    marginBottom: -4,
+  },
+  fieldLabelRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  fieldLabel: {
+    fontFamily: Typography.font.body.semi,
+    fontSize: 13,
+    fontWeight: "600",
   },
   row: {
     alignItems: "center",

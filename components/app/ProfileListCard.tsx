@@ -154,19 +154,24 @@ export function ProfileListCard({
                     </Pressable>
                 ) : null}
                 <View style={styles.overlayContent}>
-                    <Text numberOfLines={1} style={[styles.name, { textAlign: isRTL ? 'right' : 'left' }]}>
-                        {name}{age ? `, ${age}` : ''}
-                    </Text>
+                    {/* Content-sized text in a row: the row mirrors under native RTL,
+                        no textAlign needed. ‏ (RLM) sets RTL bidi base so the
+                        age renders on the visual left of the name. */}
+                    <View style={styles.nameRow}>
+                        <Text numberOfLines={1} style={styles.name}>
+                            {isRTL ? '‏' : ''}{name}{age ? `, ${age}` : ''}
+                        </Text>
+                    </View>
                     {location ? (
-                        <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.metaRow, { flexDirection: 'row' }]}>
                             <MapPin size={scale(11)} color={colors.brand.bg.border} />
-                            <Text numberOfLines={1} style={[styles.location, { textAlign: isRTL ? 'right' : 'left' }]}>
-                                {location}
+                            <Text numberOfLines={1} style={styles.location}>
+                                {isRTL ? '‏' : ''}{location}
                             </Text>
                         </View>
                     ) : null}
                     {pills.length ? (
-                        <View style={[styles.pillRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.pillRow, { flexDirection: 'row' }]}>
                             {pills.map((pill, index) => (
                                 <View key={`${String(item.id || item._id || name)}-${pill}-${index}`} style={styles.pill}>
                                     <Text numberOfLines={1} style={styles.pillText}>{pill}</Text>
@@ -178,7 +183,7 @@ export function ProfileListCard({
             </View>
 
             {((onFavorite && !showOverlayAction) || onSkip) && (
-                <View style={[styles.actions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.actions, { flexDirection: 'row' }]}>
                     {onSkip && (
                         <Pressable onPress={onSkip} style={[styles.actionButton, { borderColor: colors.brand.bg.border }]}>
                             <X size={scale(16)} color={colors.chrome.header.icon} />
@@ -297,7 +302,11 @@ const styles = StyleSheet.create({
         right: scale(10),
         bottom: scale(10),
     },
+    nameRow: {
+        flexDirection: 'row',
+    },
     name: {
+        flexShrink: 1,
         color: '#FFFFFF',
         fontSize: scale(18),
         lineHeight: scale(22),
@@ -309,7 +318,7 @@ const styles = StyleSheet.create({
         marginTop: scale(4),
     },
     location: {
-        flex: 1,
+        flexShrink: 1,
         color: '#E8E1D6',
         fontSize: scale(11),
         lineHeight: scale(15),

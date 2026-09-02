@@ -1,4 +1,7 @@
 {
+  "validation_required": "Obbligatorio",
+  "validation_max_16_chars": "Massimo 16 caratteri",
+  "validation_letters_only": "Solo lettere e spazi",
   "onboarding": {
     "start": "Start",
     "next": "Next",
@@ -406,6 +409,9 @@
   "signup_button": "Registrati di nuovo",
   "continue": "continua",
   "reset_email_sent_if_exists": "Se questa email è registrata, ti abbiamo inviato un link per reimpostare la password.",
+  "reset_check_email_title": "Controlla la tua email",
+  "resend_reset_link": "Non hai ricevuto l'email? Invia di nuovo",
+  "resend_cooldown_in": "Invia di nuovo tra {{seconds}} s",
   "reset_request_failed": "Impossibile richiedere il reset password. Riprova.",
   "email_not_found": "Nessun account trovato con questa email.",
   "already_have_an_account": "Hai già un account?",
@@ -1101,7 +1107,7 @@
   "education_required": "Seleziona il tuo livello di istruzione.",
   "occupation_required": "Seleziona la tua occupazione.",
   "designation_required": "Seleziona il tuo titolo lavorativo.",
-  "company_too_long": "Il nome dell’azienda non può superare i 30 caratteri.",
+  "company_too_long": "Il nome dell’azienda non può superare i 50 caratteri.",
   "annual_income_invalid": "Inserisci un importo valido per il reddito annuo.",
   "no_data_ocu": "Nessun dato sull’occupazione disponibile.",
   "religious_title": "Credenze e pratiche religiose",
@@ -1235,6 +1241,13 @@
   "relative": "Parente",
   "friend": "Amico/a",
   "profile_manager": "Gestore profilo",
+  "pm_self_desc": "Questo profilo è per me e lo gestisco personalmente.",
+  "pm_father_desc": "Sono il padre della persona di questo profilo.",
+  "pm_mother_desc": "Sono la madre della persona di questo profilo.",
+  "pm_brother_desc": "Sono il fratello della persona di questo profilo.",
+  "pm_sister_desc": "Sono la sorella della persona di questo profilo.",
+  "pm_relative_desc": "Sono un parente della persona di questo profilo.",
+  "pm_friend_desc": "Sono un amico della persona di questo profilo.",
   "finish": "Fine",
   "pm_placeholder": "Chi gestisce questo profilo?",
   "profile_manager_required": "Seleziona chi gestisce questo profilo.",
@@ -1567,6 +1580,8 @@
   "reauth_verification_failed": "Verifica ri-autenticazione fallita",
   "create_password_failed": "Impossibile creare la password",
   "change_email": "Cambia indirizzo email",
+  "change_email_short": "Cambia email",
+  "resend_email": "Reinvia email",
   "update_email": "Aggiorna indirizzo email",
   "email_same_as_current": "Questo indirizzo email è già associato al tuo account.",
   "change_email_verification_sent": "Ti abbiamo inviato un link di verifica al nuovo indirizzo email. Controlla la posta in arrivo per confermare il cambio.",
@@ -2389,6 +2404,8 @@
   "done": "Fatto",
   "no_results_found": "Nessun risultato trovato",
   "camera_permission_required": "È richiesta l'autorizzazione della fotocamera.",
+  "take_photo": "Scatta una foto",
+  "choose_from_gallery": "Scegli dalla galleria",
   "profile.location_edit_from_device": "La modifica della posizione utilizzerà la posizione del tuo dispositivo. La apriremo come schermata di modifica dedicata.",
   "data_privacy": "Privacy dei dati",
   "download_my_data": "Scarica i miei dati",
@@ -2445,5 +2462,116 @@
   "notifications": "Notifiche",
   "badge_verified": "Verificato",
   "badge_member": "Membro",
-  "badge_private_gallery": "Galleria privata"
+  "badge_private_gallery": "Galleria privata",
+  "moderation_text_warning_title_bio": "La bio richiede revisione",
+  "moderation_text_warning_title_headline": "Il titolo richiede revisione",
+  "moderation_text_warning_title_company": "L'azienda richiede revisione",
+  "moderation_text_warning_title_partner_about": "Il testo sul partner richiede revisione",
+  "moderation_text_warning_body": "Abbiamo trovato qualcosa che potrebbe richiedere una revisione umana prima di apparire sul tuo profilo.",
+  "moderation_text_detected": "Rilevato",
+  "moderation_text_edit_field": "Modifica {field}",
+  "moderation_text_submit_anyway": "Invia comunque per revisione",
+  "moderation_text_under_review": "In revisione",
+  "moderation_text_under_review_hint": "Questo aggiornamento è in attesa di revisione. Gli altri utenti vedranno il testo approvato precedente finché non sarà approvato.",
+  "moderation_issue_contact_info": "Informazioni di contatto",
+  "moderation_issue_social_handle": "Profilo social o link",
+  "moderation_issue_inappropriate": "Contenuto inappropriato",
+  "moderation_issue_racist": "Contenuto razzista",
+  "moderation_issue_offensive": "Contenuto offensivo",
+  "moderation_issue_non_professional_company": "Nome azienda poco chiaro o non professionale",
+  "moderation_issue_needs_review": "Richiede revisione umana",
+  "moderation_submit_anyway_success": "Inviato per revisione.",
+  "private_gallery_requires_image": "Carica almeno una foto prima di rendere privata la tua galleria.",
+  "media_guidelines_title": "Scegli immagini chiare",
+  "media_guidelines_intro": "Carica immagini chiare di te. È necessaria almeno un'immagine per utilizzare l'app. Le immagini vengono controllate prima che gli altri membri possano vederle.",
+  "media_guidelines_good_title": "Buone foto del profilo",
+  "media_guidelines_bad_title": "Foto che non possiamo approvare",
+  "media_guidelines_private_title": "Mantieni privata la galleria",
+  "media_guidelines_private_message": "Puoi nascondere le foto e mostrarle solo dopo aver iniziato una conversazione.",
+  "media_guidelines_understand": "Ho capito",
+  "media_guidelines_reopen": "Vedi le linee guida per le foto",
+  "media_guidelines_sample_alt": "Esempio di foto del profilo {number}",
+  "media_guidelines_sample_pending": "L'immagine di esempio apparirà qui",
+  "image_moderation_nsfw": "Contenuto sessuale o esplicito",
+  "image_moderation_no_human": "Nessuna persona rilevata",
+  "image_moderation_hateful_text": "Testo razzista o d'odio",
+  "image_moderation_contact_info": "Informazioni di contatto o codice QR",
+  "image_moderation_presentation_mismatch": "La foto potrebbe non corrispondere al genere del profilo",
+  "image_moderation_checking": "Controllo della foto",
+  "image_moderation_checking_hint": "Il controllo automatico di sicurezza è in corso. Di solito richiede pochi secondi.",
+  "image_moderation_pending_hint": "Questa foto è in attesa di revisione ed è nascosta agli altri membri.",
+  "image_moderation_submitted_review": "Foto inviata per revisione.",
+  "image_moderation_approved_toast": "Foto approvata e ora visibile sul tuo profilo.",
+  "image_moderation_review_toast": "La foto richiede una revisione umana e rimane nascosta agli altri membri.",
+  "image_moderation_warning_title": "La foto deve essere revisionata",
+  "image_moderation_warning_body": "Abbiamo rilevato qualcosa che potrebbe richiedere una revisione prima che la foto appaia sul tuo profilo.",
+  "image_moderation_choose_another": "Scegli un'altra",
+  "image_moderation_submit_review": "Invia per revisione",
+  "image_moderation_excessive_body_exposure": "Foto provocante o a torso nudo",
+  "image_moderation_unavailable": "Controllo automatico non disponibile",
+  "image_moderation_needs_review": "Richiede revisione umana",
+  "image_moderation_presentation_uncertain": "Non è stato possibile confermare una persona corrispondente",
+  "qualified_photo_required": "Per inviare messaggi è necessaria una foto del profilo approvata.",
+  "qualified_photo_required_title": "Aggiungi una foto del profilo approvata",
+  "qualified_photo_required_message": "Puoi esplorare i profili e leggere le chat, ma serve almeno una tua foto approvata prima di inviare messaggi.",
+  "add_profile_photo": "Aggiungi foto del profilo",
+  "profile_photo_required": "Aggiungi almeno una foto del profilo per continuare.",
+  "bio_too_short": "Scrivi qualcosa in più su di te.",
+  "checkout_open_failed": "Impossibile aprire il pagamento sicuro. Riprova.",
+  "delete_photo": "Elimina foto",
+  "make_primary": "Imposta come principale",
+  "secure_checkout": "Pagamento sicuro",
+  "upload_images_to_profile": "Carica immagini sul tuo profilo",
+  "explore_location_required_title": "Explore richiede la tua posizione",
+  "explore_location_permission_denied": "Consenti l’accesso alla posizione nelle impostazioni per scoprire profili pertinenti.",
+  "explore_location_services_disabled": "Attiva i servizi di localizzazione del dispositivo per usare Explore.",
+  "explore_location_unavailable": "Non siamo riusciti a rilevare la tua posizione attuale. Spostati in un’area aperta e riprova.",
+  "explore_location_network_error": "Non siamo riusciti a verificare la tua posizione. Controlla la connessione e riprova.",
+  "open_settings": "Apri impostazioni",
+  "image_moderation_rejected_toast": "La foto è stata rifiutata e rimossa dalla tua galleria."
+  ,"checkout_untrusted_url": "Il pagamento sicuro ha restituito un indirizzo non valido."
+  ,"membership_refresh_failed": "Impossibile aggiornare l’abbonamento. Riprova."
+  ,"refreshing_membership": "Aggiornamento dell’abbonamento..."
+  ,"payment_may_be_processing": "Il pagamento potrebbe essere ancora in elaborazione. Aggiorna prima di avviare un altro pagamento."
+  ,"refresh_membership": "Aggiorna abbonamento"
+  ,"choose_payment_method": "Scegli come pagare"
+  ,"pay_with_app_store": "Paga con App Store"
+  ,"pay_with_google_play": "Paga con Google Play"
+  ,"pay_with_card": "Paga con carta"
+  ,"app_store_payment_description": "Usa il tuo account Apple e il metodo di pagamento dell’App Store."
+  ,"google_play_payment_description": "Usa il tuo account Google e il metodo di pagamento Google Play."
+  ,"card_payment_description": "Continua nel browser con il pagamento web sicuro."
+  ,"payment_choice_ios_note": "Gli acquisti su App Store sono gestiti da Apple. I pagamenti con carta aprono il pagamento web sicuro."
+  ,"payment_choice_android_note": "Gli acquisti su Google Play sono gestiti da Google. I pagamenti con carta aprono il pagamento web sicuro."
+  ,"processing_payment": "Elaborazione del pagamento..."
+  ,"membership_purchase_success": "Il tuo abbonamento è attivo."
+  ,"payment_not_completed": "Pagamento non completato"
+  ,"native_purchase_failed": "Non è ancora stato possibile confermare l’acquisto. Controlla il tuo abbonamento prima di riprovare o contatta l’assistenza."
+  ,"restore_purchases": "Ripristina acquisti"
+  ,"restoring_purchases": "Ripristino degli acquisti..."
+  ,"purchases_restored": "Il tuo abbonamento è stato ripristinato."
+  ,"no_purchases_to_restore": "Non è stato trovato alcun acquisto di abbonamento attivo."
+  ,"restore_purchases_failed": "Non è stato possibile ripristinare gli acquisti. Riprova più tardi."
+  ,"payment_pending_store": "Il pagamento tramite lo store è in sospeso. L’abbonamento verrà attivato dopo la conferma."
+  ,"error_gift_redeem_failed": "Impossibile riscattare la carta regalo. Riprova."
+  ,"error_too_many_attempts": "Troppi tentativi. Riprova più tardi."
+  ,"free": "Gratis"
+  ,"gift_card_code_label": "Codice carta regalo"
+  ,"gift_card_helper": "Inserisci il codice della carta regalo e il PIN di 4 cifre."
+  ,"gift_card_pin_label": "PIN di 4 cifre"
+  ,"gift_card_processing": "Carta regalo accettata. L’abbonamento è in attivazione."
+  ,"gift_code_invalid_length": "Inserisci il codice carta regalo di 8 caratteri."
+  ,"gift_pin_invalid_length": "Inserisci il PIN di 4 cifre della carta regalo."
+  ,"gift_redeemed_success": "Carta regalo riscattata. Il tuo abbonamento è attivo."
+  ,"history_load_failed": "Impossibile caricare la cronologia abbonamento."
+  ,"loading_payment_options": "Caricamento opzioni di pagamento..."
+  ,"membership_ends": "Termina"
+  ,"membership_history": "Cronologia abbonamento"
+  ,"membership_history_description": "I tuoi acquisti e premi di abbonamento."
+  ,"no_membership_history": "Ancora nessuna cronologia abbonamento"
+  ,"no_membership_history_description": "Acquisti, carte regalo, prove e concessioni admin appariranno qui."
+  ,"payment_not_available_region": "Questo piano non è ancora disponibile nella tua regione."
+  ,"payment_options_unavailable": "Impossibile caricare le opzioni di pagamento. Trascina verso il basso per riprovare."
+  ,"redeem_gift_card": "Riscatta carta regalo"
+  ,"redeeming_gift_card": "Riscatto..."
 }

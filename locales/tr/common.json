@@ -1,4 +1,7 @@
 {
+  "validation_required": "Zorunlu",
+  "validation_max_16_chars": "En fazla 16 karakter",
+  "validation_letters_only": "Yalnızca harf ve boşluk",
   "onboarding": {
     "start": "Start",
     "next": "Next",
@@ -406,6 +409,9 @@
   "signup_button": "Tekrar Kaydol",
   "continue": "devam et",
   "reset_email_sent_if_exists": "Bu e-posta kayıtlıysa şifre sıfırlama bağlantısı gönderildi.",
+  "reset_check_email_title": "E-postanızı kontrol edin",
+  "resend_reset_link": "E-posta gelmedi mi? Tekrar gönder",
+  "resend_cooldown_in": "{{seconds}} sn içinde tekrar gönder",
   "reset_request_failed": "Şifre sıfırlama talebi yapılamadı. Lütfen tekrar deneyin.",
   "email_not_found": "Bu e-postaya ait hesap bulunamadı.",
   "already_have_an_account": "Zaten hesabınız var mı?",
@@ -1101,7 +1107,7 @@
   "education_required": "Lütfen eğitiminizi seçin.",
   "occupation_required": "Lütfen mesleğinizi seçin.",
   "designation_required": "Lütfen meslek unvanınızı seçin.",
-  "company_too_long": "Şirket adı en fazla 30 karakter olabilir.",
+  "company_too_long": "Şirket adı en fazla 50 karakter olabilir.",
   "annual_income_invalid": "Lütfen geçerli bir yıllık gelir miktarı girin.",
   "no_data_ocu": "Meslek verisi yok.",
   "religious_title": "Dini İnanç ve Uygulamalar",
@@ -1235,6 +1241,13 @@
   "relative": "Akraba",
   "friend": "Arkadaş",
   "profile_manager": "Profil yöneticisi",
+  "pm_self_desc": "Bu profil benim için ve kendim yönetiyorum.",
+  "pm_father_desc": "Bu profildeki kişinin babasıyım.",
+  "pm_mother_desc": "Bu profildeki kişinin annesiyim.",
+  "pm_brother_desc": "Bu profildeki kişinin erkek kardeşiyim.",
+  "pm_sister_desc": "Bu profildeki kişinin kız kardeşiyim.",
+  "pm_relative_desc": "Bu profildeki kişinin akrabasıyım.",
+  "pm_friend_desc": "Bu profildeki kişinin arkadaşıyım.",
   "finish": "Bitir",
   "pm_placeholder": "Bu profili kim yönetiyor?",
   "profile_manager_required": "Bu profili kimin yönettiğini seçin.",
@@ -1567,6 +1580,8 @@
   "reauth_verification_failed": "Yeniden doğrulama başarısız",
   "create_password_failed": "Şifre oluşturulamadı",
   "change_email": "E-posta adresini değiştir",
+  "change_email_short": "E-postayı değiştir",
+  "resend_email": "E-postayı yeniden gönder",
   "update_email": "E-posta adresini güncelle",
   "email_same_as_current": "Bu e-posta adresi zaten hesabınıza bağlı.",
   "change_email_verification_sent": "Yeni e-posta adresinize doğrulama bağlantısı gönderdik. Gelen kutunuzu kontrol ederek değişikliği onaylayın.",
@@ -2389,6 +2404,8 @@
   "done": "Tamam",
   "no_results_found": "Sonuç bulunamadı",
   "camera_permission_required": "Kamera izni gereklidir.",
+  "take_photo": "Fotoğraf çek",
+  "choose_from_gallery": "Galeriden seç",
   "profile.location_edit_from_device": "Konum düzenleme, cihazınızın konumunu kullanacaktır. Bunu ayrı bir düzenleme ekranı olarak açacağız.",
   "data_privacy": "Veri gizliliği",
   "download_my_data": "Verilerimi indir",
@@ -2445,5 +2462,116 @@
   "notifications": "Bildirimler",
   "badge_verified": "Doğrulanmış",
   "badge_member": "Üye",
-  "badge_private_gallery": "Özel galeri"
+  "badge_private_gallery": "Özel galeri",
+  "moderation_text_warning_title_bio": "Biyografi inceleme gerektiriyor",
+  "moderation_text_warning_title_headline": "Profil başlığı inceleme gerektiriyor",
+  "moderation_text_warning_title_company": "Şirket inceleme gerektiriyor",
+  "moderation_text_warning_title_partner_about": "Eş hakkındaki metin inceleme gerektiriyor",
+  "moderation_text_warning_body": "Profilinizde görünmeden önce insan incelemesi gerektirebilecek bir şey tespit ettik.",
+  "moderation_text_detected": "Tespit edildi",
+  "moderation_text_edit_field": "{field} düzenle",
+  "moderation_text_submit_anyway": "Yine de incelemeye gönder",
+  "moderation_text_under_review": "İncelemede",
+  "moderation_text_under_review_hint": "Bu güncelleme inceleme bekliyor. Onaylanana kadar diğer kullanıcılar önceki onaylanmış metninizi görecek.",
+  "moderation_issue_contact_info": "İletişim bilgisi",
+  "moderation_issue_social_handle": "Sosyal medya adı veya bağlantı",
+  "moderation_issue_inappropriate": "Uygunsuz içerik",
+  "moderation_issue_racist": "Irkçı içerik",
+  "moderation_issue_offensive": "Saldırgan içerik",
+  "moderation_issue_non_professional_company": "Belirsiz veya profesyonel olmayan şirket adı",
+  "moderation_issue_needs_review": "İnsan incelemesi gerekiyor",
+  "moderation_submit_anyway_success": "İncelemeye gönderildi.",
+  "private_gallery_requires_image": "Galerinizi gizli yapmadan önce en az bir fotoğraf yükleyin.",
+  "media_guidelines_title": "Net fotoğraflar seçin",
+  "media_guidelines_intro": "Kendinize ait net fotoğraflar yükleyin. Uygulamayı kullanmak için en az bir fotoğraf gereklidir. Fotoğraflar diğer üyeler görmeden önce kontrol edilir.",
+  "media_guidelines_good_title": "Uygun profil fotoğrafları",
+  "media_guidelines_bad_title": "Onaylayamayacağımız fotoğraflar",
+  "media_guidelines_private_title": "Galerinizi gizli tutun",
+  "media_guidelines_private_message": "Fotoğraflarınızı gizleyebilir ve yalnızca biriyle konuşmaya başladıktan sonra gösterebilirsiniz.",
+  "media_guidelines_understand": "Anladım",
+  "media_guidelines_reopen": "Fotoğraf kurallarını görüntüle",
+  "media_guidelines_sample_alt": "Örnek profil fotoğrafı {number}",
+  "media_guidelines_sample_pending": "Örnek görsel burada görünecek",
+  "image_moderation_nsfw": "Cinsel veya açık içerik",
+  "image_moderation_no_human": "Kişi algılanmadı",
+  "image_moderation_hateful_text": "Irkçı veya nefret içeren metin",
+  "image_moderation_contact_info": "İletişim bilgileri veya QR kodu",
+  "image_moderation_presentation_mismatch": "Fotoğraf profil cinsiyetiyle eşleşmeyebilir",
+  "image_moderation_checking": "Fotoğraf kontrol ediliyor",
+  "image_moderation_checking_hint": "Otomatik güvenlik kontrolü devam ediyor. Bu işlem genellikle birkaç saniye sürer.",
+  "image_moderation_pending_hint": "Bu fotoğraf inceleme bekliyor ve diğer üyelerden gizleniyor.",
+  "image_moderation_submitted_review": "Fotoğraf incelemeye gönderildi.",
+  "image_moderation_approved_toast": "Fotoğraf onaylandı ve artık profilinizde görünüyor.",
+  "image_moderation_review_toast": "Fotoğraf insan incelemesi gerektiriyor ve diğer üyelerden gizli kalacak.",
+  "image_moderation_warning_title": "Fotoğrafın incelenmesi gerekiyor",
+  "image_moderation_warning_body": "Bu fotoğraf profilinizde görünmeden önce incelenmesi gerekebilecek bir şey bulduk.",
+  "image_moderation_choose_another": "Başka bir fotoğraf seç",
+  "image_moderation_submit_review": "İncelemeye gönder",
+  "image_moderation_excessive_body_exposure": "Açık veya üstsüz fotoğraf",
+  "image_moderation_unavailable": "Otomatik kontrol kullanılamıyor",
+  "image_moderation_needs_review": "İnsan incelemesi gerekiyor",
+  "image_moderation_presentation_uncertain": "Eşleşen bir kişi doğrulanamadı",
+  "qualified_photo_required": "Mesaj göndermek için onaylı bir profil fotoğrafı gereklidir.",
+  "qualified_photo_required_title": "Onaylı bir profil fotoğrafı ekleyin",
+  "qualified_photo_required_message": "Profilleri gezebilir ve sohbetleri okuyabilirsiniz, ancak mesaj göndermeden önce kendinize ait en az bir onaylı fotoğrafınız olmalıdır.",
+  "add_profile_photo": "Profil fotoğrafı ekle",
+  "profile_photo_required": "Devam etmek için en az bir profil fotoğrafı ekleyin.",
+  "bio_too_short": "Lütfen kendiniz hakkında biraz daha yazın.",
+  "checkout_open_failed": "Güvenli ödeme açılamadı. Lütfen tekrar deneyin.",
+  "delete_photo": "Fotoğrafı sil",
+  "make_primary": "Ana fotoğraf yap",
+  "secure_checkout": "Güvenli ödeme",
+  "upload_images_to_profile": "Profilinize görsel yükleyin",
+  "explore_location_required_title": "Explore için konumunuz gerekiyor",
+  "explore_location_permission_denied": "Uygun profilleri keşfetmek için Ayarlar’dan konum erişimine izin verin.",
+  "explore_location_services_disabled": "Explore’u kullanmak için cihaz konum hizmetlerini açın.",
+  "explore_location_unavailable": "Geçerli konumunuz alınamadı. Açık bir alana çıkıp tekrar deneyin.",
+  "explore_location_network_error": "Konumunuz doğrulanamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+  "open_settings": "Ayarları aç",
+  "image_moderation_rejected_toast": "Fotoğraf reddedildi ve galerinizden kaldırıldı."
+  ,"checkout_untrusted_url": "Güvenli ödeme geçersiz bir adres döndürdü."
+  ,"membership_refresh_failed": "Üyelik yenilenemedi. Tekrar deneyin."
+  ,"refreshing_membership": "Üyelik yenileniyor..."
+  ,"payment_may_be_processing": "Ödeme hâlâ işleniyor olabilir. Yeni bir ödeme başlatmadan önce yenileyin."
+  ,"refresh_membership": "Üyeliği yenile"
+  ,"choose_payment_method": "Ödeme yöntemini seç"
+  ,"pay_with_app_store": "App Store ile öde"
+  ,"pay_with_google_play": "Google Play ile öde"
+  ,"pay_with_card": "Kartla öde"
+  ,"app_store_payment_description": "Apple hesabınızı ve App Store ödeme yönteminizi kullanın."
+  ,"google_play_payment_description": "Google hesabınızı ve Google Play ödeme yönteminizi kullanın."
+  ,"card_payment_description": "Güvenli web ödemesi için tarayıcıda devam edin."
+  ,"payment_choice_ios_note": "App Store satın alımlarını Apple yönetir. Kart ödemeleri güvenli web ödemesini açar."
+  ,"payment_choice_android_note": "Google Play satın alımlarını Google yönetir. Kart ödemeleri güvenli web ödemesini açar."
+  ,"processing_payment": "Ödeme işleniyor..."
+  ,"membership_purchase_success": "Üyeliğiniz aktif."
+  ,"payment_not_completed": "Ödeme tamamlanmadı"
+  ,"native_purchase_failed": "Bu satın alma henüz doğrulanamadı. Tekrar denemeden önce üyeliğinizi kontrol edin veya destekle iletişime geçin."
+  ,"restore_purchases": "Satın alımları geri yükle"
+  ,"restoring_purchases": "Satın alımlar geri yükleniyor..."
+  ,"purchases_restored": "Üyeliğiniz geri yüklendi."
+  ,"no_purchases_to_restore": "Etkin bir üyelik satın alımı bulunamadı."
+  ,"restore_purchases_failed": "Satın alımlar geri yüklenemedi. Lütfen daha sonra tekrar deneyin."
+  ,"payment_pending_store": "Mağaza ödemeniz beklemede. Üyelik onaydan sonra etkinleşir."
+  ,"error_gift_redeem_failed": "Hediye kartı kullanılamadı. Lütfen tekrar deneyin."
+  ,"error_too_many_attempts": "Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin."
+  ,"free": "Ücretsiz"
+  ,"gift_card_code_label": "Hediye kartı kodu"
+  ,"gift_card_helper": "Hediye kartı kodunu ve 4 haneli PIN’i girin."
+  ,"gift_card_pin_label": "4 haneli PIN"
+  ,"gift_card_processing": "Hediye kartı kabul edildi. Üyelik etkinleştiriliyor."
+  ,"gift_code_invalid_length": "8 karakterli hediye kartı kodunu girin."
+  ,"gift_pin_invalid_length": "Hediye kartının 4 haneli PIN’ini girin."
+  ,"gift_redeemed_success": "Hediye kartı kullanıldı. Üyeliğiniz aktif."
+  ,"history_load_failed": "Üyelik geçmişi yüklenemedi."
+  ,"loading_payment_options": "Ödeme seçenekleri yükleniyor..."
+  ,"membership_ends": "Bitiş"
+  ,"membership_history": "Üyelik geçmişi"
+  ,"membership_history_description": "Üyelik satın almalarınız ve ödülleriniz."
+  ,"no_membership_history": "Henüz üyelik geçmişi yok"
+  ,"no_membership_history_description": "Satın almalar, hediye kartları, denemeler ve admin hibeleri burada görünecek."
+  ,"payment_not_available_region": "Bu plan henüz bölgenizde satın alınamıyor."
+  ,"payment_options_unavailable": "Ödeme seçenekleri yüklenemedi. Tekrar denemek için aşağı çekin."
+  ,"redeem_gift_card": "Hediye kartı kullan"
+  ,"redeeming_gift_card": "Kullanılıyor..."
 }

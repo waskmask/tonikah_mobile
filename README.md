@@ -6,6 +6,10 @@
 
 # Description
 
+## Development runbooks
+
+- [Android emulator and physical device](docs/android-development-runbook.md)
+
 # Example
 
 # Install:
@@ -15,4 +19,3 @@
 `npm test`
 
 #License:
-

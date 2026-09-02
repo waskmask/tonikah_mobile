@@ -11,7 +11,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
-import { Gesture, GestureDetector, ScrollView as GHScrollView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import Animated, {
     runOnJS,
     useAnimatedStyle,
@@ -23,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
     Baby,
+    AlertCircle,
     Ban,
     BriefcaseBusiness,
     Building2,
@@ -63,6 +64,13 @@ import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import {
+    isGalleryModerationActive,
+    notifyGalleryModerationResult,
+    useGalleryModerationEventGuard,
+    useGalleryModerationNotifications,
+    useGalleryModerationReconciliation,
+} from '@/hooks/useGalleryModeration';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
 import { chatService, normalizeConversation } from '@/lib/chatService';
@@ -92,8 +100,13 @@ import {
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { formatProfileManagerBadge } from '@/lib/profileManager';
 import { ProfileManagerBadge } from '@/components/profile/ProfileManagerBadge';
+import { getTextDirection, localeTextDirection } from '@/lib/textDirection';
+import { pendingModerationCandidate } from '@/lib/textModeration';
+import { UnderReviewInfoIcon, UnderReviewPill } from '@/components/app/UnderReviewPill';
+import { ProfileSummaryEditor, SummaryField } from '@/components/profile/ProfileSummaryEditor';
+import { ReportSheet, ReportTarget } from '@/components/profile/ReportSheet';
 
-type Fact = { icon: LucideIcon; label: string; value: string };
+type Fact = { icon: LucideIcon; label: string; value: string; underReview?: boolean };
 type PendingProfileToast = {
     key: string;
     fallback: string;
@@ -243,7 +256,8 @@ export type UserProfileViewProps = {
     onUnblocked?: (userId: string) => void;
     onFavoriteChanged?: (userId: string, favorited: boolean) => void;
     refreshing?: boolean;
-    onRefresh?: () => void;
+    onRefresh?: () => void | Promise<void>;
+    onReconcile?: () => void | Promise<void>;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -261,12 +275,13 @@ export function UserProfileView({
     onFavoriteChanged,
     refreshing = false,
     onRefresh,
+    onReconcile,
 }: UserProfileViewProps) {
     const { isDark } = useTheme();
     const colors = useColors();
     const commonColors = colors.chrome.common;
     const toast = useToast();
-    const { isRTL } = useLanguage();
+    const { currentLanguage, isRTL } = useLanguage();
     const { requireVerified } = useEmailVerificationGuard();
     const insets = useSafeAreaInsets();
     const headerTopInset = insets.top;
@@ -275,6 +290,7 @@ export function UserProfileView({
     const [loading, setLoading] = useState(Boolean(userId));
     const [error, setError] = useState('');
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+    const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
     const [messageSheetOpen, setMessageSheetOpen] = useState(false);
     const [messageDraft, setMessageDraft] = useState('');
     const [messageChecking, setMessageChecking] = useState(false);
@@ -288,6 +304,11 @@ export function UserProfileView({
     const scrollOffsetRef = useRef(0);
 
     const resolvedUserId = userId || profileId(initialProfile);
+    const shouldProcessModerationEvent = useGalleryModerationEventGuard();
+    const translateModeration = useCallback(
+        (key: string, fallback?: string) => t(key, fallback),
+        [currentLanguage],
+    );
 
     const load = useCallback(async () => {
         if (!resolvedUserId) return;
@@ -303,16 +324,33 @@ export function UserProfileView({
     }, [resolvedUserId]);
 
     useEffect(() => {
-        if (resolvedUserId) void load();
-    }, [load, resolvedUserId]);
+        // Own profile renders from the parent's /me + gallery data (which keeps
+        // contentModeration for pending candidates); the public detail endpoint
+        // would strip it.
+        if (resolvedUserId && !isOwnProfile) void load();
+    }, [load, resolvedUserId, isOwnProfile]);
 
-    // Refetch when the viewed owner grants/revokes private gallery access so
-    // private photos appear or hide in real time.
+    useEffect(() => {
+        if (isOwnProfile && initialProfile) setProfile(initialProfile);
+    }, [isOwnProfile, initialProfile]);
+
+    const reconcileOwnProfile = useCallback(() => {
+        if (isOwnProfile) return onReconcile?.() ?? onRefresh?.();
+    }, [isOwnProfile, onReconcile, onRefresh]);
+
+    // Refetch when private-gallery access or the owner's background image
+    // moderation state changes. One singleton socket serves every screen.
     useChatSocket({
-        enabled: Boolean(resolvedUserId) && !isOwnProfile,
+        enabled: Boolean(resolvedUserId),
         onGalleryAccessChanged: (payload: any) => {
+            if (isOwnProfile) return;
             if (!payload?.ownerId || String(payload.ownerId) !== String(resolvedUserId)) return;
             void load();
+        },
+        onGalleryModerationUpdated: (update) => {
+            if (!isOwnProfile || !shouldProcessModerationEvent(update)) return;
+            if (update.deleted) notifyGalleryModerationResult(update, translateModeration);
+            void Promise.resolve(onReconcile?.() ?? onRefresh?.()).catch(() => undefined);
         },
     });
 
@@ -336,19 +374,65 @@ export function UserProfileView({
     const headerTitle = `${truncateHeaderName(name)}${age ? `, ${age}` : ''}`;
     const visibleHeaderTitle = isOwnProfile ? t('my_profile', 'My profile') : headerTitle;
     const gallery = normalizeGallery(profile);
-    const photos = (() => {
-        const fromGallery = gallery.map(imageUrl).filter(Boolean);
+    const hasActiveGalleryModeration = isOwnProfile && gallery.some((item: any) =>
+        isGalleryModerationActive(item?.moderationMeta?.status),
+    );
+    const hasPendingGalleryReview = isOwnProfile && gallery.some((item: any) =>
+        item?.safe === false && !isGalleryModerationActive(item?.moderationMeta?.status),
+    );
+    useGalleryModerationReconciliation(
+        reconcileOwnProfile,
+        isOwnProfile && Boolean(resolvedUserId),
+    );
+    useGalleryModerationNotifications(
+        isOwnProfile ? gallery : [],
+        translateModeration,
+    );
+
+    useEffect(() => {
+        const reconcile = onReconcile ?? onRefresh;
+        if (!hasActiveGalleryModeration || !reconcile) return;
+        const interval = setInterval(() => {
+            void Promise.resolve(reconcile()).catch(() => undefined);
+        }, 2500);
+        return () => clearInterval(interval);
+    }, [hasActiveGalleryModeration, onReconcile, onRefresh]);
+    // url + uuid pairs so image reports can reference the exact photo
+    const photoItems = (() => {
+        const fromGallery = gallery
+            .map((item: any) => ({
+                url: imageUrl(item),
+                uuid: String(item?.uuid || ''),
+                safe: item?.safe,
+                moderationStatus: item?.moderationMeta?.status,
+            }))
+            .filter((item: { url: string }) => Boolean(item.url));
         if (fromGallery.length > 0) return fromGallery;
         const avatar = typeof profile?.avatar === 'string' ? profile.avatar.trim() : '';
-        return avatar ? [avatar] : [];
+        return avatar ? [{ url: avatar, uuid: '', safe: undefined, moderationStatus: undefined }] : [];
     })();
+    const photos = photoItems.map((item) => item.url);
     const privateGallery = !isOwnProfile && (profile?.privacy || profile?.gallery_privacy || profile?.galleryPrivacy || 'public') === 'private';
     const verified = isVerifiedProfile(profile);
     const activeMembership = isMembershipActive(profile);
-    const location = formatProfileLocation(profile, true);
+    const location = formatProfileLocation(profile);
     const countryFlag = flagEmoji(profile);
-    const headline = cleanProfileText(profile?.profile_headline);
-    const bio = bioText(profile);
+    // Owners see their pending moderation candidate (with an "Under review"
+    // pill); everyone else keeps seeing only the approved public text.
+    const ownerModerationMeta = isOwnProfile ? profile?.contentModeration || {} : {};
+    const headlineCandidate = pendingModerationCandidate(ownerModerationMeta.profileHeadline);
+    const bioCandidate = pendingModerationCandidate(ownerModerationMeta.bio);
+    const headline = cleanProfileText(headlineCandidate || profile?.profile_headline);
+    const bio = bioCandidate ? cleanProfileMultilineText(bioCandidate) : bioText(profile);
+    // A field is missing only when there is no approved value AND no pending
+    // candidate; then the owner gets the real editor inline in About Me.
+    const missingSummaryFields: SummaryField[] = isOwnProfile
+        ? ([
+            ...(!headline ? ['headline'] : []),
+            ...(!bio ? ['bio'] : []),
+        ] as SummaryField[])
+        : [];
+    const bioDirection = getTextDirection(bio, localeTextDirection(currentLanguage));
     const blocked = profile?.blocked === true;
 
     const close = useCallback(() => {
@@ -385,6 +469,7 @@ export function UserProfileView({
     const modalSheetStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: mode === 'modal' ? dragY.value : 0 }],
     }));
+    const ProfileScrollView = mode === 'screen' ? ScrollView : GHScrollView;
 
     const startMessage = async () => {
         if (!id || !requireVerified('chat')) return;
@@ -515,7 +600,7 @@ export function UserProfileView({
     const reportProfile = () => {
         if (!id || !requireVerified('report')) return;
         setProfileMenuOpen(false);
-        router.push('/support' as any);
+        setReportTarget({ type: 'User', userId: id });
     };
 
     const blockUser = () => {
@@ -559,9 +644,15 @@ export function UserProfileView({
         }
     };
 
-    const facts = useMemo(() => buildFacts(profile), [profile]);
+    const facts = useMemo(() => buildFacts(profile, isOwnProfile), [profile, isOwnProfile]);
     const partnerPreference = profile?.partner_preference || profile?.partnerPreference || {};
-    const partnerAbout = cleanProfileMultilineText(partnerPreference?.about_partner);
+    const partnerAboutCandidate = isOwnProfile
+        ? pendingModerationCandidate(ownerModerationMeta.partnerPreferenceAboutPartner)
+        : '';
+    const partnerAbout = cleanProfileMultilineText(
+        partnerAboutCandidate || partnerPreference?.about_partner,
+    );
+    const partnerAboutDirection = getTextDirection(partnerAbout, localeTextDirection(currentLanguage));
     const partnerFacts = useMemo(() => buildPartnerFacts(partnerPreference), [partnerPreference]);
     const showPartnerPreference = Boolean(partnerAbout || partnerFacts.length);
 
@@ -617,28 +708,47 @@ export function UserProfileView({
             >
                 {!isOwnProfile && showClose ? (
                     <Pressable onPress={close} style={styles.headerButton} hitSlop={10}>
-                        <ChevronLeft size={scale(23)} color={colors.chrome.header.icon} />
+                        {isRTL
+                            ? <ChevronRight size={scale(23)} color={colors.chrome.header.icon} />
+                            : <ChevronLeft size={scale(23)} color={colors.chrome.header.icon} />}
                     </Pressable>
                 ) : isOwnProfile ? null : <View style={styles.headerButton} />}
-                <Text variant="body" className="font-body-semi" numberOfLines={1} style={[styles.headerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>
-                    {visibleHeaderTitle}
-                </Text>
+                {/* Content-sized title in a flex row hugs the chevron both directions;
+                    ‏ (RLM) sets RTL bidi base so age renders left of the name */}
+                <View style={styles.headerTitleWrap}>
+                    <Text
+                        variant="body"
+                        className="font-body-semi"
+                        numberOfLines={1}
+                        style={styles.headerTitle}
+                    >
+                        {isRTL ? '‏' : ''}{visibleHeaderTitle}
+                    </Text>
+                </View>
                 {isOwnProfile ? (
                     <Pressable
                         onPress={onEditProfile || (() => router.push('/(tabs)/edit-profile'))}
-                        style={[styles.editProfileButton, { borderColor: colors.brand.bg.border }]}
+                        style={({ pressed }) => [
+                            styles.editProfileButton,
+                            { backgroundColor: colors.chrome.common.primaryTint },
+                            pressed && { opacity: 0.72 },
+                        ]}
                         hitSlop={8}
                     >
-                        <Pencil size={scale(15)} color={colors.chrome.primary} />
-                        <Text variant="body-sm" className="font-body-semi" style={{ color: colors.chrome.primary }}>
-                            {t('edit_profile', 'Edit profile')}
-                        </Text>
+                        <View style={styles.editProfileContent}>
+                            <Pencil size={scale(14)} color={colors.chrome.primary} />
+                            <Text
+                                variant="body-sm"
+                                className="font-body-semi"
+                                numberOfLines={1}
+                                style={[styles.editProfileLabel, { color: colors.chrome.primary }]}
+                            >
+                                {t('edit', 'Edit')}
+                            </Text>
+                        </View>
                     </Pressable>
                 ) : (
                     <>
-                        <Pressable onPress={toggleFavorite} style={styles.headerButton} hitSlop={10}>
-                            <Bookmark size={scale(21)} color={profile?.is_favorited ? colors.chrome.primary : colors.chrome.header.icon} fill={profile?.is_favorited ? colors.chrome.primary : 'transparent'} />
-                        </Pressable>
                         <Pressable onPress={startMessage} style={styles.headerButton} hitSlop={10}>
                             {messageChecking ? <ActivityIndicator size="small" color={colors.chrome.primary} /> : <MessageCircle size={scale(21)} color={colors.chrome.header.icon} />}
                         </Pressable>
@@ -656,10 +766,14 @@ export function UserProfileView({
                 <GestureDetector gesture={headerDismissGesture}>{headerBar}</GestureDetector>
             ) : headerBar}
 
-            <GHScrollView
+            <ProfileScrollView
                 style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
+                nestedScrollEnabled={mode === 'modal'}
+                // iOS: keep the inline summary editor visible above the keyboard
+                // (Android resizes the window via adjustResize already)
+                automaticallyAdjustKeyboardInsets={isOwnProfile}
+                keyboardShouldPersistTaps="handled"
                 scrollEventThrottle={16}
                 onScroll={(event) => handleProfileScroll(event.nativeEvent.contentOffset.y)}
                 refreshControl={onRefresh ? (
@@ -678,6 +792,7 @@ export function UserProfileView({
             >
                 <ProfileGallery
                     photos={photos}
+                    photoItems={photoItems}
                     privateGallery={privateGallery}
                     canOpenPhotos={!privateGallery}
                     name={name}
@@ -690,15 +805,88 @@ export function UserProfileView({
                     onOpenPhoto={(index) => setLightboxIndex(index)}
                     isDark={isDark}
                 />
+                {hasActiveGalleryModeration || hasPendingGalleryReview ? (
+                    <View
+                        style={[
+                            styles.galleryModerationNotice,
+                            {
+                                backgroundColor: colors.chrome.toast.warning.bg,
+                                borderColor: colors.chrome.toast.warning.border,
+                            },
+                        ]}
+                    >
+                        {hasActiveGalleryModeration ? (
+                            <ActivityIndicator size="small" color={colors.chrome.toast.warning.icon} />
+                        ) : (
+                            <AlertCircle size={scale(20)} color={colors.chrome.toast.warning.icon} />
+                        )}
+                        <View style={styles.galleryModerationCopy}>
+                            <Text
+                                variant="body-sm"
+                                className="font-body-semi"
+                                style={{ color: colors.chrome.toast.warning.text }}
+                            >
+                                {hasActiveGalleryModeration
+                                    ? t('image_moderation_checking', 'Checking photo')
+                                    : t('moderation_text_under_review', 'Under review')}
+                            </Text>
+                            <Text variant="caption" style={{ color: colors.chrome.toast.warning.text }}>
+                                {hasActiveGalleryModeration
+                                    ? t(
+                                        'image_moderation_checking_hint',
+                                        'Automatic safety check in progress. You can continue using the app.',
+                                    )
+                                    : t(
+                                        'image_moderation_pending_hint',
+                                        'This photo is waiting for review and is hidden from other members.',
+                                    )}
+                            </Text>
+                        </View>
+                    </View>
+                ) : null}
 
-                {(headline || bio) ? (
+                {(headline || bio || missingSummaryFields.length > 0) ? (
                     <Section title={t('about_me', 'About me')} isDark={isDark}>
-                        {headline ? <Text variant="h3" style={styles.headline}>{headline}</Text> : null}
+                        {headline ? (
+                            headlineCandidate ? (
+                                <View style={styles.moderatedTextRow}>
+                                    <UnderReviewInfoIcon style={styles.moderatedTextIcon} />
+                                    <Text variant="h3" style={[styles.headline, styles.moderatedText]}>{headline}</Text>
+                                </View>
+                            ) : (
+                                <Text variant="h3" style={styles.headline}>{headline}</Text>
+                            )
+                        ) : null}
                         {bio ? (
                             <View style={styles.bioBox}>
                                 <Quote size={scale(24)} color={commonColors.primaryGlow} style={styles.quoteIcon} />
-                                <Text variant="body" style={styles.bioText}>{bio}</Text>
+                                <View style={styles.moderatedTextRow}>
+                                    {bioCandidate ? <UnderReviewInfoIcon style={[styles.moderatedTextIcon, styles.moderatedTextIconInCard]} /> : null}
+                                    <Text
+                                        variant="body"
+                                        style={[
+                                            styles.bioText,
+                                            styles.moderatedText,
+                                            {
+                                                textAlign: bioDirection === 'rtl' ? 'right' : 'left',
+                                                writingDirection: bioDirection,
+                                            },
+                                        ]}
+                                    >
+                                        {bio}
+                                    </Text>
+                                </View>
                             </View>
+                        ) : null}
+                        {missingSummaryFields.length > 0 ? (
+                            <ProfileSummaryEditor
+                                profile={profile}
+                                fields={missingSummaryFields}
+                                variant="inline"
+                                onSaved={async () => {
+                                    await onRefresh?.();
+                                }}
+                            />
                         ) : null}
                     </Section>
                 ) : null}
@@ -728,9 +916,28 @@ export function UserProfileView({
                 {showPartnerPreference ? (
                     <Section title={t('partner_preference', 'Partner Preference')} isDark={isDark}>
                         {partnerAbout ? (
-                            <Text variant="body" style={[styles.partnerAbout, { textAlign: isRTL ? 'right' : 'left' }]}>
-                                {partnerAbout}
-                            </Text>
+                            <>
+                                {partnerAboutCandidate ? (
+                                    <View style={styles.moderatedLabelRow}>
+                                        <Text variant="caption" className="font-body-semi">
+                                            {t('about_partner', 'About partner')}
+                                        </Text>
+                                        <UnderReviewPill />
+                                    </View>
+                                ) : null}
+                                <Text
+                                    variant="body"
+                                    style={[
+                                        styles.partnerAbout,
+                                        {
+                                            textAlign: partnerAboutDirection === 'rtl' ? 'right' : 'left',
+                                            writingDirection: partnerAboutDirection,
+                                        },
+                                    ]}
+                                >
+                                    {partnerAbout}
+                                </Text>
+                            </>
                         ) : null}
                         <FactRows facts={partnerFacts} isRTL={isRTL} />
                     </Section>
@@ -768,18 +975,26 @@ export function UserProfileView({
                     </View>
                 </View>
                 ) : null}
-            </GHScrollView>
+            </ProfileScrollView>
 
             <ImageLightbox
                 photos={photos}
                 index={lightboxIndex}
                 showReport={!isOwnProfile}
                 onClose={() => setLightboxIndex(null)}
-                onReport={() => {
+                onReport={(photoIndex) => {
                     setLightboxIndex(null);
-                    router.push('/support' as any);
+                    if (!id || !requireVerified('report')) return;
+                    const item = photoItems[photoIndex];
+                    setReportTarget({
+                        type: 'Image',
+                        userId: id,
+                        imageUrl: item?.url,
+                        imageId: item?.uuid || undefined,
+                    });
                 }}
             />
+            <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
             <IntroMessageSheet
                 visible={messageSheetOpen}
                 value={messageDraft}
@@ -799,7 +1014,12 @@ export function UserProfileView({
                 visible={profileMenuOpen}
                 top={headerTopInset + headerRowHeight + scale(6)}
                 isDark={isDark}
+                favorited={Boolean(profile?.is_favorited)}
                 onClose={() => setProfileMenuOpen(false)}
+                onToggleFavorite={() => {
+                    setProfileMenuOpen(false);
+                    void toggleFavorite();
+                }}
                 onReport={reportProfile}
                 onBlock={blockUser}
             />
@@ -899,14 +1119,18 @@ function ProfileActionsMenu({
     visible,
     top,
     isDark,
+    favorited,
     onClose,
+    onToggleFavorite,
     onReport,
     onBlock,
 }: {
     visible: boolean;
     top: number;
     isDark: boolean;
+    favorited: boolean;
     onClose: () => void;
+    onToggleFavorite: () => void;
     onReport: () => void;
     onBlock: () => void;
 }) {
@@ -931,6 +1155,7 @@ function ProfileActionsMenu({
                         </Pressable>
                     </View>
                     <View style={styles.profileMenuLinks}>
+                        <ProfileMenuItem icon={Bookmark} label={favorited ? t('unfavorited', 'Removed from Saved') : t('save_profile', 'Save profile')} color={colors.text} onPress={onToggleFavorite} />
                         <ProfileMenuItem icon={Flag} label={t('report_profile', 'Report profile')} color={colors.text} dangerColor={colors.danger} danger onPress={onReport} />
                         <ProfileMenuItem icon={Ban} label={t('block_user', 'Block user')} color={colors.text} dangerColor={colors.danger} danger onPress={onBlock} />
                     </View>
@@ -1087,6 +1312,7 @@ function IntroMessageSheet({
 
 function ProfileGallery({
     photos,
+    photoItems,
     privateGallery,
     canOpenPhotos = true,
     name,
@@ -1100,6 +1326,12 @@ function ProfileGallery({
     isDark,
 }: {
     photos: string[];
+    photoItems: Array<{
+        url: string;
+        uuid: string;
+        safe?: boolean;
+        moderationStatus?: string;
+    }>;
     privateGallery: boolean;
     canOpenPhotos?: boolean;
     name: string;
@@ -1128,20 +1360,56 @@ function ProfileGallery({
                 decelerationRate="fast"
                 directionalLockEnabled
             >
-                {slots.map((src, index) => (
-                    <Pressable
-                        key={`${src}-${index}`}
-                        disabled={!src || !canOpenPhotos}
-                        onPress={() => onOpenPhoto(index)}
-                        style={[styles.gallerySlide, { width: slideWidth, backgroundColor: palette.brand.bg.surface }]}
-                    >
-                        <Image
-                            source={src ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE}
-                            style={StyleSheet.absoluteFill}
-                            contentFit="cover"
-                        />
-                    </Pressable>
-                ))}
+                {slots.map((src, index) => {
+                    const item = photoItems[index];
+                    const checking = isGalleryModerationActive(item?.moderationStatus);
+                    const underReview = Boolean(
+                        item && item.safe === false && !checking,
+                    );
+                    return (
+                        <Pressable
+                            key={item?.uuid || `${src}-${index}`}
+                            disabled={!src || !canOpenPhotos}
+                            onPress={() => onOpenPhoto(index)}
+                            style={[styles.gallerySlide, { width: slideWidth, backgroundColor: palette.brand.bg.surface }]}
+                        >
+                            <Image
+                                source={src ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE}
+                                style={StyleSheet.absoluteFill}
+                                contentFit="cover"
+                            />
+                            {checking || underReview ? (
+                                <View
+                                    style={[
+                                        styles.galleryModerationBadge,
+                                        { backgroundColor: palette.chrome.toast.warning.border },
+                                    ]}
+                                >
+                                    {checking ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color={palette.chrome.common.inverseText}
+                                        />
+                                    ) : (
+                                        <AlertCircle
+                                            size={scale(13)}
+                                            color={palette.chrome.common.inverseText}
+                                        />
+                                    )}
+                                    <Text
+                                        variant="caption"
+                                        className="font-body-bold"
+                                        style={{ color: palette.chrome.common.inverseText }}
+                                    >
+                                        {checking
+                                            ? t('image_moderation_checking', 'Checking photo')
+                                            : t('moderation_text_under_review', 'Under review')}
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </Pressable>
+                    );
+                })}
             </GHScrollView>
             <LinearGradient colors={['rgba(24, 19, 14,0.02)', 'rgba(24, 19, 14,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
             <View style={styles.galleryBadges}>
@@ -1153,7 +1421,7 @@ function ProfileGallery({
             </View>
             <View style={styles.galleryIdentity} pointerEvents="box-none">
                 {(verified || activeMembership || showPrivateBadge || profileManagerLabel) ? (
-                    <View style={[styles.trustRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} pointerEvents="box-none">
+                    <View style={[styles.trustRow, { flexDirection: 'row' }]} pointerEvents="box-none">
                         {verified ? (
                             <TrustChip
                                 icon={<ShieldCheck size={scale(13)} color={palette.chrome.common.inverseText} fill="#3D63F3" />}
@@ -1176,13 +1444,13 @@ function ProfileGallery({
                         ) : null}
                     </View>
                 ) : null}
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: scale(8), flexWrap: 'wrap' }} pointerEvents="none">
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(8), flexWrap: 'wrap' }} pointerEvents="none">
                     <Text variant="h2" numberOfLines={2} style={{ color: palette.chrome.common.inverseText, fontSize: scale(23), lineHeight: scale(28), flexShrink: 1, textAlign: isRTL ? 'right' : 'left' }}>
                         {name}{age ? `, ${age}` : ''}
                     </Text>
                 </View>
                 {location ? (
-                    <View style={[styles.heroLocationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.heroLocationRow, { flexDirection: 'row' }]}>
                         {countryFlag ? <Text variant="body-sm" style={styles.heroLocationFlag}>{countryFlag}</Text> : <MapPin size={scale(15)} color={palette.chrome.common.inverseText} />}
                         <Text variant="body-sm" numberOfLines={1} style={{ color: palette.chrome.common.inverseText, flexShrink: 1 }}>
                             {location}
@@ -1238,12 +1506,15 @@ function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
             {facts.map((fact) => {
                 const Icon = fact.icon;
                 return (
-                    <View key={`${fact.label}-${fact.value}`} style={[styles.factRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View key={`${fact.label}-${fact.value}`} style={[styles.factRow, { flexDirection: 'row' }]}>
                         <View style={styles.factIcon}>
                             <Icon size={scale(18)} color={palette.chrome.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { color: palette.chrome.common.textMuted, textAlign: isRTL ? 'right' : 'left' }]}>{fact.label}</Text>
+                            <View style={[styles.moderatedLabelRow, { flexDirection: 'row' }]}>
+                                <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { color: palette.chrome.common.textMuted, textAlign: isRTL ? 'right' : 'left' }]}>{fact.label}</Text>
+                                {fact.underReview ? <UnderReviewPill /> : null}
+                            </View>
                             <Text variant="body" className="font-body-semi" style={{ textAlign: isRTL ? 'right' : 'left' }}>{fact.value}</Text>
                         </View>
                     </View>
@@ -1273,7 +1544,7 @@ function ChipSection({
     if (!clean.length) return null;
     return (
         <Section title={title} isDark={isDark} action={action}>
-            <View style={[styles.chipWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.chipWrap, { flexDirection: 'row' }]}>
                 {clean.map((item, index) => (
                     <View key={`${type}-${item.slug}-${index}`} style={[styles.chip, styles.emojiChip, { backgroundColor: palette.brand.bg.surface, borderColor: palette.brand.bg.border }]}>
                         <Text style={styles.emojiText}>{item.emoji}</Text>
@@ -1315,56 +1586,90 @@ function ImageLightbox({
     photos: string[];
     index: number | null;
     onClose: () => void;
-    onReport: () => void;
+    onReport: (photoIndex: number) => void;
     showReport?: boolean;
 }) {
     const [current, setCurrent] = useState(0);
     const palette = useColors();
+    const dragY = useSharedValue(0);
     useEffect(() => {
-        if (index !== null) setCurrent(index);
+        if (index !== null) {
+            setCurrent(index);
+            dragY.value = 0;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [index]);
     const src = index !== null ? photos[current] : '';
     const hasMultiple = photos.length > 1;
     const goPrevious = () => setCurrent((value) => (value <= 0 ? photos.length - 1 : value - 1));
     const goNext = () => setCurrent((value) => (value >= photos.length - 1 ? 0 : value + 1));
 
+    // Swipe-down anywhere dismisses (standard photo-viewer gesture); taps and
+    // horizontal movement fall through to the buttons.
+    const dismissGesture = Gesture.Pan()
+        .activeOffsetY(16)
+        .failOffsetX([-24, 24])
+        .onUpdate((event) => {
+            dragY.value = Math.max(0, event.translationY);
+        })
+        .onEnd((event) => {
+            if (event.translationY > 120 || event.velocityY > 900) {
+                runOnJS(onClose)();
+            } else {
+                dragY.value = withSpring(0, { damping: 18, stiffness: 220 });
+            }
+        });
+
+    const dragStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: dragY.value }],
+        opacity: 1 - Math.min(dragY.value / 600, 0.5),
+    }));
+
     return (
         <Modal visible={index !== null} transparent animationType="fade" onRequestClose={onClose}>
-            <View style={styles.lightbox}>
-                <View style={styles.lightboxTopbar}>
-                    <Pressable onPress={onClose} style={styles.lightboxIconButton} hitSlop={10}>
-                        <X size={scale(23)} color={palette.chrome.common.inverseText} />
-                    </Pressable>
-                    {hasMultiple ? (
-                        <Text variant="body-sm" className="font-body-semi" style={{ color: palette.chrome.common.inverseText }}>
-                            {current + 1}/{photos.length}
-                        </Text>
-                    ) : <View />}
-                    {showReport ? (
-                        <Pressable onPress={onReport} style={styles.lightboxIconButton} hitSlop={10}>
-                            <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
-                        </Pressable>
-                    ) : (
-                        <View style={styles.lightboxIconButton} />
-                    )}
-                </View>
-                {src ? <Image source={{ uri: src }} style={styles.lightboxImage} contentFit="contain" /> : null}
-                {hasMultiple ? (
-                    <>
-                        <Pressable onPress={goPrevious} style={[styles.lightboxNav, styles.lightboxNavLeft]} hitSlop={12}>
-                            <ChevronLeft size={scale(28)} color={palette.chrome.common.inverseText} />
-                        </Pressable>
-                        <Pressable onPress={goNext} style={[styles.lightboxNav, styles.lightboxNavRight]} hitSlop={12}>
-                            <ChevronRight size={scale(28)} color={palette.chrome.common.inverseText} />
-                        </Pressable>
-                    </>
-                ) : null}
-            </View>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <GestureDetector gesture={dismissGesture}>
+                    <Animated.View style={[styles.lightbox, dragStyle]}>
+                        <View style={styles.lightboxTopbar}>
+                            <Pressable onPress={onClose} style={styles.lightboxIconButton} hitSlop={10}>
+                                <X size={scale(23)} color={palette.chrome.common.inverseText} />
+                            </Pressable>
+                            {hasMultiple ? (
+                                <Text variant="body-sm" className="font-body-semi" style={{ color: palette.chrome.common.inverseText }}>
+                                    {current + 1}/{photos.length}
+                                </Text>
+                            ) : <View />}
+                            {showReport ? (
+                                <Pressable onPress={() => onReport(current)} style={styles.lightboxIconButton} hitSlop={10}>
+                                    <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
+                                </Pressable>
+                            ) : (
+                                <View style={styles.lightboxIconButton} />
+                            )}
+                        </View>
+                        {src ? <Image source={{ uri: src }} style={styles.lightboxImage} contentFit="contain" /> : null}
+                        {hasMultiple ? (
+                            <>
+                                <Pressable onPress={goPrevious} style={[styles.lightboxNav, styles.lightboxNavLeft]} hitSlop={12}>
+                                    <ChevronLeft size={scale(28)} color={palette.chrome.common.inverseText} />
+                                </Pressable>
+                                <Pressable onPress={goNext} style={[styles.lightboxNav, styles.lightboxNavRight]} hitSlop={12}>
+                                    <ChevronRight size={scale(28)} color={palette.chrome.common.inverseText} />
+                                </Pressable>
+                            </>
+                        ) : null}
+                    </Animated.View>
+                </GestureDetector>
+            </GestureHandlerRootView>
         </Modal>
     );
 }
 
-function buildFacts(profile: any) {
+function buildFacts(profile: any, isOwnProfile = false) {
+    // Owner sees their pending company candidate; others see approved text only
+    const companyCandidate = isOwnProfile
+        ? pendingModerationCandidate(profile?.contentModeration?.company)
+        : '';
     const common = (value: any) => displayText(typeof value === 'object' ? value?.label : value);
     const countryList = (values: any[]) => listText((values || []).map(translateCountry));
     const annualIncome = typeof profile?.annual_income === 'object'
@@ -1394,7 +1699,12 @@ function buildFacts(profile: any) {
             { icon: GraduationCap, label: t('education', 'Education'), value: common(profile?.education) },
             { icon: BriefcaseBusiness, label: t('occupation', 'Occupation'), value: common(profile?.occupation) },
             { icon: BriefcaseBusiness, label: t('designation', 'Designation'), value: common(profile?.designation) },
-            { icon: Building2, label: t('company', 'Company'), value: String(profile?.company || '') },
+            {
+                icon: Building2,
+                label: t('company', 'Company'),
+                value: String(companyCandidate || profile?.company || ''),
+                underReview: Boolean(companyCandidate),
+            },
             { icon: Coins, label: t('annual_income', 'Annual income'), value: annualIncome },
         ]),
         background: compact([
@@ -1457,23 +1767,64 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: scale(14),
+        // 6.5 + 7.5 (chevron inset inside its 38pt button) = 14dp edge→icon
+        paddingHorizontal: scale(6.5),
     },
     headerButton: { width: scale(38), height: scale(38), alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { flex: 1, fontSize: scale(16), lineHeight: scale(20) },
+    // Numerically ~11.5dp icon→title; optically matches the conversation header's
+    // 14.5dp chevron→avatar. The wrap row takes all remaining width; the
+    // content-sized text starts at the chevron side in both directions.
+    headerTitleWrap: { flex: 1, minWidth: 0, flexDirection: 'row', marginStart: scale(4) },
+    headerTitle: { flexShrink: 1, fontSize: scale(16), lineHeight: scale(20) },
     editProfileButton: {
-        minHeight: scale(34),
-        borderWidth: 1,
+        minHeight: scale(32),
         borderRadius: scale(999),
-        paddingHorizontal: scale(12),
+        paddingHorizontal: scale(13),
+        justifyContent: 'center',
+        // Keep intrinsic width — squeezed by the flexing title otherwise
+        flexShrink: 0,
+    },
+    editProfileContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: scale(6),
+        gap: scale(5),
+    },
+    editProfileLabel: {
+        flexShrink: 1,
+        fontSize: scale(15),
+        lineHeight: scale(19),
+        includeFontPadding: false,
+        textAlignVertical: 'center',
     },
     content: { paddingHorizontal: 0, paddingTop: 0 },
     gallery: { overflow: 'hidden', minHeight: scale(342), marginBottom: 0 },
     gallerySlide: { aspectRatio: 3 / 4, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    galleryModerationBadge: {
+        position: 'absolute',
+        top: scale(14),
+        left: scale(14),
+        minHeight: scale(28),
+        maxWidth: '76%',
+        borderRadius: scale(999),
+        paddingHorizontal: scale(9),
+        paddingVertical: scale(5),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
+    },
+    galleryModerationNotice: {
+        minHeight: scale(72),
+        borderWidth: 1,
+        paddingHorizontal: scale(18),
+        paddingVertical: scale(12),
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: scale(10),
+    },
+    galleryModerationCopy: {
+        flex: 1,
+        gap: scale(3),
+    },
     galleryGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
     galleryBadges: {
         position: 'absolute',
@@ -1527,10 +1878,24 @@ const styles = StyleSheet.create({
     },
     sectionActionText: { color: '#F34B6F' },
     headline: { fontSize: scale(20), lineHeight: scale(25), marginBottom: scale(10) },
-    bioBox: { borderLeftWidth: 4, borderLeftColor: '#F34B6F', backgroundColor: 'rgba(243,75,111,0.04)', borderRadius: scale(8), padding: scale(14) },
-    quoteIcon: { position: 'absolute', right: scale(12), top: scale(10) },
+    // Inline info icon + text for owner-visible pending moderation text
+    moderatedTextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(5) },
+    moderatedTextIcon: { marginTop: scale(3) },
+    // Pull the bio icon toward the card's start edge (pink bar side)
+    moderatedTextIconInCard: { marginStart: -scale(6) },
+    moderatedText: { flexShrink: 1 },
+    // start/end so native RTL mirrors: accent bar leads, quotes trail
+    bioBox: { borderStartWidth: 4, borderStartColor: '#F34B6F', backgroundColor: 'rgba(243,75,111,0.04)', borderRadius: scale(8), padding: scale(14) },
+    quoteIcon: { position: 'absolute', end: scale(12), top: scale(10) },
     bioText: { lineHeight: scale(25), fontStyle: 'italic' },
     partnerAbout: { lineHeight: scale(24), marginBottom: scale(14) },
+    moderatedLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: scale(7),
+        marginBottom: scale(4),
+    },
     factRow: { alignItems: 'flex-start', gap: scale(12) },
     factIcon: { width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: 'rgba(243,75,111,0.08)', alignItems: 'center', justifyContent: 'center' },
     factLabel: { color: '#8A8073', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: scale(3) },

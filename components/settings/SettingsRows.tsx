@@ -37,7 +37,7 @@ export function SettingsNavRow({
             accessibilityRole="button"
             accessibilityLabel={label}
             style={{
-                flexDirection: isRTL ? 'row-reverse' : 'row',
+                flexDirection: 'row',
                 alignItems: 'center',
                 gap: scale(12),
                 paddingVertical: scale(12),

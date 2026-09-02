@@ -22,6 +22,8 @@ export const Colors = {
                 primary: "#FFFFFF",
                 surface: "#F7F3ED",
                 border: "#E8E1D6",
+                // One step darker than border — list dividers on warm surfaces
+                borderStrong: "#DCD2C3",
             },
             accent: {
                 link: "#4B68C4",
@@ -42,12 +44,14 @@ export const Colors = {
                 spinner: "#F34B6F",
             },
             header: {
-                background: "#FFFFFF",
+                // Warm chrome: header + status bar + page read as one surface
+                background: "#F7F3ED",
                 border: "#E8E1D6",
                 title: "#1A1512",
                 subtitle: "#7D7266",
                 icon: "#5C5348",
-                iconBackground: "#F7F3ED",
+                // One step deeper than the warm bar so chips stay visible
+                iconBackground: "#ECE6DE",
             },
             tabBar: {
                 background: "rgba(255, 255, 255, 0.98)",
@@ -69,7 +73,7 @@ export const Colors = {
             },
             explore: {
                 screen: "#F7F3ED",
-                actionBar: "#FAFAF8",
+                actionBar: "#F7F3ED",
                 actionCircle: "#FFFFFF",
             },
             common: {
@@ -84,6 +88,8 @@ export const Colors = {
                 blueAction: "#38A8E8",
                 successStrong: "#22C55E",
                 primaryTint: "rgba(243,75,111,0.08)",
+                // Solid equivalent of primaryTint over white — opaque chat bubble
+                bubbleMine: "#FEF0F3",
                 primaryGlow: "rgba(243,75,111,0.24)",
                 primaryRing: "rgba(243,75,111,0.45)",
                 dangerTint: "rgba(244,63,94,0.10)",
@@ -116,6 +122,8 @@ export const Colors = {
                 primary: "#141210",
                 surface: "#211D18",
                 border: "#3A332B",
+                // One step stronger than border — list dividers on dark surfaces
+                borderStrong: "#4A4136",
             },
             accent: {
                 link: "#4B68C4",
@@ -136,12 +144,13 @@ export const Colors = {
                 spinner: "#F34B6F",
             },
             header: {
-                background: "#1B1713",
+                // Matches the dark page/status-bar surface (see light header note)
+                background: "#141210",
                 border: "#3A332B",
                 title: "#F4EEE6",
                 subtitle: "#A99C8D",
                 icon: "#D8CFC2",
-                iconBackground: "#211D18",
+                iconBackground: "#2C2925",
             },
             tabBar: {
                 background: "rgba(33, 29, 24, 0.98)",
@@ -163,7 +172,7 @@ export const Colors = {
             },
             explore: {
                 screen: "#141210",
-                actionBar: "#211D18",
+                actionBar: "#141210",
                 actionCircle: "#141210",
             },
             common: {
@@ -178,6 +187,8 @@ export const Colors = {
                 blueAction: "#38A8E8",
                 successStrong: "#22C55E",
                 primaryTint: "rgba(243,75,111,0.12)",
+                // Solid equivalent of primaryTint over the dark body — opaque chat bubble
+                bubbleMine: "#2F191B",
                 primaryGlow: "rgba(243,75,111,0.24)",
                 primaryRing: "rgba(243,75,111,0.45)",
                 dangerTint: "rgba(244,63,94,0.12)",

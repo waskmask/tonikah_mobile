@@ -1,11 +1,15 @@
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { View, LogBox, StatusBar } from "react-native";
+import { AppState, View, LogBox, StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+    focusManager,
+    QueryClient,
+    QueryClientProvider,
+} from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
     configureReanimatedLogger,
@@ -43,12 +47,16 @@ import { useColors } from "@/hooks/useColors";
 import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/hooks/useLanguage";
 import { configureGoogleSignIn } from "@/lib/googleSignIn";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { POST_LANGUAGE_ROUTE_KEY } from "@/store/languageStore";
 import { useAuthStore } from "@/store/authStore";
 import { ToastProvider } from "@/hooks/useToast";
 import { useToast } from "@/hooks/useToast";
 import { addPushNotificationListeners } from "@/lib/pushNotifications";
 import { ThemeSync } from "@/components/app/ThemeSync";
 import { AppLoadingScreen } from "@/components/app/AppLoadingScreen";
+import { GalleryEligibilityListener } from "@/components/app/GalleryEligibilityListener";
+import { api } from "@/lib/api";
 
 const queryClient = new QueryClient();
 
@@ -61,7 +69,7 @@ export default function RootLayout() {
     const { isDark } = useTheme();
     const colors = useColors();
     const { isRTL } = useLanguage();
-    const { restoreSession, isRestoringSession } = useAuthStore();
+    const { restoreSession, handleUnauthorized, isRestoringSession } = useAuthStore();
     const toast = useToast();
 
     const [loaded, error] = useFonts({
@@ -74,6 +82,23 @@ export default function RootLayout() {
         NotoSansArabic_600SemiBold,
         NotoSansArabic_700Bold,
     });
+
+    useEffect(() => {
+        return api.setUnauthorizedHandler(() => {
+            const wasRestoring = useAuthStore.getState().isRestoringSession;
+            handleUnauthorized();
+            queryClient.clear();
+            if (!wasRestoring) router.replace("/(auth)/login");
+        });
+    }, [handleUnauthorized]);
+
+    useEffect(() => {
+        focusManager.setFocused(AppState.currentState === 'active');
+        const subscription = AppState.addEventListener('change', (state) => {
+            focusManager.setFocused(state === 'active');
+        });
+        return () => subscription.remove();
+    }, []);
 
     useEffect(() => {
         // Run application setup only once
@@ -89,6 +114,30 @@ export default function RootLayout() {
         if ((loaded || error) && !isRestoringSession) {
             SplashScreen.hideAsync();
         }
+    }, [loaded, error, isRestoringSession]);
+
+    // Language change reloads the app (RTL needs it) and boots at the initial
+    // route — restore where the user actually was (e.g. signup, language page).
+    useEffect(() => {
+        if ((!loaded && !error) || isRestoringSession) return;
+        let cancelled = false;
+        (async () => {
+            const path = await AsyncStorage.getItem(POST_LANGUAGE_ROUTE_KEY).catch(() => null);
+            if (!path) return;
+            await AsyncStorage.removeItem(POST_LANGUAGE_ROUTE_KEY).catch(() => { });
+            if (cancelled) return;
+            // Let the initial route settle first, then jump back
+            setTimeout(() => {
+                try {
+                    router.replace(path as any);
+                } catch {
+                    // Route no longer valid — stay on the default route
+                }
+            }, 50);
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, [loaded, error, isRestoringSession]);
 
     useEffect(() => {
@@ -119,9 +168,11 @@ export default function RootLayout() {
             <ThemeSync />
             <StatusBar
                 barStyle={isDark ? "light-content" : "dark-content"}
-                backgroundColor={colors.brand.bg.primary}
+                // Warm chrome surface, same as the headers (unified app-wide)
+                backgroundColor={colors.chrome.header.background}
             />
             <QueryClientProvider client={queryClient}>
+                <GalleryEligibilityListener />
                 <BottomSheetModalProvider>
                 <Stack
                     screenOptions={{

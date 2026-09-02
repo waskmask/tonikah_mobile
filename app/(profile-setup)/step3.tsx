@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,7 +14,10 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
-import { Heart, Baby, Calendar, MapPinned, Users } from 'lucide-react-native';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
+import { Heart, Baby, CalendarHeart, Plane } from 'lucide-react-native';
+import { BabyCarriage } from '@/components/ui/icons/BabyCarriage';
 import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step3() {
@@ -69,9 +72,9 @@ export default function Step3() {
     const fields = [
         { key: 'maritalStatus', label: t('step_3.marital_status'), value: maritalStatus, options: maritalOptions, sheet: 'marital', icon: <Heart size={scale(18)} color={iconColor} /> },
         { key: 'hasChildren', label: t('step_3.has_children_label'), value: hasChildren, options: childrenOptions, sheet: 'children', icon: <Baby size={scale(18)} color={iconColor} /> },
-        { key: 'wantsChildren', label: t('step_3.wants_children_label'), value: wantsChildren, options: wantsChildrenOptions, sheet: 'wantsChildren', icon: <Baby size={scale(18)} color={iconColor} /> },
-        { key: 'marriagePlan', label: t('step_3.whats_marriage_plan'), value: marriagePlan, options: marriagePlanOptions, sheet: 'marriagePlan', icon: <Calendar size={scale(18)} color={iconColor} /> },
-        { key: 'relocationPlan', label: t('step_3.relocation_label'), value: relocationPlan, options: relocationOptions, sheet: 'relocation', icon: <MapPinned size={scale(18)} color={iconColor} /> },
+        { key: 'wantsChildren', label: t('step_3.wants_children_label'), value: wantsChildren, options: wantsChildrenOptions, sheet: 'wantsChildren', icon: <BabyCarriage size={scale(18)} color={iconColor} /> },
+        { key: 'marriagePlan', label: t('step_3.whats_marriage_plan'), value: marriagePlan, options: marriagePlanOptions, sheet: 'marriagePlan', icon: <CalendarHeart size={scale(18)} color={iconColor} /> },
+        { key: 'relocationPlan', label: t('step_3.relocation_label'), value: relocationPlan, options: relocationOptions, sheet: 'relocation', icon: <Plane size={scale(18)} color={iconColor} /> },
     ];
 
     const setters: Record<string, (v: string) => void> = {
@@ -84,11 +87,12 @@ export default function Step3() {
 
     const validate = (): boolean => {
         const e: Record<string, string> = {};
-        if (!maritalStatus) e.maritalStatus = 'Required';
-        if (!hasChildren) e.hasChildren = 'Required';
-        if (!wantsChildren) e.wantsChildren = 'Required';
-        if (!marriagePlan) e.marriagePlan = 'Required';
-        if (!relocationPlan) e.relocationPlan = 'Required';
+        const required = t('common:validation_required', { defaultValue: 'Required' });
+        if (!maritalStatus) e.maritalStatus = required;
+        if (!hasChildren) e.hasChildren = required;
+        if (!wantsChildren) e.wantsChildren = required;
+        if (!marriagePlan) e.marriagePlan = required;
+        if (!relocationPlan) e.relocationPlan = required;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -107,12 +111,14 @@ export default function Step3() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
+                // Keep the cached /me user in sync so reload resumes correctly
+                useAuthStore.getState().refreshUser().catch(() => { });
                 router.push('/(profile-setup)/step4');
             } else {
-                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
+                toast.show(apiMessage(res.message || 'server_error_default'), 'error');
             }
         } catch {
-            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
+            toast.show(apiMessage('server_error_default'), 'error');
         } finally {
             setLoading(false);
         }
@@ -153,7 +159,7 @@ export default function Step3() {
                         </View>
                     ))}            </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} widthMode="full" height={40} textSize={15} /></View>
 
             {fields.map((field) => (
                 <SingleSelectSheet key={field.sheet} visible={activeSheet === field.sheet} onClose={() => setActiveSheet(null)} onSelect={(v) => { setters[field.key](v); setErrors((e) => ({ ...e, [field.key]: '' })); }} options={field.options} selected={field.value} title={field.label} />

@@ -11,10 +11,11 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { ChevronLeft, RotateCw } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, RotateCw } from 'lucide-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 
 const EXPORT_WIDTH = 1080;
@@ -124,6 +125,7 @@ export function GalleryCropModal({
     onError,
 }: Props) {
     const insets = useSafeAreaInsets();
+    const { isRTL } = useLanguage();
     const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
     const [natural, setNatural] = useState<Size>({ width: 0, height: 0 });
     const [frame, setFrame] = useState<Size>({ width: 0, height: 0 });
@@ -133,7 +135,12 @@ export function GalleryCropModal({
     const [sliderWidth, setSliderWidth] = useState(0);
     const [processing, setProcessing] = useState(false);
 
-    const backgroundColor = '#FFFFFF';
+    // Same pairs as the app theme tokens (see edit-profile themeColors)
+    const backgroundColor = isDark ? '#0E0C09' : '#FFFFFF';
+    const textStrong = isDark ? '#E8E1D6' : '#201B15';
+    const textMuted = isDark ? '#A99C8D' : '#7D7266';
+    const surface = isDark ? '#1B1713' : '#F4EEE6';
+    const border = isDark ? '#3A332B' : '#E8E1D6';
     const metrics = useMemo(() => getRotatedMetrics(natural, frame, zoom, rotation), [frame, natural, rotation, zoom]);
     const busy = uploading || processing;
     const zoomPercent = ((zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100;
@@ -265,7 +272,7 @@ export function GalleryCropModal({
             onRequestClose={busy ? undefined : onClose}
         >
             <View style={[styles.screen, { backgroundColor }]}>
-            <StatusBar barStyle="dark-content" backgroundColor={backgroundColor} translucent />
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={backgroundColor} translucent />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <View style={styles.header}>
                     <View style={styles.backWrap}>
@@ -276,14 +283,16 @@ export function GalleryCropModal({
                             accessibilityRole="button"
                             accessibilityLabel={labels.title}
                         >
-                            <ChevronLeft size={scale(25)} color="#201B15" />
+                            {isRTL
+                                ? <ChevronRight size={scale(23)} color={textStrong} />
+                                : <ChevronLeft size={scale(23)} color={textStrong} />}
                         </Pressable>
                     </View>
                     <View style={styles.headerText}>
                         <Text variant="body" className="font-body-bold" align="center">
                             {labels.title}
                         </Text>
-                        <Text variant="caption" align="center" style={{ color: '#7D7266' }}>
+                        <Text variant="caption" align="center" style={{ color: textMuted }}>
                             {labels.subtitle}
                         </Text>
                     </View>
@@ -292,7 +301,7 @@ export function GalleryCropModal({
 
                 <View style={styles.cropArea}>
                     <View
-                        style={[styles.cropFrame, { backgroundColor: '#F4EEE6' }]}
+                        style={[styles.cropFrame, { backgroundColor: surface }]}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
                             setFrame({ width, height });
@@ -323,7 +332,7 @@ export function GalleryCropModal({
                         ) : (
                             <View style={styles.preparing}>
                                 <ActivityIndicator color="#F34B6F" />
-                                <Text variant="caption" style={{ marginTop: scale(8), color: '#5C5348' }}>
+                                <Text variant="caption" style={{ marginTop: scale(8), color: textMuted }}>
                                     {labels.preparing}
                                 </Text>
                             </View>
@@ -342,14 +351,15 @@ export function GalleryCropModal({
                         onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
                         {...sliderPanResponder.panHandlers}
                     >
-                        <View style={[styles.zoomTrack, { backgroundColor: '#E8E1D6' }]}>
+                        <View style={[styles.zoomTrack, { backgroundColor: border }]}>
                             <View style={[styles.zoomFill, { width: `${zoomPercent}%` }]} />
                             <View
                                 style={[
                                     styles.zoomThumb,
                                     {
                                         left: `${zoomPercent}%`,
-                                        borderColor: '#D9E1EC',
+                                        borderColor: isDark ? '#3A332B' : '#D9E1EC',
+                                        backgroundColor: isDark ? '#E8E1D6' : '#FFFFFF',
                                     },
                                 ]}
                             />
@@ -358,10 +368,10 @@ export function GalleryCropModal({
                     <Pressable
                         onPress={rotateImage}
                         disabled={busy}
-                        style={styles.rotateButton}
+                        style={[styles.rotateButton, { borderColor: border }]}
                         accessibilityLabel={labels.rotate}
                     >
-                        <RotateCw size={scale(21)} color="#201B15" />
+                        <RotateCw size={scale(21)} color={textStrong} />
                     </Pressable>
                 </View>
 
@@ -379,6 +389,9 @@ export function GalleryCropModal({
                         onPress={cropAndUpload}
                         loading={busy}
                         disabled={busy || !metrics.imageWidth}
+                        widthMode="full"
+                        height={40}
+                        textSize={15}
                     />
                 </View>
             </SafeAreaView>
@@ -403,7 +416,9 @@ const styles = StyleSheet.create({
     },
     backWrap: {
         position: 'absolute',
-        left: scale(22),
+        // 3.5 + 10.5 (chevron inset inside its 44pt button) = 14dp edge→icon;
+        // 'start' flips to the right edge under native RTL
+        start: scale(3.5),
         top: scale(22),
         zIndex: 2,
         alignItems: 'flex-start',

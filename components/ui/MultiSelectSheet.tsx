@@ -77,15 +77,33 @@ export function MultiSelectSheet({
         setLocalSelected(initialSelected);
     }, [initialSelected]);
 
+    // Snapshot of the confirmed selection, taken when the drawer opens: those
+    // options are pinned to the top so users can review/unselect them without
+    // hunting through a long list. A snapshot (not the live selection) keeps
+    // rows from jumping around while toggling.
+    const [pinned, setPinned] = useState<string[]>([]);
+    React.useEffect(() => {
+        if (visible) setPinned(initialSelected);
+    }, [visible, initialSelected]);
+
+    const ordered = useMemo(() => {
+        if (!isDrawer || pinned.length === 0) return options;
+        const pinnedSet = new Set(pinned);
+        return [
+            ...options.filter((o) => pinnedSet.has(o.value)),
+            ...options.filter((o) => !pinnedSet.has(o.value)),
+        ];
+    }, [options, pinned, isDrawer]);
+
     const filtered = useMemo(() => {
-        if (!search.trim()) return options;
+        if (!search.trim()) return ordered;
         const q = normalizeSearchText(search);
-        return options.filter(
+        return ordered.filter(
             (o) =>
                 normalizeSearchText(o.label).includes(q) ||
                 normalizeSearchText(o.value).includes(q)
         );
-    }, [options, search]);
+    }, [ordered, search]);
 
     const toggleItem = (value: string) => {
         setLocalSelected((prev) => {
@@ -119,6 +137,7 @@ export function MultiSelectSheet({
             transparent
             animationType="none"
             statusBarTranslucent
+            navigationBarTranslucent
             hardwareAccelerated
             onRequestClose={handleClose}
         >
@@ -139,7 +158,9 @@ export function MultiSelectSheet({
                             isDrawer ? styles.drawer : styles.sheet,
                             { backgroundColor: palette.chrome.common.card },
                             // Footer button sits at the same height as the page CTA
-                            isDrawer && { paddingTop: insets.top + 18, paddingBottom: insets.bottom + scale(10) },
+                            // Footer already pads scale(10) — matching the page CTA's
+                            // safe-bottom + scale(10) exactly
+                            isDrawer && { paddingTop: insets.top + 6, paddingBottom: insets.bottom },
                             !isDrawer && { paddingBottom: insets.bottom + scale(16) },
                         ]}
                     >
@@ -295,6 +316,9 @@ export function MultiSelectSheet({
                                 title={t('done', 'Done')}
                                 onPress={handleDone}
                                 disabled={localSelected.length === 0}
+                                widthMode="full"
+                                height={40}
+                                textSize={15}
                             />
                         </View>
                     </Animated.View>

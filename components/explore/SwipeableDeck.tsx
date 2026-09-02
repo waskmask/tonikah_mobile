@@ -10,7 +10,7 @@ import Animated, {
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
-import { Bookmark, X } from 'lucide-react-native';
+import { ChevronUp, X } from 'lucide-react-native';
 import { ExploreDeckCard } from './ExploreDeckCard';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
@@ -38,12 +38,14 @@ type Props = {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 const FLING_VELOCITY = 900;
+const VERTICAL_OPEN_THRESHOLD = 36;
+const VERTICAL_FLING_VELOCITY = 650;
 const FLY_X = SCREEN_WIDTH * 1.4;
 const FLY_DURATION = 280;
 const SPRING = { damping: 18, stiffness: 220 };
 
-// Physical directions regardless of RTL: right = save, left = skip —
-// matching the action bar where bookmark sits right of the X.
+// Gesture-left skips and gesture-right opens the profile. Programmatic right
+// remains the Save button's exit animation.
 export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function SwipeableDeck(
     { profiles, viewerLat, viewerLng, onPressCard, onSwiped, canSwipe },
     ref,
@@ -100,24 +102,57 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
 
     const pan = Gesture.Pan()
         .enabled(!animating && Boolean(current))
-        // Let taps and vertical wiggles fall through to the card's Pressable
-        .activeOffsetX([-12, 12])
+        .minDistance(8)
         .onUpdate((event) => {
-            translateX.value = event.translationX;
-            translateY.value = event.translationY * 0.6;
+            const horizontal = Math.abs(event.translationX) >= Math.abs(event.translationY);
+            translateX.value = horizontal
+                ? event.translationX
+                : interpolate(
+                    event.translationX,
+                    [-80, 0, 80],
+                    [-4, 0, 4],
+                    Extrapolation.CLAMP,
+                );
+            translateY.value = interpolate(
+                event.translationY,
+                [-160, 0, 160],
+                [-12, 0, 12],
+                Extrapolation.CLAMP,
+            );
         })
         .onEnd((event) => {
-            const byDistance = Math.abs(translateX.value) > SWIPE_THRESHOLD;
+            const horizontal = Math.abs(event.translationX) >= Math.abs(event.translationY);
+
+            if (!horizontal) {
+                translateX.value = withSpring(0, SPRING);
+                translateY.value = withSpring(0, SPRING);
+                const openFromScroll =
+                    event.translationY < -VERTICAL_OPEN_THRESHOLD
+                    || event.velocityY < -VERTICAL_FLING_VELOCITY;
+                if (openFromScroll) runOnJS(onPressCard)();
+                return;
+            }
+
+            const byDistance = Math.abs(event.translationX) > SWIPE_THRESHOLD;
             const byVelocity = Math.abs(event.velocityX) > FLING_VELOCITY;
             if (!byDistance && !byVelocity) {
                 translateX.value = withSpring(0, SPRING);
                 translateY.value = withSpring(0, SPRING);
                 return;
             }
+
             const direction: SwipeDirection = byDistance
-                ? (translateX.value > 0 ? 'right' : 'left')
+                ? (event.translationX > 0 ? 'right' : 'left')
                 : (event.velocityX > 0 ? 'right' : 'left');
-            runOnJS(releaseSwipe)(direction);
+
+            if (direction === 'right') {
+                translateX.value = withSpring(0, SPRING);
+                translateY.value = withSpring(0, SPRING);
+                runOnJS(onPressCard)();
+                return;
+            }
+
+            runOnJS(releaseSwipe)('left');
         });
 
     const topCardStyle = useAnimatedStyle(() => ({
@@ -128,7 +163,7 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
                 rotate: `${interpolate(
                     translateX.value,
                     [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-                    [-11, 0, 11],
+                    [-6, 0, 6],
                 )}deg`,
             },
         ],
@@ -142,7 +177,7 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
         };
     });
 
-    const saveBadgeStyle = useAnimatedStyle(() => ({
+    const viewBadgeStyle = useAnimatedStyle(() => ({
         opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
     }));
 
@@ -174,9 +209,9 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
                     />
                     <Animated.View
                         pointerEvents="none"
-                        style={[styles.swipeBadge, styles.saveBadge, { borderColor: colors.chrome.primary }, saveBadgeStyle]}
+                        style={[styles.swipeBadge, styles.viewBadge, { borderColor: colors.chrome.primary }, viewBadgeStyle]}
                     >
-                        <Bookmark size={scale(34)} color={colors.chrome.primary} fill={colors.chrome.primary} />
+                        <ChevronUp size={scale(36)} color={colors.chrome.primary} strokeWidth={3} />
                     </Animated.View>
                     <Animated.View
                         pointerEvents="none"
@@ -206,7 +241,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         backgroundColor: 'rgba(255,255,255,0.92)',
     },
-    saveBadge: {
+    viewBadge: {
         left: scale(22),
         transform: [{ rotate: '-10deg' }],
     },

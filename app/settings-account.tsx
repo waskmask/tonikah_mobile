@@ -103,7 +103,11 @@ export default function SettingsAccountScreen() {
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('account', 'Account')} fallbackHref="/(tabs)/settings" />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(60) }}>
-                <SectionCard title={t('account', 'Account')}>
+                <SectionCard
+                    title={t('account', 'Account')}
+                    actionLabel={t('change_email_short', 'Change Email')}
+                    onAction={() => router.push('/change-email' as any)}
+                >
                     <SettingsValueRow label={t('email', 'Email')} value={user?.email || ''} />
                     <SettingsValueRow label={t('language', 'Language')} custom={<LanguagePicker />} />
                 </SectionCard>

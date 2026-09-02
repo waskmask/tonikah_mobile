@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "toNikah"
+  },
+  "android": {
+    "app_name": "toNikah"
+  }
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useColors } from '@/hooks/useColors';
@@ -10,6 +10,8 @@ type EmptyStateAction = {
     label: string;
     onPress: () => void;
     variant?: 'primary' | 'secondary';
+    disabled?: boolean;
+    loading?: boolean;
 };
 
 type EmptyStateProps = {
@@ -52,23 +54,32 @@ export function EmptyState({ icon, title, description, actions, style }: EmptySt
                             <PressableScale
                                 key={action.label}
                                 onPress={action.onPress}
+                                disabled={action.disabled}
                                 activeScale={0.95}
                                 accessibilityRole="button"
                                 accessibilityLabel={action.label}
                                 style={[
                                     styles.button,
+                                    action.disabled ? styles.buttonDisabled : null,
                                     secondary
                                         ? { backgroundColor: 'transparent', borderWidth: 1, borderColor: BRAND_PRIMARY }
                                         : { backgroundColor: BRAND_PRIMARY },
                                 ]}
                             >
-                                <Text
-                                    variant="body-sm"
-                                    className="font-body-semi"
-                                    style={{ color: secondary ? colors.chrome.primary : colors.chrome.common.inverseText }}
-                                >
-                                    {action.label}
-                                </Text>
+                                {action.loading ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color={secondary ? colors.chrome.primary : colors.chrome.common.inverseText}
+                                    />
+                                ) : (
+                                    <Text
+                                        variant="body-sm"
+                                        className="font-body-semi"
+                                        style={{ color: secondary ? colors.chrome.primary : colors.chrome.common.inverseText }}
+                                    >
+                                        {action.label}
+                                    </Text>
+                                )}
                             </PressableScale>
                         );
                     })}
@@ -119,5 +130,8 @@ const styles = StyleSheet.create({
         minHeight: scale(44),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    buttonDisabled: {
+        opacity: 0.65,
     },
 });

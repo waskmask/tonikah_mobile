@@ -201,7 +201,7 @@ export default function LoginScreen() {
                             {/* Forgot Password — end-aligned per platform convention */}
                             <Pressable
                                 hitSlop={10}
-                                style={{ marginTop: scale(6), alignSelf: isRTL ? 'flex-start' : 'flex-end' }}
+                                style={{ marginTop: scale(6), alignSelf: 'flex-end' }}
                                 onPress={() => router.push('/(auth)/forgot-pass')}
                             >
                                 <Text

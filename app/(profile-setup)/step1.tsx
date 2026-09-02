@@ -4,7 +4,6 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
-    Alert,
     StyleSheet,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -24,8 +23,11 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Users, CalendarDays, Flag, Globe, User } from 'lucide-react-native';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
+import { DateWheelSheet } from '@/components/ui/DateWheelSheet';
+import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
+import { VenusAndMars, CalendarDays, Flag, Globe, User } from 'lucide-react-native';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
@@ -62,6 +64,7 @@ export default function Step1() {
     // UI state
     const [loading, setLoading] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
     const [showGenderSheet, setShowGenderSheet] = useState(false);
     const [showNationalitySheet, setShowNationalitySheet] = useState(false);
     const [showCountrySheet, setShowCountrySheet] = useState(false);
@@ -97,12 +100,13 @@ export default function Step1() {
 
     // Validation
     const validate = (): boolean => {
+        const required = t('common:validation_required', { defaultValue: 'Required' });
         const e: Record<string, string> = {};
-        if (!profileName.trim()) e.profileName = 'Required';
-        else if (profileName.length > 16) e.profileName = 'Max 16 characters';
-        else if (!/^[\p{L}\p{M} ]+$/u.test(profileName)) e.profileName = 'Only letters and spaces';
-        if (!gender) e.gender = 'Required';
-        if (!dob) e.dob = 'Required';
+        if (!profileName.trim()) e.profileName = required;
+        else if (profileName.length > 16) e.profileName = t('common:validation_max_16_chars', { defaultValue: 'Max 16 characters' });
+        else if (!/^[\p{L}\p{M} ]+$/u.test(profileName)) e.profileName = t('common:validation_letters_only', { defaultValue: 'Only letters and spaces' });
+        if (!gender) e.gender = required;
+        if (!dob) e.dob = required;
         else {
             // Calendar-accurate age — the old 365.25-day float math failed for
             // people born exactly 18 years ago (leap-day drift)
@@ -112,67 +116,60 @@ export default function Step1() {
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
             if (age < 18) e.dob = t('common:age_must_be_18', { defaultValue: 'You must be at least 18 years old to use toNikah.' });
         }
-        if (nationality.length === 0) e.nationality = 'Required';
-        if (!grewUpIn) e.grewUpIn = 'Required';
+        if (nationality.length === 0) e.nationality = required;
+        if (!grewUpIn) e.grewUpIn = required;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         if (!validate()) return;
+        setShowConfirm(true);
+    };
 
-        Alert.alert(
-            t('common:step_1.confirm_title', { defaultValue: 'Confirm Details' }),
-            t('common:step_1.confirm_message', {
-                defaultValue: 'Profile name, gender, date of birth, and where you grew up cannot be changed later. Are you sure?',
-            }),
-            [
-                { text: t('common:cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
-                {
-                    text: t('common:continue', { defaultValue: 'Continue' }),
-                    onPress: async () => {
-                        setLoading(true);
-                        try {
-                            const payload = {
-                                religion: 'islam',
-                                profileName: profileName.trim(),
-                                gender,
-                                dob: formatInputDate(dob!),
-                                nationality,
-                                grew_up_in: grewUpIn,
-                            };
+    const submitProfile = async () => {
+        setShowConfirm(false);
+        setLoading(true);
+        try {
+            const payload = {
+                religion: 'islam',
+                profileName: profileName.trim(),
+                gender,
+                dob: formatInputDate(dob!),
+                nationality,
+                grew_up_in: grewUpIn,
+            };
 
-                            const res = await profileService.createProfile(payload);
-                            if (res.success) {
-                                setGender(gender);
-                                setProfileData(payload);
-                                router.push('/(profile-setup)/step2');
-                            } else {
-                                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
-                            }
-                        } catch (err) {
-                            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
-                        } finally {
-                            setLoading(false);
-                        }
-                    },
-                },
-            ]
-        );
+            const res = await profileService.createProfile(payload);
+            if (res.success) {
+                setGender(gender);
+                setProfileData(payload);
+                // Refresh the cached /me user so an app reload resumes at the
+                // next incomplete step instead of replaying this one
+                useAuthStore.getState().refreshUser().catch(() => { });
+                router.replace('/(profile-setup)/step2');
+            } else {
+                toast.show(apiMessage(res.message || 'server_error_default'), 'error');
+            }
+        } catch (err) {
+            toast.show(apiMessage('server_error_default'), 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Latest selectable birthday: 18 years ago minus one day, so picking the
     // default always passes the 18+ check
-    const maxDate = new Date();
-    maxDate.setFullYear(maxDate.getFullYear() - 18);
-    maxDate.setDate(maxDate.getDate() - 1);
+    const maxDate = useMemo(() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 18);
+        d.setDate(d.getDate() - 1);
+        return d;
+    }, []);
 
-    const handleDateValueChange = (_event: unknown, selectedDate: Date) => {
-        setShowDatePicker(false);
-        if (selectedDate) {
-            setDob(selectedDate);
-            if (errors.dob) setErrors((e) => ({ ...e, dob: '' }));
-        }
+    const handleDateConfirm = (selectedDate: Date) => {
+        setDob(selectedDate);
+        if (errors.dob) setErrors((e) => ({ ...e, dob: '' }));
     };
 
     const getDisplayLabel = (value: string, opts: SelectOption[]) =>
@@ -218,7 +215,7 @@ export default function Step1() {
                         value={gender ? getDisplayLabel(gender, genderOptions) : ''}
                         placeholder={t('common:step_1.select_gender', { defaultValue: 'Select your gender' })}
                         onPress={() => setShowGenderSheet(true)}
-                        icon={<Users size={scale(18)} color={iconColor} />}
+                        icon={<VenusAndMars size={scale(18)} color={iconColor} />}
                         hasError={!!errors.gender}
                     />
                     {errors.gender && <ErrorText text={errors.gender} />}
@@ -232,17 +229,6 @@ export default function Step1() {
                         hasError={!!errors.dob}
                     />
                     {errors.dob && <ErrorText text={errors.dob} />}
-                    {showDatePicker && (
-                        <DateTimePicker
-                            value={dob || maxDate}
-                            mode="date"
-                            display="spinner"
-                            maximumDate={maxDate}
-                            minimumDate={new Date(1940, 0, 1)}
-                            onValueChange={handleDateValueChange}
-                            onDismiss={() => setShowDatePicker(false)}
-                        />
-                    )}
 
                     {/* Nationality */}
                     <SelectField required
@@ -276,6 +262,9 @@ export default function Step1() {
                     onPress={handleSubmit}
                     loading={loading}
                     disabled={loading}
+                    widthMode="full"
+                    height={40}
+                    textSize={15}
                 />
             </View>
 
@@ -297,6 +286,26 @@ export default function Step1() {
                 title={t('common:step_1.nationality', { defaultValue: 'Nationality' })}
                 maxSelections={2}
                 searchEnabled
+            />
+            <ConfirmSheet
+                visible={showConfirm}
+                onClose={() => setShowConfirm(false)}
+                onConfirm={submitProfile}
+                title={t('common:step_1.confirm_title', { defaultValue: 'Confirm Details' })}
+                message={t('common:step_1.confirm_message', {
+                    defaultValue: 'Profile name, gender, date of birth, and where you grew up cannot be changed later. Are you sure?',
+                })}
+                confirmLabel={t('common:continue', { defaultValue: 'Continue' })}
+                cancelLabel={t('common:cancel', { defaultValue: 'Cancel' })}
+            />
+            <DateWheelSheet
+                visible={showDatePicker}
+                onClose={() => setShowDatePicker(false)}
+                onConfirm={handleDateConfirm}
+                value={dob}
+                minDate={new Date(1940, 0, 1)}
+                maxDate={maxDate}
+                title={t('common:step_1.dob', { defaultValue: 'Date of Birth' })}
             />
             <SingleSelectSheet
                 visible={showCountrySheet}

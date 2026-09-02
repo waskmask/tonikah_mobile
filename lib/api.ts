@@ -16,16 +16,51 @@ export interface ApiResponse<T = any> {
     [key: string]: any; // Catch-all for extra top-level fields like `user` or `accessToken`
 }
 
-let isRefreshing = false;
-let refreshSubscribers: ((accessToken: string | null) => void)[] = [];
+type RefreshResult = {
+    accessToken: string | null;
+    reason?: 'unauthorized' | 'network_error';
+};
 
-const onRefreshed = (accessToken: string | null) => {
-    refreshSubscribers.map(cb => cb(accessToken));
+type UnauthorizedHandler = () => void | Promise<void>;
+
+let isRefreshing = false;
+let refreshSubscribers: ((result: RefreshResult) => void)[] = [];
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+let unauthorizedPromise: Promise<void> | null = null;
+
+const onRefreshed = (result: RefreshResult) => {
+    refreshSubscribers.map(cb => cb(result));
     refreshSubscribers = [];
 };
 
-const addRefreshSubscriber = (cb: (accessToken: string | null) => void) => {
+const addRefreshSubscriber = (cb: (result: RefreshResult) => void) => {
     refreshSubscribers.push(cb);
+};
+
+const clearStoredTokens = async () => {
+    await Promise.all([
+        SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS),
+        SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH),
+    ]);
+};
+
+const notifyUnauthorized = async () => {
+    if (!unauthorizedHandler) return;
+    if (!unauthorizedPromise) {
+        unauthorizedPromise = Promise.resolve()
+            .then(() => unauthorizedHandler?.())
+            .then(() => undefined)
+            .finally(() => {
+                unauthorizedPromise = null;
+            });
+    }
+    await unauthorizedPromise;
+};
+
+const handleTerminalUnauthorized = async (): Promise<RefreshResult> => {
+    await clearStoredTokens();
+    await notifyUnauthorized();
+    return { accessToken: null, reason: 'unauthorized' };
 };
 
 const getClientHeaders = () => {
@@ -86,21 +121,21 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
     }
 };
 
-const refreshAccessToken = async (): Promise<string | null> => {
+const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
     const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
 
     if (!refreshToken) {
-        await api.clearTokens();
-        return null;
+        return handleTerminalUnauthorized();
     }
 
     if (isRefreshing) {
         return new Promise((resolve) => {
-            addRefreshSubscriber((token) => resolve(token));
+            addRefreshSubscriber(resolve);
         });
     }
 
     isRefreshing = true;
+    let result: RefreshResult = { accessToken: null, reason: 'network_error' };
 
     try {
         const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
@@ -112,34 +147,40 @@ const refreshAccessToken = async (): Promise<string | null> => {
             body: JSON.stringify({ refreshToken }),
         });
 
-        const refreshData = await refreshRes.json();
+        const refreshData = await refreshRes.json().catch(() => ({}));
 
-        if (refreshData.success && refreshData.accessToken) {
+        if (refreshRes.ok && refreshData.success && refreshData.accessToken) {
             await api.setTokens(refreshData.accessToken, refreshData.refreshToken || refreshToken);
-            isRefreshing = false;
-            onRefreshed(refreshData.accessToken);
-            return refreshData.accessToken;
+            result = { accessToken: refreshData.accessToken };
+        } else if (refreshRes.status === 401 || refreshRes.status === 403) {
+            result = await handleTerminalUnauthorized();
         }
-
-        await api.clearTokens();
-        isRefreshing = false;
-        onRefreshed(null);
-        return null;
     } catch {
-        await api.clearTokens();
+        // Keep credentials on transient network/provider failures. A later request can retry.
+        result = { accessToken: null, reason: 'network_error' };
+    } finally {
         isRefreshing = false;
-        onRefreshed(null);
-        return null;
+        onRefreshed(result);
     }
+
+    return result;
+};
+
+const refreshAccessToken = async (): Promise<string | null> => {
+    const result = await refreshAccessTokenResult();
+    return result.accessToken;
 };
 
 const handleResponse = async (response: Response, endpoint: string, options: FetchOptions): Promise<ApiResponse> => {
     // If 401 Unauthorized, handle token refresh logic
     if (response.status === 401 && endpoint !== '/app-user/mobile/refresh' && endpoint !== '/app-user/mobile/login') {
-        const refreshedToken = await refreshAccessToken();
-        if (refreshedToken) {
+        const refreshResult = await refreshAccessTokenResult();
+        if (refreshResult.accessToken) {
             // Re-attempt original request. `performFetch` reads the fresh token from secure store.
             return apiRequest(endpoint, options);
+        }
+        if (refreshResult.reason === 'network_error') {
+            return { success: false, message: 'network_error', status: 0 };
         }
         return { success: false, message: 'unauthorized', status: 401 };
     }
@@ -194,9 +235,13 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
 
         xhr.onload = async () => {
             if (xhr.status === 401 && endpoint !== '/app-user/mobile/refresh' && endpoint !== '/app-user/mobile/login') {
-                const refreshedToken = await refreshAccessToken();
-                if (refreshedToken) {
+                const refreshResult = await refreshAccessTokenResult();
+                if (refreshResult.accessToken) {
                     resolve(formDataRequest(endpoint, body, timeout));
+                    return;
+                }
+                if (refreshResult.reason === 'network_error') {
+                    resolve({ success: false, message: 'network_error', status: 0 });
                     return;
                 }
                 resolve({ success: false, message: 'unauthorized', status: 401 });
@@ -246,8 +291,16 @@ export const api = {
         return { accessToken, refreshToken };
     },
     refreshAccessToken,
+    handleUnauthorized: async () => {
+        await handleTerminalUnauthorized();
+    },
+    setUnauthorizedHandler: (handler: UnauthorizedHandler | null) => {
+        unauthorizedHandler = handler;
+        return () => {
+            if (unauthorizedHandler === handler) unauthorizedHandler = null;
+        };
+    },
     clearTokens: async () => {
-        await SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS);
-        await SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH);
+        await clearStoredTokens();
     },
 };

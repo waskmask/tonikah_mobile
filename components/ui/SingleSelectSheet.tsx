@@ -13,7 +13,8 @@ import {
 import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetBackdropProps,
-    BottomSheetScrollView,
+    BottomSheetFlatList,
+    BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { SlideInLeft, SlideInRight } from 'react-native-reanimated';
@@ -79,15 +80,33 @@ export function SingleSelectSheet({
     const resolvedPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
     const isDrawer = resolvedPresentation === 'drawer';
 
+    // Snapshot of the selection, taken when the drawer opens: that option is
+    // pinned to the top so users can find their current choice in long lists
+    // without scrolling. Snapshot (not live) so the list doesn't reshuffle
+    // the moment a new option is tapped.
+    const [pinned, setPinned] = useState<string | undefined>(undefined);
+    React.useEffect(() => {
+        if (visible) setPinned(selected);
+        else setSearch('');
+    }, [visible, selected]);
+
+    const pinEnabled = isDrawer || searchEnabled;
+    const ordered = useMemo(() => {
+        if (!pinEnabled || !pinned) return options;
+        const hit = options.find((o) => o.value === pinned);
+        if (!hit) return options;
+        return [hit, ...options.filter((o) => o.value !== pinned)];
+    }, [options, pinned, pinEnabled]);
+
     const filtered = useMemo(() => {
-        if (!search.trim()) return options;
+        if (!search.trim()) return ordered;
         const q = normalizeSearchText(search);
-        return options.filter(
+        return ordered.filter(
             (o) =>
                 normalizeSearchText(o.label).includes(q) ||
                 normalizeSearchText(o.value).includes(q)
         );
-    }, [options, search]);
+    }, [ordered, search]);
 
     const handleSelect = (value: string) => {
         lightImpact();
@@ -116,7 +135,7 @@ export function SingleSelectSheet({
                 onPress={() => handleSelect(item.value)}
                 style={[
                     styles.option,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: 'row' },
                     isActive && { backgroundColor: palette.chrome.common.primaryTint },
                 ]}
             >
@@ -187,7 +206,7 @@ export function SingleSelectSheet({
     );
     const sheetHeight = Math.max(
         Math.min(
-            scale(88) + insets.bottom + rowsHeight,
+            scale(88) + (searchEnabled ? scale(54) : 0) + insets.bottom + rowsHeight,
             Dimensions.get('window').height * 0.75,
         ),
         minHeight || scale(180),
@@ -203,6 +222,7 @@ export function SingleSelectSheet({
                 transparent
                 animationType="none"
                 statusBarTranslucent
+                navigationBarTranslucent
                 hardwareAccelerated
                 onRequestClose={onClose}
             >
@@ -216,6 +236,9 @@ export function SingleSelectSheet({
                         backdropComponent={renderBackdrop}
                         backgroundStyle={{ backgroundColor: palette.chrome.common.card }}
                         handleIndicatorStyle={{ backgroundColor: palette.brand.text.muted }}
+                        keyboardBehavior="extend"
+                        keyboardBlurBehavior="restore"
+                        android_keyboardInputMode="adjustResize"
                     >
                         <View style={styles.header}>
                             <Text
@@ -229,21 +252,50 @@ export function SingleSelectSheet({
                                 <X size={scale(20)} color={palette.brand.text.subtitle} />
                             </Pressable>
                         </View>
-                        <BottomSheetScrollView
+                        {searchEnabled && (
+                            <View
+                                style={[
+                                    styles.searchContainer,
+                                    { borderBottomColor: palette.brand.bg.border },
+                                ]}
+                            >
+                                <Search size={scale(16)} color={palette.brand.text.muted} />
+                                <BottomSheetTextInput
+                                    value={search}
+                                    onChangeText={setSearch}
+                                    placeholder={searchPlaceholder}
+                                    placeholderTextColor={palette.brand.text.muted}
+                                    style={[
+                                        styles.searchInput,
+                                        {
+                                            color: palette.brand.text.body,
+                                            fontFamily: searchFontFamily,
+                                            textAlign: isRTL ? 'right' : 'left',
+                                        },
+                                    ]}
+                                />
+                                {search.length > 0 && (
+                                    <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                                        <X size={scale(14)} color={palette.brand.text.muted} />
+                                    </Pressable>
+                                )}
+                            </View>
+                        )}
+                        <BottomSheetFlatList
+                            data={filtered}
+                            keyExtractor={(item: SelectOption) => item.value}
+                            renderItem={renderOption}
+                            ListEmptyComponent={emptyList}
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="handled"
+                            initialNumToRender={14}
+                            maxToRenderPerBatch={20}
+                            windowSize={7}
+                            removeClippedSubviews
                             contentContainerStyle={{
                                 paddingBottom: insets.bottom + scale(16),
                             }}
-                        >
-                            {filtered.length === 0
-                                ? emptyList
-                                : filtered.map((item) => (
-                                    <React.Fragment key={item.value}>
-                                        {renderOption({ item })}
-                                    </React.Fragment>
-                                ))}
-                        </BottomSheetScrollView>
+                        />
                     </BottomSheet>
                 </GestureHandlerRootView>
             </Modal>
@@ -261,6 +313,7 @@ export function SingleSelectSheet({
             transparent
             animationType="none"
             statusBarTranslucent
+            navigationBarTranslucent
             hardwareAccelerated
             onRequestClose={onClose}
         >
@@ -277,7 +330,7 @@ export function SingleSelectSheet({
                             {
                                 backgroundColor: palette.chrome.common.card,
                                 minHeight: Dimensions.get('window').height,
-                                paddingTop: insets.top + 18,
+                                paddingTop: insets.top + 6,
                             },
                         ]}
                     >
@@ -338,7 +391,9 @@ export function SingleSelectSheet({
                             showsVerticalScrollIndicator={false}
                             style={styles.drawerList}
                             keyboardShouldPersistTaps="handled"
-                            initialNumToRender={16}
+                            initialNumToRender={14}
+                            maxToRenderPerBatch={20}
+                            windowSize={7}
                             removeClippedSubviews
                             renderItem={renderOption}
                             ListEmptyComponent={emptyList}

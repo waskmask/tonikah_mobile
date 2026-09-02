@@ -2,6 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import { Config } from '@/constants/config';
 import { api } from '@/lib/api';
 import { ChatMessage } from '@/lib/chatService';
+import type { GalleryModerationUpdateEvent } from '@/hooks/useGalleryModeration';
 
 /**
  * Singleton chat socket. Previously every useChatSocket() call opened its own
@@ -24,6 +25,7 @@ export type ChatSocketHandlers = {
     onTyping?: (payload: any) => void;
     onStopTyping?: (payload: any) => void;
     onGalleryAccessChanged?: (payload: any) => void;
+    onGalleryModerationUpdated?: (payload: GalleryModerationUpdateEvent) => void;
 };
 
 type Subscriber = { handlers: () => ChatSocketHandlers };
@@ -99,6 +101,10 @@ async function ensureSocket() {
             setConnected(true);
         });
         nextSocket.on('disconnect', () => setConnected(false));
+        nextSocket.on('session:revoked', () => {
+            teardownSocket();
+            void api.handleUnauthorized();
+        });
         nextSocket.on('connect_error', async (error) => {
             setConnected(false);
             const message = String(error?.message || '');
@@ -174,6 +180,9 @@ async function ensureSocket() {
         };
         nextSocket.on('gallery:access:granted', forwardGalleryAccessChanged);
         nextSocket.on('gallery:access:revoked', forwardGalleryAccessChanged);
+        nextSocket.on('gallery:moderation-updated', (payload: GalleryModerationUpdateEvent) => {
+            broadcast((handlers) => handlers.onGalleryModerationUpdated?.(payload));
+        });
 
         nextSocket.on('chat:seen', (payload) => broadcast((handlers) => handlers.onSeen?.(payload)));
         nextSocket.on('chat:delivered', (payload) => broadcast((handlers) => handlers.onDelivered?.(payload)));

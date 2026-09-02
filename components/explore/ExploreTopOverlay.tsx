@@ -1,8 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text as RNText, TouchableOpacity, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CircleHelp, Menu, SlidersHorizontal } from 'lucide-react-native';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
+import { useTheme } from '@/hooks/useTheme';
 import { t } from '@/lib/profileDisplay';
 
 export function ExploreTopOverlay({
@@ -17,12 +19,27 @@ export function ExploreTopOverlay({
     onOpenMenu: () => void;
 }) {
     const colors = useColors();
-    const iconColor = colors.chrome.header.icon;
+    const { isDark } = useTheme();
+    // Light: dark icon on warm grey chip; dark: light icon on dark chip.
+    const iconColor = isDark ? '#E8E1D6' : '#201B15';
 
     return (
-        <View style={[styles.root, { backgroundColor: colors.chrome.header.background, borderBottomColor: colors.chrome.common.hairline }]}>
-            <TouchableOpacity activeOpacity={0.82} onPress={onOpenFilters} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={[styles.filterButton, { backgroundColor: colors.chrome.primary, borderColor: colors.chrome.primary, shadowColor: colors.chrome.primary }]}>
-                <SlidersHorizontal size={scale(17)} color={colors.chrome.common.inverseText} strokeWidth={2.5} />
+        // Warm screen color (not the white header token) so status bar, top bar
+        // and deck background read as one continuous surface on Explore
+        <View style={[styles.root, { backgroundColor: colors.chrome.explore.screen }]}>
+            <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={onOpenFilters}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                style={[styles.filterButton, { shadowColor: colors.chrome.primary }]}
+            >
+                <LinearGradient
+                    colors={[colors.brand.gradient.start, colors.brand.gradient.end]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                />
+                <SlidersHorizontal size={scale(13)} color={colors.chrome.common.inverseText} strokeWidth={2.5} />
                 <RNText style={[styles.filterText, { color: colors.chrome.common.inverseText }]}>{t('filters', 'Filters')}</RNText>
                 {filterCount > 0 ? (
                     <View style={styles.countBadge}>
@@ -32,10 +49,10 @@ export function ExploreTopOverlay({
             </TouchableOpacity>
             <View style={styles.actions}>
                 <IconButton onPress={onOpenTour}>
-                    <CircleHelp size={scale(20)} color={iconColor} strokeWidth={2.35} />
+                    <CircleHelp size={scale(15)} color={iconColor} strokeWidth={2.35} />
                 </IconButton>
                 <IconButton onPress={onOpenMenu}>
-                    <Menu size={scale(22)} color={iconColor} strokeWidth={2.55} />
+                    <Menu size={scale(15)} color={iconColor} strokeWidth={2.55} />
                 </IconButton>
             </View>
         </View>
@@ -43,31 +60,40 @@ export function ExploreTopOverlay({
 }
 
 function IconButton({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
-    const colors = useColors();
+    const { isDark } = useTheme();
+    const backgroundColor = isDark ? '#2C2925' : '#ECE6DE';
+
     return (
-        <Pressable
-            onPress={onPress}
-            // Visual size stays 34pt; hitSlop brings the touch target to ~44pt
-            hitSlop={6}
-            style={({ pressed }) => [
-                styles.button,
-                { backgroundColor: colors.chrome.header.iconBackground, borderColor: colors.brand.bg.border },
-                pressed && styles.pressed,
+        <View
+            style={[
+                styles.buttonShell,
+                { backgroundColor },
             ]}
         >
-            {children}
-        </Pressable>
+            <Pressable
+                onPress={onPress}
+                hitSlop={6}
+                style={({ pressed }) => [
+                    styles.button,
+                    { backgroundColor },
+                    pressed && styles.pressed,
+                ]}
+            >
+                {children}
+            </Pressable>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    // Status bar and this bar share one background now, so keep the row tight —
+    // a taller row reads as dead space under the status bar
     root: {
-        height: scale(50),
+        height: scale(42),
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(14),
-        borderBottomWidth: 1,
     },
     actions: {
         flexDirection: 'row',
@@ -79,7 +105,7 @@ const styles = StyleSheet.create({
         minWidth: scale(80),
         minHeight: scale(34),
         borderRadius: scale(18),
-        borderWidth: 1,
+        overflow: 'hidden',
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
@@ -97,18 +123,22 @@ const styles = StyleSheet.create({
         fontSize: scale(13),
         lineHeight: scale(16),
     },
-    button: {
+    buttonShell: {
         width: scale(34),
         height: scale(34),
         borderRadius: scale(17),
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        shadowColor: '#000000',
-        shadowOpacity: 0.08,
-        shadowRadius: scale(8),
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 2,
+    },
+    button: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        borderRadius: scale(17),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     pressed: {
         opacity: 0.78,

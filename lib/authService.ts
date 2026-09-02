@@ -9,6 +9,7 @@ export interface GoogleAuthRequest {
     lang?: string;
 }
 export interface RefreshRequest { refreshToken: string }
+export interface ChangeEmailRequest { newEmail: string; lang?: string }
 
 export interface User {
     _id: string;
@@ -83,6 +84,9 @@ export const authService = {
 
     resendVerification: (email: string, lang?: string): Promise<AuthResponse> =>
         api.post('/app-user/resend-verification', { email, ...(lang ? { lang } : {}) }),
+
+    requestEmailChange: (data: ChangeEmailRequest): Promise<AuthResponse> =>
+        api.post('/app-user/email/change/request', data),
 
     requestPasswordReset: (email: string): Promise<AuthResponse> =>
         api.post('/app-user/password/request-reset', { email }),

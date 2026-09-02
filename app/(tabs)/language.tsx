@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
+import { usePathname } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
-import { SectionCard } from '@/components/ui/SectionCard';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
@@ -29,6 +29,7 @@ function textValue(value: unknown, fallback: string) {
 
 export default function LanguageScreen() {
     const { currentLanguage, changeLanguage, t, isRTL } = useLanguage();
+    const pathname = usePathname();
     const colors = useColors();
     const primary = colors.chrome.primary;
     const [savingCode, setSavingCode] = useState<string | null>(null);
@@ -40,53 +41,63 @@ export default function LanguageScreen() {
     async function selectLanguage(code: string) {
         if (code === currentLanguage || savingCode) return;
         setSavingCode(code);
-        await changeLanguage(code);
+        await changeLanguage(code, pathname);
     }
 
     return (
         <View style={[styles.root, { backgroundColor: colors.brand.bg.surface }]}>
             <AppBackTitleBar title={textValue(t('language'), 'Language')} fallbackHref="/(tabs)/settings" />
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                <SectionCard>
-                    {LANGUAGES.map((language, index) => {
-                        const active = language.code === currentLanguage;
-                        const loading = savingCode === language.code;
-                        const label = textValue(t(language.key), language.fallback);
+                {LANGUAGES.map((language, index) => {
+                    const active = language.code === currentLanguage;
+                    const loading = savingCode === language.code;
+                    const label = textValue(t(language.key), language.fallback);
 
-                        return (
-                            <Pressable
-                                key={language.code}
-                                onPress={() => selectLanguage(language.code)}
-                                disabled={Boolean(savingCode)}
-                                style={({ pressed }) => [
-                                    styles.row,
-                                    index > 0 && { borderTopColor: borderColor, borderTopWidth: StyleSheet.hairlineWidth },
-                                    active && { backgroundColor: isRTL ? 'rgba(243,75,111,0.12)' : 'rgba(243,75,111,0.07)' },
-                                    pressed && !savingCode && styles.pressed,
-                                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    return (
+                        <Pressable
+                            key={language.code}
+                            accessibilityRole="radio"
+                            accessibilityLabel={label}
+                            accessibilityState={{ checked: active, disabled: Boolean(savingCode) }}
+                            onPress={() => selectLanguage(language.code)}
+                            disabled={Boolean(savingCode)}
+                            android_ripple={{ color: colors.chrome.common.primaryTint }}
+                            style={[
+                                styles.row,
+                                index > 0 && { borderTopColor: borderColor, borderTopWidth: StyleSheet.hairlineWidth },
+                                active && { backgroundColor: colors.chrome.common.primaryTint },
+                            ]}
+                        >
+                            <View
+                                pointerEvents="none"
+                                style={[
+                                    styles.checkCircle,
+                                    isRTL ? styles.checkCircleRtl : styles.checkCircleLtr,
+                                    active ? { borderColor: primary, backgroundColor: primary } : { borderColor },
                                 ]}
                             >
-                                <Text
-                                    variant="body"
-                                    className="font-body-semi"
-                                    style={[
-                                        styles.label,
-                                        { color: active ? primary : textColor, textAlign: isRTL ? 'right' : 'left' },
-                                    ]}
-                                >
-                                    {label}
-                                </Text>
-                                <View style={[styles.checkCircle, active ? { borderColor: primary, backgroundColor: primary } : { borderColor }]}>
-                                    {loading ? (
-                                        <ActivityIndicator size="small" color={active ? '#FFFFFF' : primary} />
-                                    ) : active ? (
-                                        <Check size={scale(13)} color="#FFFFFF" strokeWidth={3} />
-                                    ) : null}
-                                </View>
-                            </Pressable>
-                        );
-                    })}
-                </SectionCard>
+                                {loading ? (
+                                    <ActivityIndicator size="small" color={active ? '#FFFFFF' : primary} />
+                                ) : active ? (
+                                    <Check size={scale(13)} color="#FFFFFF" strokeWidth={3} />
+                                ) : null}
+                            </View>
+                            <Text
+                                pointerEvents="none"
+                                numberOfLines={1}
+                                variant="body"
+                                className="font-body-semi"
+                                style={[
+                                    styles.label,
+                                    isRTL ? styles.labelRtl : styles.labelLtr,
+                                    { color: active ? primary : textColor, textAlign: isRTL ? 'right' : 'left' },
+                                ]}
+                            >
+                                {label}
+                            </Text>
+                        </Pressable>
+                    );
+                })}
 
                 <Text variant="caption" style={[styles.helper, { color: mutedColor, textAlign: isRTL ? 'right' : 'left' }]}>
                     {textValue(t('language_reload_note'), 'The app reloads after changing language so layout and translations update correctly.')}
@@ -106,20 +117,28 @@ const styles = StyleSheet.create({
         paddingBottom: scale(32),
     },
     row: {
-        minHeight: scale(56),
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: scale(12),
-        paddingVertical: scale(12),
-        marginHorizontal: -space('xs'),
-        paddingHorizontal: space('sm'),
+        position: 'relative',
+        width: '100%',
+        height: scale(56),
+        borderRadius: scale(12),
     },
     label: {
-        flex: 1,
+        position: 'absolute',
+        top: scale(15),
         fontSize: scale(16),
         lineHeight: scale(21),
     },
+    labelLtr: {
+        left: scale(48),
+        right: space('sm'),
+    },
+    labelRtl: {
+        left: space('sm'),
+        right: scale(48),
+    },
     checkCircle: {
+        position: 'absolute',
+        top: scale(16),
         width: scale(24),
         height: scale(24),
         borderRadius: scale(12),
@@ -127,11 +146,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    checkCircleLtr: {
+        left: space('sm'),
+    },
+    checkCircleRtl: {
+        right: space('sm'),
+    },
     helper: {
         marginTop: space('sm'),
         paddingHorizontal: scale(4),
-    },
-    pressed: {
-        opacity: 0.72,
     },
 });

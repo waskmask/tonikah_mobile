@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,6 +15,8 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
 import { Ruler, Palette, Users2 } from 'lucide-react-native';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
@@ -64,9 +66,10 @@ export default function Step4() {
 
     const validate = (): boolean => {
         const e: Record<string, string> = {};
-        if (!height) e.height = 'Required';
-        if (!complexion) e.complexion = 'Required';
-        if (ethnicGroup.length === 0) e.ethnicGroup = 'Required';
+        const required = t('common:validation_required', { defaultValue: 'Required' });
+        if (!height) e.height = required;
+        if (!complexion) e.complexion = required;
+        if (ethnicGroup.length === 0) e.ethnicGroup = required;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -83,12 +86,14 @@ export default function Step4() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
+                // Keep the cached /me user in sync so reload resumes correctly
+                useAuthStore.getState().refreshUser().catch(() => { });
                 router.push('/(profile-setup)/step5');
             } else {
-                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
+                toast.show(apiMessage(res.message || 'server_error_default'), 'error');
             }
         } catch {
-            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
+            toast.show(apiMessage('server_error_default'), 'error');
         } finally {
             setLoading(false);
         }
@@ -129,7 +134,7 @@ export default function Step4() {
                     <SelectField required value={ethnicGroup.length > 0 ? ethnicGroup.map((e) => getLabel(e, ethnicOpts)).join(', ') : ''} placeholder={t('common:select_limit_2_ethnicity', { defaultValue: 'Select ethnic group (max 2)' })} onPress={() => setActiveSheet('ethnic')} icon={<Users2 size={scale(18)} color={iconColor} />} hasError={!!errors.ethnicGroup} />
                     {errors.ethnicGroup && <ErrorText text={errors.ethnicGroup} />}            </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} widthMode="full" height={40} textSize={15} /></View>
 
             <SingleSelectSheet visible={activeSheet === 'height'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setHeight(v); setErrors((e) => ({ ...e, height: '' })); }} options={heightOpts} selected={height} title={t('common:height', { defaultValue: 'Height' })} searchEnabled />
             <SingleSelectSheet visible={activeSheet === 'complexion'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setComplexion(v); setErrors((e) => ({ ...e, complexion: '' })); }} options={complexionOpts} selected={complexion} title={t('common:complexion', { defaultValue: 'Complexion' })} />

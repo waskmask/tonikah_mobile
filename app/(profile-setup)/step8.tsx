@@ -15,6 +15,8 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
 import { LocateFixed } from 'lucide-react-native';
 
 type PlaceDetails = {
@@ -237,12 +239,14 @@ export default function Step8() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
+                // Keep the cached /me user in sync so reload resumes correctly
+                useAuthStore.getState().refreshUser().catch(() => { });
                 router.push('/(profile-setup)/step9');
             } else {
-                Alert.alert(t('error', { defaultValue: 'Error' }), res.message || t('server_error_default', { defaultValue: 'Failed to update' }));
+                toast.show(res.message || t('server_error_default', { defaultValue: 'Failed to update' }), 'error');
             }
         } catch {
-            Alert.alert(t('error', { defaultValue: 'Error' }), t('network_error', { defaultValue: 'Network error' }));
+            toast.show(t('network_error', { defaultValue: 'Network error' }), 'error');
         } finally {
             setLoading(false);
         }
@@ -295,7 +299,7 @@ export default function Step8() {
                     {errors.city ? <ErrorText text={errors.city} /> : null}
             </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} widthMode="full" height={40} textSize={15} /></View>
         </SafeAreaView>
     );
 }

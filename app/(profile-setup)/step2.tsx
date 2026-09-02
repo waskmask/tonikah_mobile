@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -15,7 +15,9 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
-import { Languages, BookOpenCheck, MessageCircle, Shirt } from 'lucide-react-native';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
+import { Languages, Mic, ShieldCheck, Shirt } from 'lucide-react-native';
 import { LANGUAGE_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
@@ -65,11 +67,12 @@ export default function Step2() {
     ];
 
     const validate = (): boolean => {
+        const required = t('common:validation_required', { defaultValue: 'Required' });
         const e: Record<string, string> = {};
-        if (!motherTongue) e.motherTongue = 'Required';
-        if (!bornMuslim) e.bornMuslim = 'Required';
-        if (languagesSpoken.length === 0) e.languagesSpoken = 'Required';
-        if (isFemale && !dress) e.dress = 'Required';
+        if (!motherTongue) e.motherTongue = required;
+        if (!bornMuslim) e.bornMuslim = required;
+        if (languagesSpoken.length === 0) e.languagesSpoken = required;
+        if (isFemale && !dress) e.dress = required;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -88,12 +91,14 @@ export default function Step2() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
+                // Keep the cached /me user in sync so reload resumes correctly
+                useAuthStore.getState().refreshUser().catch(() => { });
                 router.push('/(profile-setup)/step3');
             } else {
-                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
+                toast.show(apiMessage(res.message || 'server_error_default'), 'error');
             }
         } catch {
-            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
+            toast.show(apiMessage('server_error_default'), 'error');
         } finally {
             setLoading(false);
         }
@@ -123,13 +128,13 @@ export default function Step2() {
                         subtitle={t('common:step_2.subtitle', { defaultValue: 'Tell us more about your cultural identity, language skills, and preferences.' })}
                     />
 
-                    <SelectField required value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder={t('common:step_2.mother_tongue', { defaultValue: 'Mother Tongue' })} onPress={() => setShowMotherTongueSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
+                    <SelectField required value={motherTongue ? getLabel(motherTongue, languageOptions) : ''} placeholder={t('common:step_2.mother_tongue', { defaultValue: 'Mother Tongue' })} onPress={() => setShowMotherTongueSheet(true)} icon={<Mic size={scale(18)} color={iconColor} />} hasError={!!errors.motherTongue} />
                     {errors.motherTongue && <ErrorText text={errors.motherTongue} />}
 
-                    <SelectField required value={bornMuslim ? getLabel(bornMuslim, bornMuslimOptions) : ''} placeholder={t('common:step_2.born_muslim', { defaultValue: 'Born Muslim?' })} onPress={() => setShowBornMuslimSheet(true)} icon={<BookOpenCheck size={scale(18)} color={iconColor} />} hasError={!!errors.bornMuslim} />
+                    <SelectField required value={bornMuslim ? getLabel(bornMuslim, bornMuslimOptions) : ''} placeholder={t('common:step_2.born_muslim', { defaultValue: 'Born Muslim?' })} onPress={() => setShowBornMuslimSheet(true)} icon={<ShieldCheck size={scale(18)} color={iconColor} />} hasError={!!errors.bornMuslim} />
                     {errors.bornMuslim && <ErrorText text={errors.bornMuslim} />}
 
-                    <SelectField required value={languagesSpoken.length > 0 ? languagesSpoken.map((l) => getLabel(l, languageOptions)).join(', ') : ''} placeholder={t('common:select_limit_5_languages', { defaultValue: 'Select languages (max 5)' })} onPress={() => setShowLanguagesSheet(true)} icon={<MessageCircle size={scale(18)} color={iconColor} />} hasError={!!errors.languagesSpoken} />
+                    <SelectField required value={languagesSpoken.length > 0 ? languagesSpoken.map((l) => getLabel(l, languageOptions)).join(', ') : ''} placeholder={t('common:select_limit_5_languages', { defaultValue: 'Select languages (max 5)' })} onPress={() => setShowLanguagesSheet(true)} icon={<Languages size={scale(18)} color={iconColor} />} hasError={!!errors.languagesSpoken} />
                     {errors.languagesSpoken && <ErrorText text={errors.languagesSpoken} />}
 
                     {isFemale && (
@@ -139,7 +144,7 @@ export default function Step2() {
                         </>
                     )}            </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('common:continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} widthMode="full" height={40} textSize={15} /></View>
 
             <SingleSelectSheet visible={showMotherTongueSheet} onClose={() => setShowMotherTongueSheet(false)} onSelect={(v) => { setMotherTongue(v); setErrors((e) => ({ ...e, motherTongue: '' })); }} options={languageOptions} selected={motherTongue} title={t('common:step_2.mother_tongue', { defaultValue: 'Mother Tongue' })} searchEnabled />
             <SingleSelectSheet visible={showBornMuslimSheet} onClose={() => setShowBornMuslimSheet(false)} onSelect={(v) => { setBornMuslim(v); setErrors((e) => ({ ...e, bornMuslim: '' })); }} options={bornMuslimOptions} selected={bornMuslim} title={t('common:step_2.born_muslim', { defaultValue: 'Born Muslim?' })} />

@@ -1,4 +1,7 @@
 {
+  "validation_required": "Обязательно",
+  "validation_max_16_chars": "Максимум 16 символов",
+  "validation_letters_only": "Только буквы и пробелы",
   "onboarding": {
     "start": "Start",
     "next": "Next",
@@ -406,6 +409,9 @@
   "signup_button": "Зарегистрироваться заново",
   "continue": "продолжить",
   "reset_email_sent_if_exists": "Если этот email зарегистрирован, отправлена ссылка для сброса пароля.",
+  "reset_check_email_title": "Проверьте почту",
+  "resend_reset_link": "Не получили письмо? Отправить снова",
+  "resend_cooldown_in": "Отправить снова через {{seconds}} с",
   "reset_request_failed": "Не удалось запросить сброс пароля. Попробуйте снова.",
   "email_not_found": "Аккаунт с этим email не найден.",
   "already_have_an_account": "Уже есть аккаунт?",
@@ -1101,7 +1107,7 @@
   "education_required": "Пожалуйста, выберите образование.",
   "occupation_required": "Пожалуйста, выберите род занятий.",
   "designation_required": "Пожалуйста, выберите должность.",
-  "company_too_long": "Название компании не должно превышать 30 символов.",
+  "company_too_long": "Название компании не должно превышать 50 символов.",
   "annual_income_invalid": "Введите корректную сумму годового дохода.",
   "no_data_ocu": "Нет данных по роду занятий.",
   "religious_title": "Религиозные убеждения и практика",
@@ -1235,6 +1241,13 @@
   "relative": "Родственник",
   "friend": "Друг",
   "profile_manager": "Кто ведёт профиль",
+  "pm_self_desc": "Этот профиль для меня, и я управляю им сам.",
+  "pm_father_desc": "Я отец человека, для которого создаётся этот профиль.",
+  "pm_mother_desc": "Я мать человека, для которого создаётся этот профиль.",
+  "pm_brother_desc": "Я брат человека, для которого создаётся этот профиль.",
+  "pm_sister_desc": "Я сестра человека, для которого создаётся этот профиль.",
+  "pm_relative_desc": "Я родственник человека, для которого создаётся этот профиль.",
+  "pm_friend_desc": "Я друг человека, для которого создаётся этот профиль.",
   "finish": "Завершить",
   "pm_placeholder": "Кто ведёт этот профиль?",
   "profile_manager_required": "Пожалуйста, укажите, кто управляет профилем.",
@@ -1567,6 +1580,8 @@
   "reauth_verification_failed": "Ошибка проверки повторной авторизации",
   "create_password_failed": "Не удалось создать пароль",
   "change_email": "Сменить email",
+  "change_email_short": "Сменить email",
+  "resend_email": "Отправить повторно",
   "update_email": "Обновить email",
   "email_same_as_current": "Этот email уже привязан к вашему аккаунту.",
   "change_email_verification_sent": "Мы отправили ссылку подтверждения на ваш новый email. Проверьте почту, чтобы подтвердить смену.",
@@ -2389,6 +2404,8 @@
   "done": "Готово",
   "no_results_found": "Результаты не найдены",
   "camera_permission_required": "Требуется разрешение на использование камеры.",
+  "take_photo": "Сделать фото",
+  "choose_from_gallery": "Выбрать из галереи",
   "profile.location_edit_from_device": "Для изменения местоположения будет использоваться геолокация вашего устройства. Мы откроем это в отдельном экране редактирования.",
   "data_privacy": "Конфиденциальность данных",
   "download_my_data": "Скачать мои данные",
@@ -2445,5 +2462,116 @@
   "notifications": "Уведомления",
   "badge_verified": "Подтверждён",
   "badge_member": "Участник",
-  "badge_private_gallery": "Приватная галерея"
+  "badge_private_gallery": "Приватная галерея",
+  "moderation_text_warning_title_bio": "Био требует проверки",
+  "moderation_text_warning_title_headline": "Заголовок требует проверки",
+  "moderation_text_warning_title_company": "Компания требует проверки",
+  "moderation_text_warning_title_partner_about": "Текст о партнере требует проверки",
+  "moderation_text_warning_body": "Мы обнаружили то, что может потребовать проверки человеком перед показом в вашем профиле.",
+  "moderation_text_detected": "Обнаружено",
+  "moderation_text_edit_field": "Изменить {field}",
+  "moderation_text_submit_anyway": "Все равно отправить на проверку",
+  "moderation_text_under_review": "На проверке",
+  "moderation_text_under_review_hint": "Это обновление ожидает проверки. Другие пользователи будут видеть ваш предыдущий одобренный текст, пока новый не будет одобрен.",
+  "moderation_issue_contact_info": "Контактная информация",
+  "moderation_issue_social_handle": "Социальный профиль или ссылка",
+  "moderation_issue_inappropriate": "Неподходящий контент",
+  "moderation_issue_racist": "Расистский контент",
+  "moderation_issue_offensive": "Оскорбительный контент",
+  "moderation_issue_non_professional_company": "Неясное или непрофессиональное название компании",
+  "moderation_issue_needs_review": "Требуется проверка человеком",
+  "moderation_submit_anyway_success": "Отправлено на проверку.",
+  "private_gallery_requires_image": "Загрузите хотя бы одну фотографию, прежде чем сделать галерею приватной.",
+  "media_guidelines_title": "Выберите чёткие фотографии",
+  "media_guidelines_intro": "Загрузите чёткие фотографии себя. Для использования приложения требуется хотя бы одна фотография. Фотографии проверяются до того, как их увидят другие пользователи.",
+  "media_guidelines_good_title": "Подходящие фотографии профиля",
+  "media_guidelines_bad_title": "Фотографии, которые мы не можем одобрить",
+  "media_guidelines_private_title": "Сделайте галерею приватной",
+  "media_guidelines_private_message": "Вы можете скрыть фотографии и показать их только после начала разговора.",
+  "media_guidelines_understand": "Понятно",
+  "media_guidelines_reopen": "Посмотреть правила для фотографий",
+  "media_guidelines_sample_alt": "Пример фотографии профиля {number}",
+  "media_guidelines_sample_pending": "Пример изображения появится здесь",
+  "image_moderation_nsfw": "Сексуальный или откровенный контент",
+  "image_moderation_no_human": "Человек не обнаружен",
+  "image_moderation_hateful_text": "Расистский текст или язык ненависти",
+  "image_moderation_contact_info": "Контактные данные или QR-код",
+  "image_moderation_presentation_mismatch": "Фотография может не соответствовать полу в профиле",
+  "image_moderation_checking": "Проверяем фото",
+  "image_moderation_checking_hint": "Выполняется автоматическая проверка безопасности. Обычно это занимает несколько секунд.",
+  "image_moderation_pending_hint": "Эта фотография ожидает проверки и скрыта от других пользователей.",
+  "image_moderation_submitted_review": "Фотография отправлена на проверку.",
+  "image_moderation_approved_toast": "Фото одобрено и теперь отображается в вашем профиле.",
+  "image_moderation_review_toast": "Фото требует ручной проверки и остаётся скрытым от других пользователей.",
+  "image_moderation_warning_title": "Фотография требует проверки",
+  "image_moderation_warning_body": "Мы обнаружили то, что может потребовать проверки до появления фотографии в вашем профиле.",
+  "image_moderation_choose_another": "Выбрать другую",
+  "image_moderation_submit_review": "Отправить на проверку",
+  "image_moderation_excessive_body_exposure": "Откровенное фото или фото без рубашки",
+  "image_moderation_unavailable": "Автоматическая проверка недоступна",
+  "image_moderation_needs_review": "Требуется проверка человеком",
+  "image_moderation_presentation_uncertain": "Не удалось подтвердить подходящего человека",
+  "qualified_photo_required": "Для отправки сообщений нужна одобренная фотография профиля.",
+  "qualified_photo_required_title": "Добавьте одобренную фотографию профиля",
+  "qualified_photo_required_message": "Вы можете просматривать профили и читать чаты, но для отправки сообщений нужна хотя бы одна одобренная фотография себя.",
+  "add_profile_photo": "Добавить фото профиля",
+  "profile_photo_required": "Добавьте хотя бы одну фотографию профиля, чтобы продолжить.",
+  "bio_too_short": "Расскажите о себе немного подробнее.",
+  "checkout_open_failed": "Не удалось открыть безопасную оплату. Попробуйте снова.",
+  "delete_photo": "Удалить фото",
+  "make_primary": "Сделать главным",
+  "secure_checkout": "Безопасная оплата",
+  "upload_images_to_profile": "Загрузите изображения в свой профиль",
+  "explore_location_required_title": "Для Explore требуется ваше местоположение",
+  "explore_location_permission_denied": "Разрешите доступ к местоположению в настройках, чтобы находить подходящие профили.",
+  "explore_location_services_disabled": "Включите службы геолокации устройства, чтобы пользоваться Explore.",
+  "explore_location_unavailable": "Не удалось определить текущее местоположение. Выйдите на открытое место и попробуйте снова.",
+  "explore_location_network_error": "Не удалось проверить местоположение. Проверьте подключение и попробуйте снова.",
+  "open_settings": "Открыть настройки",
+  "image_moderation_rejected_toast": "Фото отклонено и удалено из вашей галереи."
+  ,"checkout_untrusted_url": "Безопасная оплата вернула недопустимый адрес."
+  ,"membership_refresh_failed": "Не удалось обновить статус подписки. Повторите попытку."
+  ,"refreshing_membership": "Обновление подписки..."
+  ,"payment_may_be_processing": "Платёж может ещё обрабатываться. Обновите статус перед новой оплатой."
+  ,"refresh_membership": "Обновить подписку"
+  ,"choose_payment_method": "Выберите способ оплаты"
+  ,"pay_with_app_store": "Оплатить через App Store"
+  ,"pay_with_google_play": "Оплатить через Google Play"
+  ,"pay_with_card": "Оплатить картой"
+  ,"app_store_payment_description": "Используйте учётную запись Apple и способ оплаты App Store."
+  ,"google_play_payment_description": "Используйте учётную запись Google и способ оплаты Google Play."
+  ,"card_payment_description": "Продолжите в браузере через безопасную веб-оплату."
+  ,"payment_choice_ios_note": "Покупки в App Store обрабатывает Apple. Оплата картой открывает безопасную веб-страницу."
+  ,"payment_choice_android_note": "Покупки в Google Play обрабатывает Google. Оплата картой открывает безопасную веб-страницу."
+  ,"processing_payment": "Обработка платежа..."
+  ,"membership_purchase_success": "Ваша подписка активна."
+  ,"payment_not_completed": "Платёж не завершён"
+  ,"native_purchase_failed": "Покупку пока не удалось подтвердить. Проверьте статус подписки перед повторной попыткой или обратитесь в поддержку."
+  ,"restore_purchases": "Восстановить покупки"
+  ,"restoring_purchases": "Восстановление покупок..."
+  ,"purchases_restored": "Ваша подписка восстановлена."
+  ,"no_purchases_to_restore": "Активная покупка подписки не найдена."
+  ,"restore_purchases_failed": "Не удалось восстановить покупки. Повторите попытку позже."
+  ,"payment_pending_store": "Платёж в магазине ожидает подтверждения. Подписка активируется после подтверждения."
+  ,"error_gift_redeem_failed": "Не удалось активировать подарочную карту. Повторите попытку."
+  ,"error_too_many_attempts": "Слишком много попыток. Попробуйте позже."
+  ,"free": "Бесплатно"
+  ,"gift_card_code_label": "Код подарочной карты"
+  ,"gift_card_helper": "Введите код подарочной карты и 4-значный PIN-код."
+  ,"gift_card_pin_label": "4-значный PIN-код"
+  ,"gift_card_processing": "Подарочная карта принята. Подписка активируется."
+  ,"gift_code_invalid_length": "Введите 8-символьный код подарочной карты."
+  ,"gift_pin_invalid_length": "Введите 4-значный PIN-код подарочной карты."
+  ,"gift_redeemed_success": "Подарочная карта активирована. Ваша подписка активна."
+  ,"history_load_failed": "Не удалось загрузить историю подписки."
+  ,"loading_payment_options": "Загрузка способов оплаты..."
+  ,"membership_ends": "Окончание"
+  ,"membership_history": "История подписки"
+  ,"membership_history_description": "Ваши покупки и награды подписки."
+  ,"no_membership_history": "Истории подписки пока нет"
+  ,"no_membership_history_description": "Покупки, подарочные карты, пробные периоды и выдачи администратора появятся здесь."
+  ,"payment_not_available_region": "Этот план пока недоступен для покупки в вашем регионе."
+  ,"payment_options_unavailable": "Не удалось загрузить способы оплаты. Потяните вниз, чтобы повторить попытку."
+  ,"redeem_gift_card": "Активировать подарочную карту"
+  ,"redeeming_gift_card": "Активация..."
 }

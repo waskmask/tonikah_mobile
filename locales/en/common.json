@@ -1,4 +1,7 @@
 {
+  "validation_required": "Required",
+  "validation_max_16_chars": "Max 16 characters",
+  "validation_letters_only": "Only letters and spaces",
   "onboarding": {
     "start": "Start",
     "next": "Next",
@@ -594,6 +597,9 @@
   "signup_button": "Signup Again",
   "continue": "Continue",
   "reset_email_sent_if_exists": "If this email is registered, a password reset link has been sent.",
+  "reset_check_email_title": "Check your email",
+  "resend_reset_link": "Didn't receive the email? Resend",
+  "resend_cooldown_in": "Resend in {{seconds}}s",
   "reset_request_failed": "Could not request password reset. Please try again.",
   "email_not_found": "No account found with this email.",
   "already_have_an_account": "Already have an account?",
@@ -1288,7 +1294,7 @@
   "education_required": "Please select your education.",
   "occupation_required": "Please select your occupation.",
   "designation_required": "Please select your work title.",
-  "company_too_long": "Company name must be 30 characters or less.",
+  "company_too_long": "Company name must be 50 characters or less.",
   "annual_income_invalid": "Please enter a valid annual income amount.",
   "no_data_ocu": "No Occupation data available.",
   "religious_title": "Religious Beliefs and Practices",
@@ -1422,6 +1428,13 @@
   "relative": "Relative",
   "friend": "Friend",
   "profile_manager": "Profile manager",
+  "pm_self_desc": "This profile is for me and I manage it myself.",
+  "pm_father_desc": "I'm the father of the person this profile is for.",
+  "pm_mother_desc": "I'm the mother of the person this profile is for.",
+  "pm_brother_desc": "I'm the brother of the person this profile is for.",
+  "pm_sister_desc": "I'm the sister of the person this profile is for.",
+  "pm_relative_desc": "I'm a relative of the person this profile is for.",
+  "pm_friend_desc": "I'm a friend of the person this profile is for.",
   "finish": "Finish",
   "pm_placeholder": "Who is operating this profile?",
   "profile_manager_required": "Please select who is managing this profile.",
@@ -1754,6 +1767,8 @@
   "reauth_verification_failed": "Re-authentication verification failed",
   "create_password_failed": "Failed to create password",
   "change_email": "Change Email Address",
+  "change_email_short": "Change Email",
+  "resend_email": "Resend Email",
   "update_email": "Update Email Address",
   "email_same_as_current": "This email address is already linked to your account.",
   "change_email_verification_sent": "We’ve sent a verification link to your new email address. Please check your inbox to confirm the change.",
@@ -2389,6 +2404,8 @@
   "done": "Done",
   "no_results_found": "No results found",
   "camera_permission_required": "Camera permission is required.",
+  "take_photo": "Take a photo",
+  "choose_from_gallery": "Choose from gallery",
   "profile.location_edit_from_device": "Location editing will use your device location. We will open this as a dedicated edit screen.",
   "data_privacy": "Data privacy",
   "download_my_data": "Download my data",
@@ -2445,5 +2462,116 @@
   "notifications": "Notifications",
   "badge_verified": "Verified",
   "badge_member": "Member",
-  "badge_private_gallery": "Private gallery"
+  "badge_private_gallery": "Private gallery",
+  "moderation_text_warning_title_bio": "Bio needs review",
+  "moderation_text_warning_title_headline": "Headline needs review",
+  "moderation_text_warning_title_company": "Company needs review",
+  "moderation_text_warning_title_partner_about": "Partner about needs review",
+  "moderation_text_warning_body": "We found something that may need a human review before it appears on your profile.",
+  "moderation_text_detected": "Detected",
+  "moderation_text_edit_field": "Edit {field}",
+  "moderation_text_submit_anyway": "Submit anyway for review",
+  "moderation_text_under_review": "Under review",
+  "moderation_text_under_review_hint": "This update is waiting for review. Other users will see your previous approved text until it is approved.",
+  "moderation_issue_contact_info": "Contact information",
+  "moderation_issue_social_handle": "Social handle or link",
+  "moderation_issue_inappropriate": "Inappropriate content",
+  "moderation_issue_racist": "Racist content",
+  "moderation_issue_offensive": "Offensive content",
+  "moderation_issue_non_professional_company": "Unclear or non-professional company name",
+  "moderation_issue_needs_review": "Needs human review",
+  "moderation_submit_anyway_success": "Submitted for review.",
+  "private_gallery_requires_image": "Upload at least one photo before making your gallery private.",
+  "media_guidelines_title": "Choose clear images",
+  "media_guidelines_intro": "Upload clear images of yourself. At least one image is required to use the app. Images are checked before other members can see them.",
+  "media_guidelines_good_title": "Good profile photos",
+  "media_guidelines_bad_title": "Photos we cannot approve",
+  "media_guidelines_private_title": "Keep your gallery private",
+  "media_guidelines_private_message": "You can hide your photos and reveal them only after you start a conversation with someone.",
+  "media_guidelines_understand": "I understand",
+  "media_guidelines_reopen": "View photo guidelines",
+  "media_guidelines_sample_alt": "Example profile photo {number}",
+  "media_guidelines_sample_pending": "Sample image will appear here",
+  "image_moderation_nsfw": "Sexual or explicit content",
+  "image_moderation_no_human": "No person detected",
+  "image_moderation_hateful_text": "Racist or hateful text",
+  "image_moderation_contact_info": "Contact information or QR code",
+  "image_moderation_presentation_mismatch": "Photo may not match profile gender",
+  "image_moderation_checking": "Checking photo",
+  "image_moderation_checking_hint": "Automatic safety check in progress. This usually takes a few seconds.",
+  "image_moderation_pending_hint": "This photo is waiting for review and is hidden from other members.",
+  "image_moderation_submitted_review": "Photo submitted for review.",
+  "image_moderation_approved_toast": "Photo approved and now visible on your profile.",
+  "image_moderation_review_toast": "Photo needs human review and remains hidden from other members.",
+  "image_moderation_warning_title": "Photo needs review",
+  "image_moderation_warning_body": "We found something that may need a human review before this photo appears on your profile.",
+  "image_moderation_choose_another": "Choose another",
+  "image_moderation_submit_review": "Submit for review",
+  "image_moderation_excessive_body_exposure": "Revealing or shirtless photo",
+  "image_moderation_unavailable": "Automatic check unavailable",
+  "image_moderation_needs_review": "Needs human review",
+  "image_moderation_presentation_uncertain": "A matching person could not be confirmed",
+  "qualified_photo_required": "An approved profile photo is required to send messages.",
+  "qualified_photo_required_title": "Add an approved profile photo",
+  "qualified_photo_required_message": "You can browse profiles and read chats, but you need at least one approved photo of yourself before you can send a message.",
+  "add_profile_photo": "Add profile photo",
+  "profile_photo_required": "Add at least one profile photo to continue.",
+  "bio_too_short": "Please write a little more about yourself.",
+  "checkout_open_failed": "Could not open secure checkout. Please try again.",
+  "delete_photo": "Delete photo",
+  "make_primary": "Make primary",
+  "secure_checkout": "Secure checkout",
+  "upload_images_to_profile": "Upload images to your profile",
+  "explore_location_required_title": "Location is needed for Explore",
+  "explore_location_permission_denied": "Allow location access in Settings to discover relevant profiles.",
+  "explore_location_services_disabled": "Turn on device location services to use Explore.",
+  "explore_location_unavailable": "We could not get your current location. Move to an open area and try again.",
+  "explore_location_network_error": "We could not verify your location. Check your connection and try again.",
+  "open_settings": "Open Settings",
+  "image_moderation_rejected_toast": "Photo rejected and removed from your gallery."
+  ,"checkout_untrusted_url": "Secure checkout returned an invalid address."
+  ,"membership_refresh_failed": "Could not refresh membership. Try again."
+  ,"refreshing_membership": "Refreshing membership..."
+  ,"payment_may_be_processing": "Payment may still be processing. Refresh before starting another checkout."
+  ,"refresh_membership": "Refresh membership"
+  ,"choose_payment_method": "Choose how to pay"
+  ,"pay_with_app_store": "Pay with App Store"
+  ,"pay_with_google_play": "Pay with Google Play"
+  ,"pay_with_card": "Pay with card"
+  ,"app_store_payment_description": "Use your Apple account and App Store payment method."
+  ,"google_play_payment_description": "Use your Google account and Play payment method."
+  ,"card_payment_description": "Continue in your browser with secure web checkout."
+  ,"payment_choice_ios_note": "App Store purchases are handled by Apple. Card payments open secure web checkout."
+  ,"payment_choice_android_note": "Google Play purchases are handled by Google. Card payments open secure web checkout."
+  ,"processing_payment": "Processing payment..."
+  ,"membership_purchase_success": "Your membership is active."
+  ,"payment_not_completed": "Payment not completed"
+  ,"native_purchase_failed": "We could not confirm this purchase yet. Check your membership before trying again, or contact support."
+  ,"restore_purchases": "Restore purchases"
+  ,"restoring_purchases": "Restoring purchases..."
+  ,"purchases_restored": "Your membership has been restored."
+  ,"no_purchases_to_restore": "No active membership purchase was found."
+  ,"restore_purchases_failed": "Purchases could not be restored. Please try again later."
+  ,"payment_pending_store": "Your store payment is pending. Membership activates after confirmation."
+  ,"error_gift_redeem_failed": "Could not redeem the gift card. Please try again."
+  ,"error_too_many_attempts": "Too many attempts. Please try again later."
+  ,"free": "Free"
+  ,"gift_card_code_label": "Gift card code"
+  ,"gift_card_helper": "Enter the gift card code and 4-digit PIN."
+  ,"gift_card_pin_label": "4-digit PIN"
+  ,"gift_card_processing": "Gift card accepted. Membership activation is processing."
+  ,"gift_code_invalid_length": "Enter the 8-character gift card code."
+  ,"gift_pin_invalid_length": "Enter the 4-digit gift card PIN."
+  ,"gift_redeemed_success": "Gift card redeemed. Your membership is active."
+  ,"history_load_failed": "Could not load membership history."
+  ,"loading_payment_options": "Loading payment options..."
+  ,"membership_ends": "Ends"
+  ,"membership_history": "Membership history"
+  ,"membership_history_description": "Your membership purchases and rewards."
+  ,"no_membership_history": "No membership history yet"
+  ,"no_membership_history_description": "Purchases, gift cards, trials, and admin grants will appear here."
+  ,"payment_not_available_region": "This plan is not available for purchase in your region yet."
+  ,"payment_options_unavailable": "Payment options could not be loaded. Pull down to try again."
+  ,"redeem_gift_card": "Redeem gift card"
+  ,"redeeming_gift_card": "Redeeming..."
 }

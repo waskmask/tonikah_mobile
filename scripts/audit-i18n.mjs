@@ -64,6 +64,7 @@ function resolveKey(key) {
 }
 
 const missingInEn = [...used].filter((k) => !resolveKey(k)).sort();
+let hasErrors = missingInEn.length > 0;
 
 console.log("=== USED KEYS", used.size);
 console.log("=== MISSING IN EN", missingInEn.length);
@@ -77,11 +78,13 @@ for (const ns of namespaces) {
     const p = path.join(root, "locales", lang, `${ns}.json`);
     if (!fs.existsSync(p)) {
       console.log(`${lang}: FILE MISSING`);
+      hasErrors = true;
       continue;
     }
     const lf = flat(readJson(p));
     const missing = enKeys.filter((k) => !(k in lf));
     const extra = Object.keys(lf).filter((k) => !(k in enByNs[ns]));
+    if (missing.length > 0 || extra.length > 0) hasErrors = true;
     console.log(`${lang}: missing ${missing.length}, extra ${extra.length}`);
     if (missing.length > 0 && missing.length <= 30) {
       missing.forEach((k) => console.log(`  - ${k}`));
@@ -105,3 +108,5 @@ Object.entries(prefixCount)
   .sort((a, b) => b[1] - a[1])
   .slice(0, 20)
   .forEach(([p, c]) => console.log(`${p}: ${c}`));
+
+if (hasErrors) process.exitCode = 1;

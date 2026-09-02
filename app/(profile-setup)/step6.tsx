@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,7 +14,10 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
-import { BookOpen, Landmark, Star, Sparkles, HandHeart } from 'lucide-react-native';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
+import { BookOpen, Compass, Signpost, MoonStar } from 'lucide-react-native';
+import { Mosque } from '@/components/ui/icons/Mosque';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
 
@@ -134,10 +137,11 @@ export default function Step6() {
 
     const validate = (): boolean => {
         const e: Record<string, string> = {};
-        if (!sect) e.sect = 'Required';
-        if (!maslak) e.maslak = 'Required';
-        if (!isPractising) e.isPractising = 'Required';
-        if (!prayers) e.prayers = 'Required';
+        const required = t('common:validation_required', { defaultValue: 'Required' });
+        if (!sect) e.sect = required;
+        if (!maslak) e.maslak = required;
+        if (!isPractising) e.isPractising = required;
+        if (!prayers) e.prayers = required;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -157,12 +161,14 @@ export default function Step6() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
+                // Keep the cached /me user in sync so reload resumes correctly
+                useAuthStore.getState().refreshUser().catch(() => { });
                 router.push('/(profile-setup)/step7');
             } else {
-                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
+                toast.show(apiMessage(res.message || 'server_error_default'), 'error');
             }
         } catch {
-            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
+            toast.show(apiMessage('server_error_default'), 'error');
         } finally {
             setLoading(false);
         }
@@ -193,21 +199,29 @@ export default function Step6() {
                     <SelectField required value={sect ? getLabel(sect, sectOpts) : ''} placeholder={t('select_sect', { defaultValue: 'Select sect' })} onPress={() => setActiveSheet('sect')} icon={<BookOpen size={scale(18)} color={iconColor} />} hasError={!!errors.sect} />
                     {errors.sect && <ErrorText text={errors.sect} />}
 
-                    <SelectField required value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder={t('maslak', { defaultValue: 'Maslak' })} onPress={() => setActiveSheet('maslak')} icon={<Landmark size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
-                    {errors.maslak && <ErrorText text={errors.maslak} />}
+                    {!!sect && (
+                        <>
+                            <SelectField required value={maslak ? getLabel(maslak, maslakOpts) : ''} placeholder={t('maslak', { defaultValue: 'Maslak' })} onPress={() => setActiveSheet('maslak')} icon={<Compass size={scale(18)} color={iconColor} />} hasError={!!errors.maslak} />
+                            {errors.maslak && <ErrorText text={errors.maslak} />}
+                        </>
+                    )}
 
-                    <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder={t('following', { defaultValue: 'Following' })} onPress={() => setActiveSheet('following')} icon={<Star size={scale(18)} color={iconColor} />} />
+                    {!!maslak && (
+                        <>
+                            <SelectField value={following ? getLabel(following, followingOpts) : ''} placeholder={t('following', { defaultValue: 'Following' })} onPress={() => setActiveSheet('following')} icon={<Signpost size={scale(18)} color={iconColor} />} />
 
-                    <SelectField required value={isPractising ? getLabel(isPractising, practisingOptions) : ''} placeholder={t('practising_label', { defaultValue: 'Practising Level' })} onPress={() => setActiveSheet('practising')} icon={<Sparkles size={scale(18)} color={iconColor} />} hasError={!!errors.isPractising} />
-                    {errors.isPractising && <ErrorText text={errors.isPractising} />}
+                            <SelectField required value={isPractising ? getLabel(isPractising, practisingOptions) : ''} placeholder={t('practising_label', { defaultValue: 'Practising Level' })} onPress={() => setActiveSheet('practising')} icon={<MoonStar size={scale(18)} color={iconColor} />} hasError={!!errors.isPractising} />
+                            {errors.isPractising && <ErrorText text={errors.isPractising} />}
 
-                    <SelectField required value={prayers ? getLabel(prayers, prayerOptions) : ''} placeholder={t('prayers_title', { defaultValue: 'Prayer Habit' })} onPress={() => setActiveSheet('prayers')} icon={<HandHeart size={scale(18)} color={iconColor} />} hasError={!!errors.prayers} />
-                    {errors.prayers && <ErrorText text={errors.prayers} />}            </KeyboardAwareScrollView>
+                            <SelectField required value={prayers ? getLabel(prayers, prayerOptions) : ''} placeholder={t('prayers_title', { defaultValue: 'Prayer Habit' })} onPress={() => setActiveSheet('prayers')} icon={<Mosque size={scale(18)} color={iconColor} />} hasError={!!errors.prayers} />
+                            {errors.prayers && <ErrorText text={errors.prayers} />}
+                        </>
+                    )}            </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading || !maslak} widthMode="full" height={40} textSize={15} /></View>
 
-            <SingleSelectSheet visible={activeSheet === 'sect'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSect(v); setMaslak(''); setFollowing(''); setErrors((e) => ({ ...e, sect: '', maslak: '' })); }} options={sectOpts} selected={sect} title={t('sect', { defaultValue: 'Sect' })} searchEnabled />
-            <SingleSelectSheet visible={activeSheet === 'maslak'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setMaslak(v); setErrors((e) => ({ ...e, maslak: '' })); }} options={maslakOpts} selected={maslak} title={t('maslak', { defaultValue: 'Maslak' })} searchEnabled />
+            <SingleSelectSheet visible={activeSheet === 'sect'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSect(v); setMaslak(''); setFollowing(''); setErrors((e) => ({ ...e, sect: '', maslak: '' })); }} options={sectOpts} selected={sect} title={t('sect', { defaultValue: 'Sect' })} presentation="sheet" />
+            <SingleSelectSheet visible={activeSheet === 'maslak'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setMaslak(v); setErrors((e) => ({ ...e, maslak: '' })); }} options={maslakOpts} selected={maslak} title={t('maslak', { defaultValue: 'Maslak' })} presentation="sheet" />
             <SingleSelectSheet visible={activeSheet === 'following'} onClose={() => setActiveSheet(null)} onSelect={(v) => setFollowing(v)} options={followingOpts} selected={following} title={t('following', { defaultValue: 'Following' })} searchEnabled />
             <SingleSelectSheet visible={activeSheet === 'practising'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setIsPractising(v); setErrors((e) => ({ ...e, isPractising: '' })); }} options={practisingOptions} selected={isPractising} title={t('practising_label', { defaultValue: 'Practising Level' })} />
             <SingleSelectSheet visible={activeSheet === 'prayers'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setPrayers(v); setErrors((e) => ({ ...e, prayers: '' })); }} options={prayerOptions} selected={prayers} title={t('prayers_title', { defaultValue: 'Prayer Habit' })} />

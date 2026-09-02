@@ -2,7 +2,7 @@
   "expo": {
     "name": "toNikah",
     "slug": "tonikah",
-    "version": "1.0.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon/icon.png",
     "scheme": "tonikah",
@@ -37,6 +37,7 @@
     },
     "plugins": [
       "expo-router",
+      "react-native-iap",
       "expo-localization",
       [
         "expo-location",

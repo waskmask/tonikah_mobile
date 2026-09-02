@@ -8,7 +8,55 @@ import * as Updates from "expo-updates";
 interface LanguageState {
     currentLanguage: string;
     isRTL: boolean;
-    setLanguage: (lng: string) => Promise<void>;
+    setLanguage: (lng: string, currentPath?: string) => Promise<void>;
+}
+
+/** Route to restore after the language-change reload (reload boots at the initial route). */
+export const POST_LANGUAGE_ROUTE_KEY = "tonikah-post-language-route";
+
+const RTL_SYNC_ATTEMPT_KEY = "tonikah-rtl-sync-attempt";
+const RTL_SWAP_PREF_APPLIED_KEY = "tonikah-rtl-swap-pref-applied";
+
+/**
+ * Native RTL state is stored per-install; a rebuild/reinstall wipes it while the
+ * persisted language survives. Re-assert it on boot and reload once when the
+ * running surface doesn't match the selected language.
+ *
+ * Also disables Android's left/right swap (literal textAlign/left/right get
+ * flipped in RTL; iOS never does this). Fabric reads that flag only when the
+ * surface starts, so the first RTL boot after this ships needs one reload too.
+ */
+async function syncNativeRTL(currentLanguage: string) {
+    const shouldBeRTL = currentLanguage === "ar";
+
+    // Persists a pref consumed at the next surface start
+    I18nManager.swapLeftAndRightInRTL(false);
+
+    let needsReload = I18nManager.isRTL !== shouldBeRTL;
+
+    // Swap pref only affects RTL rendering; force one reload the first time
+    // an RTL session runs so the running surface picks it up
+    if (!needsReload && shouldBeRTL) {
+        const applied = await AsyncStorage.getItem(RTL_SWAP_PREF_APPLIED_KEY).catch(() => null);
+        if (!applied) {
+            await AsyncStorage.setItem(RTL_SWAP_PREF_APPLIED_KEY, "1").catch(() => { });
+            needsReload = true;
+        }
+    }
+    if (!needsReload) return;
+
+    // One attempt per 15s — if the native flags can't take effect, don't reload-loop
+    const last = Number(await AsyncStorage.getItem(RTL_SYNC_ATTEMPT_KEY).catch(() => null)) || 0;
+    if (Date.now() - last < 15_000) return;
+    await AsyncStorage.setItem(RTL_SYNC_ATTEMPT_KEY, String(Date.now())).catch(() => { });
+
+    I18nManager.allowRTL(shouldBeRTL);
+    I18nManager.forceRTL(shouldBeRTL);
+    setTimeout(() => {
+        Updates.reloadAsync().catch(() => {
+            DevSettings.reload();
+        });
+    }, 120);
 }
 
 export const useLanguageStore = create<LanguageState>()(
@@ -16,12 +64,15 @@ export const useLanguageStore = create<LanguageState>()(
         (set, get) => ({
             currentLanguage: i18n.language || "en",
             isRTL: I18nManager.isRTL,
-            setLanguage: async (lng: string) => {
+            setLanguage: async (lng: string, currentPath?: string) => {
                 const previousLanguage = get().currentLanguage;
                 if (lng === previousLanguage) return;
 
                 await i18n.changeLanguage(lng);
                 await AsyncStorage.setItem("user-language", lng);
+                if (currentPath) {
+                    await AsyncStorage.setItem(POST_LANGUAGE_ROUTE_KEY, currentPath).catch(() => { });
+                }
 
                 const isRTL = lng === "ar";
 
@@ -42,6 +93,9 @@ export const useLanguageStore = create<LanguageState>()(
         {
             name: "tonikah-language-preference",
             storage: createJSONStorage(() => AsyncStorage),
+            onRehydrateStorage: () => (state) => {
+                void syncNativeRTL(state?.currentLanguage || i18n.language || "en");
+            },
         }
     )
 );

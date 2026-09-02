@@ -7,6 +7,7 @@ import {
     StyleSheet,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { usePathname } from 'expo-router';
 import { Text } from './Text';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
@@ -35,6 +36,7 @@ type LanguagePickerProps = {
 
 export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
     const { currentLanguage, changeLanguage, t } = useLanguage();
+    const pathname = usePathname();
     const colors = useColors();
     const { lightImpact } = useHaptics();
     const [visible, setVisible] = useState(false);
@@ -45,7 +47,7 @@ export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
     const handleSelect = async (code: string) => {
         setVisible(false);
         if (code !== currentLanguage) {
-            await changeLanguage(code);
+            await changeLanguage(code, pathname);
         }
     };
 

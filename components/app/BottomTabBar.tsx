@@ -3,17 +3,30 @@ import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-
 import { Bookmark, Compass, History, Send, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import Svg, { Circle } from 'react-native-svg';
 import { Text } from '@/components/ui/Text';
+import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { chatService } from '@/lib/chatService';
+import { profileService } from '@/lib/profileService';
 import { Typography } from '@/constants/typography';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useChatSocket } from '@/hooks/useChatSocket';
 
 const ACTIVE_STROKE = 2;
 const INACTIVE_STROKE = 1.8;
+
+/** #RRGGBB -> #RRGGBBAA; anything else returned untouched. */
+function hexWithAlpha(color: string, alpha: number) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+    const channel = Math.round(Math.min(1, Math.max(0, alpha)) * 255)
+        .toString(16)
+        .padStart(2, '0');
+    return `${color}${channel}`;
+}
 
 type TabRoute = {
     name: string;
@@ -40,6 +53,72 @@ function unreadFromResponse(value: any) {
     return Number(value?.unreadCount ?? value?.count ?? value?.data?.unreadCount ?? value?.data?.count ?? 0) || 0;
 }
 
+type MySummary = {
+    avatarThumbUrl: string;
+    completionPercent: number;
+};
+
+/** Me tab: the user's avatar inside a ring that fills with profile
+    completion — a quiet, permanent nudge to finish the profile. */
+function AvatarTabIcon({
+    uri,
+    percent,
+    active,
+    ringColor,
+    trackColor,
+}: {
+    uri: string;
+    percent: number;
+    active: boolean;
+    ringColor: string;
+    trackColor: string;
+}) {
+    const box = scale(27);
+    const strokeWidth = 2;
+    const radius = (box - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const clamped = Math.min(100, Math.max(0, percent));
+    const avatarSize = box - scale(7);
+
+    return (
+        <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
+            <Svg width={box} height={box} style={StyleSheet.absoluteFill}>
+                <Circle
+                    cx={box / 2}
+                    cy={box / 2}
+                    r={radius}
+                    stroke={trackColor}
+                    strokeWidth={strokeWidth}
+                    fill="none"
+                />
+                <Circle
+                    cx={box / 2}
+                    cy={box / 2}
+                    r={radius}
+                    stroke={ringColor}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={`${circumference}`}
+                    strokeDashoffset={circumference * (1 - clamped / 100)}
+                    strokeLinecap="round"
+                    fill="none"
+                    // Progress starts at 12 o'clock
+                    transform={`rotate(-90 ${box / 2} ${box / 2})`}
+                />
+            </Svg>
+            <Image
+                source={{ uri }}
+                style={{
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: avatarSize / 2,
+                    opacity: active ? 1 : 0.88,
+                }}
+                contentFit="cover"
+            />
+        </View>
+    );
+}
+
 export function BottomTabBar({ state, descriptors, navigation }: any) {
     const colors = useColors();
     const tabChrome = colors.chrome.tabBar;
@@ -52,7 +131,40 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     const [spinnerRoute, setSpinnerRoute] = useState<string | null>(null);
     const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [mySummary, setMySummary] = useState<MySummary | null>(null);
     const activeRouteName = state.routes[state.index]?.name;
+
+    const refreshMySummary = useCallback(async () => {
+        try {
+            const res = await profileService.fetchMySummary();
+            const summaryUser = res?.user;
+            if (res?.success && summaryUser) {
+                setMySummary({
+                    avatarThumbUrl: String(summaryUser.avatarThumbUrl || summaryUser.avatarUrl || ''),
+                    completionPercent: Number(summaryUser.completionPercent) || 0,
+                });
+            }
+        } catch {
+            // Keep the last known avatar if the refresh fails.
+        }
+    }, []);
+
+    // Avatar + completion refresh: on mount, on foreground, and whenever the
+    // user lands back on the Me tab (returning from edit-profile).
+    useEffect(() => {
+        refreshMySummary();
+    }, [refreshMySummary]);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (stateValue) => {
+            if (stateValue === 'active') refreshMySummary();
+        });
+        return () => subscription.remove();
+    }, [refreshMySummary]);
+
+    useEffect(() => {
+        if (activeRouteName === 'profile') refreshMySummary();
+    }, [activeRouteName, refreshMySummary]);
 
     useEffect(() => {
         setPendingRoute(null);
@@ -142,7 +254,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                 },
             ]}
         >
-            <View style={[styles.inner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.inner, { flexDirection: 'row' }]}>
                 {visibleRoutes.map((item) => {
                     const options = descriptors[item.route.key]?.options || {};
                     const isFocused = activeRouteName === item.name;
@@ -187,6 +299,14 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                 <View style={styles.iconWrap}>
                                     {spinnerRoute === item.name && !isFocused ? (
                                         <ActivityIndicator size="small" color={color} />
+                                    ) : item.name === 'profile' && mySummary?.avatarThumbUrl ? (
+                                        <AvatarTabIcon
+                                            uri={mySummary.avatarThumbUrl}
+                                            percent={mySummary.completionPercent}
+                                            active={isActive}
+                                            ringColor={tabChrome.active}
+                                            trackColor={hexWithAlpha(tabChrome.inactive, 0.3)}
+                                        />
                                     ) : (
                                         <item.Icon
                                             size={scale(23)}
@@ -196,14 +316,11 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                         />
                                     )}
                                     {badge > 0 ? (
-                                        <View
-                                            style={[
-                                                styles.tabDot,
-                                                {
-                                                    backgroundColor: colors.chrome.badge.background,
-                                                    borderColor: tabChrome.background,
-                                                },
-                                            ]}
+                                        <UnreadBadge
+                                            count={badge}
+                                            variant="sm"
+                                            borderColor={tabChrome.background}
+                                            style={styles.tabBadge}
                                         />
                                     ) : null}
                                 </View>
@@ -213,12 +330,15 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                     variant="caption"
                                     numberOfLines={1}
                                     ellipsizeMode="tail"
+                                    allowFontScaling={false}
                                     style={[
                                         styles.label,
                                         {
                                             color,
-                                            fontSize: scale(10),
-                                            lineHeight: scale(13),
+                                            // Fixed size (not scale()) so labels render identically on
+                                            // every device
+                                            fontSize: 8,
+                                            lineHeight: 11,
                                             fontFamily: labelFontFamily,
                                         },
                                     ]}
@@ -280,14 +400,10 @@ const styles = StyleSheet.create({
         minHeight: scale(28),
         maxWidth: scale(62),
     },
-    tabDot: {
+    tabBadge: {
         position: 'absolute',
-        top: -scale(2),
-        right: -scale(4),
-        width: scale(9),
-        height: scale(9),
-        borderRadius: scale(5),
-        borderWidth: scale(1.5),
+        top: -scale(5),
+        right: -scale(9),
     },
     labelWrap: {
         width: '100%',

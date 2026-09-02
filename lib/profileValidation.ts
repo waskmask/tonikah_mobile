@@ -1,5 +1,5 @@
 export const MAX_INCOME = 10_000_000;
-export const COMPANY_MAX = 30;
+export const COMPANY_MAX = 50;
 export const HEADLINE_MAX = 80;
 export const BIO_MAX = 600;
 

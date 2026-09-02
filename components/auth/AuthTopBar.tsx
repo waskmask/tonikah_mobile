@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
-import { ArrowLeft, ArrowRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { LanguagePicker } from '@/components/ui/LanguagePicker';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -19,15 +19,10 @@ export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
     // Explicit colors, no theme classes — must be visible in both modes
     const linkColor = isDark ? '#F4EEE6' : '#1B1713';
     const linkFont = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.bold;
-    const Arrow = isRTL ? ArrowRight : ArrowLeft;
+    const Arrow = isRTL ? ChevronRight : ChevronLeft;
 
     return (
-        <View
-            style={[
-                styles.bar,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
-            ]}
-        >
+        <View style={styles.bar}>
             {leftLabel && onLeftPress ? (
                 <PressableScale
                     onPress={onLeftPress}
@@ -35,14 +30,14 @@ export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
                     accessibilityRole="button"
                     accessibilityLabel={leftLabel}
                     activeScale={0.95}
-                    style={[styles.leftAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                    style={styles.leftAction}
                 >
-                    <Arrow size={scale(16)} color={linkColor} strokeWidth={2.5} />
+                    <Arrow size={scale(23)} color={linkColor} />
                     <RNText
                         style={{
                             color: linkColor,
-                            fontSize: scale(13),
-                            lineHeight: scale(17),
+                            fontSize: scale(16),
+                            lineHeight: scale(20),
                             fontFamily: linkFont,
                             includeFontPadding: false,
                         }}
@@ -61,15 +56,20 @@ export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
 
 const styles = StyleSheet.create({
     bar: {
+        // Native RTL (I18nManager.forceRTL) already mirrors 'row' — no manual reversal
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: scale(20),
+        // 14dp edge gap — consistent with all other topbars
+        paddingHorizontal: scale(14),
         paddingTop: scale(12),
         paddingBottom: scale(4),
     },
     leftAction: {
+        flexDirection: 'row',
         alignItems: 'center',
-        gap: scale(6),
+        // Optical match with profile/conversation headers' chevron→title rhythm
+        gap: scale(8),
         paddingVertical: scale(6),
     },
     spacer: {

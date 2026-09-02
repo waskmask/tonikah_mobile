@@ -39,10 +39,10 @@ export function AppTopBar() {
                     },
                 ]}
             >
-                <View style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.topBar, { flexDirection: 'row' }]}>
                     <Pressable
                         onPress={() => router.push('/(tabs)/search')}
-                        style={[styles.brandBlock, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}
+                        style={[styles.brandBlock, { alignItems: 'flex-start' }]}
                     >
                         <Text variant="h3" style={[styles.brand, { color: chrome.title }]}>
                             toNikah
@@ -56,7 +56,7 @@ export function AppTopBar() {
                         </Text>
                     </Pressable>
 
-                    <View style={[styles.actions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.actions, { flexDirection: 'row' }]}>
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={textValue(t('my_profile'), 'My Profile')}

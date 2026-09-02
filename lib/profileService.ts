@@ -7,6 +7,9 @@ export const profileService = {
 
     fetchProfileCompletion: (): Promise<ApiResponse> => api.get('/app-user/profile-completion'),
 
+    // Lightweight owner summary (avatar URLs + completion) for chrome like the tab bar
+    fetchMySummary: (): Promise<ApiResponse> => api.get('/users/me/summary'),
+
     // Create profile (Step 1 only)
     createProfile: (data: object): Promise<ApiResponse> => api.post('/profile/new', data),
 

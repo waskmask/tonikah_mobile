@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Linking, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Compass } from 'lucide-react-native';
+import { Compass, MapPin } from 'lucide-react-native';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
@@ -14,8 +14,8 @@ import { ExploreTourModal } from '@/components/explore/ExploreTourModal';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
-import { useTheme } from '@/hooks/useTheme';
 import { useToast } from '@/hooks/useToast';
+import { useExploreLocationGate } from '@/hooks/useExploreLocationGate';
 import { useAuthStore } from '@/store/authStore';
 import {
     ExploreFilterState,
@@ -28,6 +28,7 @@ import {
 import { firstProfileImage, profileId } from '@/lib/exploreProfile';
 import { profileCoordinates } from '@/lib/exploreProfile';
 import { Image } from 'expo-image';
+import * as Location from 'expo-location';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { usersService } from '@/lib/usersService';
 
@@ -49,11 +50,25 @@ function normalizeDroppedFilters(droppedFilters: any[] = []) {
 }
 
 export default function ExploreScreen() {
-    const { isDark } = useTheme();
     const palette = useColors();
     const insets = useSafeAreaInsets();
     const toast = useToast();
+    const { state: locationState, retry: retryLocation, retrying: locationRetrying } = useExploreLocationGate();
+
+    const openLocationSettings = useCallback(async () => {
+        if (locationState === 'services_disabled' && Platform.OS === 'android') {
+            try {
+                await Location.enableNetworkProviderAsync();
+                await retryLocation();
+                return;
+            } catch {
+                // Fall through to app settings when Android cannot show its location prompt.
+            }
+        }
+        await Linking.openSettings();
+    }, [locationState, retryLocation]);
     const user = useAuthStore((state) => state.user);
+    const refreshUser = useAuthStore((state) => state.refreshUser);
     const emailVerified = Boolean(user?.email_verified ?? user?.emailVerified);
     const [profiles, setProfiles] = useState<any[]>([]);
     const [filters, setFilters] = useState<ExploreFilterState>(() => resetExploreFilters());
@@ -207,9 +222,18 @@ export default function ExploreScreen() {
     }, [emailVerified, verificationReason]);
 
     useEffect(() => {
+        if (emailVerified) return;
+        const subscription = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active') void refreshUser();
+        });
+        return () => subscription.remove();
+    }, [emailVerified, refreshUser]);
+
+    useEffect(() => {
+        if (locationState !== 'ready') return;
         void load(filtersRef.current, { reset: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [locationState]);
 
     const advance = (entry?: HistoryEntry) => {
         if (entry) setHistory((items) => [entry, ...items].slice(0, 1));
@@ -325,7 +349,44 @@ export default function ExploreScreen() {
 
     return (
         <View style={[styles.root, { backgroundColor: palette.chrome.explore.screen, paddingTop: insets.top }]}>
-            {loading ? (
+            {locationState !== 'ready' ? (
+                <View style={styles.empty}>
+                    {locationState === 'checking' ? (
+                        <View style={{ width: '100%', gap: scale(14) }}>
+                            <Skeleton width="100%" height={scale(420)} borderRadius={scale(22)} />
+                            <Skeleton width="70%" height={scale(44)} borderRadius={scale(22)} style={{ alignSelf: 'center' }} />
+                        </View>
+                    ) : (
+                        <EmptyState
+                            icon={<MapPin size={scale(30)} color={palette.chrome.primary} strokeWidth={1.8} />}
+                            title={t('explore_location_required_title', 'Location is needed for Explore')}
+                            description={
+                                locationState === 'permission_denied'
+                                    ? t('explore_location_permission_denied', 'Allow location access in Settings to discover relevant profiles.')
+                                    : locationState === 'services_disabled'
+                                        ? t('explore_location_services_disabled', 'Turn on device location services to use Explore.')
+                                        : locationState === 'network_error'
+                                            ? t('explore_location_network_error', 'We could not verify your location. Check your connection and try again.')
+                                            : t('explore_location_unavailable', 'We could not get your current location. Move to an open area and try again.')
+                            }
+                            actions={[
+                                ...(locationState === 'permission_denied' || locationState === 'services_disabled'
+                                    ? [{ label: t('open_settings', 'Open Settings'), onPress: () => void openLocationSettings() }]
+                                    : []),
+                                {
+                                    label: locationRetrying
+                                        ? t('please_wait', 'Please wait...')
+                                        : t('btn_try_again', 'Try Again'),
+                                    onPress: () => void retryLocation(),
+                                    variant: 'secondary' as const,
+                                    disabled: locationRetrying,
+                                    loading: locationRetrying,
+                                },
+                            ]}
+                        />
+                    )}
+                </View>
+            ) : loading ? (
                 <View style={{ flex: 1, padding: scale(12), gap: scale(14) }}>
                     <Skeleton width="100%" height={undefined} borderRadius={scale(22)} style={{ flex: 1 }} />
                     <View style={{ flexDirection: 'row', justifyContent: 'center', gap: scale(18), paddingBottom: scale(8) }}>
@@ -342,24 +403,6 @@ export default function ExploreScreen() {
                         onOpenTour={() => setTourOpen(true)}
                         onOpenMenu={() => setMenuOpen(true)}
                     />
-                    {verificationReason ? (
-                        <View style={styles.verificationBanner}>
-                            <EmailVerificationRequiredBanner
-                                compact
-                                email={user?.email}
-                                title={
-                                    verificationReason === 'browse_limit'
-                                        ? t('verify_email_browse_limit_title', 'Verify your email to keep browsing')
-                                        : t('verify_email_profile_actions_title', 'Verify your email to save profiles')
-                                }
-                                message={
-                                    verificationReason === 'browse_limit'
-                                        ? t('verify_email_browse_limit_message', 'You can browse your first profiles now. Verify your email to continue exploring more matches.')
-                                        : t('verify_email_profile_actions_message', 'Please verify your email before saving or skipping profiles.')
-                                }
-                            />
-                        </View>
-                    ) : null}
                     <View style={styles.deckArea} pointerEvents={deckLocked ? 'none' : 'auto'}>
                         <SwipeableDeck
                             ref={deckRef}
@@ -382,14 +425,6 @@ export default function ExploreScreen() {
                 </>
             ) : (
                 <View style={styles.empty}>
-                    {verificationReason ? (
-                        <EmailVerificationRequiredBanner
-                            compact
-                            email={user?.email}
-                            title={t('verify_email_browse_limit_title', 'Verify your email to keep browsing')}
-                            message={t('verify_email_browse_limit_message', 'You can browse your first profiles now. Verify your email to continue exploring more matches.')}
-                        />
-                    ) : null}
                     <EmptyState
                         icon={<Compass size={scale(30)} color={palette.chrome.primary} strokeWidth={1.8} />}
                         title={message || t('explore_no_profiles_title', 'No matches right now')}
@@ -401,6 +436,27 @@ export default function ExploreScreen() {
                     />
                 </View>
             )}
+
+            {verificationReason ? (
+                <View style={[styles.verificationToast, { top: insets.top + scale(48) }]}>
+                    <EmailVerificationRequiredBanner
+                        compact
+                        floating
+                        email={user?.email}
+                        onDismiss={() => setVerificationReason(null)}
+                        title={
+                            verificationReason === 'browse_limit'
+                                ? t('verify_email_browse_limit_title', 'Verify your email to keep browsing')
+                                : t('verify_email_profile_actions_title', 'Verify your email to save profiles')
+                        }
+                        message={
+                            verificationReason === 'browse_limit'
+                                ? t('verify_email_browse_limit_message', 'You can browse your first profiles now. Verify your email to continue exploring more matches.')
+                                : t('verify_email_profile_actions_message', 'Please verify your email before saving or skipping profiles.')
+                        }
+                    />
+                </View>
+            ) : null}
 
             <ExploreFilterDrawer
                 visible={filtersOpen}
@@ -429,12 +485,20 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
     root: { flex: 1 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    deckArea: { flex: 1, position: 'relative' },
-    verificationBanner: {
-        paddingHorizontal: scale(12),
-        paddingTop: scale(10),
-        paddingBottom: scale(8),
-        backgroundColor: 'transparent',
+    // Deck is inset from the screen edges (same side spacing as the bottom
+    // bar's paddingHorizontal) with a small breather under the top bar
+    deckArea: {
+        flex: 1,
+        position: 'relative',
+        paddingHorizontal: scale(16),
+        paddingTop: scale(7),
+    },
+    verificationToast: {
+        elevation: 20,
+        left: scale(12),
+        position: 'absolute',
+        right: scale(12),
+        zIndex: 40,
     },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: scale(24) },
 });

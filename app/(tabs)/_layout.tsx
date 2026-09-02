@@ -13,8 +13,9 @@ export default function TabsLayout() {
             screenOptions={{
                 headerShown: false,
                 sceneStyle: { flex: 1 },
-                // Cross-fade between tab scenes instead of a hard cut
-                animation: "fade",
+                // Navigation chrome should react immediately. Screen-level
+                // transitions made tab presses feel delayed on Android.
+                animation: "none",
             }}
             tabBar={(props) => <BottomTabBar {...props} />}
         >

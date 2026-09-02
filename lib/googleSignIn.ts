@@ -3,7 +3,8 @@ import { Platform, TurboModuleRegistry } from 'react-native';
 
 // Check whether the native Google Sign-In binary is linked.
 // Use the non-throwing `.get()` so we never crash at import time.
-const isNativeModuleAvailable = !!TurboModuleRegistry.get('RNGoogleSignin');
+const isNativeModuleAvailable = Platform.OS !== 'web'
+    && Boolean(TurboModuleRegistry?.get?.('RNGoogleSignin'));
 
 if (!isNativeModuleAvailable) {
     console.warn(

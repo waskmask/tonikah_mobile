@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,6 +14,8 @@ import { scale } from '@/hooks/useResponsive';
 import { ProfileSetupTokens } from '@/constants/uiTokens';
 import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
+import { useAuthStore } from '@/store/authStore';
+import { toast } from '@/hooks/useToast';
 import { Cigarette, Wine } from 'lucide-react-native';
 import { apiMessage } from '@/lib/profileDisplay';
 
@@ -60,12 +62,14 @@ export default function Step7() {
             const res = await profileService.updateProfile(payload);
             if (res.success) {
                 setProfileData(payload);
+                // Keep the cached /me user in sync so reload resumes correctly
+                useAuthStore.getState().refreshUser().catch(() => { });
                 router.push('/(profile-setup)/step8');
             } else {
-                Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage(res.message || 'server_error_default'));
+                toast.show(apiMessage(res.message || 'server_error_default'), 'error');
             }
         } catch {
-            Alert.alert(t('error', { defaultValue: 'Error' }), apiMessage('server_error_default'));
+            toast.show(apiMessage('server_error_default'), 'error');
         } finally {
             setLoading(false);
         }
@@ -101,7 +105,7 @@ export default function Step7() {
                     <SelectField required value={alcohol ? getLabel(alcohol, alcoholOptions) : ''} placeholder={t('alcohol')} onPress={() => setActiveSheet('alcohol')} icon={<Wine size={scale(18)} color={iconColor} />} hasError={!!errors.alcohol} />
                     {errors.alcohol && <ErrorText text={errors.alcohol} />}            </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} widthMode="full" height={40} textSize={15} /></View>
 
             <SingleSelectSheet visible={activeSheet === 'smoking'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setSmoking(v); setErrors((e) => ({ ...e, smoking: '' })); }} options={smokingOptions} selected={smoking} title={t('smoking')} />
             <SingleSelectSheet visible={activeSheet === 'alcohol'} onClose={() => setActiveSheet(null)} onSelect={(v) => { setAlcohol(v); setErrors((e) => ({ ...e, alcohol: '' })); }} options={alcoholOptions} selected={alcohol} title={t('alcohol')} />

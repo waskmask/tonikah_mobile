@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { router, type Href } from 'expo-router';
+import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Ban,
@@ -58,6 +58,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     const { t, isRTL } = useLanguage();
     const { isDark, theme, setTheme } = useTheme();
     const { logout, isLoading } = useAuthStore();
+    const pathname = usePathname();
 
     const surfaceColor = isDark ? '#1B1713' : '#FFFFFF';
     const borderColor = isDark ? '#3A332B' : '#E8E8E6';
@@ -67,6 +68,13 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
 
     const navigate = (href: Href) => {
         onClose();
+        if (href === '/(tabs)/edit-profile') {
+            router.push({
+                pathname: '/(tabs)/edit-profile',
+                params: { returnTo: pathname },
+            });
+            return;
+        }
         router.push(href);
     };
 
@@ -77,7 +85,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     };
 
     return (
-        <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+        <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
             <View style={styles.modalRoot}>
                 <Pressable style={[styles.overlay, { backgroundColor: overlayColor }]} onPress={onClose} />
                 <SafeAreaView
@@ -91,7 +99,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                         },
                     ]}
                 >
-                    <View style={[styles.header, { borderBottomColor: borderColor, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.header, { borderBottomColor: borderColor, flexDirection: 'row' }]}>
                         <Text
                             variant="body-sm"
                             className="font-body-bold"
@@ -131,11 +139,11 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                     </ScrollView>
 
                     <View style={[styles.footer, { borderTopColor: borderColor }]}>
-                        <View style={[styles.themeRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.themeRow, { flexDirection: 'row' }]}>
                             <Text variant="body-sm" className="font-body-semi" style={[styles.themeLabel, { color: mutedColor }]}>
                                 {textValue(t('theme'), 'Theme')}
                             </Text>
-                            <View style={[styles.themeSegment, { backgroundColor: isDark ? '#211D18' : '#F3F3F1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.themeSegment, { backgroundColor: isDark ? '#211D18' : '#F3F3F1', flexDirection: 'row' }]}>
                                 <ThemeButton active={theme === 'light'} icon={Sun} onPress={() => setTheme('light')} />
                                 <ThemeButton active={theme === 'dark'} icon={Moon} onPress={() => setTheme('dark')} />
                                 <ThemeButton active={theme === 'system'} icon={Monitor} onPress={() => setTheme('system')} />
@@ -202,7 +210,7 @@ function MenuRow({
                 pressed && { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,50,43,0.04)' },
             ]}
         >
-            <View style={[styles.rowContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.rowContent, { flexDirection: 'row' }]}>
                 <View style={[styles.iconSlot, isRTL ? styles.iconSlotRtl : styles.iconSlotLtr]}>
                     <Icon size={20} color={color} strokeWidth={1.85} />
                 </View>

@@ -33,24 +33,31 @@ export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarPr
                     },
                 ]}
             >
-                <View style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={[styles.titleBlock, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                        <Text
-                            variant="body-sm"
-                            numberOfLines={1}
-                            className="font-body-bold"
-                            style={[styles.title, { color: chrome.title, textAlign: isRTL ? 'right' : 'left' }]}
-                        >
-                            {title}
-                        </Text>
-                        {subtitle ? (
+                <View style={[styles.topBar, { flexDirection: 'row' }]}>
+                    {/* Text is content-sized inside rows: the row's main axis mirrors
+                        under native RTL, so no textAlign is needed (Android flips
+                        literal textAlign values in RTL, iOS doesn't) */}
+                    <View style={styles.titleBlock}>
+                        <View style={styles.titleRow}>
                             <Text
-                                variant="caption"
+                                variant="body-sm"
                                 numberOfLines={1}
-                                style={{ color: chrome.subtitle, marginTop: scale(2), textAlign: isRTL ? 'right' : 'left' }}
+                                className="font-body-bold"
+                                style={[styles.title, { color: chrome.title }]}
                             >
-                                {subtitle}
+                                {title}
                             </Text>
+                        </View>
+                        {subtitle ? (
+                            <View style={styles.titleRow}>
+                                <Text
+                                    variant="caption"
+                                    numberOfLines={1}
+                                    style={{ color: chrome.subtitle, marginTop: scale(2), flexShrink: 1 }}
+                                >
+                                    {subtitle}
+                                </Text>
+                            </View>
                         ) : null}
                     </View>
                     {showMenu ? (
@@ -92,10 +99,13 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: 0,
         justifyContent: 'center',
-        paddingRight: scale(10),
+        paddingEnd: scale(10),
+    },
+    titleRow: {
+        flexDirection: 'row',
     },
     title: {
-        width: '100%',
+        flexShrink: 1,
         fontSize: scale(17),
         lineHeight: scale(22),
     },

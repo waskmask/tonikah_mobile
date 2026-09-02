@@ -4,6 +4,17 @@ export type GalleryPrivacy = 'public' | 'private';
 
 export type GalleryItem = {
     uuid: string;
+    safe?: boolean;
+    moderationMeta?: {
+        status?: 'queued' | 'processing' | 'approved' | 'pending_review' | 'rejected' | 'skipped' | string;
+        reasonCodes?: string[];
+        queuedAt?: string;
+        startedAt?: string;
+        checkedAt?: string;
+        reviewedAt?: string;
+    };
+    isPrimary?: boolean;
+    sort_index?: number;
     url?: string;
     urls?: {
         original?: string;
@@ -21,14 +32,20 @@ export interface GalleryResponse extends ApiResponse {
     gallery?: GalleryItem[];
 }
 
+export interface GalleryUploadResponse extends ApiResponse {
+    image?: GalleryItem;
+    pendingReview?: boolean;
+    moderationStatus?: string;
+}
+
 export const galleryService = {
     fetchMe: (): Promise<GalleryResponse> => api.get('/gallery/me'),
-    upload: (formData: FormData): Promise<ApiResponse> => api.postFormData('/gallery', formData),
+    upload: (formData: FormData): Promise<GalleryUploadResponse> => api.postFormData('/gallery', formData),
     remove: (uuid: string): Promise<ApiResponse> => api.delete(`/gallery/${uuid}`),
     reorder: (uuids: string[]): Promise<ApiResponse> => api.patch('/gallery/reorder', { uuids }),
     makePrimary: (uuid: string): Promise<ApiResponse> => api.patch(`/gallery/${uuid}`, { isPrimary: true }),
     updatePrivacy: (privacy: GalleryPrivacy): Promise<ApiResponse> => api.patch('/gallery/privacy', { privacy }),
-    // Owner-driven private gallery reveal (see improvements/private-gallery-chat-reveal-plan.md).
+    // Owner-driven private gallery reveal.
     createGrant: (body: { viewerId: string; conversationId?: string; scope?: 'all' | 'uuids'; uuids?: string[]; ttlHours?: number; noExpiry?: boolean }): Promise<ApiResponse> =>
         api.post('/gallery/grants', { scope: 'all', ...body }),
     revokeGrant: (grantId: string, conversationId?: string): Promise<ApiResponse> =>

@@ -31,7 +31,7 @@ import {
     useAudioRecorderState,
 } from 'expo-audio';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Bell, BellOff, Camera, Check, CheckCheck, ChevronDown, Copy, Download, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
+import { Bell, BellOff, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import {
@@ -56,6 +56,7 @@ import { loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
 import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode';
 import { BRAND_PRIMARY } from '@/constants/Colors';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
 import { KeyboardController } from 'react-native-keyboard-controller';
 import Reanimated, {
     Easing,
@@ -82,6 +83,8 @@ import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
+import { QualifiedPhotoRequiredNotice } from '@/components/app/QualifiedPhotoRequiredNotice';
+import { useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
 
 const PRIMARY = BRAND_PRIMARY;
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -205,6 +208,17 @@ export default function ConversationScreen() {
     const routeRequestRole = routeParam(params.requestRole);
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
+    const eligibility = useMessagingEligibilityStatus();
+    const showPhotoGate =
+        !eligibility.isLoading &&
+        !eligibility.isError &&
+        !eligibility.hasQualifiedPhoto;
+    const reconcilePhotoEligibility = (response?: unknown) => {
+        const code = (response as { code?: string } | undefined)?.code;
+        if (code === 'QUALIFIED_PHOTO_REQUIRED') {
+            void eligibility.refetch();
+        }
+    };
     const { isDark } = useTheme();
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
@@ -265,6 +279,7 @@ export default function ConversationScreen() {
 
     const colors = useMemo(() => ({
         bg: palette.brand.bg.surface,
+        body: palette.brand.bg.primary,
         card: palette.chrome.common.card,
         surface: palette.chrome.common.cardAlt,
         text: palette.chrome.common.textStrong,
@@ -274,6 +289,7 @@ export default function ConversationScreen() {
         primary: palette.chrome.primary,
         primaryEnd: palette.chrome.primaryEnd,
         primaryTint: palette.chrome.common.primaryTint,
+        bubbleMine: palette.chrome.common.bubbleMine,
         primaryRing: palette.chrome.common.primaryRing,
         inverse: palette.chrome.common.inverseText,
         danger: palette.brand.accent.error,
@@ -591,7 +607,7 @@ export default function ConversationScreen() {
         if (item.kind === 'date') {
             return (
                 <View style={styles.dateWrap}>
-                    <Text variant="caption" className="font-body-bold" style={[styles.dateLabel, { backgroundColor: colors.card, color: colors.muted }]}>
+                    <Text variant="caption" className="font-body-bold" style={[styles.dateLabel, { backgroundColor: colors.surface, color: colors.muted }]}>
                         {item.label}
                     </Text>
                 </View>
@@ -783,6 +799,7 @@ export default function ConversationScreen() {
                 router.replace(`/conversation/${res.conversationId}` as any);
             }
         } else {
+            reconcilePhotoEligibility(res);
             setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
             Alert.alert(t('error', 'Error'), apiMessage(res.errorMessage || 'message_failed'));
         }
@@ -813,6 +830,7 @@ export default function ConversationScreen() {
             return true;
         }
 
+        reconcilePhotoEligibility(res);
         toast.show(apiMessage(res.errorMessage || 'message_failed'), 'error');
         return false;
     };
@@ -921,6 +939,7 @@ export default function ConversationScreen() {
                 setImageViewOnce(false);
             }
         } else {
+            reconcilePhotoEligibility(uploadRes);
             toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
         }
         setUploadingMedia(false);
@@ -1035,6 +1054,7 @@ export default function ConversationScreen() {
                 setVoicePreview(null);
                 setVoiceWaveform([]);
             } else {
+                reconcilePhotoEligibility(uploadRes);
                 toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
             }
         } catch {
@@ -1236,9 +1256,9 @@ export default function ConversationScreen() {
     return (
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
             <View style={styles.screen}>
-                <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
-                        <ArrowLeft size={scale(21)} color={colors.text} strokeWidth={2.7} />
+                        {(isRTL ? <ChevronRight size={scale(23)} color={colors.text} /> : <ChevronLeft size={scale(23)} color={colors.text} />)}
                     </Pressable>
                     <Pressable
                         disabled={headerOther.account_deleted}
@@ -1260,7 +1280,7 @@ export default function ConversationScreen() {
                                 )}
                             </View>
                             <View pointerEvents="none" style={styles.headerText}>
-                                <RNText numberOfLines={1} style={[styles.headerNameText, { color: colors.text }]}>
+                                <RNText numberOfLines={2} style={[styles.headerNameText, { color: colors.text }]}>
                                     {peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
                                 </RNText>
                                 {(activeConversation || name) && (
@@ -1293,7 +1313,11 @@ export default function ConversationScreen() {
                 </View>
 
                 <ChatKeyboardAvoider>
-                <View style={styles.messageListWrap}>
+                <View style={[styles.messageListWrap, { backgroundColor: colors.body }]}>
+                    <ChatDoodleBackground
+                        color={palette.chrome.common.iconNeutral}
+                        opacity={isDark ? 0.11 : 0.09}
+                    />
                     <FlatList
                         ref={listRef}
                         style={{ flex: 1 }}
@@ -1406,7 +1430,11 @@ export default function ConversationScreen() {
                     </View>
                 )}
 
-                {canCompose && !isEnded && (
+                {canCompose && !isEnded && showPhotoGate && (
+                    <QualifiedPhotoRequiredNotice />
+                )}
+
+                {canCompose && !isEnded && !showPhotoGate && (
                     <View style={styles.composer}>
                         {replyTo && (
                             <View style={[styles.replyComposerBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -1904,7 +1932,7 @@ function TypingIndicatorBubble({ colors }: { colors: Record<string, string> }) {
     }, [progress]);
     return (
         <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)} style={styles.typingRow}>
-            <View style={[styles.typingBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.typingBubble, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {[0, 1, 2].map((index) => (
                     <TypingDot key={index} progress={progress} index={index} color={colors.muted} />
                 ))}
@@ -2004,7 +2032,7 @@ function MessageBubbleComponent({
                             if (mine) router.push('/(tabs)/profile');
                             else router.push(`/user/${message.sender}`);
                         }}
-                        style={[styles.systemPillRow, { backgroundColor: colors.card }]}
+                        style={[styles.systemPillRow, { backgroundColor: colors.surface }]}
                     >
                         <Text variant="caption" className="font-body-semi" style={{ color: colors.muted }}>
                             {'\u{1F4F7} '}{translateChatText(systemContent, systemContent === 'gallery_access_granted' ? 'Photos revealed' : 'Photo access ended')}
@@ -2015,7 +2043,7 @@ function MessageBubbleComponent({
         }
         return (
             <View style={styles.systemWrap}>
-                <Text variant="caption" className="font-body-semi" style={[styles.systemText, { backgroundColor: colors.card, color: colors.muted }]}>
+                <Text variant="caption" className="font-body-semi" style={[styles.systemText, { backgroundColor: colors.surface, color: colors.muted }]}>
                     {translateChatText(message.content || 'request_accepted', 'Request accepted')}
                 </Text>
             </View>
@@ -2110,7 +2138,7 @@ function MessageBubbleComponent({
                             styles.bubble,
                             mine ? styles.mineBubble : styles.theirBubble,
                             {
-                                backgroundColor: mine ? colors.primaryTint : colors.card,
+                                backgroundColor: mine ? colors.bubbleMine : colors.surface,
                                 borderColor: mine ? colors.primaryRing : colors.border,
                                 shadowColor: '#1A130D',
                                 shadowOpacity: mine ? 0.04 : 0.08,
@@ -2467,7 +2495,8 @@ const styles = StyleSheet.create({
         minHeight: scale(56),
         flexDirection: 'row',
         alignItems: 'stretch',
-        paddingHorizontal: scale(8),
+        // 5.5 + 9.5 (arrow inset inside its 40pt circle) = 15dp edge→glyph
+        paddingHorizontal: scale(5.5),
         paddingVertical: scale(8),
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
@@ -2480,21 +2509,22 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
     },
     headerProfileTarget: {
-        flex: 1,
-        maxWidth: '72%',
+        // Sized to its content (avatar + name + status) so taps outside the
+        // section don't open the profile; shrinks when header actions need room
+        flexShrink: 1,
         minWidth: 0,
         alignSelf: 'stretch',
         justifyContent: 'center',
         paddingVertical: scale(2),
-        paddingHorizontal: scale(4),
+        // Near the back chevron (WhatsApp-style cluster); start/end so RTL flips
+        paddingStart: scale(6),
+        paddingEnd: scale(4),
     },
     headerProfileContent: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'stretch',
         minWidth: 0,
-        width: '100%',
     },
     headerAvatar: {
         width: scale(40),
@@ -2504,7 +2534,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         marginRight: scale(12),
     },
-    headerText: { flex: 1, minWidth: scale(90), justifyContent: 'center' },
+    headerText: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
     headerNameText: { fontSize: scale(15), lineHeight: scale(18), fontWeight: '700', includeFontPadding: false, textAlignVertical: 'center' },
     headerStatusText: { marginTop: scale(2), fontSize: scale(12), lineHeight: scale(14), fontWeight: '400', includeFontPadding: false },
     headerSpacer: { flex: 1, minWidth: 0, alignSelf: 'stretch' },

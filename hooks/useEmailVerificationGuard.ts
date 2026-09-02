@@ -37,8 +37,8 @@ const COPY: Record<VerificationGuardAction, { title: string; titleFallback: stri
         messageFallback: 'Please verify your email before submitting reports.',
     },
     checkout: {
-        title: 'verify_email_checkout_title',
-        titleFallback: 'Verify your email to start checkout',
+        title: 'email_not_verified',
+        titleFallback: 'Email Not Verified',
         message: 'verify_email_checkout_message',
         messageFallback: 'Please verify your email before starting checkout.',
     },

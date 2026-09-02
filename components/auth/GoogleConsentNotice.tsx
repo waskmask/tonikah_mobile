@@ -35,7 +35,7 @@ export function GoogleConsentNotice() {
     const openPrivacy = () => WebBrowser.openBrowserAsync(Config.PRIVACY_URL);
 
     return (
-        <View style={[styles.wrap, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap' }]}>
+        <View style={[styles.wrap, { flexDirection: 'row', flexWrap: 'wrap' }]}>
             <Text variant="caption" align="center" className="text-brand-text-subtitle" style={styles.text}>
                 {parts.beforeTerms}
             </Text>
