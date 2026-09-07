@@ -90,4 +90,13 @@ export const authService = {
 
     requestPasswordReset: (email: string): Promise<AuthResponse> =>
         api.post('/app-user/password/request-reset', { email }),
+
+    createPassword: (newPassword: string): Promise<AuthResponse> =>
+        api.post('/app-user/password/create', { newPassword, idToken: '' }),
+
+    updateHeardAboutUs: (data: {
+        heard_about_us: string;
+        heard_about_us_other?: string;
+    }): Promise<AuthResponse & { heard_about_us_answered?: boolean }> =>
+        api.patch('/app-user/heard-about-us', data),
 };

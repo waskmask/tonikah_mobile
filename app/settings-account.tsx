@@ -1,21 +1,38 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { LogOut, RefreshCw, ShieldAlert, Smartphone } from 'lucide-react-native';
+import { LogOut, RefreshCw, ShieldAlert, Smartphone, UserCog } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { LanguagePicker } from '@/components/ui/LanguagePicker';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { SettingsValueRow, formatSessionDate, formatSessionLocation } from '@/components/settings/SettingsRows';
+import {
+    SettingsLockedRow,
+    SettingsNavRow,
+    SettingsValueRow,
+    formatSessionDate,
+    formatSessionLocation,
+} from '@/components/settings/SettingsRows';
 import { useAuthStore } from '@/store/authStore';
 import { useColors } from '@/hooks/useColors';
-import { t } from '@/lib/profileDisplay';
+import { displayText, t, translateCountry } from '@/lib/profileDisplay';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
 import { authService, UserSession } from '@/lib/authService';
 
+function formatDob(value?: string) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(date);
+}
+
 export default function SettingsAccountScreen() {
-    const { user, logoutAllDevices, isLoading } = useAuthStore();
+    const { user, logoutAllDevices, isLoading, refreshUser } = useAuthStore();
     const colors = useColors();
     const primary = colors.chrome.primary;
     const toast = useToast();
@@ -23,6 +40,12 @@ export default function SettingsAccountScreen() {
     const [loggingOutAll, setLoggingOutAll] = useState(false);
     const [sessionsLoading, setSessionsLoading] = useState(false);
     const [sessions, setSessions] = useState<UserSession[]>([]);
+
+    const profile = user?.profile || {};
+    const googleConnected = Boolean(user?.googleId);
+    const profileManagerValue = profile?.profile_manager
+        ? t(String(profile.profile_manager), displayText(String(profile.profile_manager)))
+        : t('not_set', 'Not set');
 
     const refreshSessions = useCallback(async () => {
         setSessionsLoading(true);
@@ -43,7 +66,8 @@ export default function SettingsAccountScreen() {
     useFocusEffect(
         useCallback(() => {
             refreshSessions();
-        }, [refreshSessions])
+            refreshUser();
+        }, [refreshSessions, refreshUser])
     );
 
     const confirmLogoutOtherDevices = () => {
@@ -103,13 +127,52 @@ export default function SettingsAccountScreen() {
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('account', 'Account')} fallbackHref="/(tabs)/settings" />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(60) }}>
+                <SectionCard title={t('personal_info', 'Personal Information')}>
+                    <SettingsLockedRow
+                        label={t('name', 'Name')}
+                        value={String(profile?.profileName || profile?.profile_name || '')}
+                    />
+                    <SettingsLockedRow
+                        label={t('gender', 'Gender')}
+                        value={profile?.gender ? t(String(profile.gender), displayText(profile.gender)) : t('not_set', 'Not set')}
+                    />
+                    <SettingsLockedRow
+                        label={t('dob', 'Date of Birth')}
+                        value={formatDob(profile?.dob) || t('not_set', 'Not set')}
+                    />
+                    <SettingsLockedRow
+                        label={t('grew_up_in', 'Grew up in')}
+                        value={translateCountry(profile?.grew_up_in) || t('not_set', 'Not set')}
+                    />
+                </SectionCard>
+
                 <SectionCard
                     title={t('account', 'Account')}
                     actionLabel={t('change_email_short', 'Change Email')}
                     onAction={() => router.push('/change-email' as any)}
                 >
-                    <SettingsValueRow label={t('email', 'Email')} value={user?.email || ''} />
+                    <SettingsValueRow
+                        label={t('email', 'Email')}
+                        value={user?.email || ''}
+                        note={
+                            googleConnected
+                                ? `${t('google_account_connected', 'Google account connected.')} ${t('google_account_connected_desc', 'Changing your email address will not affect Google sign-in.')}`
+                                : undefined
+                        }
+                    />
                     <SettingsValueRow label={t('language', 'Language')} custom={<LanguagePicker />} />
+                </SectionCard>
+
+                <SectionCard title={t('profile_manager', 'Profile manager')}>
+                    <SettingsNavRow
+                        icon={<UserCog size={scale(18)} color={primary} />}
+                        label={t('profile_manager', 'Profile manager')}
+                        description={profileManagerValue}
+                        onPress={() => router.push({
+                            pathname: '/(tabs)/edit-profile',
+                            params: { returnTo: '/settings-account' },
+                        })}
+                    />
                 </SectionCard>
 
                 <SectionCard title={t('active_sessions', 'Active sessions')}>

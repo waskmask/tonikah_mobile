@@ -1,10 +1,11 @@
 import React from 'react';
 import { Pressable, Switch, View } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useToast } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 import i18n from '@/lib/i18n';
@@ -155,13 +156,53 @@ export function SettingsActionRow({
 }
 
 /** Static label/value row (email, language picker, ...). */
-export function SettingsValueRow({ label, value, custom }: { label: string; value?: string; custom?: React.ReactNode }) {
+export function SettingsValueRow({
+    label,
+    value,
+    custom,
+    note,
+}: {
+    label: string;
+    value?: string;
+    custom?: React.ReactNode;
+    note?: string;
+}) {
     const colors = useColors();
     return (
         <View style={{ marginTop: scale(10) }}>
             <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>{label}</Text>
             {custom || <Text variant="body" style={{ marginTop: scale(4) }}>{value}</Text>}
+            {note ? (
+                <Text variant="caption" style={{ marginTop: scale(4), color: colors.brand.text.muted }}>
+                    {note}
+                </Text>
+            ) : null}
         </View>
+    );
+}
+
+/** Read-only locked field — tap shows cannot_change toast (web parity). */
+export function SettingsLockedRow({ label, value }: { label: string; value: string }) {
+    const colors = useColors();
+    const toast = useToast();
+
+    return (
+        <Pressable
+            onPress={() => toast.show(t('cannot_change', 'Cannot be changed'), 'info', 2200)}
+            accessibilityRole="button"
+            accessibilityLabel={`${label}: ${value}`}
+            style={{ marginTop: scale(10) }}
+        >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: scale(8) }}>
+                <Text variant="caption" style={{ color: colors.brand.text.subtitle, flex: 1 }}>
+                    {label}
+                </Text>
+                <Lock size={scale(13)} color={colors.brand.text.muted} />
+            </View>
+            <Text variant="body" style={{ marginTop: scale(4) }}>
+                {value || t('not_set', 'Not set')}
+            </Text>
+        </Pressable>
     );
 }
 

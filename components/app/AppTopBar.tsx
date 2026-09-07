@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Menu, User } from 'lucide-react-native';
-import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
+import { useAppMenu } from '@/components/app/AppMenuProvider';
 import { Text } from '@/components/ui/Text';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -16,11 +16,11 @@ function textValue(value: unknown, fallback: string) {
 }
 
 export function AppTopBar() {
-    const { t, isRTL } = useLanguage();
+    const { t } = useLanguage();
     const colors = useColors();
     const chrome = colors.chrome.header;
     const user = useAuthStore((state) => state.user);
-    const [menuOpen, setMenuOpen] = useState(false);
+    const { openMenu } = useAppMenu();
 
     const displayName = useMemo(() => {
         const profileName = user?.profile?.profileName;
@@ -68,7 +68,7 @@ export function AppTopBar() {
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={textValue(t('menu'), 'Menu')}
-                            onPress={() => setMenuOpen(true)}
+                            onPress={openMenu}
                             style={[styles.iconButton, { borderColor: chrome.border, backgroundColor: chrome.iconBackground }]}
                         >
                             <Menu size={20} color={chrome.icon} />
@@ -76,8 +76,6 @@ export function AppTopBar() {
                     </View>
                 </View>
             </SafeAreaView>
-
-            <AppMenuDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} />
         </>
     );
 }

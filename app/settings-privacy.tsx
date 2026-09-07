@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, Share, View } from 'react-native';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { SectionCard } from '@/components/ui/SectionCard';
-import { SettingsActionRow, SettingsToggleRow, formatSessionDate } from '@/components/settings/SettingsRows';
+import { SettingsActionRow, SettingsToggleRow, SettingsValueRow, formatSessionDate } from '@/components/settings/SettingsRows';
 import { Text } from '@/components/ui/Text';
 import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
@@ -11,13 +11,16 @@ import { useToast } from '@/hooks/useToast';
 import { accountService, PrivacyConsent } from '@/lib/accountService';
 import { apiMessage } from '@/lib/profileDisplay';
 import { Config } from '@/constants/config';
+import { useAuthStore } from '@/store/authStore';
 
 export default function SettingsPrivacyScreen() {
     const colors = useColors();
     const toast = useToast();
+    const user = useAuthStore((state) => state.user);
     const [privacyConsent, setPrivacyConsent] = useState<PrivacyConsent | null>(null);
     const [marketingBusy, setMarketingBusy] = useState(false);
     const [exportingData, setExportingData] = useState(false);
+    const isVisible = user?.visible !== false;
 
     const refreshPrivacyConsent = useCallback(async () => {
         const result = await accountService.getPrivacyConsent();
@@ -78,6 +81,15 @@ export default function SettingsPrivacyScreen() {
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('data_privacy', 'Data & privacy')} fallbackHref="/(tabs)/settings" />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(60) }}>
+                <SectionCard title={t('account_visibility', 'Account visibility')}>
+                    <SettingsValueRow
+                        label={t('account_visibility', 'Account visibility')}
+                        value={isVisible
+                            ? t('publicly_visible', 'Publicly visible')
+                            : t('account_is_hidden', 'Account is hidden')}
+                    />
+                </SectionCard>
+
                 <SectionCard title={t('marketing_emails', 'Marketing emails')}>
                     <SettingsToggleRow
                         label={t('marketing_emails', 'Marketing emails')}

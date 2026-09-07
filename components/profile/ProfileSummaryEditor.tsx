@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Keyboard, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { TextModerationWarningModal } from '@/components/app/TextModerationWarningModal';
@@ -49,12 +49,22 @@ type Props = {
         'inline' (My Profile): underline inputs like the profile-setup steps,
         save bar appears only while the keyboard is open. */
     variant?: 'card' | 'inline';
+    /** "+N%" completion badge next to the labels while the field is missing. */
+    headlineImpact?: number;
+    bioImpact?: number;
 };
 
 /** Shared Headline + Bio editor used by Edit Profile and My Profile.
     Owns prefill from pending/rejected moderation candidates, validation,
     RTL/LTR direction, the moderation warning modal and submit-anyway. */
-export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], onSaved, variant = 'card' }: Props) {
+export function ProfileSummaryEditor({
+    profile,
+    fields = ['headline', 'bio'],
+    onSaved,
+    variant = 'card',
+    headlineImpact = 0,
+    bioImpact = 0,
+}: Props) {
     const palette = useColors();
     const { isDark } = useTheme();
     const { currentLanguage } = useLanguage();
@@ -100,13 +110,22 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
         };
     }, [inline]);
 
-    const bioDirection = getTextDirection(bio, localeTextDirection(currentLanguage));
-    const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
+    const localeDirection = localeTextDirection(currentLanguage);
+    const headlineDirection = getTextDirection(headline, localeDirection);
+    const bioDirection = getTextDirection(bio, localeDirection);
+    const headlineFontFamily = headlineDirection === 'rtl'
+        ? Typography.font.arabic.regular
+        : Typography.font.body.regular;
+    const bioFontFamily = bioDirection === 'rtl'
+        ? Typography.font.arabic.regular
+        : Typography.font.body.regular;
     const borderColor = palette.brand.bg.border;
     const underlineIdle = isDark ? '#3A332B' : '#E8E1D6';
 
     const bioCount = countNonSpace(bio);
-    const dirty = headline !== initialValues.headline || bio !== initialValues.bio;
+    const headlineDirty = showHeadline && headline !== initialValues.headline;
+    const bioDirty = showBio && bio !== initialValues.bio;
+    const dirty = headlineDirty || bioDirty;
     const bioBelowMin = inline && showBio && bioCount > 0 && bioCount < BIO_MIN;
     const canSave = dirty && !saving && !(inline && showBio && bioCount < BIO_MIN);
 
@@ -136,11 +155,14 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
 
     async function save(submitAnyway = false) {
         if (!validate()) return;
+        if (!dirty) return;
         setSaving(true);
         try {
+            // Only changed fields are submitted — an unchanged field would
+            // trigger pointless AI moderation on the server
             const payload: Record<string, any> = { clientLocale: currentLanguage };
-            if (showHeadline) payload.profile_headline = cleanHeadlineTextForSave(headline);
-            if (showBio) payload.bio = cleanProfileTextForSave(bio);
+            if (headlineDirty) payload.profile_headline = cleanHeadlineTextForSave(headline);
+            if (bioDirty) payload.bio = cleanProfileTextForSave(bio);
             if (submitAnyway) payload.submitAnyway = true;
 
             const res = await profileService.updateProfile(payload);
@@ -159,6 +181,9 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
             }
             setModerationWarning(null);
             Keyboard.dismiss();
+            // Update baselines immediately so Save disables without waiting
+            // for the parent's profile refetch
+            setInitialValues({ headline, bio });
             await refreshUser().catch(() => undefined);
             const latestModeration =
                 useAuthStore.getState().user?.profile?.contentModeration || {};
@@ -195,7 +220,9 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
         {
             borderColor: hasError ? palette.brand.accent.error : borderColor,
             color: palette.brand.text.body,
-            fontFamily: inputFontFamily,
+            fontFamily: headlineFontFamily,
+            textAlign: headlineDirection === 'rtl' ? 'right' as const : 'left' as const,
+            writingDirection: headlineDirection,
         },
     ];
 
@@ -208,6 +235,21 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
                             {t('profile_headline', 'Profile headline')}
                         </Text>
                         {headlinePending ? <UnderReviewPill /> : null}
+                        {headlineImpact ? (
+                            <View style={[styles.impactBadge, { backgroundColor: palette.chrome.primary }]}>
+                                <Text variant="caption" className="font-body-bold" style={styles.impactText}>
+                                    {`\u2066+${headlineImpact}%\u2069`}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {saving && headlineDirty ? (
+                            <View style={styles.savingRow}>
+                                <ActivityIndicator size="small" color={palette.chrome.primary} />
+                                <Text variant="caption" style={{ color: palette.brand.text.muted }}>
+                                    {t('saving', 'Saving…')}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
                     <TextInput
                         ref={headlineInputRef}
@@ -228,7 +270,9 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
                                     borderBottomColor: underlineColor('headline', Boolean(errors.headline)),
                                     borderBottomWidth: focusedField === 'headline' ? 1.5 : 1,
                                     color: palette.brand.text.body,
-                                    fontFamily: inputFontFamily,
+                                    fontFamily: headlineFontFamily,
+                                    textAlign: headlineDirection === 'rtl' ? 'right' : 'left',
+                                    writingDirection: headlineDirection,
                                 },
                             ]
                             : boxedInputStyle(Boolean(errors.headline))}
@@ -249,6 +293,21 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
                             {t('bio', 'Bio')}
                         </Text>
                         {bioPending ? <UnderReviewPill /> : null}
+                        {bioImpact ? (
+                            <View style={[styles.impactBadge, { backgroundColor: palette.chrome.primary }]}>
+                                <Text variant="caption" className="font-body-bold" style={styles.impactText}>
+                                    {`\u2066+${bioImpact}%\u2069`}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {saving && bioDirty ? (
+                            <View style={styles.savingRow}>
+                                <ActivityIndicator size="small" color={palette.chrome.primary} />
+                                <Text variant="caption" style={{ color: palette.brand.text.muted }}>
+                                    {t('saving', 'Saving…')}
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
                     <TextInput
                         ref={bioInputRef}
@@ -276,7 +335,7 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
                                 : [styles.textarea, { borderColor: errors.bio ? palette.brand.accent.error : borderColor }],
                             {
                                 color: palette.brand.text.body,
-                                fontFamily: inputFontFamily,
+                                fontFamily: bioFontFamily,
                                 textAlign: bioDirection === 'rtl' ? 'right' : 'left',
                                 writingDirection: bioDirection,
                             },
@@ -322,8 +381,8 @@ export function ProfileSummaryEditor({ profile, fields = ['headline', 'bio'], on
                     title={t('save', 'Save')}
                     onPress={() => void save()}
                     loading={saving}
-                    disabled={saving}
-                    widthMode="full"
+                    disabled={!canSave}
+                    widthMode="auto"
                     height={40}
                     textSize={14}
                     containerStyle={styles.saveButton}
@@ -361,6 +420,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(12),
         paddingVertical: 0,
         fontSize: scale(14),
+        lineHeight: scale(21),
+        includeFontPadding: false,
     },
     textarea: {
         marginTop: scale(10),
@@ -370,6 +431,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(12),
         paddingVertical: scale(10),
         fontSize: scale(14),
+        lineHeight: scale(21),
+        includeFontPadding: false,
     },
     // Underline style, matching the profile-setup step inputs
     inlineInput: {
@@ -378,6 +441,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(6),
         paddingVertical: 0,
         fontSize: scale(14),
+        lineHeight: scale(21),
+        includeFontPadding: false,
         backgroundColor: 'transparent',
     },
     inlineTextarea: {
@@ -386,6 +451,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(6),
         paddingVertical: scale(8),
         fontSize: scale(14),
+        lineHeight: scale(21),
+        includeFontPadding: false,
         backgroundColor: 'transparent',
     },
     counter: {
@@ -398,6 +465,9 @@ const styles = StyleSheet.create({
     },
     saveButton: {
         marginTop: scale(12),
+        width: scale(140),
+        // Logical end: right in LTR, left in RTL.
+        alignSelf: 'flex-end',
     },
     // Appears under the focused input while the keyboard is open, so the
     // resized viewport keeps it right above the keyboard
@@ -410,5 +480,24 @@ const styles = StyleSheet.create({
     },
     inlineSaveButton: {
         width: scale(110),
+    },
+    impactBadge: {
+        height: scale(24),
+        borderRadius: 999,
+        paddingHorizontal: scale(8),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    impactText: {
+        color: '#FFFFFF',
+        fontSize: scale(11),
+        lineHeight: scale(14),
+        includeFontPadding: false,
+        writingDirection: 'ltr',
+    },
+    savingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
     },
 });

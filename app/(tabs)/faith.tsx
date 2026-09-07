@@ -70,7 +70,7 @@ export default function FaithScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
-            <AppBackTitleBar title={t('faith_in_daily_life', 'Faith in daily life')} />
+            <AppBackTitleBar title={t('faith_in_daily_life', 'Faith in Daily Life')} />
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(120) }}>
             <Text variant="body-sm" style={{ color: colors.brand.text.subtitle, marginBottom: scale(18) }}>
                 {t('click_add_faith', 'Add faith in daily life')}
@@ -79,7 +79,7 @@ export default function FaithScreen() {
                 <Text variant="body">{selectedLabels.length ? selectedLabels.join(', ') : t('select', 'Select')}</Text>
             </Pressable>
             <GradientButton title={t('save', 'Save')} onPress={save} loading={saving} disabled={saving} widthMode="full" containerStyle={{ marginTop: scale(20) }} />
-            <MultiSelectSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={setSelected} options={options} selected={selected} title={t('faith_in_daily_life', 'Faith in daily life')} />
+            <MultiSelectSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} onConfirm={setSelected} options={options} selected={selected} title={t('faith_in_daily_life', 'Faith in Daily Life')} />
         </ScrollView>
         </View>
     );

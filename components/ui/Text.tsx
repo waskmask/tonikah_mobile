@@ -67,55 +67,74 @@ export const Text: React.FC<TextProps> = ({
             case "h1":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.extra, "800"),
-                    fontSize: Typography.size["4xl"]
+                    fontSize: Typography.size["4xl"],
+                    lineHeight: Typography.lineHeight["4xl"],
+                    letterSpacing: 0,
                 };
             case "h2":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold, "700"),
-                    fontSize: Typography.size["3xl"]
+                    fontSize: Typography.size["3xl"],
+                    lineHeight: Typography.lineHeight["3xl"],
+                    letterSpacing: 0,
                 };
             case "h3":
             case "heading-sm":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.heading.semi, "600"),
-                    fontSize: Typography.size["2xl"]
+                    fontSize: Typography.size["2xl"],
+                    lineHeight: Typography.lineHeight["2xl"],
+                    letterSpacing: 0,
                 };
             case "heading":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.bold : Typography.font.heading.bold, "700"),
-                    fontSize: Typography.size["3xl"]
+                    fontSize: Typography.size["3xl"],
+                    lineHeight: Typography.lineHeight["3xl"],
+                    letterSpacing: 0,
                 };
             case "subtitle":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.heading.medium, "500"),
                     fontSize: Typography.size.sm,
-                    letterSpacing: 2,
+                    lineHeight: Typography.lineHeight.sm,
+                    letterSpacing: 0,
                     textTransform: "uppercase"
                 };
             case "body":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
-                    fontSize: Typography.size.base
+                    fontSize: Typography.size.base,
+                    lineHeight: Typography.lineHeight.base,
+                    letterSpacing: 0,
                 };
             case "body-sm":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
-                    fontSize: Typography.size.sm
+                    fontSize: Typography.size.sm,
+                    lineHeight: Typography.lineHeight.sm,
+                    letterSpacing: 0,
                 };
             case "caption":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
-                    fontSize: Typography.size.xs
+                    fontSize: Typography.size.xs,
+                    lineHeight: Typography.lineHeight.xs,
+                    letterSpacing: 0,
                 };
             case "button":
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.semi : Typography.font.body.semi, "600"),
-                    fontSize: Typography.size.lg
+                    fontSize: Typography.size.lg,
+                    lineHeight: Typography.lineHeight.lg,
+                    letterSpacing: 0,
                 };
             default:
                 return {
                     ...font(isArabicFamily ? Typography.font.arabic.regular : Typography.font.body.regular, "400"),
-                    fontSize: Typography.size.base
+                    fontSize: Typography.size.base,
+                    lineHeight: Typography.lineHeight.base,
+                    letterSpacing: 0,
                 };
         }
     };
@@ -139,6 +158,7 @@ export const Text: React.FC<TextProps> = ({
                     fontFamily: variantStyle.fontFamily,
                     fontWeight: variantStyle.fontWeight,
                     fontSize: variantStyle.fontSize,
+                    lineHeight: variantStyle.lineHeight,
                     letterSpacing: variantStyle.letterSpacing,
                     textTransform: variantStyle.textTransform,
                 },

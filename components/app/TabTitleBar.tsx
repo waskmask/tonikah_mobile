@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Menu } from 'lucide-react-native';
-import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
+import { useAppMenu } from '@/components/app/AppMenuProvider';
 import { Text } from '@/components/ui/Text';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
-import { HeaderTokens } from '@/constants/uiTokens';
+import { HeaderTokens, NavigationTypeTokens } from '@/constants/uiTokens';
 import { scale } from '@/hooks/useResponsive';
 
 type TabTitleBarProps = {
@@ -19,7 +19,7 @@ type TabTitleBarProps = {
 export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarProps) {
     const { isRTL, t } = useLanguage();
     const chrome = useColors().chrome.header;
-    const [menuOpen, setMenuOpen] = useState(false);
+    const { openMenu } = useAppMenu();
 
     return (
         <>
@@ -64,7 +64,7 @@ export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarPr
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={String(t('menu') || 'Menu')}
-                            onPress={() => setMenuOpen(true)}
+                            onPress={openMenu}
                             style={({ pressed }) => [
                                 styles.iconButton,
                                 { borderColor: chrome.border, backgroundColor: chrome.iconBackground },
@@ -78,9 +78,6 @@ export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarPr
                     )}
                 </View>
             </SafeAreaView>
-            {showMenu ? (
-                <AppMenuDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} />
-            ) : null}
         </>
     );
 }
@@ -106,8 +103,7 @@ const styles = StyleSheet.create({
     },
     title: {
         flexShrink: 1,
-        fontSize: scale(17),
-        lineHeight: scale(22),
+        ...NavigationTypeTokens.topBarTitle,
     },
     iconButton: {
         width: scale(34),

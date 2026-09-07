@@ -90,6 +90,9 @@ export function cleanProfileText(value?: string | null) {
 export function cleanProfileMultilineText(value?: string | null) {
     return String(value || '')
         .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+        // The API stores blank-line-separated paragraphs as adjacent <p>
+        // elements. Preserve that paragraph boundary before stripping tags.
+        .replace(/<\/\s*(p|div)\s*>\s*<\s*(p|div)(?:\s[^>]*)?>/gi, '\n\n')
         .replace(/<\/\s*(p|div|li)\s*>/gi, '\n')
         .replace(/<[^>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
@@ -128,5 +131,40 @@ export function profileImage(item?: any) {
         fromUrls ||
         item.url ||
         ''
+    );
+}
+
+function firstImageUrl(...values: unknown[]) {
+    const match = values.find((value) => typeof value === 'string' && value.trim());
+    return typeof match === 'string' ? match.trim() : '';
+}
+
+/** Prefer bandwidth-appropriate variants for repeated list cards and avatars. */
+export function profileListImage(item?: any) {
+    if (!item || typeof item === 'string') return profileImage(item);
+    return firstImageUrl(
+        item.avatarSmallUrl,
+        item.avatarThumbUrl,
+        item.smallUrl,
+        item.thumbUrl,
+        item.urls?.small,
+        item.urls?.thumb,
+        item.urls?.blur,
+        item.urls?.original,
+        profileImage(item),
+    );
+}
+
+export function profileAvatarImage(item?: any) {
+    if (!item || typeof item === 'string') return profileImage(item);
+    return firstImageUrl(
+        item.avatarThumbUrl,
+        item.thumbUrl,
+        item.avatarSmallUrl,
+        item.urls?.thumb,
+        item.urls?.small,
+        item.urls?.blur,
+        item.avatarUrl,
+        profileImage(item),
     );
 }

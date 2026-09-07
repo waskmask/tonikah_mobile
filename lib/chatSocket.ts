@@ -3,6 +3,11 @@ import { Config } from '@/constants/config';
 import { api } from '@/lib/api';
 import { ChatMessage } from '@/lib/chatService';
 import type { GalleryModerationUpdateEvent } from '@/hooks/useGalleryModeration';
+import { queryClient } from '@/lib/queryClient';
+import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
+import { clearAllCachedMessages } from '@/lib/chatCache';
+import { clearChatMediaCache } from '@/lib/chatMediaCache';
+import { useAuthStore } from '@/store/authStore';
 
 /**
  * Singleton chat socket. Previously every useChatSocket() call opened its own
@@ -182,6 +187,25 @@ async function ensureSocket() {
         nextSocket.on('gallery:access:revoked', forwardGalleryAccessChanged);
         nextSocket.on('gallery:moderation-updated', (payload: GalleryModerationUpdateEvent) => {
             broadcast((handlers) => handlers.onGalleryModerationUpdated?.(payload));
+        });
+
+        nextSocket.on('chat:message:locked', (payload) => {
+            broadcast((handlers) => handlers.onConversationChanged?.(payload));
+        });
+
+        nextSocket.on('membership:changed', (payload) => {
+            const messagingAccess = payload?.messagingAccess;
+            queryClient.setQueryData<CurrentUserStatus>(CURRENT_USER_STATUS_QUERY_KEY, (current) => ({
+                ...(current || {}),
+                messagingAccess,
+            }));
+            void queryClient.invalidateQueries({ queryKey: CURRENT_USER_STATUS_QUERY_KEY });
+            if (messagingAccess?.allowed === false) {
+                const user = useAuthStore.getState().user;
+                const userId = String(user?._id || user?.id || '');
+                queryClient.removeQueries({ queryKey: ['chat'] });
+                void Promise.all([clearAllCachedMessages(userId), clearChatMediaCache()]);
+            }
         });
 
         nextSocket.on('chat:seen', (payload) => broadcast((handlers) => handlers.onSeen?.(payload)));

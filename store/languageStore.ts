@@ -17,6 +17,19 @@ export const POST_LANGUAGE_ROUTE_KEY = "tonikah-post-language-route";
 const RTL_SYNC_ATTEMPT_KEY = "tonikah-rtl-sync-attempt";
 const RTL_SWAP_PREF_APPLIED_KEY = "tonikah-rtl-swap-pref-applied";
 
+function reloadApp() {
+    setTimeout(() => {
+        if (__DEV__) {
+            DevSettings.reload();
+            return;
+        }
+
+        Updates.reloadAsync().catch(() => {
+            DevSettings.reload();
+        });
+    }, 120);
+}
+
 /**
  * Native RTL state is stored per-install; a rebuild/reinstall wipes it while the
  * persisted language survives. Re-assert it on boot and reload once when the
@@ -52,11 +65,7 @@ async function syncNativeRTL(currentLanguage: string) {
 
     I18nManager.allowRTL(shouldBeRTL);
     I18nManager.forceRTL(shouldBeRTL);
-    setTimeout(() => {
-        Updates.reloadAsync().catch(() => {
-            DevSettings.reload();
-        });
-    }, 120);
+    reloadApp();
 }
 
 export const useLanguageStore = create<LanguageState>()(
@@ -83,11 +92,7 @@ export const useLanguageStore = create<LanguageState>()(
                 }
 
                 set({ currentLanguage: lng, isRTL });
-                setTimeout(() => {
-                    Updates.reloadAsync().catch(() => {
-                        DevSettings.reload();
-                    });
-                }, 120);
+                reloadApp();
             },
         }),
         {

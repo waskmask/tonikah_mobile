@@ -2,10 +2,12 @@ import { Config } from '@/constants/config';
 import * as SecureStore from 'expo-secure-store';
 import i18n from '@/lib/i18n';
 import { Platform } from 'react-native';
+import { recordApiRequest } from '@/lib/performanceDiagnostics';
+import { connectivity } from '@/lib/connectivity';
 
 const TOKEN_KEYS = {
     ACCESS: 'tn_access_token',
-    REFRESH: 'tn_refresh_token',
+    REFRESH: 'tn_refresh_token'
 };
 
 // API Response interface
@@ -23,10 +25,35 @@ type RefreshResult = {
 
 type UnauthorizedHandler = () => void | Promise<void>;
 
+type StoredTokens = {
+    accessToken: string | null;
+    refreshToken: string | null;
+};
+
 let isRefreshing = false;
 let refreshSubscribers: ((result: RefreshResult) => void)[] = [];
 let unauthorizedHandler: UnauthorizedHandler | null = null;
 let unauthorizedPromise: Promise<void> | null = null;
+let tokenCache: StoredTokens | null = null;
+let tokenHydrationPromise: Promise<StoredTokens> | null = null;
+let tokenCacheGeneration = 0;
+
+const readStoredTokens = async (): Promise<StoredTokens> => {
+    if (tokenCache) return tokenCache;
+    if (!tokenHydrationPromise) {
+        const generation = tokenCacheGeneration;
+        tokenHydrationPromise = Promise.all([SecureStore.getItemAsync(TOKEN_KEYS.ACCESS), SecureStore.getItemAsync(TOKEN_KEYS.REFRESH)])
+            .then(([accessToken, refreshToken]) => {
+                const storedTokens = { accessToken, refreshToken };
+                if (generation === tokenCacheGeneration) tokenCache = storedTokens;
+                return storedTokens;
+            })
+            .finally(() => {
+                tokenHydrationPromise = null;
+            });
+    }
+    return tokenHydrationPromise;
+};
 
 const onRefreshed = (result: RefreshResult) => {
     refreshSubscribers.map(cb => cb(result));
@@ -38,10 +65,10 @@ const addRefreshSubscriber = (cb: (result: RefreshResult) => void) => {
 };
 
 const clearStoredTokens = async () => {
-    await Promise.all([
-        SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS),
-        SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH),
-    ]);
+    tokenCacheGeneration += 1;
+    tokenCache = { accessToken: null, refreshToken: null };
+    tokenHydrationPromise = null;
+    await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS), SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH)]);
 };
 
 const notifyUnauthorized = async () => {
@@ -68,7 +95,7 @@ const getClientHeaders = () => {
 
     return {
         'X-Client-Type': clientPlatform === 'web' ? 'web' : 'native',
-        'X-Client-Platform': clientPlatform,
+        'X-Client-Platform': clientPlatform
     };
 };
 
@@ -83,15 +110,14 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
 
-    const accessToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
+    const { accessToken } = await readStoredTokens();
 
-    const isFormDataBody =
-        typeof FormData !== 'undefined' && restOptions.body instanceof FormData;
+    const isFormDataBody = typeof FormData !== 'undefined' && restOptions.body instanceof FormData;
 
     const headers: Record<string, string> = {
         'Accept-Language': i18n.language,
         ...getClientHeaders(),
-        ...(customHeaders as Record<string, string>),
+        ...(customHeaders as Record<string, string>)
     };
 
     if (!isFormDataBody && !headers['Content-Type']) {
@@ -105,14 +131,17 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
     const url = `${Config.API_URL}${endpoint}`;
 
     try {
+        recordApiRequest(endpoint);
         const response = await fetch(url, {
             ...restOptions,
             headers,
-            signal: controller.signal,
+            signal: controller.signal
         });
+        connectivity.markOnline();
         clearTimeout(id);
         return response;
     } catch (error: any) {
+        connectivity.markOffline();
         clearTimeout(id);
         if (error.name === 'AbortError') {
             throw new Error('timeout');
@@ -122,14 +151,14 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
 };
 
 const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
-    const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
+    const { refreshToken } = await readStoredTokens();
 
     if (!refreshToken) {
         return handleTerminalUnauthorized();
     }
 
     if (isRefreshing) {
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
             addRefreshSubscriber(resolve);
         });
     }
@@ -138,14 +167,16 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
     let result: RefreshResult = { accessToken: null, reason: 'network_error' };
 
     try {
+        recordApiRequest('/app-user/mobile/refresh');
         const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                ...getClientHeaders(),
+                ...getClientHeaders()
             },
-            body: JSON.stringify({ refreshToken }),
+            body: JSON.stringify({ refreshToken })
         });
+        connectivity.markOnline();
 
         const refreshData = await refreshRes.json().catch(() => ({}));
 
@@ -157,6 +188,7 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
         }
     } catch {
         // Keep credentials on transient network/provider failures. A later request can retry.
+        connectivity.markOffline();
         result = { accessToken: null, reason: 'network_error' };
     } finally {
         isRefreshing = false;
@@ -176,7 +208,7 @@ const handleResponse = async (response: Response, endpoint: string, options: Fet
     if (response.status === 401 && endpoint !== '/app-user/mobile/refresh' && endpoint !== '/app-user/mobile/login') {
         const refreshResult = await refreshAccessTokenResult();
         if (refreshResult.accessToken) {
-            // Re-attempt original request. `performFetch` reads the fresh token from secure store.
+            // Re-attempt original request with the freshly cached token.
             return apiRequest(endpoint, options);
         }
         if (refreshResult.reason === 'network_error') {
@@ -189,7 +221,11 @@ const handleResponse = async (response: Response, endpoint: string, options: Fet
         const data = await response.json();
         return { ...data, status: response.status };
     } catch (e) {
-        return { success: false, message: 'invalid_json', status: response.status };
+        return {
+            success: false,
+            message: 'invalid_json',
+            status: response.status
+        };
     }
 };
 
@@ -199,7 +235,11 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}): Promise
         return handleResponse(response, endpoint, options);
     } catch (error: any) {
         if (error.message === 'timeout') {
-            return { success: false, message: 'network_error', error: 'timeout' };
+            return {
+                success: false,
+                message: 'network_error',
+                error: 'timeout'
+            };
         }
         return { success: false, message: 'network_error' };
     }
@@ -215,10 +255,11 @@ const parseApiResponseText = (text: string, status: number): ApiResponse => {
 };
 
 const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000): Promise<ApiResponse> => {
-    const accessToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
+    const { accessToken } = await readStoredTokens();
     const url = `${Config.API_URL}${endpoint}`;
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
+        recordApiRequest(endpoint);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url);
         xhr.timeout = timeout;
@@ -234,6 +275,7 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
         }
 
         xhr.onload = async () => {
+            connectivity.markOnline();
             if (xhr.status === 401 && endpoint !== '/app-user/mobile/refresh' && endpoint !== '/app-user/mobile/login') {
                 const refreshResult = await refreshAccessTokenResult();
                 if (refreshResult.accessToken) {
@@ -241,10 +283,18 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
                     return;
                 }
                 if (refreshResult.reason === 'network_error') {
-                    resolve({ success: false, message: 'network_error', status: 0 });
+                    resolve({
+                        success: false,
+                        message: 'network_error',
+                        status: 0
+                    });
                     return;
                 }
-                resolve({ success: false, message: 'unauthorized', status: 401 });
+                resolve({
+                    success: false,
+                    message: 'unauthorized',
+                    status: 401
+                });
                 return;
             }
 
@@ -252,27 +302,28 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
         };
 
         xhr.onerror = () => {
+            connectivity.markOffline();
             resolve({
                 success: false,
                 message: 'network_error',
                 error: 'upload_network_error',
-                status: xhr.status || 0,
+                status: xhr.status || 0
             });
         };
 
         xhr.ontimeout = () => {
+            connectivity.markOffline();
             resolve({
                 success: false,
                 message: 'network_error',
                 error: 'upload_timeout',
-                status: 0,
+                status: 0
             });
         };
 
         xhr.send(body);
     });
 };
-
 
 export const api = {
     get: (endpoint: string) => apiRequest(endpoint, { method: 'GET' }),
@@ -282,14 +333,12 @@ export const api = {
     delete: (endpoint: string) => apiRequest(endpoint, { method: 'DELETE' }),
     deleteWithBody: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'DELETE', body: JSON.stringify(body) }),
     setTokens: async (access: string, refresh: string) => {
-        await SecureStore.setItemAsync(TOKEN_KEYS.ACCESS, access);
-        await SecureStore.setItemAsync(TOKEN_KEYS.REFRESH, refresh);
+        tokenCacheGeneration += 1;
+        tokenCache = { accessToken: access, refreshToken: refresh };
+        tokenHydrationPromise = null;
+        await Promise.all([SecureStore.setItemAsync(TOKEN_KEYS.ACCESS, access), SecureStore.setItemAsync(TOKEN_KEYS.REFRESH, refresh)]);
     },
-    getTokens: async () => {
-        const accessToken = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
-        const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
-        return { accessToken, refreshToken };
-    },
+    getTokens: readStoredTokens,
     refreshAccessToken,
     handleUnauthorized: async () => {
         await handleTerminalUnauthorized();
@@ -302,5 +351,5 @@ export const api = {
     },
     clearTokens: async () => {
         await clearStoredTokens();
-    },
+    }
 };

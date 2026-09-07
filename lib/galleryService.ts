@@ -12,6 +12,7 @@ export type GalleryItem = {
         startedAt?: string;
         checkedAt?: string;
         reviewedAt?: string;
+        updatedAt?: string;
     };
     isPrimary?: boolean;
     sort_index?: number;

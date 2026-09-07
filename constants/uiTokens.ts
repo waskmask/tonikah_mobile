@@ -48,9 +48,23 @@ export const HeaderTokens = {
     paddingHorizontal: scale(14),
     iconButtonSize: scale(38),
     iconButtonRadius: scale(13),
-    brandFontSize: scale(21),
-    brandLineHeight: scale(24),
+    brandFontSize: 21,
+    brandLineHeight: 24,
     actionGap: scale(10),
+} as const;
+
+export const NavigationTypeTokens = {
+    tabLabel: { fontSize: 10, lineHeight: 13 },
+    compactTabLabel: { fontSize: 10, lineHeight: 13 },
+    topBarTitle: { fontSize: 17, lineHeight: 22 },
+    drawerTitle: { fontSize: 14, lineHeight: 18 },
+    drawerLabel: { fontSize: 16, lineHeight: 22 },
+} as const;
+
+export const ControlTokens = {
+    minimumTouchTarget: 44,
+    compactIconButton: scale(38),
+    fieldMinHeight: scale(48),
 } as const;
 
 export function formatBadgeCount(count: number) {

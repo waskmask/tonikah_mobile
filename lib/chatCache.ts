@@ -1,4 +1,5 @@
 import { storage } from '@/lib/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChatMessage } from '@/lib/chatService';
 
 /**
@@ -38,9 +39,20 @@ export async function saveCachedMessages(
     if (!userId || !conversationId || conversationId === 'new') return;
     // Keep only the newest slice — older history is fetched on demand via pagination.
     const trimmed = sortAscending(
-        messages.filter((m) => m && !m.pending && !m.failed && m.id && !String(m.id).startsWith('tmp_')),
+        messages.filter((message) => {
+            if (!message || message.pending) return false;
+            const stableServerMessage = message.id && !String(message.id).startsWith('tmp_');
+            const retryableTextMessage = message.failed
+                && message.type === 'text'
+                && Boolean(message.tempId)
+                && Boolean(message.content?.trim());
+            return Boolean(stableServerMessage || retryableTextMessage);
+        }),
     ).slice(-MAX_CACHED_MESSAGES);
-    if (trimmed.length === 0) return;
+    if (trimmed.length === 0) {
+        await storage.removeItem(keyFor(userId, conversationId));
+        return;
+    }
     await storage.setItem(keyFor(userId, conversationId), trimmed);
 }
 
@@ -50,4 +62,12 @@ export async function clearCachedMessages(
 ): Promise<void> {
     if (!userId || !conversationId) return;
     await storage.removeItem(keyFor(userId, conversationId));
+}
+
+export async function clearAllCachedMessages(userId: string): Promise<void> {
+    if (!userId) return;
+    const prefix = `chat:msgs:${userId}:`;
+    const keys = await AsyncStorage.getAllKeys();
+    const matching = keys.filter((key) => key.startsWith(prefix));
+    if (matching.length) await AsyncStorage.multiRemove(matching);
 }

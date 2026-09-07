@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Ban,
+    BookHeart,
     CreditCard,
     Handshake,
     Languages,
@@ -25,6 +26,9 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
+import { NavigationTypeTokens } from '@/constants/uiTokens';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { completeInteraction } from '@/lib/performanceDiagnostics';
 
 type MenuItem = {
     href: Href;
@@ -35,7 +39,7 @@ type MenuItem = {
 
 const QUICK_ITEMS: MenuItem[] = [
     { href: '/(tabs)/my-hobbies', labelKey: 'hobbies', fallback: 'Hobbies', icon: Sparkles },
-    { href: '/(tabs)/faith', labelKey: 'faith', fallback: 'Faith', icon: Moon },
+    { href: '/(tabs)/faith', labelKey: 'faith_in_daily_life', fallback: 'Faith in Daily Life', icon: BookHeart },
     { href: '/(tabs)/partner-preference', labelKey: 'partner_preference', fallback: 'Partner Preference', icon: Handshake },
     { href: '/(tabs)/language', labelKey: 'language', fallback: 'Language', icon: Languages },
 ];
@@ -49,6 +53,7 @@ const ACCOUNT_ITEMS: MenuItem[] = [
 ];
 
 const DRAWER_WIDTH = Dimensions.get('window').width;
+const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 
 function textValue(value: unknown, fallback: string) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
@@ -59,6 +64,26 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     const { isDark, theme, setTheme } = useTheme();
     const { logout, isLoading } = useAuthStore();
     const pathname = usePathname();
+    const reduceMotion = useReducedMotion();
+    const progress = useSharedValue(0);
+
+    useEffect(() => {
+        if (!visible) return;
+        progress.value = reduceMotion ? 1 : 0;
+        if (!reduceMotion) {
+            progress.value = withTiming(1, {
+                duration: 180,
+                easing: Easing.out(Easing.cubic),
+            });
+        }
+    }, [progress, reduceMotion, visible]);
+
+    const overlayStyle = useAnimatedStyle(() => ({
+        opacity: progress.value,
+    }));
+    const drawerStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: (1 - progress.value) * DRAWER_WIDTH * (isRTL ? -1 : 1) }],
+    }));
 
     const surfaceColor = isDark ? '#1B1713' : '#FFFFFF';
     const borderColor = isDark ? '#3A332B' : '#E8E8E6';
@@ -68,14 +93,16 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
 
     const navigate = (href: Href) => {
         onClose();
-        if (href === '/(tabs)/edit-profile') {
-            router.push({
-                pathname: '/(tabs)/edit-profile',
-                params: { returnTo: pathname },
-            });
-            return;
-        }
-        router.push(href);
+        requestAnimationFrame(() => {
+            if (href === '/(tabs)/edit-profile') {
+                router.push({
+                    pathname: '/(tabs)/edit-profile',
+                    params: { returnTo: pathname },
+                });
+                return;
+            }
+            router.push(href);
+        });
     };
 
     const handleLogout = async () => {
@@ -85,17 +112,29 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     };
 
     return (
-        <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="none"
+            statusBarTranslucent
+            onShow={() => completeInteraction('drawer', 'visible')}
+            onRequestClose={onClose}
+        >
             <View style={styles.modalRoot}>
-                <Pressable style={[styles.overlay, { backgroundColor: overlayColor }]} onPress={onClose} />
-                <SafeAreaView
+                <Animated.View style={[styles.overlay, { backgroundColor: overlayColor }, overlayStyle]}>
+                    <Pressable style={styles.overlayPressable} onPress={onClose} />
+                </Animated.View>
+                <AnimatedSafeAreaView
                     edges={['top', 'bottom']}
                     style={[
                         styles.drawer,
+                        drawerStyle,
                         {
                             width: DRAWER_WIDTH,
                             backgroundColor: surfaceColor,
                             borderColor,
+                            left: isRTL ? 0 : undefined,
+                            right: isRTL ? undefined : 0,
                         },
                     ]}
                 >
@@ -156,7 +195,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                             onPress={handleLogout}
                         />
                     </View>
-                </SafeAreaView>
+                </AnimatedSafeAreaView>
             </View>
         </Modal>
     );
@@ -238,6 +277,9 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
     },
+    overlayPressable: {
+        flex: 1,
+    },
     drawer: {
         position: 'absolute',
         top: 0,
@@ -252,8 +294,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         flex: 1,
-        fontSize: 14,
-        lineHeight: 18,
+        ...NavigationTypeTokens.drawerTitle,
     },
     closeButton: {
         width: scale(34),
@@ -293,8 +334,7 @@ const styles = StyleSheet.create({
     },
     menuLabel: {
         flex: 1,
-        fontSize: 16,
-        lineHeight: 22,
+        ...NavigationTypeTokens.drawerLabel,
     },
     footer: {
         borderTopWidth: StyleSheet.hairlineWidth,

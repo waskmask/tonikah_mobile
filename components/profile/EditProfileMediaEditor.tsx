@@ -3,28 +3,22 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ArrowUp, ImagePlus, Info, Lock, Star, Trash2, Unlock } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { SingleSelectSheet } from '@/components/ui/SingleSelectSheet';
 import { GalleryCropModal } from '@/components/app/GalleryCropModal';
 import { MediaGuidelinesModal } from '@/components/app/MediaGuidelinesModal';
-import { galleryService, GalleryItem, GalleryPrivacy } from '@/lib/galleryService';
+import { galleryService, GalleryItem, GalleryPrivacy, GalleryResponse } from '@/lib/galleryService';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
-import { useChatSocket } from '@/hooks/useChatSocket';
-import {
-    isGalleryModerationActive,
-    notifyGalleryModerationResult,
-    useGalleryModerationEventGuard,
-    useGalleryModerationNotifications,
-    useGalleryModerationReconciliation,
-} from '@/hooks/useGalleryModeration';
+import { isGalleryModerationActive } from '@/hooks/useGalleryModeration';
 import { scale } from '@/hooks/useResponsive';
 import { CURRENT_USER_STATUS_QUERY_KEY } from '@/hooks/useCurrentUserStatus';
+import { queryKeys } from '@/lib/queryKeys';
 
 const GALLERY_MAX_SLOTS = 3;
 const GALLERY_SOURCE_MAX_BYTES = 15 * 1024 * 1024;
@@ -90,7 +84,11 @@ export function ProfileMediaEditor({
     const [sourceSlot, setSourceSlot] = useState<number | null>(null);
     const [guidelinesVisible, setGuidelinesVisible] = useState(false);
     const onGalleryChangeRef = useRef(onGalleryChange);
-    const translate = useCallback((key: string, fallback?: string) => t(key, fallback), [currentLanguage]);
+    const { data: sharedGalleryResponse } = useQuery<GalleryResponse>({
+        queryKey: queryKeys.gallery.me,
+        queryFn: galleryService.fetchMe,
+        enabled: false,
+    });
 
     const slots = useMemo(
         () => Array.from({ length: GALLERY_MAX_SLOTS }, (_, index) => gallery[index] ?? null),
@@ -146,9 +144,7 @@ export function ProfileMediaEditor({
         void AsyncStorage.setItem(guidelinesStorageKey, '1').catch(() => undefined);
     }, [guidelinesStorageKey]);
 
-    const refreshGallery = useCallback(async (showLoader = false, silent = false) => {
-        if (showLoader) setLoading(true);
-        const res = await galleryService.fetchMe();
+    const applyGalleryResponse = useCallback((res: GalleryResponse) => {
         if (res.success) {
             const nextGallery = normalizeGallery(res.gallery || []);
             // Male accounts and empty galleries are always represented as public
@@ -164,43 +160,29 @@ export function ProfileMediaEditor({
             void queryClient.invalidateQueries({
                 queryKey: CURRENT_USER_STATUS_QUERY_KEY,
             });
+        }
+    }, [canUsePrivateGallery, queryClient]);
+
+    const refreshGallery = useCallback(async (showLoader = false, silent = false) => {
+        if (showLoader) setLoading(true);
+        const res = await galleryService.fetchMe();
+        if (res.success) {
+            queryClient.setQueryData(queryKeys.gallery.me, res);
+            applyGalleryResponse(res);
         } else if (!silent) {
             showToast(apiMessage(res.message), 'error');
         }
         if (showLoader) setLoading(false);
         return res;
-    }, [canUsePrivateGallery, queryClient, showToast]);
+    }, [applyGalleryResponse, queryClient, showToast]);
+
+    useEffect(() => {
+        if (sharedGalleryResponse?.success) applyGalleryResponse(sharedGalleryResponse);
+    }, [applyGalleryResponse, sharedGalleryResponse]);
 
     useEffect(() => {
         void refreshGallery(true);
     }, [refreshGallery]);
-
-    const reconcileGallery = useCallback(
-        () => refreshGallery(false, true),
-        [refreshGallery],
-    );
-    const shouldProcessModerationEvent = useGalleryModerationEventGuard();
-    useGalleryModerationReconciliation(reconcileGallery);
-    useGalleryModerationNotifications(gallery, translate);
-
-    useChatSocket({
-        enabled: true,
-        onGalleryModerationUpdated: (update) => {
-            if (!shouldProcessModerationEvent(update)) return;
-            if (update.deleted) {
-                notifyGalleryModerationResult(update, translate);
-            }
-            void refreshGallery(false, true).catch(() => undefined);
-        },
-    });
-
-    useEffect(() => {
-        if (!hasActiveModeration) return;
-        const interval = setInterval(() => {
-            void refreshGallery(false, true).catch(() => undefined);
-        }, 2500);
-        return () => clearInterval(interval);
-    }, [hasActiveModeration, refreshGallery]);
 
     const pickImage = (slotIndex: number) => {
         if (gallery.length >= GALLERY_MAX_SLOTS && !gallery[slotIndex]) {
@@ -375,7 +357,7 @@ export function ProfileMediaEditor({
                 variant === 'onboarding' && styles.onboardingSection,
                 {
                     borderColor: variant === 'onboarding' ? 'transparent' : borderColor,
-                    backgroundColor: variant === 'onboarding' ? 'transparent' : surface,
+                    backgroundColor: variant === 'onboarding' ? 'transparent' : colors.brand.bg.surface,
                 },
             ]}
         >
@@ -454,22 +436,26 @@ export function ProfileMediaEditor({
                                     <View
                                         style={[
                                             styles.moderationBadge,
-                                            { backgroundColor: warningColors.border },
+                                            { backgroundColor: warningColors.bg },
                                         ]}
                                     >
                                         {checking ? (
                                             <ActivityIndicator
                                                 size="small"
-                                                color={colors.chrome.common.inverseText}
+                                                color={warningColors.icon}
                                                 style={styles.badgeSpinner}
                                             />
                                         ) : (
                                             <AlertCircle
                                                 size={scale(12)}
-                                                color={colors.chrome.common.inverseText}
+                                                color={warningColors.icon}
+                                                strokeWidth={2.5}
                                             />
                                         )}
-                                        <Text style={styles.moderationBadgeText} numberOfLines={1}>
+                                        <Text
+                                            style={[styles.moderationBadgeText, { color: warningColors.text }]}
+                                            numberOfLines={1}
+                                        >
                                             {checking
                                                 ? t('image_moderation_checking', 'Checking photo')
                                                 : t('moderation_text_under_review', 'Under review')}
@@ -655,9 +641,10 @@ export const EditProfileMediaEditor = ProfileMediaEditor;
 
 const styles = StyleSheet.create({
     section: {
-        borderWidth: 1,
-        borderRadius: scale(12),
-        padding: scale(12),
+        borderTopWidth: 1,
+        borderRadius: 0,
+        paddingHorizontal: scale(18),
+        paddingVertical: scale(20),
         gap: scale(12),
     },
     onboardingSection: {
@@ -757,26 +744,26 @@ const styles = StyleSheet.create({
     moderationBadge: {
         position: 'absolute',
         left: scale(8),
-        right: scale(8),
         bottom: scale(8),
-        minHeight: scale(26),
+        height: scale(24),
         borderRadius: scale(999),
-        paddingHorizontal: scale(7),
-        paddingVertical: scale(4),
+        paddingHorizontal: scale(8),
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: scale(4),
+        maxWidth: '88%',
     },
     moderationBadgeText: {
         flexShrink: 1,
-        color: '#FFFFFF',
-        fontSize: scale(10),
-        lineHeight: scale(13),
+        fontSize: scale(11),
+        lineHeight: scale(14),
         fontWeight: '700',
+        includeFontPadding: false,
     },
     badgeSpinner: {
-        transform: [{ scale: 0.72 }],
+        transform: [{ scale: 0.62 }],
+        marginHorizontal: -scale(3),
     },
     deleteSpinner: {
         transform: [{ scale: 0.78 }],

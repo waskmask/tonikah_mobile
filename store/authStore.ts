@@ -4,6 +4,7 @@ import { authService, AuthResponse, GoogleAuthRequest, SignupRequest, User } fro
 import { api } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleSignIn';
 import { registerForPushNotifications, removeRegisteredPushToken } from '@/lib/pushNotifications';
+import { queryClient } from '@/lib/queryClient';
 
 // Last known user, persisted so a returning user starts instantly and the
 // fresh /me fetch happens in the background instead of blocking the splash.
@@ -167,7 +168,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                         .then((result) => {
                             if (result.success && result.user) {
                                 set({ user: result.user, isAuthenticated: true });
-                            } else {
+                            } else if (result.status === 401 || result.message === 'unauthorized') {
                                 void api.clearTokens();
                                 void AsyncStorage.removeItem(USER_CACHE_KEY);
                                 set({ user: null, isAuthenticated: false });
@@ -187,13 +188,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.user) {
                 set({ user: result.user, isAuthenticated: true });
                 registerForPushNotifications().catch(() => { });
-            } else {
+            } else if (result.status === 401 || result.message === 'unauthorized') {
                 await api.clearTokens();
                 set({ user: null, isAuthenticated: false });
             }
         } catch {
-            await api.clearTokens();
-            set({ user: null, isAuthenticated: false });
+            // Keep credentials on transient startup failures. A later request
+            // or foreground refresh can restore the session without a login.
         } finally {
             set({ isRestoringSession: false });
         }
@@ -207,6 +208,7 @@ useAuthStore.subscribe((state, prevState) => {
     if (state.user) {
         void AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(state.user)).catch(() => undefined);
     } else {
+        queryClient.clear();
         void AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => undefined);
     }
 });

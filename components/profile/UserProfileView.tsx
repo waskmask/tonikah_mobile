@@ -25,6 +25,7 @@ import {
     Baby,
     AlertCircle,
     Ban,
+    BookHeart,
     BriefcaseBusiness,
     Building2,
     CalendarHeart,
@@ -39,14 +40,16 @@ import {
     Languages,
     Lock,
     MapPin,
+    Menu,
     MessageCircle,
     Moon,
     MoreVertical,
     Pencil,
     Plane,
-    Quote,
+    Puzzle,
     Ruler,
     ShieldCheck,
+    Shirt,
     Sparkles,
     UserRound,
     Users,
@@ -64,13 +67,7 @@ import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
-import {
-    isGalleryModerationActive,
-    notifyGalleryModerationResult,
-    useGalleryModerationEventGuard,
-    useGalleryModerationNotifications,
-    useGalleryModerationReconciliation,
-} from '@/hooks/useGalleryModeration';
+import { isGalleryModerationActive } from '@/hooks/useGalleryModeration';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
 import { chatService, normalizeConversation } from '@/lib/chatService';
@@ -98,6 +95,7 @@ import {
     profileName,
 } from '@/lib/exploreProfile';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+import { emojiChipItem } from '@/lib/profileEmoji';
 import { formatProfileManagerBadge } from '@/lib/profileManager';
 import { ProfileManagerBadge } from '@/components/profile/ProfileManagerBadge';
 import { getTextDirection, localeTextDirection } from '@/lib/textDirection';
@@ -105,6 +103,9 @@ import { pendingModerationCandidate } from '@/lib/textModeration';
 import { UnderReviewInfoIcon, UnderReviewPill } from '@/components/app/UnderReviewPill';
 import { ProfileSummaryEditor, SummaryField } from '@/components/profile/ProfileSummaryEditor';
 import { ReportSheet, ReportTarget } from '@/components/profile/ReportSheet';
+import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
+import { useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
+import { canOpenMessaging } from '@/lib/messagingAccess';
 
 type Fact = { icon: LucideIcon; label: string; value: string; underReview?: boolean };
 type PendingProfileToast = {
@@ -119,130 +120,21 @@ function truncateHeaderName(value: string, max = 11) {
     return trimmed.length > max ? `${trimmed.slice(0, max)}..` : trimmed;
 }
 
-const HOBBY_EMOJI: Record<string, string> = {
-    sports: '\u{1F3C6}',
-    reading: '\u{1F4DA}',
-    reading_quran: '\u{1F4D6}',
-    traveling: '\u{2708}\u{FE0F}',
-    travel: '\u{2708}\u{FE0F}',
-    cooking: '\u{1F373}',
-    baking: '\u{1F9C1}',
-    music: '\u{1F3B5}',
-    art: '\u{1F3A8}',
-    painting: '\u{1F3A8}',
-    drawing: '\u{270F}\u{FE0F}',
-    photography: '\u{1F4F8}',
-    gaming: '\u{1F3AE}',
-    video_games: '\u{1F3AE}',
-    fitness: '\u{1F4AA}',
-    gym: '\u{1F4AA}',
-    running: '\u{1F3C3}',
-    hiking: '\u{1F97E}',
-    swimming: '\u{1F3CA}',
-    cycling: '\u{1F6B4}',
-    yoga: '\u{1F9D8}',
-    meditation: '\u{1F9D8}',
-    football: '\u{26BD}',
-    soccer: '\u{26BD}',
-    basketball: '\u{1F3C0}',
-    cricket: '\u{1F3CF}',
-    tennis: '\u{1F3BE}',
-    chess: '\u{265F}\u{FE0F}',
-    horse_riding: '\u{1F40E}',
-    fishing: '\u{1F3A3}',
-    writing: '\u{270D}\u{FE0F}',
-    calligraphy: '\u{1F58B}\u{FE0F}',
-    vlogging: '\u{1F3A5}',
-    diy: '\u{1F6E0}\u{FE0F}',
-    gardening: '\u{1F331}',
-    fashion: '\u{1F457}',
-    investing: '\u{1F4C8}',
-    volunteering: '\u{1F91D}',
-    animals_pets: '\u{1F43E}',
-    animals_and_pets: '\u{1F43E}',
-    pets: '\u{1F43E}',
-    movies: '\u{1F3AC}',
-    netflix: '\u{1F4FA}',
-    podcasts: '\u{1F399}\u{FE0F}',
-    poetry: '\u{1F4DC}',
-    technology: '\u{1F4BB}',
-    coding: '\u{1F4BB}',
-    teaching: '\u{1F468}\u{200D}\u{1F3EB}',
-    dancing: '\u{1F483}',
-    singing: '\u{1F3A4}',
-};
-
-const FAITH_EMOJI: Record<string, string> = {
-    prays_5_times: '\u{1F932}',
-    prays_5_times_a_day: '\u{1F932}',
-    prays_on_time: '\u{23F1}\u{FE0F}',
-    prays_sometimes: '\u{1F932}',
-    jummah_regular: '\u{1F54C}',
-    regular_for_friday_prayer: '\u{1F54C}',
-    quran_recitation: '\u{1F4D6}',
-    recites_quran: '\u{1F4D6}',
-    recites_qur_an: '\u{1F4D6}',
-    dhikr_regular: '\u{1F319}',
-    regular_in_dhikr: '\u{1F319}',
-    fasts_ramadan: '\u{1F319}',
-    fasts_in_ramadan: '\u{1F319}',
-    fasts_sunnah: '\u{1F319}',
-    gives_sadaqah: '\u{1F49D}',
-    zakat_conscious: '\u{1F4B0}',
-    careful_about_zakat: '\u{1F4B0}',
-    completed_umrah: '\u{1F54B}',
-    plans_umrah: '\u{1F54B}',
-    plans_to_perform_umrah: '\u{1F54B}',
-    completed_hajj: '\u{1F54B}',
-    plans_hajj: '\u{1F54B}',
-    plans_to_perform_hajj: '\u{1F54B}',
-    halal_earnings_priority: '\u{2705}',
-    prioritizes_halal_earnings: '\u{2705}',
-    avoids_interest_riba: '\u{1F6AB}',
-    avoids_interest: '\u{1F6AB}',
-    avoids_alcohol: '\u{1F6AB}',
-    avoids_smoking: '\u{1F6AB}',
-    modest_lifestyle: '\u{1F33F}',
-    lives_a_modest_lifestyle: '\u{1F33F}',
-    honest_trustworthy: '\u{1F48E}',
-    honest_and_trustworthy: '\u{1F48E}',
-    kind_soft_spoken: '\u{1F497}',
-    kind_and_soft_spoken: '\u{1F497}',
-    patient_calm_temper: '\u{1F343}',
-    patient_and_calm: '\u{1F343}',
-    respectful: '\u{1F64F}',
-    respectful_to_others: '\u{1F64F}',
-    growth_in_deen: '\u{1F331}',
-    focused_on_growing_in_deen: '\u{1F331}',
-    family_oriented: '\u{1F46A}',
-    close_to_family: '\u{1F46A}',
-    values_marriage: '\u{1F48D}',
-    community_minded: '\u{1F30D}',
-    balances_deen_dunya: '\u{2696}\u{FE0F}',
-    balances_deen_and_duniya: '\u{2696}\u{FE0F}',
-    attends_mosque: '\u{1F54C}',
-    studies_hadith: '\u{1F4DC}',
-    modest_dressing: '\u{1F9D5}',
-    islamic_lectures: '\u{1F399}\u{FE0F}',
-    learns_islam: '\u{1F4DA}',
-};
-
-function profileFieldSlug(value: any) {
-    const raw = String(
-        typeof value === 'object' && value !== null
-            ? value.label || value.name || value.title || value.value || value.value_id || ''
-            : value || '',
-    ).trim();
-    return toKey(raw);
+function blendHexColors(foreground: string, background: string, opacity: number) {
+    const parse = (color: string) => {
+        const hex = color.replace('#', '');
+        if (!/^[\da-f]{6}$/i.test(hex)) return null;
+        return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
+    };
+    const foregroundRgb = parse(foreground);
+    const backgroundRgb = parse(background);
+    if (!foregroundRgb || !backgroundRgb) return background;
+    const channels = foregroundRgb.map((channel, index) =>
+        Math.round(channel * opacity + backgroundRgb[index] * (1 - opacity)),
+    );
+    return `rgb(${channels.join(', ')})`;
 }
 
-function emojiChipItem(value: any, type: 'faith' | 'hobby') {
-    const slug = profileFieldSlug(value);
-    const fallback = displayText(value);
-    const label = type === 'hobby' ? t(`hobby_${slug}`, fallback) : t(slug, fallback);
-    const emoji = type === 'hobby' ? HOBBY_EMOJI[slug] || '\u{2728}' : FAITH_EMOJI[slug] || '\u{1F319}';
-    return { label, emoji, slug };
-}
 
 export type UserProfileViewProps = {
     userId?: string;
@@ -251,6 +143,7 @@ export type UserProfileViewProps = {
     showClose?: boolean;
     isOwnProfile?: boolean;
     onEditProfile?: () => void;
+    onOpenMenu?: () => void;
     onClose?: () => void;
     onBlocked?: (userId: string) => void;
     onUnblocked?: (userId: string) => void;
@@ -269,6 +162,7 @@ export function UserProfileView({
     showClose = true,
     isOwnProfile = false,
     onEditProfile,
+    onOpenMenu,
     onClose,
     onBlocked,
     onUnblocked,
@@ -286,7 +180,10 @@ export function UserProfileView({
     const insets = useSafeAreaInsets();
     const headerTopInset = insets.top;
     const headerRowHeight = scale(48);
-    const [profile, setProfile] = useState<any>(initialProfile || null);
+    const [loadedProfile, setProfile] = useState<any>(initialProfile || null);
+    // The owner profile already has a live parent-owned /me model. Mirroring it
+    // into local state caused an extra full render after every parent update.
+    const profile = isOwnProfile ? initialProfile || loadedProfile : loadedProfile;
     const [loading, setLoading] = useState(Boolean(userId));
     const [error, setError] = useState('');
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -295,6 +192,8 @@ export function UserProfileView({
     const [messageDraft, setMessageDraft] = useState('');
     const [messageChecking, setMessageChecking] = useState(false);
     const [messageSending, setMessageSending] = useState(false);
+    const [membershipGateOpen, setMembershipGateOpen] = useState(false);
+    const messagingEligibility = useMessagingEligibilityStatus();
     const [locallySentRequestIds, setLocallySentRequestIds] = useState<Set<string>>(() => new Set());
     const [pendingProfileToast, setPendingProfileToast] = useState<PendingProfileToast | null>(null);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -304,12 +203,6 @@ export function UserProfileView({
     const scrollOffsetRef = useRef(0);
 
     const resolvedUserId = userId || profileId(initialProfile);
-    const shouldProcessModerationEvent = useGalleryModerationEventGuard();
-    const translateModeration = useCallback(
-        (key: string, fallback?: string) => t(key, fallback),
-        [currentLanguage],
-    );
-
     const load = useCallback(async () => {
         if (!resolvedUserId) return;
         setLoading(true);
@@ -330,27 +223,13 @@ export function UserProfileView({
         if (resolvedUserId && !isOwnProfile) void load();
     }, [load, resolvedUserId, isOwnProfile]);
 
-    useEffect(() => {
-        if (isOwnProfile && initialProfile) setProfile(initialProfile);
-    }, [isOwnProfile, initialProfile]);
-
-    const reconcileOwnProfile = useCallback(() => {
-        if (isOwnProfile) return onReconcile?.() ?? onRefresh?.();
-    }, [isOwnProfile, onReconcile, onRefresh]);
-
-    // Refetch when private-gallery access or the owner's background image
-    // moderation state changes. One singleton socket serves every screen.
+    // Private-gallery access belongs to the viewed member. Owner moderation is
+    // coordinated once at the app root and reaches this screen via shared data.
     useChatSocket({
-        enabled: Boolean(resolvedUserId),
+        enabled: Boolean(resolvedUserId) && !isOwnProfile,
         onGalleryAccessChanged: (payload: any) => {
-            if (isOwnProfile) return;
             if (!payload?.ownerId || String(payload.ownerId) !== String(resolvedUserId)) return;
             void load();
-        },
-        onGalleryModerationUpdated: (update) => {
-            if (!isOwnProfile || !shouldProcessModerationEvent(update)) return;
-            if (update.deleted) notifyGalleryModerationResult(update, translateModeration);
-            void Promise.resolve(onReconcile?.() ?? onRefresh?.()).catch(() => undefined);
         },
     });
 
@@ -377,26 +256,6 @@ export function UserProfileView({
     const hasActiveGalleryModeration = isOwnProfile && gallery.some((item: any) =>
         isGalleryModerationActive(item?.moderationMeta?.status),
     );
-    const hasPendingGalleryReview = isOwnProfile && gallery.some((item: any) =>
-        item?.safe === false && !isGalleryModerationActive(item?.moderationMeta?.status),
-    );
-    useGalleryModerationReconciliation(
-        reconcileOwnProfile,
-        isOwnProfile && Boolean(resolvedUserId),
-    );
-    useGalleryModerationNotifications(
-        isOwnProfile ? gallery : [],
-        translateModeration,
-    );
-
-    useEffect(() => {
-        const reconcile = onReconcile ?? onRefresh;
-        if (!hasActiveGalleryModeration || !reconcile) return;
-        const interval = setInterval(() => {
-            void Promise.resolve(reconcile()).catch(() => undefined);
-        }, 2500);
-        return () => clearInterval(interval);
-    }, [hasActiveGalleryModeration, onReconcile, onRefresh]);
     // url + uuid pairs so image reports can reference the exact photo
     const photoItems = (() => {
         const fromGallery = gallery
@@ -476,6 +335,15 @@ export function UserProfileView({
         if (messageChecking) return;
         setMessageChecking(true);
         try {
+            let access = messagingEligibility.messagingAccess;
+            if (!canOpenMessaging(access)) {
+                const refreshed = await messagingEligibility.refetch();
+                access = refreshed.data?.messagingAccess ?? access;
+            }
+            if (access?.required === true && !canOpenMessaging(access)) {
+                setMembershipGateOpen(true);
+                return;
+            }
             const status = await chatService.status(id);
 
             if (!status.success) {
@@ -545,6 +413,12 @@ export function UserProfileView({
         try {
             const res = await chatService.send({ recipientId: id, content: body, type: 'text' });
             if (!res.success) {
+                if (res.code === 'MEMBERSHIP_REQUIRED') {
+                    setMessageSheetOpen(false);
+                    void messagingEligibility.refetch();
+                    setMembershipGateOpen(true);
+                    return;
+                }
                 if (res.errorMessage === 'request_already_pending') {
                     setMessageDraft('');
                     setLocallySentRequestIds((current) => new Set(current).add(id));
@@ -697,6 +571,7 @@ export function UserProfileView({
             <View
                 style={[
                     styles.header,
+                    isOwnProfile && styles.ownHeader,
                     {
                         paddingTop: headerTopInset,
                         minHeight: headerTopInset + headerRowHeight,
@@ -726,27 +601,47 @@ export function UserProfileView({
                     </Text>
                 </View>
                 {isOwnProfile ? (
-                    <Pressable
-                        onPress={onEditProfile || (() => router.push('/(tabs)/edit-profile'))}
-                        style={({ pressed }) => [
-                            styles.editProfileButton,
-                            { backgroundColor: colors.chrome.common.primaryTint },
-                            pressed && { opacity: 0.72 },
-                        ]}
-                        hitSlop={8}
-                    >
-                        <View style={styles.editProfileContent}>
-                            <Pencil size={scale(14)} color={colors.chrome.primary} />
-                            <Text
-                                variant="body-sm"
-                                className="font-body-semi"
-                                numberOfLines={1}
-                                style={[styles.editProfileLabel, { color: colors.chrome.primary }]}
+                    <View style={styles.ownHeaderActions}>
+                        <Pressable
+                            onPress={onEditProfile || (() => router.push('/(tabs)/edit-profile'))}
+                            style={({ pressed }) => [
+                                styles.editProfileButton,
+                                { backgroundColor: colors.chrome.common.primaryTint },
+                                pressed && { opacity: 0.72 },
+                            ]}
+                            hitSlop={8}
+                        >
+                            <View style={styles.editProfileContent}>
+                                <Pencil size={scale(14)} color={colors.chrome.primary} />
+                                <Text
+                                    variant="body-sm"
+                                    className="font-body-semi"
+                                    numberOfLines={1}
+                                    style={[styles.editProfileLabel, { color: colors.chrome.primary }]}
+                                >
+                                    {t('edit', 'Edit')}
+                                </Text>
+                            </View>
+                        </Pressable>
+                        {onOpenMenu ? (
+                            <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={t('menu', 'Menu')}
+                                onPress={onOpenMenu}
+                                hitSlop={8}
+                                style={({ pressed }) => [
+                                    styles.ownMenuButton,
+                                    {
+                                        backgroundColor: colors.chrome.header.iconBackground,
+                                        borderColor: colors.chrome.header.border,
+                                    },
+                                    pressed && { opacity: 0.72 },
+                                ]}
                             >
-                                {t('edit', 'Edit')}
-                            </Text>
-                        </View>
-                    </Pressable>
+                                <Menu size={scale(19)} color={colors.chrome.header.icon} strokeWidth={2.4} />
+                            </Pressable>
+                        ) : null}
+                    </View>
                 ) : (
                     <>
                         <Pressable onPress={startMessage} style={styles.headerButton} hitSlop={10}>
@@ -787,7 +682,11 @@ export function UserProfileView({
                 ) : undefined}
                 contentContainerStyle={[
                     styles.content,
-                    mode === 'screen' ? { paddingBottom: scale(120) } : { paddingBottom: scale(26) },
+                    isOwnProfile
+                        ? { paddingBottom: 0 }
+                        : mode === 'screen'
+                            ? { paddingBottom: scale(120) }
+                            : { paddingBottom: scale(26) },
                 ]}
             >
                 <ProfileGallery
@@ -805,45 +704,8 @@ export function UserProfileView({
                     onOpenPhoto={(index) => setLightboxIndex(index)}
                     isDark={isDark}
                 />
-                {hasActiveGalleryModeration || hasPendingGalleryReview ? (
-                    <View
-                        style={[
-                            styles.galleryModerationNotice,
-                            {
-                                backgroundColor: colors.chrome.toast.warning.bg,
-                                borderColor: colors.chrome.toast.warning.border,
-                            },
-                        ]}
-                    >
-                        {hasActiveGalleryModeration ? (
-                            <ActivityIndicator size="small" color={colors.chrome.toast.warning.icon} />
-                        ) : (
-                            <AlertCircle size={scale(20)} color={colors.chrome.toast.warning.icon} />
-                        )}
-                        <View style={styles.galleryModerationCopy}>
-                            <Text
-                                variant="body-sm"
-                                className="font-body-semi"
-                                style={{ color: colors.chrome.toast.warning.text }}
-                            >
-                                {hasActiveGalleryModeration
-                                    ? t('image_moderation_checking', 'Checking photo')
-                                    : t('moderation_text_under_review', 'Under review')}
-                            </Text>
-                            <Text variant="caption" style={{ color: colors.chrome.toast.warning.text }}>
-                                {hasActiveGalleryModeration
-                                    ? t(
-                                        'image_moderation_checking_hint',
-                                        'Automatic safety check in progress. You can continue using the app.',
-                                    )
-                                    : t(
-                                        'image_moderation_pending_hint',
-                                        'This photo is waiting for review and is hidden from other members.',
-                                    )}
-                            </Text>
-                        </View>
-                    </View>
-                ) : null}
+                {/* Per-photo "Under review" pills on the gallery images carry the
+                    moderation state — no separate banner below the gallery */}
 
                 {(headline || bio || missingSummaryFields.length > 0) ? (
                     <Section title={t('about_me', 'About me')} isDark={isDark}>
@@ -859,9 +721,10 @@ export function UserProfileView({
                         ) : null}
                         {bio ? (
                             <View style={styles.bioBox}>
-                                <Quote size={scale(24)} color={commonColors.primaryGlow} style={styles.quoteIcon} />
+                                <View style={styles.bioAccent} />
+                                <View style={styles.bioBody}>
                                 <View style={styles.moderatedTextRow}>
-                                    {bioCandidate ? <UnderReviewInfoIcon style={[styles.moderatedTextIcon, styles.moderatedTextIconInCard]} /> : null}
+                                    {bioCandidate ? <UnderReviewInfoIcon style={styles.moderatedTextIcon} /> : null}
                                     <Text
                                         variant="body"
                                         style={[
@@ -875,6 +738,7 @@ export function UserProfileView({
                                     >
                                         {bio}
                                     </Text>
+                                </View>
                                 </View>
                             </View>
                         ) : null}
@@ -914,29 +778,54 @@ export function UserProfileView({
                     action={isOwnProfile ? { label: t('edit', 'Edit'), onPress: () => router.push('/(tabs)/my-hobbies') } : undefined}
                 />
                 {showPartnerPreference ? (
-                    <Section title={t('partner_preference', 'Partner Preference')} isDark={isDark}>
+                    <Section
+                        title={t('partner_preference', 'Partner Preference')}
+                        isDark={isDark}
+                        highlight
+                        extraBottomPadding={isOwnProfile ? 20 : 0}
+                        action={isOwnProfile ? {
+                            label: t('edit', 'Edit'),
+                            onPress: () => router.push('/(tabs)/partner-preference'),
+                        } : undefined}
+                    >
                         {partnerAbout ? (
                             <>
-                                {partnerAboutCandidate ? (
-                                    <View style={styles.moderatedLabelRow}>
-                                        <Text variant="caption" className="font-body-semi">
-                                            {t('about_partner', 'About partner')}
-                                        </Text>
-                                        <UnderReviewPill />
-                                    </View>
+                                <View style={styles.moderatedLabelRow}>
+                                    <Text
+                                        variant="caption"
+                                        className="font-body-semi"
+                                        style={[
+                                            styles.factLabel,
+                                            { color: colors.chrome.common.textMuted },
+                                        ]}
+                                    >
+                                        {t('about_partner', 'About partner')}
+                                    </Text>
+                                    {partnerAboutCandidate ? <UnderReviewPill /> : null}
+                                </View>
+                                <View style={styles.factValueRow}>
+                                    <Text
+                                        variant="body"
+                                        style={[
+                                            styles.bioText,
+                                            styles.factValueText,
+                                            {
+                                                textAlign: partnerAboutDirection === 'rtl' ? 'right' : 'left',
+                                                writingDirection: partnerAboutDirection,
+                                            },
+                                        ]}
+                                    >
+                                        {partnerAbout}
+                                    </Text>
+                                </View>
+                                {partnerFacts.length > 0 ? (
+                                    <View
+                                        style={[
+                                            styles.partnerPreferenceDivider,
+                                            { backgroundColor: colors.chrome.common.primaryTint },
+                                        ]}
+                                    />
                                 ) : null}
-                                <Text
-                                    variant="body"
-                                    style={[
-                                        styles.partnerAbout,
-                                        {
-                                            textAlign: partnerAboutDirection === 'rtl' ? 'right' : 'left',
-                                            writingDirection: partnerAboutDirection,
-                                        },
-                                    ]}
-                                >
-                                    {partnerAbout}
-                                </Text>
                             </>
                         ) : null}
                         <FactRows facts={partnerFacts} isRTL={isRTL} />
@@ -1030,6 +919,11 @@ export function UserProfileView({
                     if (!blockBusy) setBlockConfirmOpen(false);
                 }}
                 onConfirm={confirmBlockUser}
+            />
+            <MessagingMembershipGate
+                visible={membershipGateOpen}
+                trialOffer={messagingEligibility.trialOffer}
+                onClose={() => setMembershipGateOpen(false)}
             />
             </ProfileRootComponent>
     );
@@ -1346,7 +1240,10 @@ function ProfileGallery({
 }) {
     const palette = useColors();
     const { isRTL } = useLanguage();
-    const slots = [0, 1, 2].map((index) => photos[index] || '');
+    const slots = photos.length > 1
+        ? photos.slice(0, 3)
+        : [photos[0] || '', '', ''];
+    const canScrollPhotos = photos.length > 1;
     const slideWidth = Math.round(SCREEN_WIDTH * 0.68);
     const showPrivateBadge = privateGallery && photos.length > 0;
 
@@ -1355,6 +1252,9 @@ function ProfileGallery({
             <GHScrollView
                 horizontal
                 nestedScrollEnabled
+                scrollEnabled={canScrollPhotos}
+                alwaysBounceHorizontal={false}
+                overScrollMode="never"
                 showsHorizontalScrollIndicator={false}
                 snapToInterval={slideWidth}
                 decelerationRate="fast"
@@ -1382,24 +1282,29 @@ function ProfileGallery({
                                 <View
                                     style={[
                                         styles.galleryModerationBadge,
-                                        { backgroundColor: palette.chrome.toast.warning.border },
+                                        { backgroundColor: palette.chrome.toast.warning.bg },
                                     ]}
                                 >
                                     {checking ? (
                                         <ActivityIndicator
                                             size="small"
-                                            color={palette.chrome.common.inverseText}
+                                            color={palette.chrome.toast.warning.icon}
+                                            style={styles.galleryModerationSpinner}
                                         />
                                     ) : (
                                         <AlertCircle
-                                            size={scale(13)}
-                                            color={palette.chrome.common.inverseText}
+                                            size={scale(12)}
+                                            color={palette.chrome.toast.warning.icon}
+                                            strokeWidth={2.5}
                                         />
                                     )}
                                     <Text
                                         variant="caption"
                                         className="font-body-bold"
-                                        style={{ color: palette.chrome.common.inverseText }}
+                                        style={[
+                                            styles.galleryModerationBadgeText,
+                                            { color: palette.chrome.toast.warning.text },
+                                        ]}
                                     >
                                         {checking
                                             ? t('image_moderation_checking', 'Checking photo')
@@ -1502,20 +1407,20 @@ function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
     const palette = useColors();
     if (!facts.length) return null;
     return (
-        <View style={{ gap: scale(14) }}>
+        <View style={styles.factList}>
             {facts.map((fact) => {
                 const Icon = fact.icon;
                 return (
-                    <View key={`${fact.label}-${fact.value}`} style={[styles.factRow, { flexDirection: 'row' }]}>
-                        <View style={styles.factIcon}>
-                            <Icon size={scale(18)} color={palette.chrome.primary} />
+                    <View key={`${fact.label}-${fact.value}`} style={styles.factRow}>
+                        <View style={styles.factLabelRow}>
+                            <Icon size={scale(15)} color={palette.chrome.common.textMuted} />
+                            <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { color: palette.chrome.common.textMuted }]}>{fact.label}</Text>
+                            {fact.underReview ? <UnderReviewPill /> : null}
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <View style={[styles.moderatedLabelRow, { flexDirection: 'row' }]}>
-                                <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { color: palette.chrome.common.textMuted, textAlign: isRTL ? 'right' : 'left' }]}>{fact.label}</Text>
-                                {fact.underReview ? <UnderReviewPill /> : null}
-                            </View>
-                            <Text variant="body" className="font-body-semi" style={{ textAlign: isRTL ? 'right' : 'left' }}>{fact.value}</Text>
+                            {/* Content-sized value inside a row: the row's main axis mirrors
+                                under native RTL — no textAlign (unreliable on Android in RTL) */}
+                        <View style={[styles.factValueRow, styles.factValueIndented]}>
+                            <Text variant="body" className="font-body-semi" style={[styles.factValueText, styles.factValueTextCompact]}>{fact.value}</Text>
                         </View>
                     </View>
                 );
@@ -1543,7 +1448,12 @@ function ChipSection({
     const clean = items.map((item) => emojiChipItem(item, type)).filter((item) => item.label);
     if (!clean.length) return null;
     return (
-        <Section title={title} isDark={isDark} action={action}>
+        <Section
+            title={title}
+            isDark={isDark}
+            action={action}
+            icon={type === 'hobby' ? Puzzle : BookHeart}
+        >
             <View style={[styles.chipWrap, { flexDirection: 'row' }]}>
                 {clean.map((item, index) => (
                     <View key={`${type}-${item.slug}-${index}`} style={[styles.chip, styles.emojiChip, { backgroundColor: palette.brand.bg.surface, borderColor: palette.brand.bg.border }]}>
@@ -1556,12 +1466,56 @@ function ChipSection({
     );
 }
 
-function Section({ title, children, isDark, action }: { title: string; children: React.ReactNode; isDark: boolean; action?: SectionAction }) {
+function Section({
+    title,
+    children,
+    isDark,
+    action,
+    icon: SectionIcon,
+    highlight = false,
+    extraBottomPadding = 0,
+}: {
+    title: string;
+    children: React.ReactNode;
+    isDark: boolean;
+    action?: SectionAction;
+    icon?: LucideIcon;
+    highlight?: boolean;
+    extraBottomPadding?: number;
+}) {
     const palette = useColors();
+    const backgroundColor = highlight
+        ? blendHexColors(palette.chrome.primary, palette.chrome.common.card, isDark ? 0.11 : 0.06)
+        : palette.chrome.common.card;
+    const borderColor = highlight
+        ? blendHexColors(palette.chrome.primary, palette.chrome.common.card, isDark ? 0.3 : 0.22)
+        : palette.brand.bg.border;
     return (
-        <View style={[styles.section, { backgroundColor: palette.chrome.common.card, borderTopColor: palette.brand.bg.border }]}>
+        <View
+            style={[
+                styles.section,
+                highlight && styles.highlightedSection,
+                extraBottomPadding > 0 && { paddingBottom: scale(20 + extraBottomPadding) },
+                { backgroundColor, borderTopColor: borderColor, borderBottomColor: borderColor },
+            ]}
+        >
             <View style={styles.sectionHeader}>
-                <Text variant="caption" className="font-body-semi" style={[styles.sectionTitle, { color: palette.chrome.common.textStrong }]}>{title}</Text>
+                <View style={styles.sectionTitleRow}>
+                    {SectionIcon ? (
+                        <SectionIcon
+                            size={scale(16)}
+                            color={highlight ? palette.chrome.primary : palette.chrome.common.textStrong}
+                            strokeWidth={2}
+                        />
+                    ) : null}
+                    <Text
+                        variant="caption"
+                        className="font-body-semi"
+                        style={[styles.sectionTitle, { color: highlight ? palette.chrome.primary : palette.chrome.common.textStrong }]}
+                    >
+                        {title}
+                    </Text>
+                </View>
                 {action ? (
                     <Pressable onPress={action.onPress} style={styles.sectionAction} hitSlop={8}>
                         <Pencil size={scale(13)} color={palette.chrome.primary} />
@@ -1644,7 +1598,7 @@ function ImageLightbox({
                                     <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
                                 </Pressable>
                             ) : (
-                                <View style={styles.lightboxIconButton} />
+                                <View style={styles.lightboxActionSpacer} />
                             )}
                         </View>
                         {src ? <Image source={{ uri: src }} style={styles.lightboxImage} contentFit="contain" /> : null}
@@ -1670,7 +1624,19 @@ function buildFacts(profile: any, isOwnProfile = false) {
     const companyCandidate = isOwnProfile
         ? pendingModerationCandidate(profile?.contentModeration?.company)
         : '';
+    const gender = String(
+        profile?.gender?.value || profile?.gender?.label || profile?.gender || '',
+    ).toLowerCase();
     const common = (value: any) => displayText(typeof value === 'object' ? value?.label : value);
+    const ethnicity = (value: any) => {
+        const candidates = typeof value === 'object'
+            ? [value?.label, value?.name, value?.value, value?.value_id]
+            : [value];
+        const raw = candidates
+            .map((candidate) => String(candidate || '').trim())
+            .find((candidate) => candidate && !/^[a-f\d]{24}$/i.test(candidate));
+        return translateNamespace('ethnic_group', raw);
+    };
     const countryList = (values: any[]) => listText((values || []).map(translateCountry));
     const annualIncome = typeof profile?.annual_income === 'object'
         ? [profile?.annual_income?.amount, profile?.annual_income?.currency].filter(Boolean).join(' ')
@@ -1712,12 +1678,18 @@ function buildFacts(profile: any, isOwnProfile = false) {
             { icon: Home, label: t('grew_up_in', 'Grew up in'), value: translateCountry(profile?.grew_up_in) },
             { icon: Languages, label: t('mother_tongue', 'Mother tongue'), value: common(profile?.mother_tongue) },
             { icon: Languages, label: t('languages_spoken', 'Languages'), value: listText((profile?.languages_spoken || []).map(displayText)) },
-            { icon: Sparkles, label: t('dress', 'Dress'), value: common(profile?.i_usually_dress) },
+            gender === 'female'
+                ? {
+                    icon: Shirt,
+                    label: t('profile.i_usually_dress', 'How do you usually dress?'),
+                    value: common(profile?.i_usually_dress),
+                }
+                : null,
         ]),
         appearance: compact([
             { icon: Ruler, label: t('height', 'Height'), value: common(profile?.height) },
             { icon: UserRound, label: t('complexion', 'Complexion'), value: common(profile?.complexion) },
-            { icon: Users, label: t('ethnic_group', 'Ethnic group'), value: Array.isArray(profile?.ethnic_group) ? listText(profile.ethnic_group.map(displayText)) : common(profile?.ethnic_group) },
+            { icon: Users, label: t('ethnic_group', 'Ethnic group'), value: Array.isArray(profile?.ethnic_group) ? listText(profile.ethnic_group.map(ethnicity)) : ethnicity(profile?.ethnic_group) },
         ]),
         lifestyle: compact([
             { icon: Cigarette, label: t('smoking', 'Smoking'), value: common(profile?.smoking) },
@@ -1738,7 +1710,12 @@ function buildPartnerFacts(partnerPreference: any) {
         return displayText(value);
     }));
     const ethnicList = (values: any) => listText(asArray(values).map((value) => {
-        const raw = typeof value === 'object' ? value?.label || value?.name || value?.value : value;
+        const candidates = typeof value === 'object'
+            ? [value?.label, value?.name, value?.value, value?.value_id]
+            : [value];
+        const raw = candidates
+            .map((candidate) => String(candidate || '').trim())
+            .find((candidate) => candidate && !/^[a-f\d]{24}$/i.test(candidate));
         return translateNamespace('ethnic_group', raw);
     }));
     const countryList = (values: any) => listText(asArray(values).map((value) => {
@@ -1770,6 +1747,9 @@ const styles = StyleSheet.create({
         // 6.5 + 7.5 (chevron inset inside its 38pt button) = 14dp edge→icon
         paddingHorizontal: scale(6.5),
     },
+    ownHeader: {
+        paddingHorizontal: scale(14),
+    },
     headerButton: { width: scale(38), height: scale(38), alignItems: 'center', justifyContent: 'center' },
     // Numerically ~11.5dp icon→title; optically matches the conversation header's
     // 14.5dp chevron→avatar. The wrap row takes all remaining width; the
@@ -1783,6 +1763,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         // Keep intrinsic width — squeezed by the flexing title otherwise
         flexShrink: 0,
+    },
+    ownHeaderActions: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        flexShrink: 0,
+        gap: scale(8),
+    },
+    ownMenuButton: {
+        alignItems: 'center',
+        borderRadius: scale(17),
+        borderWidth: 1,
+        height: scale(34),
+        justifyContent: 'center',
+        width: scale(34),
     },
     editProfileContent: {
         flexDirection: 'row',
@@ -1803,28 +1797,22 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: scale(14),
         left: scale(14),
-        minHeight: scale(28),
+        height: scale(24),
         maxWidth: '76%',
         borderRadius: scale(999),
-        paddingHorizontal: scale(9),
-        paddingVertical: scale(5),
+        paddingHorizontal: scale(8),
         flexDirection: 'row',
         alignItems: 'center',
-        gap: scale(5),
+        justifyContent: 'center',
+        gap: scale(4),
     },
-    galleryModerationNotice: {
-        minHeight: scale(72),
-        borderWidth: 1,
-        paddingHorizontal: scale(18),
-        paddingVertical: scale(12),
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: scale(10),
+    galleryModerationBadgeText: {
+        flexShrink: 1,
+        fontSize: scale(11),
+        lineHeight: scale(14),
+        includeFontPadding: false,
     },
-    galleryModerationCopy: {
-        flex: 1,
-        gap: scale(3),
-    },
+    galleryModerationSpinner: { transform: [{ scale: 0.62 }], marginHorizontal: -scale(3) },
     galleryGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
     galleryBadges: {
         position: 'absolute',
@@ -1861,12 +1849,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(18),
         paddingVertical: scale(20),
     },
+    highlightedSection: { borderBottomWidth: 1 },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: scale(12),
-        marginBottom: scale(14),
+        marginBottom: scale(18),
+    },
+    sectionTitleRow: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(7),
     },
     sectionTitle: { textTransform: 'uppercase', letterSpacing: 2, color: '#241E17', fontSize: scale(13), flexShrink: 1 },
     sectionAction: {
@@ -1882,23 +1878,44 @@ const styles = StyleSheet.create({
     moderatedTextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(5) },
     moderatedTextIcon: { marginTop: scale(3) },
     // Pull the bio icon toward the card's start edge (pink bar side)
-    moderatedTextIconInCard: { marginStart: -scale(6) },
     moderatedText: { flexShrink: 1 },
-    // start/end so native RTL mirrors: accent bar leads, quotes trail
-    bioBox: { borderStartWidth: 4, borderStartColor: '#F34B6F', backgroundColor: 'rgba(243,75,111,0.04)', borderRadius: scale(8), padding: scale(14) },
-    quoteIcon: { position: 'absolute', end: scale(12), top: scale(10) },
-    bioText: { lineHeight: scale(25), fontStyle: 'italic' },
-    partnerAbout: { lineHeight: scale(24), marginBottom: scale(14) },
+    factValueRow: { flexDirection: 'row' },
+    factValueText: { flexShrink: 1 },
+    factValueIndented: { paddingStart: scale(22) },
+    factValueTextCompact: { lineHeight: scale(20), includeFontPadding: false },
+    // start/end so native RTL mirrors the accent bar (quote icon removed by design)
+    // Accent bar is a real element (not a border) so its side stays fully
+    // square; only the trailing side of the card is rounded
+    bioBox: {
+        flexDirection: 'row',
+        borderTopEndRadius: scale(8),
+        borderBottomEndRadius: scale(8),
+        overflow: 'hidden',
+    },
+    bioAccent: {
+        width: 4,
+        backgroundColor: '#F34B6F',
+    },
+    bioBody: {
+        flex: 1,
+        backgroundColor: 'rgba(243,75,111,0.04)',
+        padding: scale(14),
+    },
+    // Partner-about reuses bioText directly, but stays unframed.
+    bioText: { fontSize: scale(15), lineHeight: scale(22), fontStyle: 'italic' },
+    partnerPreferenceDivider: { height: StyleSheet.hairlineWidth, marginTop: scale(18), marginBottom: scale(18) },
     moderatedLabelRow: {
         flexDirection: 'row',
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: scale(7),
-        marginBottom: scale(4),
+        marginBottom: scale(2),
     },
-    factRow: { alignItems: 'flex-start', gap: scale(12) },
-    factIcon: { width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: 'rgba(243,75,111,0.08)', alignItems: 'center', justifyContent: 'center' },
-    factLabel: { color: '#8A8073', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: scale(3) },
+    factList: { gap: scale(18) },
+    factRow: { width: '100%' },
+    factLabelRow: { flexDirection: 'row', alignItems: 'center', gap: scale(7), marginBottom: scale(3) },
+    // Pinned line height — Noto Sans Arabic's natural metrics add ~6dp of air
+    factLabel: { color: '#8A8073', textTransform: 'uppercase', letterSpacing: 1.2, fontSize: scale(13), lineHeight: scale(17), includeFontPadding: false, flexShrink: 1 },
     chipWrap: { flexWrap: 'wrap', gap: scale(8) },
     chip: { borderWidth: 1, borderRadius: scale(999), paddingHorizontal: scale(12), paddingVertical: scale(8) },
     emojiChip: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
@@ -2070,6 +2087,7 @@ const styles = StyleSheet.create({
     lightbox: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
     lightboxTopbar: { position: 'absolute', left: 0, right: 0, top: scale(42), zIndex: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(16) },
     lightboxIconButton: { width: scale(42), height: scale(42), borderRadius: scale(21), backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+    lightboxActionSpacer: { width: scale(42), height: scale(42) },
     lightboxImage: { width: wp(100), height: '82%' },
     lightboxNav: { position: 'absolute', top: '50%', zIndex: 3, width: scale(44), height: scale(44), marginTop: -scale(22), borderRadius: scale(22), backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
     lightboxNavLeft: { left: scale(14) },

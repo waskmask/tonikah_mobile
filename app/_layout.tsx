@@ -7,7 +7,6 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import {
     focusManager,
-    QueryClient,
     QueryClientProvider,
 } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -57,8 +56,8 @@ import { ThemeSync } from "@/components/app/ThemeSync";
 import { AppLoadingScreen } from "@/components/app/AppLoadingScreen";
 import { GalleryEligibilityListener } from "@/components/app/GalleryEligibilityListener";
 import { api } from "@/lib/api";
-
-const queryClient = new QueryClient();
+import { queryClient } from "@/lib/queryClient";
+import { ConnectivityMonitor } from "@/components/app/ConnectivityMonitor";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -172,6 +171,7 @@ export default function RootLayout() {
                 backgroundColor={colors.chrome.header.background}
             />
             <QueryClientProvider client={queryClient}>
+                <ConnectivityMonitor />
                 <GalleryEligibilityListener />
                 <BottomSheetModalProvider>
                 <Stack

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Bookmark, Compass, History, Send, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +15,10 @@ import { profileService } from '@/lib/profileService';
 import { Typography } from '@/constants/typography';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useChatSocket } from '@/hooks/useChatSocket';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { NavigationTypeTokens } from '@/constants/uiTokens';
+import { completeInteraction, markInteraction } from '@/lib/performanceDiagnostics';
 
 const ACTIVE_STROKE = 2;
 const INACTIVE_STROKE = 1.8;
@@ -130,43 +134,35 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     // switches keep the icon so there is no one-frame spinner flash.
     const [spinnerRoute, setSpinnerRoute] = useState<string | null>(null);
     const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [mySummary, setMySummary] = useState<MySummary | null>(null);
     const activeRouteName = state.routes[state.index]?.name;
-
-    const refreshMySummary = useCallback(async () => {
-        try {
+    const queryClient = useQueryClient();
+    const { data: unreadCount = 0 } = useQuery({
+        queryKey: queryKeys.chat.unreadCount,
+        queryFn: async () => unreadFromResponse(await chatService.unreadCount()),
+        staleTime: 15_000,
+    });
+    const { data: mySummary = null } = useQuery<MySummary | null>({
+        queryKey: queryKeys.profile.mySummary,
+        queryFn: async () => {
             const res = await profileService.fetchMySummary();
             const summaryUser = res?.user;
-            if (res?.success && summaryUser) {
-                setMySummary({
-                    avatarThumbUrl: String(summaryUser.avatarThumbUrl || summaryUser.avatarUrl || ''),
-                    completionPercent: Number(summaryUser.completionPercent) || 0,
-                });
-            }
-        } catch {
-            // Keep the last known avatar if the refresh fails.
+            if (!res?.success || !summaryUser) return null;
+            return {
+                avatarThumbUrl: String(summaryUser.avatarThumbUrl || summaryUser.avatarUrl || ''),
+                completionPercent: Number(summaryUser.completionPercent) || 0,
+            };
+        },
+        staleTime: 60_000,
+    });
+
+    useEffect(() => {
+        if (activeRouteName === 'profile') {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.profile.mySummary });
         }
-    }, []);
-
-    // Avatar + completion refresh: on mount, on foreground, and whenever the
-    // user lands back on the Me tab (returning from edit-profile).
-    useEffect(() => {
-        refreshMySummary();
-    }, [refreshMySummary]);
+    }, [activeRouteName, queryClient]);
 
     useEffect(() => {
-        const subscription = AppState.addEventListener('change', (stateValue) => {
-            if (stateValue === 'active') refreshMySummary();
-        });
-        return () => subscription.remove();
-    }, [refreshMySummary]);
-
-    useEffect(() => {
-        if (activeRouteName === 'profile') refreshMySummary();
-    }, [activeRouteName, refreshMySummary]);
-
-    useEffect(() => {
+        if (activeRouteName) completeInteraction(`tab:${activeRouteName}`, 'active');
         setPendingRoute(null);
         setSpinnerRoute(null);
         if (spinnerTimerRef.current) {
@@ -179,57 +175,13 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
         if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
     }, []);
 
-    const refreshUnreadCount = useCallback(async () => {
-        try {
-            const res = await chatService.unreadCount();
-            setUnreadCount(unreadFromResponse(res));
-        } catch {
-            // Keep the existing badge value if the refresh fails.
-        }
-    }, []);
-
-    useEffect(() => {
-        let active = true;
-        chatService.unreadCount()
-            .then((res) => {
-                if (active) setUnreadCount(unreadFromResponse(res));
-            })
-            .catch(() => undefined);
-        return () => {
-            active = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        const subscription = AppState.addEventListener('change', (stateValue) => {
-            if (stateValue === 'active') {
-                refreshUnreadCount();
-            }
-        });
-        return () => subscription.remove();
-    }, [refreshUnreadCount]);
-
-    // Re-sync whenever the active tab changes (e.g. returning from a conversation
-    // after reading it) so the badge reflects the latest server state.
-    useEffect(() => {
-        refreshUnreadCount();
-    }, [activeRouteName, refreshUnreadCount]);
-
-    // Stable handlers: useChatSocket lists its callbacks as effect deps, so inline
-    // arrows would tear down and reconnect the socket every render and miss the
-    // `chat:unread` events that drive this badge.
     const handleUnread = useCallback((payload: any) => {
-        setUnreadCount(unreadFromResponse(payload));
-    }, []);
-    const handleUnreadRefresh = useCallback(() => {
-        refreshUnreadCount();
-    }, [refreshUnreadCount]);
+        queryClient.setQueryData(queryKeys.chat.unreadCount, unreadFromResponse(payload));
+    }, [queryClient]);
 
     useChatSocket({
         enabled: true,
         onUnread: handleUnread,
-        onMessage: handleUnreadRefresh,
-        onConversationChanged: handleUnreadRefresh,
     });
 
     const visibleRoutes = useMemo(
@@ -277,6 +229,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
 
                         if (isFocused || event.defaultPrevented) return;
                         lightImpact();
+                        markInteraction(`tab:${item.name}`);
                         setPendingRoute(item.name);
                         if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
                         spinnerTimerRef.current = setTimeout(() => setSpinnerRoute(item.name), 250);
@@ -337,8 +290,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                             color,
                                             // Fixed size (not scale()) so labels render identically on
                                             // every device
-                                            fontSize: 8,
-                                            lineHeight: 11,
+                                            ...NavigationTypeTokens.tabLabel,
                                             fontFamily: labelFontFamily,
                                         },
                                     ]}

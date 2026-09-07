@@ -139,12 +139,15 @@ export function formatDistanceKm(
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const km = R * c;
     if (!Number.isFinite(km)) return '';
-    if (km < 1) return '<1 km';
+    // LRI…PDI isolate: "<1 km" stays an atomic left-to-right token inside
+    // RTL text instead of bidi reordering it ("km 1>")
+    const ltr = (value: string) => `⁦${value}⁩`;
+    if (km < 1) return ltr('<1 km');
     if (km < 10) {
         const rounded = Math.round(km * 10) / 10;
-        return `${String(rounded).replace(/\.0$/, '')} km`;
+        return ltr(`${String(rounded).replace(/\.0$/, '')} km`);
     }
-    return `${Math.round(km)} km`;
+    return ltr(`${Math.round(km)} km`);
 }
 
 export function formatProfileLocation(profile: any, includeState = false) {

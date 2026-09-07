@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Compass, MapPin } from 'lucide-react-native';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
+import { useAppMenu } from '@/components/app/AppMenuProvider';
 import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
 import { ExploreActionBar } from '@/components/explore/ExploreActionBar';
 import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
@@ -31,6 +31,7 @@ import { Image } from 'expo-image';
 import * as Location from 'expo-location';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { usersService } from '@/lib/usersService';
+import { DevRenderProfiler } from '@/components/dev/DevRenderProfiler';
 
 type HistoryEntry = { action: 'skip' | 'favorite' | 'view'; profile: any };
 type VerificationReason = 'browse_limit' | 'save_or_skip' | null;
@@ -53,6 +54,7 @@ export default function ExploreScreen() {
     const palette = useColors();
     const insets = useSafeAreaInsets();
     const toast = useToast();
+    const { openMenu } = useAppMenu();
     const { state: locationState, retry: retryLocation, retrying: locationRetrying } = useExploreLocationGate();
 
     const openLocationSettings = useCallback(async () => {
@@ -80,7 +82,6 @@ export default function ExploreScreen() {
     const [viewedCount, setViewedCount] = useState(0);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [tourOpen, setTourOpen] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(false);
     const [verificationReason, setVerificationReason] = useState<VerificationReason>(null);
     const nextCursorRef = useRef<string | null>(null);
     const hasMoreRef = useRef(true);
@@ -401,18 +402,20 @@ export default function ExploreScreen() {
                         filterCount={filterCount}
                         onOpenFilters={() => setFiltersOpen(true)}
                         onOpenTour={() => setTourOpen(true)}
-                        onOpenMenu={() => setMenuOpen(true)}
+                        onOpenMenu={openMenu}
                     />
                     <View style={styles.deckArea} pointerEvents={deckLocked ? 'none' : 'auto'}>
-                        <SwipeableDeck
-                            ref={deckRef}
-                            profiles={profiles}
-                            viewerLat={viewerCoordinates?.lat}
-                            viewerLng={viewerCoordinates?.lng}
-                            onPressCard={viewProfile}
-                            onSwiped={handleSwiped}
-                            canSwipe={canSwipe}
-                        />
+                        <DevRenderProfiler id="ExploreDeck">
+                            <SwipeableDeck
+                                ref={deckRef}
+                                profiles={profiles}
+                                viewerLat={viewerCoordinates?.lat}
+                                viewerLng={viewerCoordinates?.lng}
+                                onPressCard={viewProfile}
+                                onSwiped={handleSwiped}
+                                canSwipe={canSwipe}
+                            />
+                        </DevRenderProfiler>
                     </View>
                     <ExploreActionBar
                         canUndo={history.length > 0}
@@ -465,7 +468,6 @@ export default function ExploreScreen() {
                 onApply={applyFilters}
             />
             <ExploreTourModal visible={tourOpen} onClose={() => setTourOpen(false)} />
-            <AppMenuDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} />
             <UserProfileSheet
                 visible={detailOpen && Boolean(currentId)}
                 userId={currentId}

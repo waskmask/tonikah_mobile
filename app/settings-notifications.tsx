@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { Monitor, Moon, Sun } from 'lucide-react-native';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { SectionCard } from '@/components/ui/SectionCard';
 import { SettingsToggleRow } from '@/components/settings/SettingsRows';
+import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
@@ -17,7 +19,7 @@ import {
 } from '@/lib/pushNotifications';
 
 export default function SettingsNotificationsScreen() {
-    const { isDark, toggleTheme } = useTheme();
+    const { theme, setTheme } = useTheme();
     const colors = useColors();
     const toast = useToast();
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -77,14 +79,88 @@ export default function SettingsNotificationsScreen() {
                     />
                 </SectionCard>
                 <SectionCard title={t('appearance', 'Appearance')}>
-                    <SettingsToggleRow
-                        label={t('dark_mode', 'Dark mode')}
-                        description={t('dark_mode_desc', 'Use a darker color scheme across the app.')}
-                        value={isDark}
-                        onValueChange={() => toggleTheme()}
-                    />
+                    <Text variant="body" className="font-body-semi" style={{ marginBottom: scale(10) }}>
+                        {t('theme', 'Theme')}
+                    </Text>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            borderRadius: scale(12),
+                            padding: scale(4),
+                            backgroundColor: colors.brand.bg.surface,
+                            borderWidth: 1,
+                            borderColor: colors.brand.bg.border,
+                            gap: scale(4),
+                        }}
+                    >
+                        <ThemeSegment
+                            active={theme === 'light'}
+                            icon={Sun}
+                            label={t('theme_light', 'Light')}
+                            onPress={() => setTheme('light')}
+                        />
+                        <ThemeSegment
+                            active={theme === 'dark'}
+                            icon={Moon}
+                            label={t('theme_dark', 'Dark')}
+                            onPress={() => setTheme('dark')}
+                        />
+                        <ThemeSegment
+                            active={theme === 'system'}
+                            icon={Monitor}
+                            label={t('theme_system', 'System')}
+                            onPress={() => setTheme('system')}
+                        />
+                    </View>
                 </SectionCard>
             </ScrollView>
         </View>
+    );
+}
+
+function ThemeSegment({
+    active,
+    icon: Icon,
+    label,
+    onPress,
+}: {
+    active: boolean;
+    icon: typeof Sun;
+    label: string;
+    onPress: () => void;
+}) {
+    const colors = useColors();
+    return (
+        <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={label}
+            style={{
+                flex: 1,
+                minHeight: scale(44),
+                borderRadius: scale(10),
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: scale(4),
+                paddingVertical: scale(8),
+                backgroundColor: active ? colors.chrome.common.card : 'transparent',
+                borderWidth: active ? 1 : 0,
+                borderColor: active ? colors.brand.bg.border : 'transparent',
+            }}
+        >
+            <Icon
+                size={scale(16)}
+                color={active ? colors.chrome.common.textStrong : colors.brand.text.muted}
+                strokeWidth={1.9}
+            />
+            <Text
+                variant="caption"
+                className="font-body-semi"
+                style={{ color: active ? colors.chrome.common.textStrong : colors.brand.text.muted }}
+            >
+                {label}
+            </Text>
+        </Pressable>
     );
 }

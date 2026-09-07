@@ -3,6 +3,7 @@ import { getLocales } from 'expo-localization';
 import { Platform } from 'react-native';
 
 import { api, ApiResponse } from './api';
+import type { MessagingAccess, TrialOffer } from './messagingAccess';
 
 export type MembershipProvider =
     | 'trial'
@@ -30,12 +31,15 @@ export type MembershipOverview = {
     daysLeft: number;
     trial: { used: boolean; active: boolean; daysLeft: number };
     historyCount: number;
+    messagingAccess?: MessagingAccess;
+    trialOffer?: TrialOffer;
 };
 
 export type MembershipPlan = {
     id: string;
     slug: string;
     displayName: string;
+    kind?: 'paid' | 'trial';
     durationDays: number;
     features: string[];
     checkoutEnabled: boolean;
@@ -77,6 +81,11 @@ export type MembershipPlansResponse = ApiResponse & {
 
 export type MembershipOverviewResponse = ApiResponse & Partial<MembershipOverview> & {
     ok?: boolean;
+};
+
+export type TrialActivationResponse = ApiResponse & {
+    messagingAccess?: MessagingAccess;
+    trialOffer?: TrialOffer;
 };
 
 export type MembershipHistoryItem = {
@@ -168,7 +177,7 @@ export const membershipService = {
             : '';
         return api.get(`/membership/plans${query}`);
     },
-    startTrial: (planSlugOrId?: string): Promise<ApiResponse> =>
+    startTrial: (planSlugOrId?: string): Promise<TrialActivationResponse> =>
         api.post('/membership/trial/start', { planSlugOrId }),
     history: (cursor = '', limit = 10): Promise<MembershipHistoryResponse> => {
         const params = new URLSearchParams({ limit: String(limit) });

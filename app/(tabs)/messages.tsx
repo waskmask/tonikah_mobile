@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { Archive, Bell, BellOff, Check, MessageCircle, Search, Send, UserRoundPlus, X } from 'lucide-react-native';
+import { Archive, Bell, BellOff, Check, CreditCard, MessageCircle, Search, Send, UserRoundPlus, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { UnreadBadge } from '@/components/ui/UnreadBadge';
@@ -24,7 +24,7 @@ import {
     ConversationTab,
     normalizeConversation,
 } from '@/lib/chatService';
-import { apiMessage, profileImage, t } from '@/lib/profileDisplay';
+import { apiMessage, profileAvatarImage, t } from '@/lib/profileDisplay';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { translateChatText } from '@/lib/chatDisplay';
 import { useTheme } from '@/hooks/useTheme';
@@ -40,6 +40,16 @@ import {
     openPushNotificationSettings,
     shouldShowPushBannerToday,
 } from '@/lib/pushNotifications';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
+import { NavigationTypeTokens } from '@/constants/uiTokens';
+import { useAuthStore } from '@/store/authStore';
+import { useConnectivity } from '@/hooks/useConnectivity';
+import { CachedInbox, loadCachedInbox, saveCachedInbox } from '@/lib/chatInboxCache';
+import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
+import { useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
+import { canOpenMessaging, shouldShowMembershipPromo } from '@/lib/messagingAccess';
+import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 
 const TABS: Array<{ key: ConversationTab; labelKey: string; fallback: string; Icon: any }> = [
     { key: 'chats', labelKey: 'chat:tab_chats', fallback: 'Chats', Icon: MessageCircle },
@@ -77,7 +87,7 @@ function openConversation(conversation: Conversation) {
             id: conversation.id,
             recipientId: String(other.id || other._id || ''),
             name: otherName(conversation),
-            avatar: profileImage(other),
+            avatar: profileAvatarImage(other),
             online: other.recently_active ? '1' : '0',
             accountDeleted: other.account_deleted ? '1' : '0',
             state: conversation.state,
@@ -91,20 +101,29 @@ export default function MessagesScreen() {
     const palette = useColors();
     const primary = palette.chrome.primary;
     const { currentLanguage, isRTL } = useLanguage();
+    const userId = useAuthStore((state) => String(state.user?._id || state.user?.id || ''));
+    const { status: connectivityStatus } = useConnectivity();
     const toast = useToast();
+    const eligibility = useMessagingEligibilityStatus();
+    const { requireVerified } = useEmailVerificationGuard();
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
+    const cachedInbox = queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox);
     const [activeTab, setActiveTab] = useState<ConversationTab>('chats');
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [requests, setRequests] = useState<Conversation[]>([]);
-    const [sent, setSent] = useState<Conversation[]>([]);
-    const [nextCursor, setNextCursor] = useState<string | null>(null);
-    const [slots, setSlots] = useState<{ used?: number; total?: number } | null>(null);
+    const [conversations, setConversations] = useState<Conversation[]>(() => cachedInbox?.conversations || []);
+    const [requests, setRequests] = useState<Conversation[]>(() => cachedInbox?.requests || []);
+    const [sent, setSent] = useState<Conversation[]>(() => cachedInbox?.sent || []);
+    const [nextCursor, setNextCursor] = useState<string | null>(() => cachedInbox?.nextCursor || null);
+    const [slots, setSlots] = useState<{ used?: number; total?: number } | null>(() => cachedInbox?.slots || null);
     const [search, setSearch] = useState('');
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!cachedInbox);
     const [loadingMore, setLoadingMore] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [notificationBannerVisible, setNotificationBannerVisible] = useState(false);
     const [notificationBannerBusy, setNotificationBannerBusy] = useState(false);
+    const [membershipGateVisible, setMembershipGateVisible] = useState(false);
+    const [membershipPromoVisible, setMembershipPromoVisible] = useState(false);
+    const inboxCacheReadyRef = useRef(false);
+    const previousConnectivityRef = useRef(connectivityStatus);
 
     const colors = {
         // Warm surface so messages matches the unified warm chrome
@@ -131,49 +150,131 @@ export default function MessagesScreen() {
 
         if (conversationRes.success) {
             const nextItems = (conversationRes.items || []).map((item) => normalizeConversation(item));
-            setConversations((current) => mode === 'append' ? [...current, ...nextItems] : nextItems);
-            setNextCursor(conversationRes.nextCursor || null);
+            const responseCursor = conversationRes.nextCursor || null;
+            setConversations((current) => {
+                const nextConversations = mode === 'append' ? [...current, ...nextItems] : nextItems;
+                queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (cached) => ({
+                    conversations: nextConversations,
+                    requests: cached?.requests || requests,
+                    sent: cached?.sent || sent,
+                    nextCursor: responseCursor,
+                    slots: cached ? cached.slots : slots,
+                }));
+                return nextConversations;
+            });
+            setNextCursor(responseCursor);
         }
         if (requestRes?.success) {
-            setRequests((requestRes.items || []).map((item) => normalizeConversation(item, 'incoming')));
+            const nextRequests = (requestRes.items || []).map((item) => normalizeConversation(item, 'incoming'));
+            setRequests(nextRequests);
+            queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (cached) => ({
+                conversations: cached?.conversations || conversations,
+                requests: nextRequests,
+                sent: cached?.sent || sent,
+                nextCursor: cached ? cached.nextCursor : nextCursor,
+                slots: cached ? cached.slots : slots,
+            }));
         }
         if (sentRes?.success) {
-            setSent((sentRes.items || []).map((item) => normalizeConversation(item, 'sent')));
+            const nextSent = (sentRes.items || []).map((item) => normalizeConversation(item, 'sent'));
+            setSent(nextSent);
+            queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (cached) => ({
+                conversations: cached?.conversations || conversations,
+                requests: cached?.requests || requests,
+                sent: nextSent,
+                nextCursor: cached ? cached.nextCursor : nextCursor,
+                slots: cached ? cached.slots : slots,
+            }));
         }
         if (slotsRes?.success) {
-            setSlots({ used: slotsRes.used ?? slotsRes.data?.used, total: slotsRes.total ?? slotsRes.data?.total });
+            const nextSlots = { used: slotsRes.used ?? slotsRes.data?.used, total: slotsRes.total ?? slotsRes.data?.total };
+            setSlots(nextSlots);
+            queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (cached) => ({
+                conversations: cached?.conversations || conversations,
+                requests: cached?.requests || requests,
+                sent: cached?.sent || sent,
+                nextCursor: cached ? cached.nextCursor : nextCursor,
+                slots: nextSlots,
+            }));
         }
-    }, [nextCursor]);
+    }, [conversations, nextCursor, requests, sent, slots]);
 
-    // Keep a live ref to load so the socket handler stays referentially stable.
-    // Otherwise load (which depends on nextCursor) would change identity on every
-    // pagination, tearing down and reconnecting the socket and dropping the
-    // chat:message / chat:unread events that should update the list instantly.
-    const loadRef = useRef(load);
+    const refreshConversationList = useCallback(async () => {
+        const response = await chatService.conversations({ cursor: null, limit: 30 });
+        if (!response.success) return;
+        const nextConversations = (response.items || []).map((item) => normalizeConversation(item));
+        const responseCursor = response.nextCursor || null;
+        setConversations(nextConversations);
+        setNextCursor(responseCursor);
+        queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (cached) => ({
+            conversations: nextConversations,
+            requests: cached?.requests || requests,
+            sent: cached?.sent || sent,
+            nextCursor: responseCursor,
+            slots: cached ? cached.slots : slots,
+        }));
+    }, [requests, sent, slots]);
+
+    // Socket callbacks stay stable while their implementation follows current state.
+    const refreshConversationListRef = useRef(refreshConversationList);
+    const socketRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
-        loadRef.current = load;
+        refreshConversationListRef.current = refreshConversationList;
     });
 
     const refreshFromSocket = useCallback(() => {
-        void loadRef.current('replace');
+        if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
+        socketRefreshTimerRef.current = setTimeout(() => {
+            void refreshConversationListRef.current();
+        }, 300);
+    }, []);
+
+    useEffect(() => () => {
+        if (socketRefreshTimerRef.current) clearTimeout(socketRefreshTimerRef.current);
     }, []);
 
     useChatSocket({
         enabled: true,
-        onMessage: refreshFromSocket,
         onConversationChanged: refreshFromSocket,
-        onMessageUnsent: refreshFromSocket,
-        onMessageUpdated: refreshFromSocket,
-        onUnread: refreshFromSocket,
     });
 
     useEffect(() => {
+        let active = true;
         (async () => {
-            setLoading(true);
+            const persisted = !cachedInbox ? await loadCachedInbox(userId) : null;
+            if (!active) return;
+            if (persisted) {
+                setConversations(persisted.conversations);
+                setRequests(persisted.requests);
+                setSent(persisted.sent);
+                setNextCursor(persisted.nextCursor);
+                setSlots(persisted.slots);
+                queryClient.setQueryData(queryKeys.chat.inbox, persisted);
+                setLoading(false);
+            }
+            inboxCacheReadyRef.current = true;
             await load('replace');
-            setLoading(false);
+            if (active) setLoading(false);
         })();
+        return () => {
+            active = false;
+        };
+        // Initial hydration deliberately runs once for the restored account.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!inboxCacheReadyRef.current || !userId) return;
+        void saveCachedInbox(userId, { conversations, requests, sent, nextCursor, slots });
+    }, [conversations, nextCursor, requests, sent, slots, userId]);
+
+    useEffect(() => {
+        const previous = previousConnectivityRef.current;
+        previousConnectivityRef.current = connectivityStatus;
+        if (previous === 'offline' && connectivityStatus === 'online') {
+            void load('replace');
+        }
+    }, [connectivityStatus, load]);
 
     useFocusEffect(
         useCallback(() => {
@@ -188,6 +289,24 @@ export default function MessagesScreen() {
             };
         }, [])
     );
+
+    useEffect(() => {
+        if (!userId || eligibility.isLoading || eligibility.messagingAccess?.allowed !== false) return;
+        shouldShowMembershipPromo(userId).then(setMembershipPromoVisible).catch(() => {});
+    }, [eligibility.isLoading, eligibility.messagingAccess?.allowed, userId]);
+
+    const requireConversationAccess = useCallback(async () => {
+        if (!requireVerified('chat')) return false;
+        if (canOpenMessaging(eligibility.messagingAccess)) return true;
+        const refreshed = await eligibility.refetch();
+        if (canOpenMessaging(refreshed.data?.messagingAccess)) return true;
+        setMembershipGateVisible(true);
+        return false;
+    }, [eligibility, requireVerified]);
+
+    const handleOpenConversation = useCallback(async (conversation: Conversation) => {
+        if (await requireConversationAccess()) openConversation(conversation);
+    }, [requireConversationAccess]);
 
     const enableNotificationsFromBanner = async () => {
         setNotificationBannerBusy(true);
@@ -239,6 +358,7 @@ export default function MessagesScreen() {
             await load('replace');
             return;
         }
+        if (action === 'accept' && !(await requireConversationAccess())) return;
         const res = action === 'accept'
             ? await chatService.accept(conversation.id)
             : action === 'decline'
@@ -251,7 +371,7 @@ export default function MessagesScreen() {
         await load('replace');
         if (action === 'accept') {
             setActiveTab('chats');
-            openConversation(conversation);
+            await handleOpenConversation(conversation);
         }
     };
 
@@ -294,7 +414,7 @@ export default function MessagesScreen() {
                                 variant="caption"
                                 numberOfLines={1}
                                 className={active ? 'font-body-bold' : 'font-body-semi'}
-                                style={{ color: active ? primary : colors.text, fontSize: scale(9.5), lineHeight: scale(11) }}
+                                style={{ color: active ? primary : colors.text, ...NavigationTypeTokens.compactTabLabel }}
                             >
                                 {t(labelKey, fallback)}
                             </Text>
@@ -337,6 +457,27 @@ export default function MessagesScreen() {
                         </Text>
                     </Pressable>
                     <Pressable onPress={() => setNotificationBannerVisible(false)} hitSlop={10} style={styles.notificationBannerClose}>
+                        <X size={scale(14)} color={colors.muted} />
+                    </Pressable>
+                </View>
+            )}
+
+            {membershipPromoVisible && eligibility.messagingAccess?.allowed === false && (
+                <View style={[styles.notificationBanner, { backgroundColor: palette.chrome.common.primaryTint, borderColor: palette.chrome.common.primaryRing }]}>
+                    <View style={[styles.notificationBannerIcon, { backgroundColor: palette.chrome.common.card }]}>
+                        <CreditCard size={scale(15)} color={primary} strokeWidth={2.4} />
+                    </View>
+                    <View style={styles.notificationBannerText}>
+                        <Text variant="caption" className="font-body-bold" style={{ color: colors.text }}>
+                            {eligibility.trialOffer?.available
+                                ? t('chat:membership_trial_promo', 'Start your {{days}}-day free trial', { days: eligibility.trialOffer.durationDays })
+                                : t('chat:membership_promo', 'Activate membership to open conversations')}
+                        </Text>
+                    </View>
+                    <Pressable onPress={() => router.push('/(tabs)/memberships')} hitSlop={8} style={styles.notificationBannerAction}>
+                        <Text variant="caption" className="font-body-bold" style={{ color: primary }}>{t('chat:view', 'View')}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setMembershipPromoVisible(false)} hitSlop={10} style={styles.notificationBannerClose}>
                         <X size={scale(14)} color={colors.muted} />
                     </Pressable>
                 </View>
@@ -399,7 +540,7 @@ export default function MessagesScreen() {
                         conversation={item}
                         variant={activeTab}
                         colors={colors}
-                        onPress={() => openConversation(item)}
+                        onPress={() => void handleOpenConversation(item)}
                         onAccept={() => runRequestAction(item, 'accept')}
                         onDecline={() => runRequestAction(item, 'decline')}
                         onWithdraw={() => runRequestAction(item, 'withdraw')}
@@ -407,6 +548,11 @@ export default function MessagesScreen() {
                 )}
             />
             </View>
+            <MessagingMembershipGate
+                visible={membershipGateVisible}
+                trialOffer={eligibility.trialOffer}
+                onClose={() => setMembershipGateVisible(false)}
+            />
         </SafeAreaView>
     );
 }
@@ -430,7 +576,7 @@ function ConversationRow({
 }) {
     const primary = useColors().chrome.primary;
     const other = (conversation.otherUser || {}) as ConversationOtherUser;
-    const avatar = profileImage(other);
+    const avatar = profileAvatarImage(other);
     const initial = otherName(conversation).trim().charAt(0).toUpperCase() || '?';
     const isRequest = variant === 'requests' || variant === 'sent';
     const isDeleted = !!other.account_deleted;
@@ -441,7 +587,12 @@ function ConversationRow({
             <Pressable onPress={onPress} style={styles.row}>
                 <View style={[styles.avatar, { backgroundColor: colors.avatarBg }]}>
                     {avatar ? (
-                        <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                        <Image
+                            source={{ uri: avatar }}
+                            recyclingKey={conversation.id}
+                            style={StyleSheet.absoluteFill}
+                            contentFit="cover"
+                        />
                     ) : (
                         <Text variant="body" className="font-body-bold" style={{ color: colors.muted }}>
                             {initial}

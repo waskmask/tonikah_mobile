@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { toast } from '@/hooks/useToast';
+import type { GalleryResponse } from '@/lib/galleryService';
 
 export type GalleryModerationUpdateEvent = {
     imageUuid?: string;
@@ -25,6 +26,39 @@ const ACTIVE_STATUSES = new Set(['queued', 'processing']);
 
 export function isGalleryModerationActive(status?: string): boolean {
     return ACTIVE_STATUSES.has(String(status || ''));
+}
+
+export function patchGalleryModerationUpdate(
+    current: GalleryResponse | undefined,
+    update: GalleryModerationUpdateEvent,
+): GalleryResponse | undefined {
+    if (!current?.gallery || !update.imageUuid) return current;
+
+    const status = String(update.status || '');
+    if (update.deleted || status === 'rejected') {
+        return {
+            ...current,
+            gallery: current.gallery.filter((item) => item.uuid !== update.imageUuid),
+        };
+    }
+
+    let matched = false;
+    const gallery = current.gallery.map((item) => {
+        if (item.uuid !== update.imageUuid) return item;
+        matched = true;
+        return {
+            ...item,
+            ...(typeof update.safe === 'boolean' ? { safe: update.safe } : {}),
+            moderationMeta: {
+                ...item.moderationMeta,
+                ...(status ? { status } : {}),
+                ...(update.reasonCodes ? { reasonCodes: update.reasonCodes } : {}),
+                ...(update.updatedAt ? { updatedAt: update.updatedAt } : {}),
+            },
+        };
+    });
+
+    return matched ? { ...current, gallery } : current;
 }
 
 export function notifyGalleryModerationResult(

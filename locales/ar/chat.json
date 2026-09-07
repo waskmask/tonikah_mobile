@@ -145,5 +145,14 @@
   "gallery_revoke_success": "Photo access ended",
   "gallery_revoke_error": "Could not stop sharing. Please try again.",
   "gallery_access_granted": "Photos revealed",
-  "gallery_access_revoked": "Photo access ended"
+  "gallery_access_revoked": "Photo access ended",
+  "membership_trial_title": "ابدأ تجربتك المجانية",
+  "membership_required_title": "العضوية مطلوبة",
+  "membership_trial_desc": "فعّل تجربتك لمدة {{days}} أيام لفتح المحادثات.",
+  "membership_required_desc": "فعّل العضوية لفتح المحادثات واستخدامها.",
+  "start_free_trial": "عرض التجربة المجانية",
+  "view_memberships": "عرض العضويات",
+  "membership_trial_promo": "ابدأ تجربتك المجانية لمدة {{days}} أيام",
+  "membership_promo": "فعّل العضوية لفتح المحادثات",
+  "view": "عرض"
 }

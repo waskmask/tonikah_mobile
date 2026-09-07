@@ -47,6 +47,8 @@ import {
     type NativeStoreProduct,
 } from '@/lib/nativeMembershipPurchase';
 import { apiMessage, t } from '@/lib/profileDisplay';
+import { queryClient } from '@/lib/queryClient';
+import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
 
 type CheckoutState = 'idle' | 'creating' | 'browser_open' | 'refreshing' | 'pending';
 
@@ -83,6 +85,8 @@ function overviewFromResponse(response: any): MembershipOverview {
             daysLeft: Math.max(0, Number(source?.trial?.daysLeft || 0)),
         },
         historyCount: Math.max(0, Number(source?.historyCount || 0)),
+        messagingAccess: source?.messagingAccess,
+        trialOffer: source?.trialOffer,
     };
 }
 
@@ -108,7 +112,7 @@ function isTrustedCheckoutUrl(value: string) {
 }
 
 function isTrialPlan(plan: MembershipPlan) {
-    return plan.slug.toLowerCase().includes('trial') || Number(plan.price?.amountMinor) === 0;
+    return plan.kind === 'trial' || plan.slug.toLowerCase().includes('trial');
 }
 
 function translatedPlanName(plan?: MembershipPlan | null) {
@@ -186,6 +190,11 @@ export default function MembershipsScreen() {
             .then(overviewFromResponse)
             .then((nextOverview) => {
                 setOverview(nextOverview);
+                queryClient.setQueryData<CurrentUserStatus>(CURRENT_USER_STATUS_QUERY_KEY, (current) => ({
+                    ...(current || {}),
+                    messagingAccess: nextOverview.messagingAccess,
+                    trialOffer: nextOverview.trialOffer,
+                }));
                 return nextOverview;
             })
             .finally(() => {
@@ -383,6 +392,13 @@ export default function MembershipsScreen() {
             if (!response.success && !response.ok) {
                 Alert.alert(t('error', 'Error'), apiMessage(response.message));
                 return;
+            }
+            if (response.messagingAccess) {
+                queryClient.setQueryData<CurrentUserStatus>(CURRENT_USER_STATUS_QUERY_KEY, (current) => ({
+                    ...(current || {}),
+                    messagingAccess: response.messagingAccess,
+                    trialOffer: response.trialOffer,
+                }));
             }
             await refreshMembership();
             toast.show(apiMessage(response.message, 'profile_updated_success'), 'success', 3000);

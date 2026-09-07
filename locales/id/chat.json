@@ -145,5 +145,14 @@
   "gallery_revoke_success": "Photo access ended",
   "gallery_revoke_error": "Could not stop sharing. Please try again.",
   "gallery_access_granted": "Photos revealed",
-  "gallery_access_revoked": "Photo access ended"
+  "gallery_access_revoked": "Photo access ended",
+  "membership_trial_title": "Start your free trial",
+  "membership_required_title": "Membership required",
+  "membership_trial_desc": "Activate your {{days}}-day trial to open conversations.",
+  "membership_required_desc": "Activate membership to open and use conversations.",
+  "start_free_trial": "View free trial",
+  "view_memberships": "View memberships",
+  "membership_trial_promo": "Start your {{days}}-day free trial",
+  "membership_promo": "Activate membership to open conversations",
+  "view": "View"
 }

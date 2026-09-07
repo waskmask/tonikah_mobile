@@ -11,26 +11,42 @@ import { apiMessage, t } from '@/lib/profileDisplay';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
+
+type CachedProfileList = {
+    items: any[];
+    nextCursor: string | null;
+};
 
 export default function FavouritedScreen() {
     const colors = useColors();
     const primary = colors.chrome.primary;
     const toast = useToast();
-    const [items, setItems] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const cachedList = queryClient.getQueryData<CachedProfileList>(queryKeys.favourites.list);
+    const [items, setItems] = useState<any[]>(() => cachedList?.items || []);
+    const [loading, setLoading] = useState(!cachedList);
     const [refreshing, setRefreshing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [nextCursor, setNextCursor] = useState<string | null>(null);
-    const [hasMore, setHasMore] = useState(false);
+    const [nextCursor, setNextCursor] = useState<string | null>(() => cachedList?.nextCursor || null);
+    const [hasMore, setHasMore] = useState(() => Boolean(cachedList?.nextCursor));
     const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
     const [removingId, setRemovingId] = useState<string | null>(null);
 
     const load = useCallback(async (cursor?: string | null, append = false) => {
         const res = await usersService.favorites({ limit: 30, cursor });
         if (res.success) {
-            setItems((current) => append ? [...current, ...(res.items || [])] : (res.items || []));
-            setNextCursor(res.nextCursor || null);
-            setHasMore(Boolean(res.nextCursor));
+            const responseCursor = res.nextCursor || null;
+            setItems((current) => {
+                const nextItems = append ? [...current, ...(res.items || [])] : (res.items || []);
+                queryClient.setQueryData(queryKeys.favourites.list, {
+                    items: nextItems,
+                    nextCursor: responseCursor,
+                });
+                return nextItems;
+            });
+            setNextCursor(responseCursor);
+            setHasMore(Boolean(responseCursor));
         }
     }, []);
 
@@ -61,7 +77,11 @@ export default function FavouritedScreen() {
         try {
             const res = await usersService.unfavorite(id);
             if (res.success) {
-                setItems((current) => current.filter((item) => String(item.id || item._id) !== String(id)));
+                setItems((current) => {
+                    const nextItems = current.filter((item) => String(item.id || item._id) !== String(id));
+                    queryClient.setQueryData(queryKeys.favourites.list, { items: nextItems, nextCursor });
+                    return nextItems;
+                });
                 toast.show(t('unfavorited', 'Removed from Saved'), 'success', 2500);
             } else {
                 toast.show(apiMessage(res.message), 'error');
@@ -122,10 +142,20 @@ export default function FavouritedScreen() {
                 onClose={() => setSelectedProfile(null)}
                 onBlocked={(id) => {
                     setSelectedProfile(null);
-                    setItems((current) => current.filter((item) => String(item.id || item._id) !== String(id)));
+                    setItems((current) => {
+                        const nextItems = current.filter((item) => String(item.id || item._id) !== String(id));
+                        queryClient.setQueryData(queryKeys.favourites.list, { items: nextItems, nextCursor });
+                        return nextItems;
+                    });
                 }}
                 onFavoriteChanged={(id, favorited) => {
-                    if (!favorited) setItems((current) => current.filter((item) => String(item.id || item._id) !== String(id)));
+                    if (!favorited) {
+                        setItems((current) => {
+                            const nextItems = current.filter((item) => String(item.id || item._id) !== String(id));
+                            queryClient.setQueryData(queryKeys.favourites.list, { items: nextItems, nextCursor });
+                            return nextItems;
+                        });
+                    }
                 }}
             />
         </View>

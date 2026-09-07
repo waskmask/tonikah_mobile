@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { Clock3, Info } from 'lucide-react-native';
+import { CircleAlert, Info } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { useColors } from '@/hooks/useColors';
 import { toast } from '@/hooks/useToast';
@@ -8,13 +8,16 @@ import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 
 /** "Under review" pill shown next to a field whose text change awaits
-    moderation. Tapping explains why the old text is still public. */
-export function UnderReviewPill() {
+    moderation. Tapping explains why the old text is still public.
+    Pass interactive={false} inside touchable rows so the pill doesn't
+    swallow the row's tap. */
+export function UnderReviewPill({ interactive = true }: { interactive?: boolean }) {
     const palette = useColors();
-    const warning = palette.chrome.toast.warning;
+    const reviewColor = palette.brand.accent.error;
 
     return (
         <Pressable
+            disabled={!interactive}
             onPress={() =>
                 toast.show(
                     t(
@@ -25,22 +28,21 @@ export function UnderReviewPill() {
                     4000,
                 )
             }
-            accessibilityRole="button"
+            accessibilityRole={interactive ? 'button' : 'text'}
             accessibilityLabel={t('moderation_text_under_review', 'Under review')}
-            hitSlop={6}
+            hitSlop={interactive ? 6 : undefined}
             style={[
                 styles.pill,
                 {
-                    borderColor: warning.border,
-                    backgroundColor: warning.bg,
+                    backgroundColor: palette.chrome.common.dangerTint,
                 },
             ]}
         >
-            <Clock3 size={scale(11)} color={warning.icon} />
+            <CircleAlert size={scale(12)} color={reviewColor} strokeWidth={2.5} />
             <Text
                 variant="caption"
-                className="font-body-semi"
-                style={[styles.label, { color: warning.text }]}
+                className="font-body-bold"
+                style={[styles.label, { color: reviewColor }]}
             >
                 {t('moderation_text_under_review', 'Under review')}
             </Text>
@@ -82,16 +84,18 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     pill: {
+        height: scale(24),
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: scale(4),
-        borderWidth: 1,
         borderRadius: 9999,
         paddingHorizontal: scale(8),
-        paddingVertical: scale(2.5),
         alignSelf: 'flex-start',
     },
     label: {
-        fontSize: scale(10.5),
+        fontSize: scale(11),
+        lineHeight: scale(14),
+        includeFontPadding: false,
     },
 });

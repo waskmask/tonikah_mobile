@@ -9,7 +9,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
-import { displayText, profileImage, t, translateCountry, translateNamespace } from '@/lib/profileDisplay';
+import { displayText, profileListImage, t, translateCountry, translateNamespace } from '@/lib/profileDisplay';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 
 type ProfileListCardProps = {
@@ -78,12 +78,13 @@ export function ProfileListCard({
     const { lightImpact } = useHaptics();
     const common = colors.chrome.common;
     const { width } = useWindowDimensions();
-    const image = profileImage(item);
+    const image = profileListImage(item);
     const cardWidth = Math.floor((width - scale(28) - scale(10)) / 2);
     const location = item.location
         ? [item.location.city, translateCountry(item.location.country)].filter(Boolean).join(' - ')
         : [item.city, translateCountry(item.country)].filter(Boolean).join(' - ');
     const name = item.profileName || item.username || t('not_set', 'Not set');
+    const imageKey = String(item.id || item._id || image || name);
     const age = item.age || item.profile?.age;
     const verified = Boolean(item.verified?.selfie || item.verified_profile);
     const pills = collectPills(item);
@@ -104,7 +105,12 @@ export function ProfileListCard({
             ]}
         >
             <View style={[styles.imageWrap, { backgroundColor: common.cardAlt }]}>
-                <Image source={image ? { uri: image } : PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
+                <Image
+                    source={image ? { uri: image } : PROFILE_PLACEHOLDER_IMAGE}
+                    recyclingKey={imageKey}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                />
                 <LinearGradient
                     colors={['rgba(24, 19, 14,0.04)', 'rgba(24, 19, 14,0.18)', 'rgba(24, 19, 14,0.82)']}
                     locations={[0, 0.48, 1]}

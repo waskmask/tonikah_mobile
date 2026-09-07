@@ -46,28 +46,30 @@ export function TextModerationWarningModal({ warning, submitting, onEdit, onClos
             <View style={styles.overlay}>
                 <View style={[styles.card, { backgroundColor: palette.chrome.common.card, borderColor: palette.brand.bg.border }]}>
                     <View style={[styles.headerRow, { flexDirection: 'row' }]}>
-                        <View style={[styles.warnIcon, { backgroundColor: palette.chrome.common.dangerTint }]}>
-                            <AlertCircle size={scale(20)} color={palette.brand.accent.error} />
-                        </View>
-                        <View style={styles.headerText}>
-                            <Text
-                                variant="body"
-                                className="font-body-bold"
-                                style={{ fontSize: scale(16), textAlign: isRTL ? 'right' : 'left' }}
-                            >
-                                {t(moderationTitleKeys[warning.field], 'This text needs review')}
-                            </Text>
-                            <Text
-                                variant="body-sm"
-                                style={{
-                                    marginTop: scale(6),
-                                    color: palette.brand.text.subtitle,
-                                    lineHeight: scale(19),
-                                    textAlign: isRTL ? 'right' : 'left',
-                                }}
-                            >
-                                {t('moderation_text_warning_body', 'We found something that may need a human review before it appears on your profile.')}
-                            </Text>
+                        <View style={[styles.titleGroup, { flexDirection: 'row' }]}>
+                            <View style={[styles.warnIcon, { backgroundColor: palette.chrome.common.dangerTint }]}>
+                                <AlertCircle size={scale(17)} color={palette.brand.accent.error} />
+                            </View>
+                            <View style={styles.headerText}>
+                                <Text
+                                    variant="body"
+                                    className="font-body-bold"
+                                    style={{ fontSize: scale(16), textAlign: isRTL ? 'right' : 'left' }}
+                                >
+                                    {t(moderationTitleKeys[warning.field], 'This text needs review')}
+                                </Text>
+                                <Text
+                                    variant="body-sm"
+                                    style={{
+                                        marginTop: scale(6),
+                                        color: palette.brand.text.subtitle,
+                                        lineHeight: scale(19),
+                                        textAlign: isRTL ? 'right' : 'left',
+                                    }}
+                                >
+                                    {t('moderation_text_warning_body', 'We found something that may need a human review before it appears on your profile.')}
+                                </Text>
+                            </View>
                         </View>
                         <Pressable
                             onPress={dismiss}
@@ -168,12 +170,18 @@ const styles = StyleSheet.create({
     },
     headerRow: {
         alignItems: 'flex-start',
-        gap: scale(10),
+        gap: scale(8),
+    },
+    titleGroup: {
+        flex: 1,
+        minWidth: 0,
+        alignItems: 'flex-start',
+        gap: scale(6),
     },
     warnIcon: {
-        width: scale(38),
-        height: scale(38),
-        borderRadius: scale(19),
+        width: scale(32),
+        height: scale(32),
+        borderRadius: scale(16),
         alignItems: 'center',
         justifyContent: 'center',
     },

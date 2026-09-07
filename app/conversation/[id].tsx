@@ -14,6 +14,7 @@ import {
     StyleProp,
     StyleSheet,
     Text as RNText,
+    type TextStyle,
     TextInput,
     View,
     ViewStyle,
@@ -52,7 +53,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useChatScrollAnchor, CHAT_NEAR_BOTTOM_THRESHOLD } from '@/hooks/useChatScrollAnchor';
-import { loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
+import { clearAllCachedMessages, loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
 import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode';
 import { BRAND_PRIMARY } from '@/constants/Colors';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -73,7 +74,7 @@ import Reanimated, {
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
-import { cacheChatMedia, deleteCachedChatMediaForMessage, getCachedChatMedia } from '@/lib/chatMediaCache';
+import { cacheChatMedia, clearChatMediaCache, deleteCachedChatMediaForMessage, getCachedChatMedia } from '@/lib/chatMediaCache';
 import { translateChatText } from '@/lib/chatDisplay';
 import { ImageAttachmentComposer } from '@/components/chat/ImageAttachmentComposer';
 import { GalleryRevealControl } from '@/components/chat/GalleryRevealControl';
@@ -84,7 +85,13 @@ import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
 import { QualifiedPhotoRequiredNotice } from '@/components/app/QualifiedPhotoRequiredNotice';
-import { useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
+import { useMessagingAccessExpiry, useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
+import { useConnectivity } from '@/hooks/useConnectivity';
+import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
+import { canOpenMessaging } from '@/lib/messagingAccess';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
+import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
 
 const PRIMARY = BRAND_PRIMARY;
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -107,6 +114,21 @@ function messageId(message: ChatMessage) {
 
 function messageText(message: ChatMessage) {
     return message.content || message.text || '';
+}
+
+const RTL_STRONG_CHARACTER = /[\u05D0-\u05EA\u05F0-\u05F2\u0620-\u063F\u0641-\u064A\u066E-\u066F\u0671-\u06D3\u06D5\u06EE-\u06EF\u06FA-\u06FC\u06FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+const LTR_STRONG_CHARACTER = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02AF\u0370-\u052F]/;
+
+function directionalTextStyle(value: string): Pick<TextStyle, 'textAlign' | 'writingDirection'> {
+    for (const character of value) {
+        if (RTL_STRONG_CHARACTER.test(character)) {
+            return { textAlign: 'right', writingDirection: 'rtl' };
+        }
+        if (LTR_STRONG_CHARACTER.test(character)) {
+            return { textAlign: 'left', writingDirection: 'ltr' };
+        }
+    }
+    return { textAlign: 'left', writingDirection: 'ltr' };
 }
 
 function makeWaveform(count = VOICE_WAVE_BAR_COUNT) {
@@ -209,6 +231,12 @@ export default function ConversationScreen() {
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
     const eligibility = useMessagingEligibilityStatus();
+    useMessagingAccessExpiry();
+    const membershipBlocked = eligibility.messagingAccess?.required === true
+        && !canOpenMessaging(eligibility.messagingAccess);
+    const membershipAccessUnavailable = !eligibility.isLoading
+        && eligibility.isError
+        && !eligibility.messagingAccess;
     const showPhotoGate =
         !eligibility.isLoading &&
         !eligibility.isError &&
@@ -219,9 +247,20 @@ export default function ConversationScreen() {
             void eligibility.refetch();
         }
     };
+    const reconcileMembershipEligibility = (response?: unknown) => {
+        const data = response as { code?: string; messagingAccess?: CurrentUserStatus['messagingAccess']; trialOffer?: CurrentUserStatus['trialOffer'] } | undefined;
+        if (data?.code !== 'MEMBERSHIP_REQUIRED') return false;
+        queryClient.setQueryData<CurrentUserStatus>(CURRENT_USER_STATUS_QUERY_KEY, (current) => ({
+            ...(current || {}),
+            messagingAccess: data.messagingAccess,
+            trialOffer: data.trialOffer,
+        }));
+        return true;
+    };
     const { isDark } = useTheme();
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
+    const { status: connectivityStatus, isOffline } = useConnectivity();
     const toast = useToast();
     const { lightImpact } = useHaptics();
     const insets = useSafeAreaInsets();
@@ -276,6 +315,7 @@ export default function ConversationScreen() {
     const peerTypingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const typingActiveRef = useRef(false);
     const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const previousConnectivityRef = useRef(connectivityStatus);
 
     const colors = useMemo(() => ({
         bg: palette.brand.bg.surface,
@@ -350,7 +390,7 @@ export default function ConversationScreen() {
     }, [recorderState.durationMillis, recorderState.isRecording, recordingBusy, voicePanelOpen]);
 
     const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
-        if (!id || id === 'new') return;
+        if (!id || id === 'new' || membershipBlocked) return;
         const cursor = mode === 'append' ? nextCursor : null;
         const [metaRes, messageRes] = await Promise.all([
             mode === 'replace' ? chatService.conversation(id) : Promise.resolve(null),
@@ -361,12 +401,37 @@ export default function ConversationScreen() {
         }
         if (messageRes.success) {
             const nextItems = (messageRes.items || []).map(normalizeMessage);
-            setItems((current) => mode === 'append' ? [...current, ...nextItems] : nextItems);
+            setItems((current) => {
+                if (mode === 'append') return [...current, ...nextItems];
+                const failedLocalMessages = current.filter(
+                    (message) => message.failed && message.type === 'text' && message.tempId,
+                );
+                return [...nextItems, ...failedLocalMessages];
+            });
             setNextCursor(messageRes.nextCursor || null);
-        } else {
+        } else if (messageRes.code === 'MEMBERSHIP_REQUIRED') {
+            void eligibility.refetch();
+        } else if (messageRes.message !== 'network_error') {
             Alert.alert(t('error', 'Error'), apiMessage(messageRes.message));
         }
-    }, [id, nextCursor]);
+    }, [eligibility, id, membershipBlocked, nextCursor]);
+
+    useEffect(() => {
+        if (!membershipBlocked) return;
+        const userId = String(user?._id || user?.id || '');
+        setItems([]);
+        setConversation(null);
+        queryClient.removeQueries({ queryKey: queryKeys.chat.inbox });
+        void Promise.all([clearAllCachedMessages(userId), clearChatMediaCache()]);
+    }, [membershipBlocked, user?._id, user?.id]);
+
+    useEffect(() => {
+        const previous = previousConnectivityRef.current;
+        previousConnectivityRef.current = connectivityStatus;
+        if (previous === 'offline' && connectivityStatus === 'online') {
+            void load('replace');
+        }
+    }, [connectivityStatus, load]);
 
     const refreshCurrentConversation = useCallback(() => {
         if (!id || id === 'new') return;
@@ -461,7 +526,7 @@ export default function ConversationScreen() {
 
     const socket = useChatSocket({
         conversationId: id !== 'new' ? id : null,
-        enabled: Boolean(user && id && id !== 'new'),
+        enabled: Boolean(user && id && id !== 'new' && !membershipBlocked),
         onMessage: handleSocketMessage,
         onMessageUnsent: handleSocketUnsent,
         onMessageUpdated: handleSocketMessageUpdated,
@@ -488,6 +553,12 @@ export default function ConversationScreen() {
         pendingSeenRef.current = false;
         isNearBottomRef.current = true;
         (async () => {
+            if (eligibility.isLoading) return;
+            if (membershipBlocked || membershipAccessUnavailable) {
+                setLoading(false);
+                setMessagesReady(false);
+                return;
+            }
             if (!id || id === 'new') {
                 setLoading(false);
                 setMessagesReady(true);
@@ -517,14 +588,14 @@ export default function ConversationScreen() {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, user?._id, user?.id]);
+    }, [eligibility.isLoading, id, membershipAccessUnavailable, membershipBlocked, user?._id, user?.id]);
 
     // Persist the newest slice locally so the next open is instant.
     useEffect(() => {
-        if (!id || id === 'new' || !messagesReady) return;
+        if (!id || id === 'new' || !messagesReady || membershipBlocked || membershipAccessUnavailable) return;
         const userId = String(user?._id || user?.id || '');
         void saveCachedMessages(userId, id, items);
-    }, [items, id, messagesReady, user?._id, user?.id]);
+    }, [items, id, membershipAccessUnavailable, membershipBlocked, messagesReady, user?._id, user?.id]);
 
     useEffect(() => {
         if (!viewOnce) return;
@@ -592,7 +663,7 @@ export default function ConversationScreen() {
                 messageId: message.id,
                 seconds: res.expiresIn || res.data?.expiresIn || 30,
             });
-        } else {
+        } else if (!reconcileMembershipEligibility(res)) {
             Alert.alert(t('error', 'Error'), apiMessage(res.message || 'photo_expired'));
         }
         setViewOnceLoadingId(null);
@@ -602,6 +673,45 @@ export default function ConversationScreen() {
         setReplyTo(message);
         setSelectedMessage(null);
     }, []);
+
+    const retryFailedMessage = useCallback(async (message: ChatMessage) => {
+        if (!message.failed || message.pending || message.type !== 'text') return;
+        if (isOffline) {
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            return;
+        }
+        const body = messageText(message).trim();
+        if (!body) return;
+
+        setItems((current) => current.map((item) => messageId(item) === messageId(message)
+            ? { ...item, failed: false, pending: true }
+            : item));
+
+        const replyId = typeof message.replyTo === 'string' ? message.replyTo : message.replyTo?.id;
+        const res = await chatService.send({
+            conversationId: id !== 'new' ? id : undefined,
+            recipientId: id === 'new' ? recipientId : undefined,
+            content: body,
+            type: 'text',
+            replyTo: replyId || undefined,
+        });
+
+        if (res.success && res.message) {
+            const normalized = normalizeMessage(res.message);
+            setItems((current) => current.map((item) => messageId(item) === messageId(message) ? normalized : item));
+            if (id === 'new' && res.conversationId) {
+                router.replace(`/conversation/${res.conversationId}` as any);
+            }
+            return;
+        }
+
+        if (reconcileMembershipEligibility(res)) return;
+        reconcilePhotoEligibility(res);
+        setItems((current) => current.map((item) => messageId(item) === messageId(message)
+            ? { ...item, pending: false, failed: true }
+            : item));
+        toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
+    }, [id, isOffline, recipientId, toast]);
 
     const renderMessageItem = useCallback(({ item }: { item: ListItem }) => {
         if (item.kind === 'date') {
@@ -620,6 +730,7 @@ export default function ConversationScreen() {
             <MessageBubble
                 message={message}
                 mine={mine}
+                uiDirection={isRTL ? 'rtl' : 'ltr'}
                 colors={colors}
                 userId={String(user?._id || user?.id || '')}
                 animateIn={animateIn}
@@ -627,11 +738,12 @@ export default function ConversationScreen() {
                 onOpenViewOnce={openViewOnce}
                 viewOnceLoading={viewOnceLoadingId === message.id}
                 onOpenMenu={setSelectedMessage}
+                onRetry={retryFailedMessage}
                 onSwipeReply={beginReply}
                 onReplyClick={handleReplyJump}
             />
         );
-    }, [colors, user?._id, user?.id, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump]);
+    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage]);
     const routeConversation = useMemo(() => {
         if (!id || id === 'new' || !routeState) return null;
         return {
@@ -756,6 +868,10 @@ export default function ConversationScreen() {
             toast.show(t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
+        if (isOffline) {
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            return;
+        }
         const body = content.trim();
         if (!body) {
             Alert.alert(t('message_empty', 'Please enter a message before sending.'));
@@ -799,9 +915,18 @@ export default function ConversationScreen() {
                 router.replace(`/conversation/${res.conversationId}` as any);
             }
         } else {
+            if (reconcileMembershipEligibility(res)) {
+                setItems((current) => current.filter((item) => item.tempId !== tempId));
+                setSending(false);
+                return;
+            }
             reconcilePhotoEligibility(res);
             setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
-            Alert.alert(t('error', 'Error'), apiMessage(res.errorMessage || 'message_failed'));
+            if (res.errorMessage === 'network_error') {
+                toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
+            } else {
+                Alert.alert(t('error', 'Error'), apiMessage(res.errorMessage || 'message_failed'));
+            }
         }
         setSending(false);
     };
@@ -830,6 +955,7 @@ export default function ConversationScreen() {
             return true;
         }
 
+        if (reconcileMembershipEligibility(res)) return false;
         reconcilePhotoEligibility(res);
         toast.show(apiMessage(res.errorMessage || 'message_failed'), 'error');
         return false;
@@ -844,6 +970,10 @@ export default function ConversationScreen() {
 
     const canAttachMedia = () => {
         if (!requireVerified('chat')) return false;
+        if (isOffline) {
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            return false;
+        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
@@ -913,6 +1043,10 @@ export default function ConversationScreen() {
 
     const sendImageAttachment = async () => {
         if (!imageAttachment || uploadingMedia || id === 'new') return;
+        if (isOffline) {
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            return;
+        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
@@ -939,6 +1073,10 @@ export default function ConversationScreen() {
                 setImageViewOnce(false);
             }
         } else {
+            if (reconcileMembershipEligibility(uploadRes)) {
+                setUploadingMedia(false);
+                return;
+            }
             reconcilePhotoEligibility(uploadRes);
             toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
         }
@@ -947,6 +1085,10 @@ export default function ConversationScreen() {
 
     const startRecording = async () => {
         if (!requireVerified('chat')) return;
+        if (isOffline) {
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            return;
+        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
@@ -1029,6 +1171,10 @@ export default function ConversationScreen() {
 
     const sendVoicePreview = async () => {
         if (!voicePreview || voiceSending || id === 'new') return;
+        if (isOffline) {
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            return;
+        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
@@ -1054,6 +1200,7 @@ export default function ConversationScreen() {
                 setVoicePreview(null);
                 setVoiceWaveform([]);
             } else {
+                if (reconcileMembershipEligibility(uploadRes)) return;
                 reconcilePhotoEligibility(uploadRes);
                 toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
             }
@@ -1074,6 +1221,7 @@ export default function ConversationScreen() {
                 ? await chatService.decline(target.id)
                 : await chatService.withdraw(target.id);
         setRequestBusy(false);
+        if (reconcileMembershipEligibility(res)) return;
         if (!res.success) {
             Alert.alert(t('error', 'Error'), apiMessage(res.message));
             return;
@@ -1243,7 +1391,7 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
-    if (loading) {
+    if (eligibility.isLoading || loading) {
         return (
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={styles.center}>
@@ -1253,10 +1401,46 @@ export default function ConversationScreen() {
         );
     }
 
+    if (membershipAccessUnavailable) {
+        return (
+            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+                <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
+                    <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
+                        {isRTL ? <ChevronRight size={24} color={colors.text} /> : <ChevronLeft size={24} color={colors.text} />}
+                    </Pressable>
+                </View>
+                <View style={styles.center}>
+                    <Text variant="body" className="font-body-semi" style={{ color: colors.muted, textAlign: 'center' }}>
+                        {t('chat:connection_error', 'Connection error. Retrying...')}
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (membershipBlocked) {
+        return (
+            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+                <MessagingMembershipGate
+                    visible
+                    trialOffer={eligibility.trialOffer}
+                    onClose={goBackToMessages}
+                />
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
             <View style={styles.screen}>
-                <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
+                <View style={[
+                    styles.header,
+                    {
+                        backgroundColor: colors.bg,
+                        borderBottomColor: colors.border,
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                    },
+                ]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
                         {(isRTL ? <ChevronRight size={scale(23)} color={colors.text} /> : <ChevronLeft size={scale(23)} color={colors.text} />)}
                     </Pressable>
@@ -1271,7 +1455,10 @@ export default function ConversationScreen() {
                             pressed && !headerOther.account_deleted && { opacity: 0.72 },
                         ]}
                     >
-                        <View pointerEvents="box-none" style={styles.headerProfileContent}>
+                        <View
+                            pointerEvents="box-none"
+                            style={[styles.headerProfileContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                        >
                             <View pointerEvents="none" style={[styles.headerAvatar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                 {avatar ? (
                                     <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -1279,12 +1466,12 @@ export default function ConversationScreen() {
                                     <Image source={PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
                                 )}
                             </View>
-                            <View pointerEvents="none" style={styles.headerText}>
-                                <RNText numberOfLines={2} style={[styles.headerNameText, { color: colors.text }]}>
+                            <View pointerEvents="none" style={[styles.headerText, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+                                <RNText numberOfLines={2} style={[styles.headerNameText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                                     {peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
                                 </RNText>
                                 {(activeConversation || name) && (
-                                    <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted }]}>
+                                    <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
                                         {headerOther.account_deleted
                                             ? t('chat:account_deleted', 'Account deleted')
                                             : headerOther.recently_active
@@ -1469,7 +1656,7 @@ export default function ConversationScreen() {
                                 <View style={[styles.inputPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                     <PressableScale
                                         onPress={captureAndAttachPhoto}
-                                        disabled={uploadingMedia || recordingBusy || voiceSending}
+                                        disabled={isOffline || uploadingMedia || recordingBusy || voiceSending}
                                         accessibilityLabel={translateChatText('camera', 'Camera')}
                                         style={styles.pillIcon}
                                     >
@@ -1492,7 +1679,7 @@ export default function ConversationScreen() {
                                         <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)} style={styles.pillIconCluster}>
                                             <PressableScale
                                                 onPress={startRecording}
-                                                disabled={recordingBusy || voiceSending}
+                                                disabled={isOffline || recordingBusy || voiceSending}
                                                 accessibilityLabel={translateChatText('voice_message', 'Voice message')}
                                                 style={styles.pillIcon}
                                             >
@@ -1500,7 +1687,7 @@ export default function ConversationScreen() {
                                             </PressableScale>
                                             <PressableScale
                                                 onPress={pickAndUploadImage}
-                                                disabled={uploadingMedia || recordingBusy || voiceSending}
+                                                disabled={isOffline || uploadingMedia || recordingBusy || voiceSending}
                                                 accessibilityLabel={translateChatText('attach_photo', 'Attach photo')}
                                                 style={styles.pillIcon}
                                             >
@@ -1596,7 +1783,11 @@ export default function ConversationScreen() {
                         ]}
                     >
                         <View style={[styles.conversationMenuHeader, { borderBottomColor: colors.border }]}>
-                            <Text variant="body-sm" className="font-body-bold" style={{ color: colors.text }}>
+                            <Text
+                                variant="body-sm"
+                                className="font-body-bold"
+                                style={[styles.conversationMenuTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+                            >
                                 {translateChatText('more_options', 'More options')}
                             </Text>
                             <Pressable onPress={() => !menuBusy && setMenuOpen(false)} style={styles.menuClose}>
@@ -1992,6 +2183,7 @@ function ChatScrollDownButton({
 function MessageBubbleComponent({
     message,
     mine,
+    uiDirection,
     colors,
     userId,
     animateIn,
@@ -1999,11 +2191,13 @@ function MessageBubbleComponent({
     onOpenViewOnce,
     viewOnceLoading,
     onOpenMenu,
+    onRetry,
     onSwipeReply,
     onReplyClick,
 }: {
     message: ChatMessage;
     mine: boolean;
+    uiDirection: 'ltr' | 'rtl';
     colors: Record<string, string>;
     userId: string;
     animateIn: boolean;
@@ -2011,9 +2205,12 @@ function MessageBubbleComponent({
     onOpenViewOnce: (message: ChatMessage) => void;
     viewOnceLoading: boolean;
     onOpenMenu: (message: ChatMessage) => void;
+    onRetry: (message: ChatMessage) => void;
     onSwipeReply: (message: ChatMessage) => void;
     onReplyClick: (messageId: string) => void;
 }) {
+    const content = messageText(message);
+
     if (message.type === 'system') {
         const systemContent = String(message.content || '').trim().toLowerCase().replace(/\s+/g, '_');
         const isGalleryAccessSystem = systemContent === 'gallery_access_granted' || systemContent === 'gallery_access_revoked';
@@ -2051,11 +2248,12 @@ function MessageBubbleComponent({
     }
 
     if (message.unsent) {
+        const unsentLabel = translateChatText('message_unsent', 'Message unsent');
         return (
             <View style={[styles.bubbleRow, mine ? styles.bubbleRight : styles.bubbleLeft]}>
-                <View style={[styles.unsentBubble, { borderColor: colors.border }]}>
-                    <Text variant="body-sm" style={{ color: colors.muted, fontStyle: 'italic' }}>
-                        {translateChatText('message_unsent', 'Message unsent')}
+                <View style={[styles.unsentBubble, { borderColor: colors.border, direction: uiDirection }]}>
+                    <Text variant="body-sm" style={[{ color: colors.muted, fontStyle: 'italic' }, directionalTextStyle(unsentLabel)]}>
+                        {unsentLabel}
                     </Text>
                 </View>
             </View>
@@ -2067,6 +2265,7 @@ function MessageBubbleComponent({
     const hasViewOnce = message.type === 'image' && media?.viewOnce;
     const hasVoice = message.type === 'voice';
     const replyTo = typeof message.replyTo === 'object' && message.replyTo ? message.replyTo : null;
+    const quotedText = replyPreview(replyTo);
     const reactions = message.reactions || [];
     const swipeX = useRef(new Animated.Value(0)).current;
     const swipeTriggered = useRef(false);
@@ -2116,7 +2315,7 @@ function MessageBubbleComponent({
             style={[styles.bubbleRow, mine ? styles.bubbleRight : styles.bubbleLeft]}
             entering={animateIn ? FadeInDown.duration(240) : undefined}
         >
-            <View style={styles.swipeReplyWrap}>
+            <View style={[styles.swipeReplyWrap, { direction: uiDirection }]}>
                 <Animated.View
                     style={[
                         styles.swipeReplyHint,
@@ -2133,7 +2332,13 @@ function MessageBubbleComponent({
                     {...panResponder.panHandlers}
                     style={[styles.swipeReplyBubble, { transform: [{ translateX: swipeX }] }]}
                 >
-                    <Pressable onLongPress={() => onOpenMenu(message)} delayLongPress={420}>
+                    <Pressable
+                        onPress={message.failed ? () => onRetry(message) : undefined}
+                        onLongPress={message.failed ? undefined : () => onOpenMenu(message)}
+                        delayLongPress={420}
+                        accessibilityRole={message.failed ? 'button' : undefined}
+                        accessibilityLabel={message.failed ? translateChatText('tap_to_retry', 'Tap to retry') : undefined}
+                    >
                         <View style={[
                             styles.bubble,
                             mine ? styles.mineBubble : styles.theirBubble,
@@ -2155,8 +2360,8 @@ function MessageBubbleComponent({
                                     <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
                                         {t('chat:reply', 'Reply')}
                                     </Text>
-                                    <Text variant="caption" numberOfLines={2} style={{ color: colors.muted }}>
-                                        {replyPreview(replyTo)}
+                                    <Text variant="caption" numberOfLines={2} style={[{ color: colors.muted }, directionalTextStyle(quotedText)]}>
+                                        {quotedText}
                                     </Text>
                                 </Pressable>
                             )}
@@ -2200,9 +2405,9 @@ function MessageBubbleComponent({
                         <VoiceMessage message={message} media={media} mine={mine} colors={colors} userId={userId} />
                     )}
 
-                    {!!messageText(message) && (
-                        <Text variant="body" style={[styles.messageText, { color: colors.text }]}>
-                            {messageText(message)}
+                    {!!content && (
+                        <Text variant="body" style={[styles.messageText, { color: colors.text }, directionalTextStyle(content)]}>
+                            {content}
                         </Text>
                     )}
 
@@ -2223,7 +2428,9 @@ function MessageBubbleComponent({
                                     </Text>
                                 )}
                                 {message.failed && (
-                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>!</Text>
+                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>
+                                        {translateChatText('tap_to_retry', 'Tap to retry')}
+                                    </Text>
                                 )}
                             </View>
                         </View>
@@ -2494,6 +2701,7 @@ const styles = StyleSheet.create({
     header: {
         minHeight: scale(56),
         flexDirection: 'row',
+        direction: 'ltr',
         alignItems: 'stretch',
         // 5.5 + 9.5 (arrow inset inside its 40pt circle) = 15dp edge→glyph
         paddingHorizontal: scale(5.5),
@@ -2516,15 +2724,14 @@ const styles = StyleSheet.create({
         alignSelf: 'stretch',
         justifyContent: 'center',
         paddingVertical: scale(2),
-        // Near the back chevron (WhatsApp-style cluster); start/end so RTL flips
-        paddingStart: scale(6),
-        paddingEnd: scale(4),
+        paddingHorizontal: scale(4),
     },
     headerProfileContent: {
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'stretch',
         minWidth: 0,
+        gap: scale(8),
     },
     headerAvatar: {
         width: scale(40),
@@ -2532,7 +2739,6 @@ const styles = StyleSheet.create({
         borderRadius: scale(20),
         borderWidth: StyleSheet.hairlineWidth,
         overflow: 'hidden',
-        marginRight: scale(12),
     },
     headerText: { flexShrink: 1, minWidth: 0, justifyContent: 'center' },
     headerNameText: { fontSize: scale(15), lineHeight: scale(18), fontWeight: '700', includeFontPadding: false, textAlignVertical: 'center' },
@@ -2541,7 +2747,7 @@ const styles = StyleSheet.create({
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: scale(80) },
     dateWrap: { alignItems: 'center', marginVertical: scale(8) },
     dateLabel: { paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden', textTransform: 'uppercase' },
-    bubbleRow: { width: '100%', marginBottom: scale(14) },
+    bubbleRow: { width: '100%', marginBottom: scale(14), direction: 'ltr' },
     bubbleLeft: { alignItems: 'flex-start' },
     bubbleRight: { alignItems: 'flex-end' },
     swipeReplyWrap: { position: 'relative', maxWidth: '78%' },
@@ -2799,14 +3005,17 @@ const styles = StyleSheet.create({
     },
     conversationMenuHeader: {
         height: scale(48),
-        paddingLeft: scale(16),
-        paddingRight: scale(8),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        paddingStart: scale(16),
+        paddingEnd: scale(52),
+        justifyContent: 'center',
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
+    conversationMenuTitle: {
+        alignSelf: 'stretch',
+    },
     menuClose: {
+        position: 'absolute',
+        end: scale(8),
         width: scale(36),
         height: scale(36),
         borderRadius: scale(18),

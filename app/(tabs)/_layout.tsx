@@ -2,13 +2,16 @@ import { Tabs } from "expo-router";
 import { BottomTabBar } from "@/components/app/BottomTabBar";
 import { LegalConsentGate } from "@/components/app/LegalConsentGate";
 import { usePeriodicLocationRefresh } from "@/hooks/usePeriodicLocationRefresh";
+import { AppMenuProvider } from "@/components/app/AppMenuProvider";
+import { MembershipAccessListener } from "@/components/app/MembershipAccessListener";
 
 export default function TabsLayout() {
     usePeriodicLocationRefresh();
 
     return (
-        <>
+        <AppMenuProvider>
         <LegalConsentGate />
+        <MembershipAccessListener />
         <Tabs
             screenOptions={{
                 headerShown: false,
@@ -52,6 +55,7 @@ export default function TabsLayout() {
                 options={{
                     title: "Profile",
                     headerShown: false,
+                    freezeOnBlur: true,
                 }}
             />
             <Tabs.Screen name="edit-profile" options={{ href: null }} />
@@ -63,6 +67,6 @@ export default function TabsLayout() {
             <Tabs.Screen name="faith" options={{ href: null }} />
             <Tabs.Screen name="partner-preference" options={{ href: null }} />
         </Tabs>
-        </>
+        </AppMenuProvider>
     );
 }

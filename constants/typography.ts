@@ -20,6 +20,16 @@ export const Typography = {
         "3xl": 30,
         "4xl": 36,
     },
+    lineHeight: {
+        xs: 16,
+        sm: 20,
+        base: 24,
+        lg: 24,
+        xl: 28,
+        "2xl": 32,
+        "3xl": 38,
+        "4xl": 44,
+    },
     font: {
         heading: {
             extra: jakarta.extra,

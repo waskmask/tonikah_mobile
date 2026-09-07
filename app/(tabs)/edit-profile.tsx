@@ -1,45 +1,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from "react-native";
-import { Image } from "expo-image";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import * as Location from "expo-location";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   Baby,
-  Banknote,
-  Briefcase,
+  BookHeart,
+  BriefcaseBusiness,
   Building2,
-  Calendar,
+  CalendarHeart,
+  ChevronLeft,
   ChevronRight,
   Cigarette,
-  Flag,
+  Coins,
   GraduationCap,
   Heart,
+  Home,
   Languages,
+  Lock,
   MapPin,
-  MoonStar,
-  Palette,
+  Moon,
   Plane,
+  Puzzle,
   Ruler,
   ShieldCheck,
+  Shirt,
   Sparkles,
+  UserCog,
+  UserRound,
   Users,
   Wine,
 } from "lucide-react-native";
 
 import { AppBackTitleBar } from "@/components/app/AppBackTitleBar";
 import { EditProfileMediaEditor } from "@/components/profile/EditProfileMediaEditor";
+import { ProfileCompletionBar } from "@/components/profile/ProfileCompletionBar";
 import { ProfileSummaryEditor } from "@/components/profile/ProfileSummaryEditor";
-import { GradientButton } from "@/components/ui/GradientButton";
+import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
+import { IncomeEditSheet } from "@/components/ui/IncomeEditSheet";
 import { MultiSelectOption, MultiSelectSheet } from "@/components/ui/MultiSelectSheet";
 import { SelectOption, SingleSelectSheet } from "@/components/ui/SingleSelectSheet";
 import { Text } from "@/components/ui/Text";
+import { TextEditSheet } from "@/components/ui/TextEditSheet";
 import { COUNTRY_OPTIONS, LANGUAGE_OPTIONS, NATIONALITY_OPTIONS } from "@/constants/profileOptions";
 import { Typography } from "@/constants/typography";
 import { useEmailVerificationGuard } from "@/hooks/useEmailVerificationGuard";
@@ -47,21 +55,24 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
-import { type GalleryItem, type GalleryPrivacy } from "@/lib/galleryService";
-import { PROFILE_PLACEHOLDER_IMAGE } from "@/lib/profileAssets";
+import { type GalleryItem, type GalleryPrivacy, type GalleryResponse } from "@/lib/galleryService";
+import {
+  buildMissingImpactGroups,
+  calculateWeightedMissingImpacts,
+} from "@/lib/profileCompletionImpact";
+import { emojiChipItem } from "@/lib/profileEmoji";
 import { formatProfileOptionLabel } from "@/lib/profileOptionLabels";
 import {
   apiMessage,
-  calculateAge,
-  cleanProfileMultilineText,
   cleanProfileText,
   displayText,
-  profileImage,
   selectLabel,
   t as translateText,
   translateCountry,
 } from "@/lib/profileDisplay";
 import { profileService } from "@/lib/profileService";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   extractModerationRejection,
   getTextModerationWarning,
@@ -71,15 +82,11 @@ import {
 } from "@/lib/textModeration";
 import { TextModerationWarningModal } from "@/components/app/TextModerationWarningModal";
 import { UnderReviewPill } from "@/components/app/UnderReviewPill";
-import { getTextDirection, localeTextDirection } from "@/lib/textDirection";
 import {
-  BIO_MAX,
   cleanHeadlineTextForSave,
-  cleanProfileTextForSave,
   COMPANY_MAX,
   countNonSpace,
   formatAmount,
-  HEADLINE_MAX,
   isAllowedProfileText,
   MAX_INCOME,
   parseAmount,
@@ -109,13 +116,17 @@ type FieldRow = {
   value: string;
   completionKey?: string;
   icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  /** Locked fields show a lock and cannot be edited (web parity: grew_up_in). */
+  locked?: boolean;
+  /** Non-interactive "Under review" pill on the row (web parity: company). */
+  pendingReview?: boolean;
 };
 
 const NOT_SET = "Not set";
 const PRIMARY = "#F34B6F";
 
 const themeColors = (isDark: boolean) => ({
-  background: isDark ? "#0E0C09" : "#F7F3ED",
+  background: isDark ? "#211D18" : "#F7F3ED",
   surface: isDark ? "#141210" : "#FFFFFF",
   card: isDark ? "#1B1713" : "#F7F3ED",
   border: isDark ? "#3A332B" : "#E8E1D6",
@@ -243,7 +254,28 @@ const formatList = (value: unknown, fallback: string) => {
 };
 
 const formatSelect = (value: unknown, fallback: string) =>
-  selectLabel(value) || (typeof value === "string" ? displayText(value) : "") || fallback;
+  selectLabel(value) || displayText(value) || fallback;
+
+const countryValue = (value: unknown) => {
+  const candidates = typeof value === "object" && value !== null
+    ? [
+        (value as any).label,
+        (value as any).name,
+        (value as any).value,
+        (value as any).value_id,
+      ]
+    : [value];
+  const raw = candidates
+    .map((candidate) => String(candidate || "").trim())
+    .find((candidate) => candidate && !/^[a-f\d]{24}$/i.test(candidate));
+  return raw ? translateCountry(raw) : "";
+};
+
+const formatCountryList = (value: unknown, fallback: string) => {
+  if (!Array.isArray(value)) return fallback;
+  const labels = value.map(countryValue).filter(Boolean);
+  return labels.length ? labels.join(", ") : fallback;
+};
 
 const formatLocation = (location: any, locale: string, fallback: string) => {
   if (!location) return fallback;
@@ -259,10 +291,6 @@ const formatIncome = (income: any, fallback: string) => {
   return `${currency}${Number(income.amount).toLocaleString()}`;
 };
 
-const gainFor = (completion: CompletionState, key?: string) => {
-  if (!key || !completion.total || !completion.missingKeys.includes(key)) return null;
-  return Math.max(1, Math.round(100 / completion.total));
-};
 
 const MASTER_FIELDS = new Set([
   "height",
@@ -325,8 +353,6 @@ const fieldValueId = (value: any) =>
 
 const fieldValueIds = (value: any) => (Array.isArray(value) ? value.map(fieldValueId).filter(Boolean) : []);
 
-const normalizeLanguage = (language: string) => language.split("-")[0]?.trim() || "en";
-
 const hasResolvedLocation = (details: PlaceDetails | undefined) => {
   if (!details) return false;
   const lat = Number(details.lat);
@@ -377,30 +403,50 @@ export default function EditProfileScreen() {
     return candidate;
   }, [returnTo]);
 
-  const [profile, setProfile] = useState<any>(null);
-  const [gallery, setGallery] = useState<GalleryItem[]>([]);
-  const [privacy, setPrivacy] = useState<GalleryPrivacy>("public");
-  const [completion, setCompletion] = useState<CompletionState>({
-    percent: 0,
-    completed: 0,
-    total: 0,
-    missingKeys: [],
-  });
-  const [headline, setHeadline] = useState("");
-  const [company, setCompany] = useState("");
-  const [annualIncomeAmount, setAnnualIncomeAmount] = useState("");
-  const [annualIncomeCurrency, setAnnualIncomeCurrency] = useState("USD");
+  const cachedProfile = authUser?.profile || null;
+  const cachedGalleryResponse = queryClient.getQueryData<GalleryResponse>(queryKeys.gallery.me);
+  const cachedGallery = cachedGalleryResponse?.gallery
+    || (Array.isArray(cachedProfile?.gallery) ? cachedProfile.gallery : []);
+  const cachedModerationMeta = cachedProfile?.contentModeration || {};
+  const cachedCompany = cleanProfileText(
+    moderationCandidateForEditing(cachedModerationMeta.company) || cachedProfile?.company || "",
+  );
+  const [profile, setProfile] = useState<any>(cachedProfile);
+  const [gallery, setGallery] = useState<GalleryItem[]>(cachedGallery);
+  const [privacy, setPrivacy] = useState<GalleryPrivacy>(
+    cachedGalleryResponse?.privacy
+      || cachedProfile?.gallery_privacy
+      || cachedProfile?.galleryPrivacy
+      || "public",
+  );
+  const [completion, setCompletion] = useState<CompletionState>(() =>
+    localCompletion(cachedProfile || {}, cachedGallery),
+  );
+  const [company, setCompany] = useState(cachedCompany);
+  const [annualIncomeAmount, setAnnualIncomeAmount] = useState(
+    cachedProfile?.annual_income?.amount
+      ? formatAmount(String(cachedProfile.annual_income.amount))
+      : "",
+  );
+  const [annualIncomeCurrency, setAnnualIncomeCurrency] = useState(
+    cachedProfile?.annual_income?.currency || "USD",
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [masterdata, setMasterdata] = useState<Record<string, any[]>>({});
+  const [masterdata, setMasterdata] = useState<Record<string, any[]>>(() =>
+    queryClient.getQueryData<Record<string, any[]>>(queryKeys.masterdata.editProfile(currentLanguage)) || {},
+  );
   const [activeSingleField, setActiveSingleField] = useState<string | null>(null);
   const [activeMultiField, setActiveMultiField] = useState<string | null>(null);
-  const [showIncomeCurrencySheet, setShowIncomeCurrencySheet] = useState(false);
+  const [companySheetOpen, setCompanySheetOpen] = useState(false);
+  const [incomeSheetOpen, setIncomeSheetOpen] = useState(false);
+  const [locationConfirmOpen, setLocationConfirmOpen] = useState(false);
+  const [locationSettingsOpen, setLocationSettingsOpen] = useState(false);
   const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
-  const companyInputRef = useRef<TextInput>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedProfile);
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
   const initialLoadStartedRef = useRef(false);
+  const hasCachedProfileRef = useRef(Boolean(cachedProfile));
 
   const t = useCallback(
     (key: string, fallback?: string, options?: Record<string, any>) =>
@@ -414,26 +460,30 @@ export default function EditProfileScreen() {
     let cancelled = false;
 
     const loadMasterdata = async () => {
-      const entries = await Promise.all(
-        MASTER_TYPES.map(async (type) => {
-          try {
-            const response = await profileService.fetchMasterdata(type);
-            return [type, response.data || []] as const;
-          } catch {
-            return [type, []] as const;
-          }
-        }),
-      );
+      const data = await queryClient.fetchQuery({
+        queryKey: queryKeys.masterdata.editProfile(currentLanguage),
+        staleTime: 24 * 60 * 60_000,
+        queryFn: async () => {
+          const entries = await Promise.all(
+            MASTER_TYPES.map(async (type) => {
+              const response = await profileService.fetchMasterdata(type);
+              if (!response.success) throw new Error(response.message || `masterdata_${type}_failed`);
+              return [type, response.data || []] as const;
+            }),
+          );
+          return Object.fromEntries(entries);
+        },
+      });
 
-      if (!cancelled) setMasterdata(Object.fromEntries(entries));
+      if (!cancelled) setMasterdata(data);
     };
 
-    void loadMasterdata();
+    void loadMasterdata().catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentLanguage]);
 
   const loadCompletion = useCallback(
     async (nextProfile: any = {}, nextGallery: GalleryItem[] = []) => {
@@ -488,26 +538,11 @@ export default function EditProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const showLoader = !initialLoadStartedRef.current;
+      const showLoader = !initialLoadStartedRef.current && !hasCachedProfileRef.current;
       initialLoadStartedRef.current = true;
       void loadProfile(showLoader);
     }, [loadProfile]),
   );
-
-  const primaryImage = useMemo(() => {
-    const sortedGallery = [...gallery].sort((a, b) => {
-      if (a.isPrimary === b.isPrimary) return (a.order || 0) - (b.order || 0);
-      return a.isPrimary ? -1 : 1;
-    });
-    return sortedGallery[0]?.url || profileImage(profile) || PROFILE_PLACEHOLDER_IMAGE;
-  }, [gallery, profile]);
-  const primaryImageSource = useMemo(
-    () => (typeof primaryImage === "string" ? { uri: primaryImage } : primaryImage),
-    [primaryImage],
-  );
-
-  const age = useMemo(() => calculateAge(profile?.dob), [profile?.dob]);
-  const displayName = profile?.profileName || profile?.profile_name || t("profile.my_profile", "My profile");
 
   const makeTranslatedOptions = useCallback(
     (values: readonly string[], namespace?: string): SelectOption[] =>
@@ -639,8 +674,8 @@ export default function EditProfileScreen() {
   const selectedSingleValue = useCallback((field: string) => fieldValueId(profile?.[field]), [profile]);
   const selectedMultiValue = useCallback((field: string) => fieldValueIds(profile?.[field]), [profile]);
 
-  const currencyOptions: SelectOption[] = useMemo(
-    () => ["USD", "EUR", "INR", "SAR", "AED", "AUD", "CAD", "QAR"].map((value) => ({ value, label: value })),
+  const incomeCurrencies = useMemo(
+    () => ["USD", "EUR", "INR", "SAR", "AED", "AUD", "CAD", "QAR"],
     [],
   );
 
@@ -662,16 +697,17 @@ export default function EditProfileScreen() {
           {
             id: "nationality",
             label: t("profile.nationality", "Nationality"),
-            value: formatList(profile?.nationality, fallbackText),
+            value: formatCountryList(profile?.nationality, fallbackText),
             completionKey: "nationality",
-            icon: Flag,
+            icon: ShieldCheck,
           },
           {
             id: "grew_up_in",
             label: t("profile.grew_up_in", "Grew up in"),
-            value: formatSelect(profile?.grew_up_in, fallbackText),
+            value: countryValue(profile?.grew_up_in) || fallbackText,
             completionKey: "grew_up_in",
-            icon: Flag,
+            icon: Home,
+            locked: true,
           },
         ],
       },
@@ -706,7 +742,7 @@ export default function EditProfileScreen() {
                   label: t("profile.i_usually_dress", "How do you usually dress?"),
                   value: formatSelect(profile?.i_usually_dress, fallbackText),
                   completionKey: "i_usually_dress",
-                  icon: Sparkles,
+                  icon: Shirt,
                 } satisfies FieldRow,
               ]
             : []),
@@ -718,7 +754,7 @@ export default function EditProfileScreen() {
           {
             id: "height",
             label: t("profile.height", "Height"),
-            value: displayText(String(profile?.height || "")) || fallbackText,
+            value: formatSelect(profile?.height, fallbackText),
             completionKey: "height",
             icon: Ruler,
           },
@@ -727,7 +763,7 @@ export default function EditProfileScreen() {
             label: t("profile.complexion", "Complexion"),
             value: formatSelect(profile?.complexion, fallbackText),
             completionKey: "complexion",
-            icon: Palette,
+            icon: UserRound,
           },
           {
             id: "ethnic_group",
@@ -746,7 +782,7 @@ export default function EditProfileScreen() {
             label: t("profile.marital_status", "Marital status"),
             value: formatSelect(profile?.marital_status, fallbackText),
             completionKey: "marital_status",
-            icon: Heart,
+            icon: Users,
           },
           {
             id: "have_children",
@@ -772,7 +808,7 @@ export default function EditProfileScreen() {
             label: t("profile.marriage_plan", "Marriage plan"),
             value: formatSelect(profile?.marriage_plan, fallbackText),
             completionKey: "marriage_plan",
-            icon: Calendar,
+            icon: CalendarHeart,
           },
           {
             id: "relocation_plans",
@@ -798,13 +834,13 @@ export default function EditProfileScreen() {
             label: t("profile.occupation", "Occupation"),
             value: formatSelect(profile?.occupation, fallbackText),
             completionKey: "occupation",
-            icon: Briefcase,
+            icon: BriefcaseBusiness,
           },
           {
             id: "designation",
             label: t("profile.designation", "Designation"),
             value: formatSelect(profile?.designation, fallbackText),
-            icon: Briefcase,
+            icon: BriefcaseBusiness,
           },
           {
             id: "company",
@@ -812,13 +848,14 @@ export default function EditProfileScreen() {
             value: company || fallbackText,
             completionKey: "company",
             icon: Building2,
+            pendingReview: Boolean(pendingModerationCandidate(profile?.contentModeration?.company)),
           },
           {
             id: "annual_income",
             label: t("profile.annual_income", "Annual income"),
             value: annualIncome,
             completionKey: "annual_income",
-            icon: Banknote,
+            icon: Coins,
           },
         ],
       },
@@ -830,34 +867,34 @@ export default function EditProfileScreen() {
             label: t("profile.sect", "Sect"),
             value: formatSelect(profile?.sect, fallbackText),
             completionKey: "sect",
-            icon: MoonStar,
+            icon: Moon,
           },
           {
             id: "maslak",
             label: t("profile.maslak", "Maslak / School of thought"),
             value: formatSelect(profile?.maslak, fallbackText),
             completionKey: "maslak",
-            icon: MoonStar,
+            icon: Sparkles,
           },
           {
             id: "following",
             label: t("profile.following", "Following / Movement"),
             value: formatSelect(profile?.following, fallbackText),
-            icon: MoonStar,
+            icon: Heart,
           },
           {
             id: "is_practising",
             label: t("profile.is_practising", "How practising are you?"),
             value: formatSelect(profile?.is_practising, fallbackText),
             completionKey: "is_practising",
-            icon: MoonStar,
+            icon: Moon,
           },
           {
             id: "prayers",
             label: t("profile.prayers", "Prayer habit"),
             value: formatSelect(profile?.prayers, fallbackText),
             completionKey: "prayers",
-            icon: MoonStar,
+            icon: CalendarHeart,
           },
         ],
       },
@@ -880,10 +917,50 @@ export default function EditProfileScreen() {
           },
         ],
       },
+      {
+        title: t("profile_manager", "Profile manager"),
+        rows: [
+          {
+            id: "profile_manager",
+            label: t("profile_manager", "Profile manager"),
+            value: profile?.profile_manager
+              ? t(String(profile.profile_manager), displayText(String(profile.profile_manager)))
+              : fallbackText,
+            completionKey: "profile_manager",
+            icon: UserCog,
+          },
+        ],
+      },
     ];
 
     return groups;
   }, [company, currentLanguage, fallbackText, profile]);
+
+  // Weighted "+N%" badges: each missing group's share of (100 - percent),
+  // summing exactly to the remainder (largest-remainder rounding, web parity)
+  const impactGroups = useMemo(() => buildMissingImpactGroups(rows), [rows]);
+  const missingImpacts = useMemo(
+    () => calculateWeightedMissingImpacts(completion.percent, completion.missingKeys, impactGroups),
+    [completion.missingKeys, completion.percent, impactGroups],
+  );
+  const missingKeySet = useMemo(() => new Set(completion.missingKeys), [completion.missingKeys]);
+  const mediaMissing = missingKeySet.has("avatar") || missingKeySet.has("gallery");
+  const summaryMissing = missingKeySet.has("profile_headline") || missingKeySet.has("bio");
+  const hobbiesMissing = missingKeySet.has("hobbies");
+
+  // Web parity: sections containing missing fields are promoted directly
+  // below the gallery; the rest keep the canonical order
+  const { promotedSections, regularSections } = useMemo(() => {
+    const promoted: typeof rows = [];
+    const regular: typeof rows = [];
+    for (const section of rows) {
+      const hasMissing = section.rows.some(
+        (row) => row.completionKey && missingKeySet.has(row.completionKey),
+      );
+      (hasMissing ? promoted : regular).push(section);
+    }
+    return { promotedSections: promoted, regularSections: regular };
+  }, [missingKeySet, rows]);
 
   const rowById = useMemo(() => {
     const map = new Map<string, FieldRow>();
@@ -914,42 +991,26 @@ export default function EditProfileScreen() {
     [loadCompletion, profile],
   );
 
-  const validateInlineFields = () => {
-    const nextErrors: Record<string, string> = {};
-    const cleanedCompany = cleanHeadlineTextForSave(company);
-    const incomeAmount = parseAmount(annualIncomeAmount);
-    const companyError =
-      cleanedCompany && (!isAllowedProfileText(cleanedCompany) || countNonSpace(cleanedCompany) > COMPANY_MAX)
-        ? t("profile.invalid_company", "Use a shorter company name without links or unsupported characters.")
-        : "";
-    const incomeError =
-      annualIncomeAmount.trim() &&
-      (!Number.isFinite(incomeAmount) || incomeAmount <= 0 || incomeAmount > MAX_INCOME)
-        ? t("annual_income_invalid", "Please enter a valid annual income amount.")
-        : "";
+  // Last submitted company draft, so the moderation modal's "Submit anyway"
+  // can resend the exact text that was rejected
+  const [companyDraft, setCompanyDraft] = useState("");
 
-    if (companyError) nextErrors.company = companyError;
-    if (incomeError) nextErrors.annualIncome = incomeError;
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  };
-
-  const saveInlineFields = (submitAnyway = false) => {
+  const saveCompany = (value: string, submitAnyway = false) => {
     if (!requireVerified("save")) return;
     void (async () => {
-      if (!validateInlineFields()) return;
+      const cleaned = cleanHeadlineTextForSave(value);
+      const companyError =
+        cleaned && (!isAllowedProfileText(cleaned) || countNonSpace(cleaned) > COMPANY_MAX)
+          ? t("profile.invalid_company", "Use a shorter company name without links or unsupported characters.")
+          : "";
+      setErrors((current) => ({ ...current, company: companyError }));
+      if (companyError) return;
+
+      setCompanyDraft(value);
       setSaving(true);
       try {
-        const incomeAmount = parseAmount(annualIncomeAmount);
-        const payload = {
-          company: cleanHeadlineTextForSave(company),
-          ...(annualIncomeAmount.trim() && Number.isFinite(incomeAmount) && incomeAmount > 0
-            ? { annual_income: { currency: annualIncomeCurrency, amount: incomeAmount } }
-            : {}),
-        };
         const response = await profileService.updateProfile({
-          ...payload,
+          company: cleaned,
           clientLocale: currentLanguage,
           ...(submitAnyway ? { submitAnyway: true } : {}),
         });
@@ -965,7 +1026,9 @@ export default function EditProfileScreen() {
           return;
         }
         setModerationWarning(null);
-        const nextProfile = response.profile || response.user?.profile || { ...(profile || {}), ...payload };
+        setCompany(cleaned);
+        setCompanySheetOpen(false);
+        const nextProfile = response.profile || response.user?.profile || { ...(profile || {}), company: cleaned };
         setProfile(nextProfile);
         await refreshUser();
         const savedForReview = Boolean(
@@ -988,14 +1051,36 @@ export default function EditProfileScreen() {
     })();
   };
 
-  const focusModeratedField = () => {
-    // Headline and bio live in ProfileSummaryEditor now; only company remains
-    setTimeout(() => companyInputRef.current?.focus(), 150);
+  const saveIncome = (currency: string, amount: string) => {
+    if (!requireVerified("save")) return;
+    void (async () => {
+      const parsed = parseAmount(amount);
+      const incomeError =
+        !amount.trim() || !Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_INCOME
+          ? t("annual_income_invalid", "Please enter a valid annual income amount.")
+          : "";
+      setErrors((current) => ({ ...current, annualIncome: incomeError }));
+      if (incomeError) return;
+
+      setSaving(true);
+      try {
+        const payload = { annual_income: { currency, amount: parsed } };
+        const response = await profileService.updateProfile(payload);
+        await mergeUpdatedProfile(payload, response.profile || response.user?.profile);
+        setAnnualIncomeCurrency(currency);
+        setAnnualIncomeAmount(formatAmount(String(parsed)));
+        setIncomeSheetOpen(false);
+        toast.show(t("profile.profile_updated", "Profile updated."), "success");
+      } catch (error) {
+        toast.show(apiMessage(String((error as any)?.message || ""), t("profile.update_error", "Could not update profile.")), "error");
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const moderationMeta = profile?.contentModeration || {};
   const companyPending = Boolean(pendingModerationCandidate(moderationMeta.company));
-  const companyDirection = getTextDirection(company, localeTextDirection(currentLanguage));
 
   const mergeUpdatedProfile = useCallback(
     async (payload: Record<string, any>, responseProfile?: any) => {
@@ -1084,10 +1169,7 @@ export default function EditProfileScreen() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
-        toast.show(
-          t("location_permission_required", "Location permission is required to fill your current city."),
-          "error",
-        );
+        setLocationSettingsOpen(true);
         return;
       }
 
@@ -1122,7 +1204,7 @@ export default function EditProfileScreen() {
 
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
-      const reverseResponse = await profileService.fetchPlaceReverse(lat, lng, normalizeLanguage(currentLanguage));
+      const reverseResponse = await profileService.fetchPlaceReverse(lat, lng, "en");
 
       if (!reverseResponse.success || !hasResolvedLocation(reverseResponse.data)) {
         const messageKey =
@@ -1160,19 +1242,26 @@ export default function EditProfileScreen() {
     } finally {
       setSavingField(null);
     }
-  }, [currentLanguage, mergeUpdatedProfile, requireVerified, toast]);
+  }, [mergeUpdatedProfile, requireVerified, toast]);
 
   const openFieldEditor = (row: FieldRow) => {
-    if (row.id === "current_location") {
-      toast.show(
-        t("profile.location_edit_from_device", "Location editing will use your device location. We will open this as a dedicated edit screen."),
-        "info",
-      );
+    if (row.locked) {
+      toast.show(t("cannot_change", "Cannot be changed"), "info");
       return;
     }
 
-    if (row.id === "annual_income" || row.id === "company") {
-      toast.show(t("profile.edit_inline_above", "Use the editable section above to update this field."), "info");
+    if (row.id === "current_location") {
+      setLocationConfirmOpen(true);
+      return;
+    }
+
+    if (row.id === "company") {
+      setCompanySheetOpen(true);
+      return;
+    }
+
+    if (row.id === "annual_income") {
+      setIncomeSheetOpen(true);
       return;
     }
 
@@ -1197,6 +1286,206 @@ export default function EditProfileScreen() {
     );
   }
 
+  const renderFieldSection = (section: { title: string; rows: FieldRow[] }) => (
+    <View
+      key={section.title}
+      style={[styles.sectionCard, { borderColor: colors.border, backgroundColor: colors.background }]}
+    >
+      <Text
+        variant="caption"
+        className="font-body-semi"
+        style={[styles.sectionTitle, { color: colors.muted, fontSize: scale(13) }]}
+      >
+        {section.title}
+      </Text>
+      {section.rows.map((row, index) => {
+        const Icon = row.icon;
+        const missing = row.completionKey ? missingKeySet.has(row.completionKey) : false;
+        const impact = missing && row.completionKey ? missingImpacts[row.completionKey] || 0 : 0;
+        const notSet = row.value === fallbackText;
+
+        return (
+          // Pressable is only a shell: on this build a Pressable with
+          // function/array styles can drop its layout styles, stacking the
+          // row into a column — layout lives on the inner plain View
+          <Pressable
+            key={row.id}
+            onPress={() => openFieldEditor(row)}
+            disabled={Boolean(savingField)}
+            accessibilityRole="button"
+            accessibilityLabel={`${row.label}, ${row.value}`}
+            accessibilityHint={impact ? `+${impact}%` : undefined}
+            accessibilityState={row.locked ? { disabled: true } : undefined}
+            style={({ pressed }) => (pressed && !row.locked ? { opacity: 0.82 } : null)}
+          >
+            <View
+              style={[
+                styles.row,
+                index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+                missing && { backgroundColor: "rgba(243,75,111,0.07)" },
+              ]}
+            >
+              <View
+                style={[
+                  styles.iconTile,
+                  missing
+                    ? { backgroundColor: "rgba(243,75,111,0.12)" }
+                    : {
+                        backgroundColor: isDark
+                          ? "rgba(255,255,255,0.06)"
+                          : "rgba(24,19,14,0.06)",
+                      },
+                ]}
+              >
+                <Icon size={19} color={missing ? colors.primary : colors.muted} strokeWidth={2} />
+              </View>
+              <View style={styles.rowContent}>
+                <View style={styles.rowTop}>
+                  <Text style={[styles.rowLabel, { color: colors.muted }]}>{row.label}</Text>
+                  {row.locked ? <Lock size={12} color={colors.muted} /> : null}
+                  {row.pendingReview ? <UnderReviewPill interactive={false} /> : null}
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.rowValue,
+                    { color: missing ? colors.primary : notSet ? colors.muted : colors.text },
+                    notSet && !missing && styles.rowValueNotSet,
+                  ]}
+                >
+                  {row.value}
+                </Text>
+              </View>
+              {impact ? <ImpactBadge value={impact} /> : null}
+              {savingField === row.id ? (
+                <ActivityIndicator color={colors.primary} size="small" />
+              ) : row.locked ? null : (
+                isRTL ? (
+                  <ChevronLeft size={19} color={colors.muted} style={styles.rowChevron} />
+                ) : (
+                  <ChevronRight size={19} color={colors.muted} style={styles.rowChevron} />
+                )
+              )}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const renderChipSection = (config: {
+    key: string;
+    title: string;
+    items: any[];
+    type: "hobby" | "faith";
+    route: string;
+    emptyLabel: string;
+    impact: number;
+  }) => {
+    const chips = config.items.map((item) => emojiChipItem(item, config.type)).filter((item) => item.label);
+    const SectionIcon = config.type === "hobby" ? Puzzle : BookHeart;
+    return (
+      // Pressable shell only — layout on the inner View (see field rows)
+      <Pressable
+        key={config.key}
+        onPress={() => router.push(config.route as any)}
+        accessibilityRole="button"
+        accessibilityLabel={config.title}
+        accessibilityHint={config.impact ? `+${config.impact}%` : undefined}
+        style={({ pressed }) => (pressed ? { opacity: 0.85 } : null)}
+      >
+        <View
+          style={[
+            styles.sectionCard,
+            { borderColor: config.impact ? colors.primary : colors.border, backgroundColor: colors.background },
+          ]}
+        >
+        <View style={styles.chipHeaderRow}>
+          <SectionIcon
+            size={19}
+            color={config.impact ? colors.primary : colors.muted}
+            strokeWidth={2}
+          />
+          <Text
+            variant="caption"
+            className="font-body-semi"
+            style={[styles.sectionTitle, styles.chipHeaderTitle, { color: colors.muted, fontSize: scale(13) }]}
+          >
+            {config.title}
+          </Text>
+          {config.impact ? <ImpactBadge value={config.impact} /> : null}
+          {isRTL ? (
+            <ChevronLeft size={19} color={colors.muted} style={styles.rowChevron} />
+          ) : (
+            <ChevronRight size={19} color={colors.muted} style={styles.rowChevron} />
+          )}
+        </View>
+        {chips.length ? (
+          <View style={styles.chipWrap}>
+            {chips.map((item, index) => (
+              <View
+                key={`${config.key}-${item.slug}-${index}`}
+                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.background }]}
+              >
+                <Text style={styles.chipEmoji}>{item.emoji}</Text>
+                <Text style={[styles.chipLabel, { color: colors.text }]} numberOfLines={1}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={[styles.chipEmpty, { color: config.impact ? colors.primary : colors.muted }]}>
+            {config.emptyLabel}
+          </Text>
+        )}
+        </View>
+      </Pressable>
+    );
+  };
+
+  const summaryCard = (
+    <View style={[styles.sectionCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+      <Text
+        variant="caption"
+        className="font-body-semi"
+        style={[styles.sectionTitle, { color: colors.muted, fontSize: scale(13) }]}
+      >
+        {t("profile.profile_summary", "Profile summary")}
+      </Text>
+      <View style={styles.summaryContent}>
+        <ProfileSummaryEditor
+          profile={profile}
+          onSaved={loadProfile}
+          headlineImpact={missingKeySet.has("profile_headline") ? missingImpacts.profile_headline || 0 : 0}
+          bioImpact={missingKeySet.has("bio") ? missingImpacts.bio || 0 : 0}
+        />
+      </View>
+    </View>
+  );
+
+  const hobbiesSection = renderChipSection({
+    key: "hobbies",
+    title: t("hobbies", "Hobbies"),
+    items: Array.isArray(profile?.hobbies) ? profile.hobbies : [],
+    type: "hobby",
+    route: "/(tabs)/my-hobbies",
+    emptyLabel: t("click_add_hobbies", "Tap to add your hobbies"),
+    impact: hobbiesMissing ? missingImpacts.hobbies || 0 : 0,
+  });
+
+  const faithSection = renderChipSection({
+    key: "faith",
+    title: t("faith_in_daily_life", "Faith in Daily Life"),
+    items: Array.isArray(profile?.faith_in_daily_life) ? profile.faith_in_daily_life : [],
+    type: "faith",
+    route: "/(tabs)/faith",
+    emptyLabel: t("click_add_faith", "Tap to add how faith shapes your daily life"),
+    // Faith is not part of profile completion today; if the backend ever adds
+    // it to missingKeys the badge appears automatically
+    impact: missingKeySet.has("faith_in_daily_life") ? missingImpacts.faith_in_daily_life || 0 : 0,
+  });
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <AppBackTitleBar
@@ -1204,171 +1493,56 @@ export default function EditProfileScreen() {
         fallbackHref="/(tabs)/profile"
         onBack={() => router.replace(returnHref as any)}
       />
-      <ScrollView
+      <KeyboardAwareScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.container, { paddingHorizontal: scale(20) }]}
+        contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={scale(24)}
       >
-      <View style={[styles.summary, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-        <Image source={primaryImageSource as any} style={styles.avatar} contentFit="cover" />
-        <View style={styles.summaryBody}>
-          <View style={[styles.nameRow]}>
-            <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
-              {displayName}
-              {age ? `, ${age}` : ""}
-            </Text>
-            {profile?.isVerified ? <ShieldCheck size={18} color={colors.primary} /> : null}
-          </View>
-          <Text style={[styles.summaryMeta, { color: colors.muted }]}>
-            {completion.percent}% {t("profile.profile_completed", "profile completed")}
-          </Text>
-          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                styles.progressFill,
-                { backgroundColor: colors.primary, width: `${Math.min(100, completion.percent)}%` },
-              ]}
-            />
-          </View>
-        </View>
-      </View>
+        <ProfileCompletionBar percent={completion.percent} />
 
-      <EditProfileMediaEditor
-        canUsePrivateGallery={String(profile?.gender || "").toLowerCase() === "female"}
-        gender={String(profile?.gender || "").toLowerCase() === "female" ? "female" : "male"}
-        guidelinesIdentity={String(authUser?._id || authUser?.email || "current-user")}
-        initialGallery={gallery}
-        initialPrivacy={privacy}
-        onGalleryChange={onGalleryChange}
-      />
-
-      <View style={[styles.inlineCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          {t("profile.profile_summary", "Profile summary")}
-        </Text>
-        <ProfileSummaryEditor profile={profile} onSaved={loadProfile} />
-
-        <View style={styles.fieldLabelRow}>
-          <Text style={[styles.fieldLabel, { color: colors.text }]}>
-            {t("profile.company", "Company")}
-          </Text>
-          {companyPending ? <UnderReviewPill /> : null}
-        </View>
-        <TextInput
-          ref={companyInputRef}
-          value={company}
-          onChangeText={(value) => {
-            setCompany(value);
-            if (errors.company) setErrors((current) => ({ ...current, company: "" }));
-          }}
-          placeholder={t("profile.company", "Company")}
-          placeholderTextColor={colors.muted}
-          style={[
-            styles.input,
-            {
-              borderColor: colors.border,
-              color: colors.text,
-              textAlign: companyDirection === "rtl" ? "right" : "left",
-              writingDirection: companyDirection,
-            },
-          ]}
-          maxLength={80}
-        />
-        {errors.company ? <Text style={styles.error}>{errors.company}</Text> : null}
-
-        <View style={styles.incomeRow}>
-          <Pressable
-            onPress={() => setShowIncomeCurrencySheet(true)}
-            style={[styles.currencyButton, { borderColor: colors.border }]}
-          >
-            <Text style={[styles.currencyText, { color: colors.text }]}>{annualIncomeCurrency}</Text>
-          </Pressable>
-          <TextInput
-            value={annualIncomeAmount}
-            onChangeText={(value) => {
-              setAnnualIncomeAmount(formatAmount(value));
-              if (errors.annualIncome) setErrors((current) => ({ ...current, annualIncome: "" }));
-            }}
-            placeholder={t("amount", "Amount")}
-            placeholderTextColor={colors.muted}
-            keyboardType="numeric"
-            style={[styles.incomeInput, { borderColor: colors.border, color: colors.text }]}
-            maxLength={12}
+        <View
+          style={
+            mediaMissing
+              ? [styles.mediaMissingWrap, { borderColor: colors.primary }]
+              : null
+          }
+        >
+          {mediaMissing && missingImpacts.media ? (
+            <View style={styles.mediaBadgeRow}>
+              <ImpactBadge value={missingImpacts.media} />
+            </View>
+          ) : null}
+          <EditProfileMediaEditor
+            canUsePrivateGallery={String(profile?.gender || "").toLowerCase() === "female"}
+            gender={String(profile?.gender || "").toLowerCase() === "female" ? "female" : "male"}
+            guidelinesIdentity={String(authUser?._id || authUser?.email || "current-user")}
+            initialGallery={gallery}
+            initialPrivacy={privacy}
+            onGalleryChange={onGalleryChange}
           />
         </View>
-        {errors.annualIncome ? <Text style={styles.error}>{errors.annualIncome}</Text> : null}
 
-        <GradientButton
-          title={t("save", "Save")}
-          onPress={() => saveInlineFields()}
-          loading={saving}
-          containerStyle={styles.saveButton}
-          widthMode="full"
-        />
-      </View>
+        {/* Web parity: whatever is missing gets promoted right below the photos */}
+        {summaryMissing ? summaryCard : null}
+        {hobbiesMissing ? hobbiesSection : null}
+        {promotedSections.map(renderFieldSection)}
+        {!summaryMissing ? summaryCard : null}
+        {regularSections.map(renderFieldSection)}
+        {faithSection}
+        {!hobbiesMissing ? hobbiesSection : null}
+
+        <View style={{ height: 24 }} />
+      </KeyboardAwareScrollView>
 
       <TextModerationWarningModal
         warning={moderationWarning}
         submitting={saving}
-        onEdit={() => {
-          setModerationWarning(null);
-          focusModeratedField();
-        }}
+        onEdit={() => setModerationWarning(null)}
         onClose={() => setModerationWarning(null)}
-        onSubmitAnyway={() => saveInlineFields(true)}
+        onSubmitAnyway={() => saveCompany(companyDraft, true)}
       />
-
-      {rows.map((section) => (
-        <View key={section.title} style={[styles.section, { borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
-          {section.rows.map((row) => {
-            const Icon = row.icon;
-            const missing = row.completionKey ? completion.missingKeys.includes(row.completionKey) : false;
-            const gain = gainFor(completion, row.completionKey);
-
-            return (
-              <Pressable
-                key={row.id}
-                onPress={() => openFieldEditor(row)}
-                disabled={Boolean(savingField)}
-                style={[styles.row]}
-              >
-                <View style={[styles.iconCircle, { backgroundColor: isDark ? colors.card : "#FFF0F4" }]}>
-                  <Icon size={20} color={colors.primary} strokeWidth={2} />
-                </View>
-                <View style={styles.rowContent}>
-                  <View style={[styles.rowTop]}>
-                    <Text style={[styles.rowLabel, { color: colors.muted }]}>{row.label}</Text>
-                    {gain ? (
-                      <Text style={[styles.gain, { color: colors.primary }]}>+{gain}%</Text>
-                    ) : null}
-                  </View>
-                  <Text
-                    style={[
-                      styles.rowValue,
-                      { color: missing ? colors.muted : colors.text },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {row.value}
-                  </Text>
-                </View>
-                {savingField === row.id ? (
-                  <ActivityIndicator color={colors.primary} size="small" />
-                ) : (
-                  <ChevronRight
-                    size={18}
-                    color={colors.muted}
-                    style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }}
-                  />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
-      ))}
-
-      <View style={{ height: 24 }} />
 
       <SingleSelectSheet
         visible={Boolean(activeSingleField)}
@@ -1380,15 +1554,6 @@ export default function EditProfileScreen() {
         selected={activeSingleField ? selectedSingleValue(activeSingleField) : undefined}
         title={activeSingleTitle}
         searchEnabled={activeSingleOptions.length > 8}
-      />
-
-      <SingleSelectSheet
-        visible={showIncomeCurrencySheet}
-        onClose={() => setShowIncomeCurrencySheet(false)}
-        onSelect={setAnnualIncomeCurrency}
-        options={currencyOptions}
-        selected={annualIncomeCurrency}
-        title={t("select_currency", "Select currency")}
       />
 
       <MultiSelectSheet
@@ -1403,7 +1568,84 @@ export default function EditProfileScreen() {
         maxSelections={activeMultiMax}
         searchEnabled
       />
-      </ScrollView>
+
+      <TextEditSheet
+        visible={companySheetOpen}
+        title={t("profile.company", "Company")}
+        initialValue={company}
+        placeholder={t("profile.company", "Company")}
+        maxNonSpace={COMPANY_MAX}
+        saving={saving}
+        pendingReview={companyPending}
+        errorText={errors.company || undefined}
+        onClose={() => {
+          if (saving) return;
+          setCompanySheetOpen(false);
+          setErrors((current) => ({ ...current, company: "" }));
+        }}
+        onSave={(value) => saveCompany(value)}
+      />
+
+      <IncomeEditSheet
+        visible={incomeSheetOpen}
+        title={t("profile.annual_income", "Annual income")}
+        initialCurrency={annualIncomeCurrency}
+        initialAmount={annualIncomeAmount}
+        currencies={incomeCurrencies}
+        saving={saving}
+        errorText={errors.annualIncome || undefined}
+        onClose={() => {
+          if (saving) return;
+          setIncomeSheetOpen(false);
+          setErrors((current) => ({ ...current, annualIncome: "" }));
+        }}
+        onSave={saveIncome}
+      />
+
+      <ConfirmSheet
+        visible={locationConfirmOpen}
+        onClose={() => setLocationConfirmOpen(false)}
+        onConfirm={() => {
+          setLocationConfirmOpen(false);
+          void refreshCurrentLocation();
+        }}
+        title={t("profile.current_location", "Current location")}
+        message={t(
+          "profile.location_edit_from_device",
+          "Location editing will use your device location. We will open this as a dedicated edit screen.",
+        )}
+        confirmLabel={t("continue", "Continue")}
+        cancelLabel={t("cancel", "Cancel")}
+      />
+
+      <ConfirmSheet
+        visible={locationSettingsOpen}
+        onClose={() => setLocationSettingsOpen(false)}
+        onConfirm={() => {
+          setLocationSettingsOpen(false);
+          void Linking.openSettings().catch(() => {
+            toast.show(
+              t("something_went_wrong", "Could not open app settings."),
+              "error",
+            );
+          });
+        }}
+        title={t("app_settings", "App Settings")}
+        message={t(
+          "location_permission_required",
+          "Location permission is required to update your current city.",
+        )}
+        confirmLabel={t("open_settings", "Open Settings")}
+        cancelLabel={t("cancel", "Cancel")}
+      />
+    </View>
+  );
+}
+
+function ImpactBadge({ value }: { value: number }) {
+  return (
+    <View style={styles.impactBadge} accessibilityLabel={`+${value}%`}>
+      <Text style={styles.impactBadgeText}>{`\u2066+${value}%\u2069`}</Text>
     </View>
   );
 }
@@ -1416,186 +1658,147 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingBottom: 112,
-    paddingTop: 16,
+    paddingTop: 0,
   },
-  summary: {
-    alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 14,
-    padding: 14,
-  },
-  avatar: {
-    borderRadius: 32,
-    height: 64,
-    width: 64,
-  },
-  summaryBody: {
-    flex: 1,
-  },
-  nameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
-  },
-  name: {
-    flex: 1,
-    fontSize: 18,
-    fontFamily: Typography.font.heading.bold,
-    fontWeight: "700",
-    lineHeight: 24,
-  },
-  summaryMeta: {
-    fontSize: 13,
-    fontFamily: Typography.font.body.medium,
-    fontWeight: "500",
-    marginTop: 3,
-  },
-  progressTrack: {
-    borderRadius: 999,
-    height: 6,
-    marginTop: 10,
-    overflow: "hidden",
-  },
-  progressFill: {
-    borderRadius: 999,
-    height: "100%",
-  },
-  inlineCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 14,
-  },
-  section: {
+  // Full-width profile bands mirror My Profile while controls remain framed.
+  sectionCard: {
     borderTopWidth: 1,
-    marginTop: 22,
-    paddingTop: 18,
+    borderRadius: 0,
+    marginTop: 0,
+    paddingTop: 20,
+    paddingBottom: 8,
+    paddingHorizontal: 0,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontFamily: Typography.font.heading.bold,
-    fontWeight: "700",
-    letterSpacing: 3,
-    lineHeight: 20,
-    marginBottom: 14,
+    fontSize: 13,
+    letterSpacing: 2,
+    marginBottom: 8,
+    paddingHorizontal: 16,
     textTransform: "uppercase",
   },
-  input: {
-    borderRadius: 14,
-    borderWidth: 1,
-    fontSize: 15,
-    minHeight: 52,
-    paddingHorizontal: 14,
-  },
-  textarea: {
-    borderRadius: 14,
-    borderWidth: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 12,
-    minHeight: 132,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-  },
-  counter: {
-    alignSelf: "flex-end",
-    fontSize: 12,
-    marginTop: 4,
-  },
-  error: {
-    color: "#EF4444",
-    fontSize: 12,
-    marginTop: 6,
-  },
-  incomeRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 12,
-  },
-  currencyButton: {
-    alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 52,
-    paddingHorizontal: 14,
-    width: 92,
-  },
-  currencyText: {
-    fontSize: 15,
-    fontFamily: Typography.font.body.semi,
-    fontWeight: "600",
-  },
-  incomeInput: {
-    borderRadius: 14,
-    borderWidth: 1,
-    flex: 1,
-    fontSize: 15,
-    minHeight: 52,
-    paddingHorizontal: 14,
-  },
-  saveButton: {
-    marginTop: 14,
-  },
-  pendingPillRow: {
-    marginTop: 10,
-    marginBottom: -4,
-  },
-  fieldLabelRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 10,
-  },
-  fieldLabel: {
-    fontFamily: Typography.font.body.semi,
-    fontSize: 13,
-    fontWeight: "600",
+  summaryContent: {
+    paddingHorizontal: 18,
+    paddingBottom: 16,
   },
   row: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
-    minHeight: 66,
-    paddingVertical: 10,
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: "100%",
   },
-  iconCircle: {
+  // Neutral rounded-square tile; brand tint only when the field is missing
+  iconTile: {
     alignItems: "center",
-    borderRadius: 20,
+    borderRadius: 8,
     height: 40,
     justifyContent: "center",
+    flexShrink: 0,
     width: 40,
+  },
+  rowChevron: {
+    flexShrink: 0,
   },
   rowContent: {
     flex: 1,
+    minWidth: 0,
     gap: 3,
   },
   rowTop: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   rowLabel: {
-    flex: 1,
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: Typography.font.body.bold,
     fontWeight: "700",
-    letterSpacing: 2,
-    lineHeight: 16,
+    letterSpacing: 1.5,
+    lineHeight: 17,
     textTransform: "uppercase",
-  },
-  gain: {
-    fontSize: 12,
-    fontFamily: Typography.font.body.bold,
-    fontWeight: "700",
+    flexShrink: 1,
   },
   rowValue: {
     fontSize: 15,
     fontFamily: Typography.font.body.semi,
     fontWeight: "600",
     lineHeight: 21,
+  },
+  rowValueNotSet: {
+    opacity: 0.55,
+  },
+  impactBadge: {
+    backgroundColor: PRIMARY,
+    height: 24,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  impactBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 14,
+    includeFontPadding: false,
+    fontFamily: Typography.font.body.bold,
+    fontWeight: "700",
+    writingDirection: "ltr",
+  },
+  mediaMissingWrap: {
+    borderRadius: 0,
+    marginTop: 0,
+  },
+  mediaBadgeRow: {
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  chipHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+  },
+  chipHeaderTitle: {
+    flex: 1,
+    marginBottom: 0,
+    paddingHorizontal: 0,
+  },
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  chip: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    maxWidth: "100%",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  chipEmoji: {
+    fontSize: 15,
+    lineHeight: 18,
+  },
+  chipLabel: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontFamily: Typography.font.body.medium,
+    fontWeight: "500",
+  },
+  chipEmpty: {
+    fontSize: 14,
+    fontFamily: Typography.font.body.semi,
+    fontWeight: "600",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 });

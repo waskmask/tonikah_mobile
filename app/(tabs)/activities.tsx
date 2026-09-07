@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ban, Eye, Users } from 'lucide-react-native';
@@ -11,8 +11,15 @@ import { apiMessage, t } from '@/lib/profileDisplay';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
 
 type Mode = 'visitors' | 'visited' | 'blocked';
+
+type CachedProfileList = {
+    items: any[];
+    nextCursor: string | null;
+};
 
 const MODES: Array<{ value: Mode; labelKey: string; fallback: string; icon: any }> = [
     { value: 'visitors', labelKey: 'visitors', fallback: 'Visitors', icon: Users },
@@ -36,12 +43,15 @@ export default function ActivitiesScreen() {
     const toast = useToast();
     const params = useLocalSearchParams<{ tab?: string }>();
     const [mode, setMode] = useState<Mode>(() => normalizeMode(params.tab));
-    const [items, setItems] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const activeModeRef = useRef(mode);
+    activeModeRef.current = mode;
+    const initialCache = useRef(queryClient.getQueryData<CachedProfileList>(queryKeys.activities.list(normalizeMode(params.tab))));
+    const [items, setItems] = useState<any[]>(() => initialCache.current?.items || []);
+    const [loading, setLoading] = useState(!initialCache.current);
     const [refreshing, setRefreshing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [nextCursor, setNextCursor] = useState<string | null>(null);
-    const [hasMore, setHasMore] = useState(false);
+    const [nextCursor, setNextCursor] = useState<string | null>(() => initialCache.current?.nextCursor || null);
+    const [hasMore, setHasMore] = useState(() => Boolean(initialCache.current?.nextCursor));
     const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
     const [unblockingId, setUnblockingId] = useState<string | null>(null);
 
@@ -51,10 +61,19 @@ export default function ActivitiesScreen() {
             : mode === 'visited'
                 ? await usersService.visited({ limit: 30, cursor })
                 : await usersService.blocked({ limit: 30, cursor });
+        if (activeModeRef.current !== mode) return;
         if (res.success) {
-            setItems((current) => append ? [...current, ...(res.items || [])] : (res.items || []));
-            setNextCursor(res.nextCursor || null);
-            setHasMore(Boolean(res.nextCursor));
+            const responseCursor = res.nextCursor || null;
+            setItems((current) => {
+                const nextItems = append ? [...current, ...(res.items || [])] : (res.items || []);
+                queryClient.setQueryData(queryKeys.activities.list(mode), {
+                    items: nextItems,
+                    nextCursor: responseCursor,
+                });
+                return nextItems;
+            });
+            setNextCursor(responseCursor);
+            setHasMore(Boolean(responseCursor));
         }
     }, [mode]);
 
@@ -66,7 +85,18 @@ export default function ActivitiesScreen() {
 
     useEffect(() => {
         (async () => {
-            setLoading(true);
+            const cached = queryClient.getQueryData<CachedProfileList>(queryKeys.activities.list(mode));
+            if (cached) {
+                setItems(cached.items);
+                setNextCursor(cached.nextCursor);
+                setHasMore(Boolean(cached.nextCursor));
+                setLoading(false);
+            } else {
+                setItems([]);
+                setNextCursor(null);
+                setHasMore(false);
+                setLoading(true);
+            }
             await load();
             setLoading(false);
         })();
@@ -92,7 +122,11 @@ export default function ActivitiesScreen() {
         try {
             const res = await usersService.unblock(id);
             if (res.success) {
-                setItems((current) => current.filter((entry) => String(entry.id || entry._id) !== String(id)));
+                setItems((current) => {
+                    const nextItems = current.filter((entry) => String(entry.id || entry._id) !== String(id));
+                    queryClient.setQueryData(queryKeys.activities.list(mode), { items: nextItems, nextCursor });
+                    return nextItems;
+                });
                 setSelectedProfile({ ...item, blocked: false });
                 toast.show(t('unblocked', 'User has been unblocked.'), 'success', 2500);
             } else {
@@ -188,13 +222,27 @@ export default function ActivitiesScreen() {
                 onClose={() => setSelectedProfile(null)}
                 onBlocked={(id) => {
                     setSelectedProfile(null);
-                    setItems((current) => current.filter((item) => String(item.id || item._id) !== String(id)));
+                    setItems((current) => {
+                        const nextItems = current.filter((item) => String(item.id || item._id) !== String(id));
+                        queryClient.setQueryData(queryKeys.activities.list(mode), { items: nextItems, nextCursor });
+                        return nextItems;
+                    });
                 }}
                 onUnblocked={(id) => {
-                    if (mode === 'blocked') setItems((current) => current.filter((item) => String(item.id || item._id) !== String(id)));
+                    if (mode === 'blocked') {
+                        setItems((current) => {
+                            const nextItems = current.filter((item) => String(item.id || item._id) !== String(id));
+                            queryClient.setQueryData(queryKeys.activities.list(mode), { items: nextItems, nextCursor });
+                            return nextItems;
+                        });
+                    }
                 }}
                 onFavoriteChanged={(id, favorited) => {
-                    setItems((current) => current.map((item) => String(item.id || item._id) === String(id) ? { ...item, is_favorited: favorited } : item));
+                    setItems((current) => {
+                        const nextItems = current.map((item) => String(item.id || item._id) === String(id) ? { ...item, is_favorited: favorited } : item);
+                        queryClient.setQueryData(queryKeys.activities.list(mode), { items: nextItems, nextCursor });
+                        return nextItems;
+                    });
                 }}
             />
         </View>
