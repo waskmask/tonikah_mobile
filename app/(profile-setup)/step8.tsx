@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ProfileSetupHeader } from '@/components/ui/ProfileSetupHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorText } from '@/components/ui/FormField';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
@@ -17,7 +18,15 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { LocateFixed } from 'lucide-react-native';
+import { LocateFixed, MapPinOff } from 'lucide-react-native';
+
+type LocationRecovery =
+    | 'permission_denied'
+    | 'services_disabled'
+    | 'location_unavailable'
+    | 'network_error'
+    | 'service_unavailable'
+    | 'resolve_failed';
 
 type PlaceDetails = {
     place_id?: string;
@@ -105,6 +114,7 @@ export default function Step8() {
     const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
 
     const [detectingLocation, setDetectingLocation] = useState(false);
+    const [locationRecovery, setLocationRecovery] = useState<LocationRecovery | null>(null);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -132,22 +142,22 @@ export default function Step8() {
 
     const detectCurrentLocation = async () => {
         setDetectingLocation(true);
+        setLocationRecovery(null);
+        setErrors((current) => ({ ...current, city: '' }));
         try {
-            const permission = await Location.requestForegroundPermissionsAsync();
+            let permission = await Location.getForegroundPermissionsAsync();
+            if (permission.status !== Location.PermissionStatus.GRANTED && permission.canAskAgain) {
+                permission = await Location.requestForegroundPermissionsAsync();
+            }
+
             if (permission.status !== Location.PermissionStatus.GRANTED) {
-                Alert.alert(
-                    t('error', { defaultValue: 'Error' }),
-                    t('common:location_permission_required', { defaultValue: 'Location permission is required to fill your current city.' }),
-                );
+                setLocationRecovery('permission_denied');
                 return;
             }
 
             const servicesEnabled = await Location.hasServicesEnabledAsync();
             if (!servicesEnabled) {
-                Alert.alert(
-                    t('error', { defaultValue: 'Error' }),
-                    t('common:device_location_services_disabled', { defaultValue: 'Please turn on device location services and try again.' }),
-                );
+                setLocationRecovery('services_disabled');
                 return;
             }
 
@@ -164,10 +174,7 @@ export default function Step8() {
             }
 
             if (!position) {
-                Alert.alert(
-                    t('error', { defaultValue: 'Error' }),
-                    t('common:device_location_unavailable', { defaultValue: 'Could not get your device location. Please enable location services and try again.' }),
-                );
+                setLocationRecovery('location_unavailable');
                 return;
             }
 
@@ -177,29 +184,62 @@ export default function Step8() {
 
             if (res.success && hasResolvedLocation(res.data)) {
                 applyLocationDetails(res.data);
+                setLocationRecovery(null);
                 return;
             }
 
-            const messageKey =
+            const recovery =
                 res.message === 'network_error'
-                    ? 'common:location_backend_network_error'
+                    ? 'network_error'
                     : res.status === 404 || res.message === 'invalid_json'
-                        ? 'common:location_backend_unavailable'
-                        : 'common:location_resolve_failed';
+                        ? 'service_unavailable'
+                        : 'resolve_failed';
 
-            Alert.alert(
-                t('error', { defaultValue: 'Error' }),
-                t(messageKey, { defaultValue: 'Could not resolve your city from this location. Please try again.' }),
-            );
+            setLocationRecovery(recovery);
         } catch {
-            Alert.alert(
-                t('error', { defaultValue: 'Error' }),
-                t('common:device_location_unavailable', { defaultValue: 'Could not get your device location. Please enable location services and try again.' }),
-            );
+            setLocationRecovery('location_unavailable');
         } finally {
             setDetectingLocation(false);
         }
     };
+
+    const openLocationSettings = async () => {
+        if (locationRecovery === 'services_disabled' && Platform.OS === 'android') {
+            try {
+                await Location.enableNetworkProviderAsync();
+                await detectCurrentLocation();
+                return;
+            } catch {
+                // Fall through to the app settings when the native prompt is unavailable.
+            }
+        }
+
+        try {
+            await Linking.openSettings();
+        } catch {
+            toast.show(
+                t('common:device_location_services_disabled', { defaultValue: 'Please turn on device location services and try again.' }),
+                'error',
+            );
+        }
+    };
+
+    const recoveryMessage = locationRecovery
+        ? t(
+            locationRecovery === 'permission_denied'
+                ? 'common:location_permission_required'
+                : locationRecovery === 'services_disabled'
+                    ? 'common:device_location_services_disabled'
+                    : locationRecovery === 'network_error'
+                        ? 'common:location_backend_network_error'
+                        : locationRecovery === 'service_unavailable'
+                            ? 'common:location_backend_unavailable'
+                            : locationRecovery === 'resolve_failed'
+                                ? 'common:location_resolve_failed'
+                                : 'common:device_location_unavailable',
+            { defaultValue: 'Could not verify your current location. Please try again.' },
+        )
+        : '';
 
     const validate = (): boolean => {
         const e: Record<string, string> = {};
@@ -265,47 +305,76 @@ export default function Step8() {
                     <ProfileSetupHeader
                         step={8}
                         title={t('location_title', { defaultValue: 'Current location' })}
-                        subtitle={t('location_desc', { defaultValue: 'Enter your present residing city and country.' })}
+                        subtitle={t('current_location_required', { defaultValue: 'Please use current location to fill your city, state, and country.' })}
                     />
 
-                    <Pressable
-                        onPress={detectCurrentLocation}
-                        disabled={detectingLocation}
-                        style={[
-                            styles.locationButton,
-                            {
-                                borderBottomColor: errors.city ? '#EF4444' : isDark ? '#3A332B' : '#E8E1D6',
-                                opacity: detectingLocation ? 0.65 : 1,
-                            },
-                        ]}
-                    >
-                        <Text
-                            variant="body-sm"
-                            numberOfLines={2}
-                            style={{
-                                // Same pair as Input placeholders / values
-                                color: city ? (isDark ? '#E8E1D6' : '#201B15') : (isDark ? '#A99C8D' : '#5C5348'),
-                                flex: 1,
-                            }}
+                    {locationRecovery ? (
+                        <EmptyState
+                            style={styles.recovery}
+                            icon={<MapPinOff size={scale(30)} color="#F34B6F" />}
+                            title={t('location_title', { defaultValue: 'Current location' })}
+                            description={recoveryMessage}
+                            actions={[
+                                ...(
+                                    locationRecovery === 'permission_denied' || locationRecovery === 'services_disabled'
+                                        ? [{
+                                            label: t('open_settings', { defaultValue: 'Open Settings' }),
+                                            onPress: openLocationSettings,
+                                        }]
+                                        : []
+                                ),
+                                {
+                                    label: t('btn_try_again', { defaultValue: 'Try Again' }),
+                                    onPress: detectCurrentLocation,
+                                    variant: 'secondary' as const,
+                                    disabled: detectingLocation,
+                                    loading: detectingLocation,
+                                },
+                            ]}
+                        />
+                    ) : (
+                        <Pressable
+                            onPress={detectCurrentLocation}
+                            disabled={detectingLocation}
+                            style={[
+                                styles.locationButton,
+                                {
+                                    borderBottomColor: errors.city ? '#EF4444' : isDark ? '#3A332B' : '#E8E1D6',
+                                    opacity: detectingLocation ? 0.65 : 1,
+                                },
+                            ]}
                         >
-                            {currentLocationValue}
-                        </Text>
-                        {detectingLocation ? (
-                            <ActivityIndicator color="#F34B6F" />
-                        ) : (
-                            <LocateFixed size={scale(18)} color="#F34B6F" />
-                        )}
-                    </Pressable>
+                            <Text
+                                variant="body-sm"
+                                numberOfLines={2}
+                                style={{
+                                    color: city ? (isDark ? '#E8E1D6' : '#201B15') : (isDark ? '#A99C8D' : '#5C5348'),
+                                    flex: 1,
+                                }}
+                            >
+                                {currentLocationValue}
+                            </Text>
+                            {detectingLocation ? (
+                                <ActivityIndicator color="#F34B6F" />
+                            ) : (
+                                <LocateFixed size={scale(18)} color="#F34B6F" />
+                            )}
+                        </Pressable>
+                    )}
                     {errors.city ? <ErrorText text={errors.city} /> : null}
             </KeyboardAwareScrollView>
 
-            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading} widthMode="full" height={40} textSize={15} /></View>
+            <View style={styles.footer}><GradientButton title={t('continue', { defaultValue: 'Continue' })} onPress={handleSubmit} loading={loading} disabled={loading || detectingLocation} widthMode="full" height={40} textSize={15} /></View>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     footer: { padding: scale(20), paddingBottom: scale(10) },
+    recovery: {
+        paddingTop: scale(12),
+        paddingBottom: scale(24),
+    },
     // Underline style, matching the app's inputs
     locationButton: {
         minHeight: scale(48),

@@ -5,6 +5,8 @@ import { api } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleSignIn';
 import { registerForPushNotifications, removeRegisteredPushToken } from '@/lib/pushNotifications';
 import { queryClient } from '@/lib/queryClient';
+import { canUseCachedUserAfterRefreshFailure, isAccessTokenUsable } from '@/lib/authToken';
+import { clearPrivateChatData } from '@/lib/chatDataCleanup';
 
 // Last known user, persisted so a returning user starts instantly and the
 // fresh /me fetch happens in the background instead of blocking the splash.
@@ -21,7 +23,7 @@ interface AuthState {
     googleAuth: (options?: Pick<GoogleAuthRequest, 'agreed' | 'marketing_opt_in' | 'lang'>) => Promise<AuthResponse>;
     logout: () => Promise<void>;
     logoutAllDevices: () => Promise<AuthResponse>;
-    handleUnauthorized: () => void;
+    handleUnauthorized: () => Promise<void>;
     restoreSession: () => Promise<void>;
     refreshUser: () => Promise<AuthResponse>;
     setUser: (user: User) => void;
@@ -101,6 +103,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     logout: async () => {
+        const userId = get().user?._id;
         set({ isLoading: true });
         try {
             await removeRegisteredPushToken().catch(() => { });
@@ -110,18 +113,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 authService.logout({ refreshToken }).catch(() => { });
             }
         } finally {
-            await api.clearTokens();
+            await Promise.all([
+                api.clearTokens(),
+                clearPrivateChatData(userId),
+            ]);
             set({ user: null, isAuthenticated: false, isLoading: false });
         }
     },
 
     logoutAllDevices: async () => {
+        const userId = get().user?._id;
         set({ isLoading: true });
         try {
             await removeRegisteredPushToken().catch(() => { });
             const result = await authService.revokeAllSessions();
             if (result.success) {
-                await api.clearTokens();
+                await Promise.all([
+                    api.clearTokens(),
+                    clearPrivateChatData(userId),
+                ]);
                 set({ user: null, isAuthenticated: false, isLoading: false });
                 return result;
             }
@@ -133,7 +143,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    handleUnauthorized: () => {
+    handleUnauthorized: async () => {
+        const userId = get().user?._id;
+        await clearPrivateChatData(userId);
         set({ user: null, isAuthenticated: false, isLoading: false });
     },
 
@@ -156,30 +168,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 return;
             }
 
-            // Fast path: cached user unblocks the splash without a network
-            // round-trip; /me refreshes (or logs out) in the background.
             const cached = await AsyncStorage.getItem(USER_CACHE_KEY).catch(() => null);
+            let cachedUser: User | null = null;
             if (cached) {
                 try {
-                    const cachedUser = JSON.parse(cached) as User;
-                    set({ user: cachedUser, isAuthenticated: true, isRestoringSession: false });
-                    registerForPushNotifications().catch(() => { });
-                    authService.me()
-                        .then((result) => {
-                            if (result.success && result.user) {
-                                set({ user: result.user, isAuthenticated: true });
-                            } else if (result.status === 401 || result.message === 'unauthorized') {
-                                void api.clearTokens();
-                                void AsyncStorage.removeItem(USER_CACHE_KEY);
-                                set({ user: null, isAuthenticated: false });
-                            }
-                        })
-                        .catch(() => {
-                            // Network failure: keep the cached session, retry next launch
-                        });
-                    return;
+                    cachedUser = JSON.parse(cached) as User;
                 } catch {
-                    // Corrupt cache — fall through to the blocking fetch
+                    await AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => undefined);
+                }
+            }
+
+            // Only a locally unexpired token may take the instant cached path.
+            // The background /me remains authoritative and can still reject it.
+            if (cachedUser && isAccessTokenUsable(accessToken)) {
+                set({ user: cachedUser, isAuthenticated: true });
+                registerForPushNotifications().catch(() => { });
+                void authService.me().then((result) => {
+                    if (result.success && result.user) {
+                        set({ user: result.user, isAuthenticated: true });
+                    }
+                });
+                return;
+            }
+
+            if (!isAccessTokenUsable(accessToken)) {
+                const refreshResult = await api.refreshSession();
+                if (!refreshResult.accessToken) {
+                    if (cachedUser && canUseCachedUserAfterRefreshFailure(refreshResult.reason)) {
+                        set({ user: cachedUser, isAuthenticated: true });
+                    } else if (refreshResult.reason === 'unauthorized') {
+                        set({ user: null, isAuthenticated: false });
+                    }
+                    return;
                 }
             }
 
@@ -188,9 +208,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.user) {
                 set({ user: result.user, isAuthenticated: true });
                 registerForPushNotifications().catch(() => { });
-            } else if (result.status === 401 || result.message === 'unauthorized') {
-                await api.clearTokens();
-                set({ user: null, isAuthenticated: false });
+            } else if (result.message === 'network_error' && cachedUser) {
+                set({ user: cachedUser, isAuthenticated: true });
             }
         } catch {
             // Keep credentials on transient startup failures. A later request

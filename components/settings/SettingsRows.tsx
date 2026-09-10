@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -18,6 +18,8 @@ export function SettingsNavRow({
     onPress,
     danger,
     disabled,
+    loading,
+    divider,
 }: {
     icon: React.ReactNode;
     label: string;
@@ -25,6 +27,8 @@ export function SettingsNavRow({
     onPress: () => void;
     danger?: boolean;
     disabled?: boolean;
+    loading?: boolean;
+    divider?: boolean;
 }) {
     const colors = useColors();
     const { isRTL } = useLanguage();
@@ -37,33 +41,45 @@ export function SettingsNavRow({
             activeScale={0.97}
             accessibilityRole="button"
             accessibilityLabel={label}
+            accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(loading) }}
             style={{
                 flexDirection: 'row',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 gap: scale(12),
+                minHeight: scale(72),
+                paddingHorizontal: scale(16),
                 paddingVertical: scale(12),
-                opacity: disabled ? 0.55 : 1,
+                borderTopWidth: divider ? StyleSheet.hairlineWidth : 0,
+                borderTopColor: colors.brand.bg.border,
+                opacity: loading ? 1 : disabled ? 0.55 : 1,
             }}
         >
             <View
                 style={{
-                    width: scale(38),
-                    height: scale(38),
-                    borderRadius: scale(19),
+                    width: scale(40),
+                    height: scale(40),
+                    borderRadius: scale(8),
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: danger ? colors.chrome.common.dangerTint : colors.chrome.common.primaryTint,
+                    flexShrink: 0,
+                    backgroundColor: danger ? colors.chrome.common.dangerTint : colors.chrome.header.iconBackground,
                 }}
             >
-                {icon}
+                {loading ? (
+                    <ActivityIndicator
+                        size="small"
+                        color={danger ? colors.brand.accent.error : colors.chrome.primary}
+                    />
+                ) : icon}
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                 <Text
                     variant="body"
                     className="font-body-semi"
                     style={{
                         color: danger ? colors.brand.accent.error : colors.chrome.common.textStrong,
                         textAlign: isRTL ? 'right' : 'left',
+                        width: '100%',
                     }}
                 >
                     {label}
@@ -71,14 +87,25 @@ export function SettingsNavRow({
                 {description ? (
                     <Text
                         variant="caption"
-                        style={{ marginTop: scale(2), color: colors.brand.text.subtitle, textAlign: isRTL ? 'right' : 'left' }}
+                        style={{
+                            marginTop: scale(2),
+                            color: colors.brand.text.subtitle,
+                            textAlign: isRTL ? 'right' : 'left',
+                            width: '100%',
+                        }}
                         numberOfLines={2}
                     >
                         {description}
                     </Text>
                 ) : null}
             </View>
-            <Chevron size={scale(18)} color={colors.brand.text.muted} />
+            {loading ? null : (
+                <Chevron
+                    size={scale(18)}
+                    color={colors.brand.text.muted}
+                    style={{ alignSelf: 'flex-start', flexShrink: 0 }}
+                />
+            )}
         </PressableScale>
     );
 }

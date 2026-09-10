@@ -6,10 +6,10 @@
     "start": "Mulai",
     "next": "Berikutnya",
     "bismillah": "Bismillah",
-    "splash_tagline": "Halal Â· Tulus Â· Untuk Menikah",
+    "splash_tagline": "Halal · Tulus · Untuk Menikah",
     "screen2_subtitle": "SEBUAH PLATFORM",
     "screen2_title": "Hanya untuk Pernikahan",
-    "screen2_body1": "Kami menciptakan toNikah karena satu alasan â€” untuk membantu umat Islam yang tulus menemukan pasangan hidup mereka melalui jalan yang halal dan bermakna.",
+    "screen2_body1": "Kami menciptakan toNikah karena satu alasan — untuk membantu umat Islam yang tulus menemukan pasangan hidup mereka melalui jalan yang halal dan bermakna.",
     "screen2_body2": "Tanpa geser-memilih. Tanpa hubungan biasa. Setiap fitur dirancang untuk menghormati niat Anda, keluarga Anda, dan agama Anda.",
     "screen3_subtitle": "NIAT SAYA",
     "screen3_title": "Sebelum Saya Mulai",
@@ -25,15 +25,15 @@
   "lang": "id",
   "dir": "ltr",
   "English": "English",
-  "French": "FranÃ§ais",
+  "French": "Français",
   "German": "Deutsch",
   "Italian": "Italiano",
-  "Portuguese": "PortuguÃªs",
+  "Portuguese": "Português",
   "Polish": "Polski",
-  "Russian": "Ð ÑƒÑÑÐºÐ¸Ð¹",
-  "Spanish": "EspaÃ±ol",
-  "Turkish": "TÃ¼rkÃ§e",
-  "Arabic": "Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©",
+  "Russian": "Русский",
+  "Spanish": "Español",
+  "Turkish": "Türkçe",
+  "Arabic": "العربية",
   "Indonesian": "Indonesian",
   "home": "Beranda",
   "content": "Konten",
@@ -57,7 +57,7 @@
   "hero_subtitle": "Dibuat untuk muslim yang tulus mencari Nikah lintas budaya",
   "btn_join_now": "Gabung Sekarang",
   "btn_learn_more": "Pelajari Lebih Lanjut",
-  "scroll_hint": "Gulir untuk melanjutkan â†“",
+  "scroll_hint": "Gulir untuk melanjutkan ↓",
   "hero_offer": {
     "badge": "Penawaran terbatas",
     "headline_html": "<strong>1 bulan GRATIS</strong> + diskon 50% untuk paket 3 bulan",
@@ -68,7 +68,7 @@
     "seconds": "detik"
   },
   "what_is_tonikah_title": "Apa itu toNikah?",
-  "what_is_tonikah_text": "toNikah bukan sekadar aplikasi perjodohan biasa â€” ini adalah platform yang memiliki tujuan jelas, dibuat khusus untuk muslim yang mencari pernikahan (nikah), bukan pacaran atau hubungan kasual. Berlandaskan nilai-nilai Islam dan dirancang untuk generasi modern, toNikah menawarkan pengalaman yang penuh hormat, ramah pengguna, dan berkelas bagi mereka yang serius menuju nikah.",
+  "what_is_tonikah_text": "toNikah bukan sekadar aplikasi perjodohan biasa — ini adalah platform yang memiliki tujuan jelas, dibuat khusus untuk muslim yang mencari pernikahan (nikah), bukan pacaran atau hubungan kasual. Berlandaskan nilai-nilai Islam dan dirancang untuk generasi modern, toNikah menawarkan pengalaman yang penuh hormat, ramah pengguna, dan berkelas bagi mereka yang serius menuju nikah.",
   "no_match_games_title": "Tanpa Permainan Match. Hanya Nikah.",
   "no_match_games_text": "<strong>toNikah bukan aplikasi kencan.</strong> Tidak ada geser tak berujung, like, atau kompetisi. Setiap orang mendapat satu kesempatan hormat untuk memperkenalkan diri. Jika yang lain membalas, percakapan berlanjut. Jika tidak, lanjut saja. Setiap profil terlihat, tidak ada yang tersembunyi.",
   "hiw_main_title": "Bagaimana Cara Kerjanya?",
@@ -82,7 +82,7 @@
   "btn_register_now": "Daftar Sekarang",
   "verified_profile_title": "Profil Terverifikasi. Kontrol Privasi Foto.",
   "verified_profile_text": "Verifikasi selfie memastikan orang asli. Anda mengontrol siapa yang boleh melihat foto: akses per orang, batas waktu, dan pengaturan visibilitas.",
-  "early_access_title": "Dapatkan Akses Awal â€“ Diskon 50%",
+  "early_access_title": "Dapatkan Akses Awal – Diskon 50%",
   "early_access_text": "Bergabunglah dengan daftar tunggu dan nikmati 3 bulan pertama dengan setengah harga. Kami akan beri tahu Anda saat resmi diluncurkan.",
   "joined": "Bergabung",
   "email_address": "Alamat Email",
@@ -90,8 +90,8 @@
   "language": "Bahasa",
   "membership": {
     "title": "Keanggotaan",
-    "subtitle": "__PRICE__/bulan â€” Satu paket sederhana, semua fitur terbuka",
-    "body": "Di toNikah kami tidak percaya pada geser gratis atau akses setengah-setengah. Keanggotaan __PRICE__ memastikan semua orang di sini serius mencari nikah, bukan buang waktu. Dengan biaya terjangkau Anda mendapatkan akses penuh ke semua fitur â€” tanpa permainan atau batasan tersembunyi.",
+    "subtitle": "__PRICE__/bulan — Satu paket sederhana, semua fitur terbuka",
+    "body": "Di toNikah kami tidak percaya pada geser gratis atau akses setengah-setengah. Keanggotaan __PRICE__ memastikan semua orang di sini serius mencari nikah, bukan buang waktu. Dengan biaya terjangkau Anda mendapatkan akses penuh ke semua fitur — tanpa permainan atau batasan tersembunyi.",
     "image_alt": "Keanggotaan Emas"
   },
   "membership_reason": {
@@ -108,7 +108,7 @@
       "no_swiping": "Tanpa geser, tanpa menunggu",
       "verified_community": "Komunitas terverifikasi muslim yang serius",
       "private_gallery": "Galeri pribadi dengan kontrol penuh",
-      "affordable_plan": "Terjangkau dan berkelanjutan â€” hanya __PRICE__/bulan",
+      "affordable_plan": "Terjangkau dan berkelanjutan — hanya __PRICE__/bulan",
       "family_participation_title": "Partisipasi Keluarga",
       "family_participation_text": "Akun juga dapat dikelola oleh orang tua, saudara, atau kerabat, dan akan diberi label jelas.",
       "profile_references_title": "Referensi Profil",
@@ -168,7 +168,7 @@
       "intro": "Tujuan kami adalah menciptakan ruang yang aman, penuh hormat, dan berorientasi tujuan di mana muslim dapat:",
       "list": {
         "item1": "Terhubung dengan muslim yang sungguh-sungguh mencari pasangan melalui nikah.",
-        "item2": "Belajar dari Al-Qurâ€™an dan Hadits tentang pernikahan dan kehidupan keluarga.",
+        "item2": "Belajar dari Al-Qur’an dan Hadits tentang pernikahan dan kehidupan keluarga.",
         "item3": "Mengetahui budaya pernikahan, tradisi, dan tren dari berbagai wilayah.",
         "item4": "Mendapatkan konten yang mendidik, menginspirasi, dan mempersiapkan untuk nikah."
       },
@@ -176,7 +176,7 @@
     },
     "achieve": {
       "title": "Apa yang Ingin Kami Capai",
-      "text": "toNikah lebih dari sekadar aplikasi â€” ini adalah komunitas yang dibangun untuk menghidupkan kembali semangat sejati nikah. Tujuan kami bukan hanya membantu muslim bertemu calon pasangan, tetapi juga membimbing, menginspirasi, dan mempersiapkan mereka untuk kehidupan keluarga yang langgeng."
+      "text": "toNikah lebih dari sekadar aplikasi — ini adalah komunitas yang dibangun untuk menghidupkan kembali semangat sejati nikah. Tujuan kami bukan hanya membantu muslim bertemu calon pasangan, tetapi juga membimbing, menginspirasi, dan mempersiapkan mereka untuk kehidupan keluarga yang langgeng."
     },
     "collab": {
       "title": "Bagikan Ide atau Berkolaborasi",
@@ -211,22 +211,22 @@
       "highlight1": "petunjuk Islam autentik",
       "middle": " dengan ",
       "highlight2": "keindahan keragaman budaya pernikahan muslim di seluruh dunia",
-      "outro": ". Banyak masalah dalam pernikahan muncul karena kurangnya pengetahuan tentang ajaran Islam dan hubungan. Melalui konten kami, kami ingin membimbing pasangan dengan pelajaran dari Al-Qurâ€™an dan Hadits, serta menyoroti tradisi pernikahan muslim global.",
+      "outro": ". Banyak masalah dalam pernikahan muncul karena kurangnya pengetahuan tentang ajaran Islam dan hubungan. Melalui konten kami, kami ingin membimbing pasangan dengan pelajaran dari Al-Qur’an dan Hadits, serta menyoroti tradisi pernikahan muslim global.",
       "closing": "Tujuan kami sederhana: mendidik, menginspirasi, dan menghubungkan muslim dengan pengetahuan dan budaya yang memperkuat keluarga serta menjaga iman.",
       "video_fallback": "Peramban Anda tidak mendukung tag video."
     },
     "categories": {
       "title": "Kategori Konten Kami",
       "islamic": {
-        "label": "ðŸ“– Panduan Islam",
-        "text": "Pelajaran dari Al-Qurâ€™an dan Hadits tentang pernikahan, keluarga, dan hubungan."
+        "label": "📖 Panduan Islam",
+        "text": "Pelajaran dari Al-Qur’an dan Hadits tentang pernikahan, keluarga, dan hubungan."
       },
       "trending": {
-        "label": "ðŸŽ‰ Topik Terkini",
+        "label": "🎉 Topik Terkini",
         "text": "Yang terbaru dalam busana pengantin pria & wanita, venue pernikahan, dekorasi, dan perayaan."
       },
       "cultures": {
-        "label": "ðŸŒ Budaya Pernikahan Muslim",
+        "label": "🌍 Budaya Pernikahan Muslim",
         "text": "Makanan, tradisi, dan kebiasaan pernikahan di seluruh dunia, dimulai dari Hyderabad dan berkembang secara global."
       },
       "image_alt": "Studio"
@@ -259,15 +259,15 @@
     },
     "meeting_guidelines": {
       "title": "Panduan Bertemu",
-      "public_places": "ðŸ¦ <strong>Bertemu di tempat umum</strong> â€“ Selalu atur pertemuan pertama di tempat umum yang aman seperti kafe atau taman, jangan pernah di tempat pribadi atau terpencil.",
-      "inform_friends": "ðŸ‘¨â€ðŸ‘©â€ðŸ‘§ <strong>Beritahu keluarga atau teman</strong> â€“ Beri tahu orang terpercaya ke mana Anda pergi, dengan siapa bertemu, dan kapan Anda berencana pulang.",
-      "take_your_time": "ðŸ•°ï¸ <strong>Ambil waktu Anda</strong> â€“ Jangan terburu-buru mengambil keputusan besar. Hubungan yang tulus akan berkembang secara alami tanpa paksaan."
+      "public_places": "🏦 <strong>Bertemu di tempat umum</strong> – Selalu atur pertemuan pertama di tempat umum yang aman seperti kafe atau taman, jangan pernah di tempat pribadi atau terpencil.",
+      "inform_friends": "👨‍👩‍👧 <strong>Beritahu keluarga atau teman</strong> – Beri tahu orang terpercaya ke mana Anda pergi, dengan siapa bertemu, dan kapan Anda berencana pulang.",
+      "take_your_time": "🕰️ <strong>Ambil waktu Anda</strong> – Jangan terburu-buru mengambil keputusan besar. Hubungan yang tulus akan berkembang secara alami tanpa paksaan."
     },
     "avoiding_scams": {
       "title": "Menghindari Penipuan",
-      "never_send_money": "âš ï¸ <strong>Jangan pernah mengirim uang atau hadiah</strong> â€“ Waspadai siapa pun yang meminta bantuan keuangan, seberapa pun meyakinkan ceritanya.",
-      "watch_for_red_flags": "ðŸš© <strong>Perhatikan tanda bahaya</strong> â€“ Permintaan kerahasiaan, desakan mendesak, atau cerita yang tidak konsisten adalah tanda umum penipuan.",
-      "report_suspicious_behavior": "ðŸ“¢ <strong>Laporkan perilaku mencurigakan</strong> â€“ Jika Anda melihat sesuatu yang aneh, laporkan segera agar tim kami dapat melindungi komunitas."
+      "never_send_money": "⚠️ <strong>Jangan pernah mengirim uang atau hadiah</strong> – Waspadai siapa pun yang meminta bantuan keuangan, seberapa pun meyakinkan ceritanya.",
+      "watch_for_red_flags": "🚩 <strong>Perhatikan tanda bahaya</strong> – Permintaan kerahasiaan, desakan mendesak, atau cerita yang tidak konsisten adalah tanda umum penipuan.",
+      "report_suspicious_behavior": "📢 <strong>Laporkan perilaku mencurigakan</strong> – Jika Anda melihat sesuatu yang aneh, laporkan segera agar tim kami dapat melindungi komunitas."
     }
   },
   "page_title": {
@@ -309,8 +309,9 @@
   "login_with_google": "Masuk dengan Google",
   "dont_have_an_account": "Belum punya akun",
   "create_new_account": "Buat akun baru",
+  "create_account": "Buat akun",
   "welcome_back": "Selamat datang kembali",
-  "login_subtitle": "Masuk untuk melanjutkan perjalananmu",
+  "login_subtitle": "Masuk ke akun Anda",
   "new_to_app": "Baru di toNikah?",
   "invalid_credentials": "Kredensial tidak valid",
   "csrf_origin_blocked": "Pemeriksaan keamanan gagal. Segarkan halaman lalu coba lagi.",
@@ -360,13 +361,13 @@
   "passwords_mismatch": "Kata sandi tidak cocok",
   "email_password_required": "Email dan kata sandi wajib diisi",
   "email_already_exists": "Email sudah terdaftar",
-  "signup_success_verify_email_sent": "Terima kasih telah bergabung dengan toNikah! Email verifikasi sedang dikirim â€” mohon konfirmasi. InsyaAllah, Anda akan segera menemukan pasangan ideal Anda. Kami akan otomatis masuk dalam {seconds} detikâ€¦",
+  "signup_success_verify_email_sent": "Terima kasih telah bergabung dengan toNikah! Email verifikasi sedang dikirim — mohon konfirmasi. InsyaAllah, Anda akan segera menemukan pasangan ideal Anda. Kami akan otomatis masuk dalam {seconds} detik…",
   "signup_failed": "Pendaftaran gagal. Coba lagi atau <a href='/support' target='_blank'>hubungi dukungan</a> jika masalah berlanjut.",
   "please_wait": "Mohon tunggu...",
   "login_here": "Masuk di sini",
   "join_tonikah": "Gabung toNikah",
   "confirm_password": "Konfirmasi kata sandi",
-  "singup_desc": "Perjalanan Anda menuju â†’ Nikah dimulai di sini.",
+  "singup_desc": "Perjalanan Anda menuju → Nikah dimulai di sini.",
   "consent_statement": "Saya menyetujui <a href='/terms' target='_blank' rel='noopener'>Ketentuan Penggunaan</a> dan <a href='/privacy-policy' target='_blank' rel='noopener'>Kebijakan Privasi</a>, serta memberikan izin kepada toNikah untuk memproses data saya guna membuat dan mengelola akun.",
   "marketing_opt_statement": "Ya, saya ingin menerima pembaruan bermanfaat, panduan, dan penawaran eksklusif dari toNikah melalui email (opsional).",
   "consent_required": "Anda harus menyetujui Ketentuan Penggunaan dan Kebijakan Privasi untuk melanjutkan.",
@@ -392,7 +393,7 @@
   "sending": "Mengirim...",
   "verification_mail_sent_if_exists": "Email verifikasi dikirim jika ada",
   "resend_failed": "Gagal mengirim ulang",
-  "verifying_email_title": "Memverifikasi Emailâ€¦",
+  "verifying_email_title": "Memverifikasi Email…",
   "verifying_email_message": "Mohon tunggu sementara kami memverifikasi email Anda.",
   "verified_success_title": "Email Terverifikasi",
   "verified_success_message": "Alamat email Anda berhasil diverifikasi. Terima kasih telah membantu menjaga komunitas kami tetap aman.",
@@ -415,8 +416,8 @@
   "reset_request_failed": "Tidak dapat meminta reset kata sandi. Coba lagi.",
   "email_not_found": "Tidak ditemukan akun dengan email ini.",
   "already_have_an_account": "Sudah punya akun?",
-  "back_to_login_link": "Kembali ke â†’ <a class=\"link\" href=\"/login\">Masuk</a>",
-  "verifying_reset_link_title": "Menyiapkan tautan reset Andaâ€¦",
+  "back_to_login_link": "Kembali ke → <a class=\"link\" href=\"/login\">Masuk</a>",
+  "verifying_reset_link_title": "Menyiapkan tautan reset Anda…",
   "verifying_reset_link_desc": "Mohon tunggu sebentar.",
   "reset_password_title": "Atur Ulang Kata Sandi",
   "reset_password_desc": "Masukkan kata sandi baru Anda di bawah ini dan konfirmasi untuk mengamankan akun.",
@@ -980,7 +981,7 @@
   "quality_control_engineer": "Insinyur Kontrol Kualitas",
   "quality_manager": "Manajer Kualitas",
   "quantity_surveyor": "Quantity Surveyor",
-  "quran_teacher": "Guru Al-Qurâ€™an",
+  "quran_teacher": "Guru Al-Qur’an",
   "radio_jockey": "Penyiar Radio",
   "radiologist": "Radiolog",
   "real_estate_agent": "Agen Properti",
@@ -1148,8 +1149,8 @@
   "just_shia": "Hanya Syiah",
   "other_shia": "Syiah lainnya",
   "five_times_daily": "Shalat 5 waktu setiap hari",
-  "most_prayers": "Shalat sebagian besar (4â€“5 kali)",
-  "some_prayers": "Shalat beberapa kali (2â€“3 kali)",
+  "most_prayers": "Shalat sebagian besar (4–5 kali)",
+  "some_prayers": "Shalat beberapa kali (2–3 kali)",
   "friday_only": "Hanya Jumat (Shalat Jumat)",
   "never_prays": "Tidak pernah shalat",
   "prayers_title": "Shalat (Salah - Namaz)",
@@ -1232,7 +1233,7 @@
   "city_location_required": "Pilih kota dari daftar agar kami bisa menemukan lokasi.",
   "country_required": "Silakan masukkan negara Anda.",
   "profile_m_title": "Siapa yang Membuat Profil Ini?",
-  "profile_m_desc": "Beri tahu kami siapa yang mengelola profil ini â€” Anda sendiri atau orang lain atas nama Anda.",
+  "profile_m_desc": "Beri tahu kami siapa yang mengelola profil ini — Anda sendiri atau orang lain atas nama Anda.",
   "self": "Sendiri",
   "father": "Ayah",
   "mother": "Ibu",
@@ -1257,7 +1258,7 @@
   "page_not_found_heading": "Halaman Tidak Ditemukan",
   "page_not_found_message": "Jalur yang Anda cari sepertinya mengambil arah lain. Mungkin jodoh Anda sedang menunggu di halaman beranda!",
   "page_not_found_quote": "Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untuk kamu pasangan dari jenismu sendiri...",
-  "page_not_found_quote_source": "- Al-Qurâ€™an 30:21",
+  "page_not_found_quote_source": "- Al-Qur’an 30:21",
   "server_error_title": "Kesalahan Server",
   "server_error_heading": "Terjadi Kesalahan",
   "server_error_message": "Kami sedang mengalami kesulitan teknis. Tim kami telah diberi tahu dan sedang bekerja untuk memperbaikinya.",
@@ -1272,14 +1273,14 @@
   "mins": "Menit",
   "secs": "Detik",
   "launch_date_text": "Diluncurkan pada 5 Mei 2026, 00:00 WIB (UTC+07:00)",
-  "prelaunch_congrats_message": "Selamat! Anda mendaftar saat pra-peluncuran â€” nikmati <span class=\"bold-primary\">diskon 50%</span> untuk 3 bulan pertama Anda. Kami akan mengirim email saat kami tayang.",
+  "prelaunch_congrats_message": "Selamat! Anda mendaftar saat pra-peluncuran — nikmati <span class=\"bold-primary\">diskon 50%</span> untuk 3 bulan pertama Anda. Kami akan mengirim email saat kami tayang.",
   "features_heading": "Beberapa fitur utama yang membedakan kami dari platform lain.",
   "feature_browse_title": "Jelajah profil tanpa batas",
   "feature_messaging_title": "Pesan kontak langsung",
   "feature_no_swiping_title": "Tanpa geser, tanpa menunggu",
   "feature_verified_title": "Komunitas terverifikasi muslim yang serius",
   "feature_privacy_title": "Galeri pribadi dengan kontrol penuh",
-  "feature_pricing_title": "Terjangkau dan berkelanjutan â€” hanya â‚¬5/bulan",
+  "feature_pricing_title": "Terjangkau dan berkelanjutan — hanya €5/bulan",
   "feature_family_title": "Partisipasi Keluarga",
   "feature_family_description": "Akun juga dapat dikelola oleh orang tua, saudara, atau kerabat, dan akan diberi label jelas.",
   "feature_reference_title": "Referensi Profil",
@@ -1288,21 +1289,21 @@
   "status_upcoming": "Akan Datang",
   "status_ongoing": "Sedang Berjalan",
   "status_done": "Selesai",
-  "roadmap_launch_title": "5 Mei 2026 â€” Langsung",
-  "roadmap_launch_description": "Platform dibuka untuk semua â€” cari profil, terhubung, dan berkomunikasi untuk menemukan pasangan hidup.",
-  "roadmap_prelaunch_title": "Feb 2026 â€” Pra-peluncuran (Tahap 1)",
+  "roadmap_launch_title": "5 Mei 2026 — Langsung",
+  "roadmap_launch_description": "Platform dibuka untuk semua — cari profil, terhubung, dan berkomunikasi untuk menemukan pasangan hidup.",
+  "roadmap_prelaunch_title": "Feb 2026 — Pra-peluncuran (Tahap 1)",
   "roadmap_prelaunch_description": "Pendaftaran awal dengan diskon eksklusif 50%. Ajak teman dan keluarga ke toNikah.",
-  "roadmap_beta_oct_title": "Oktober 2025 â€” Uji coba beta",
+  "roadmap_beta_oct_title": "Oktober 2025 — Uji coba beta",
   "roadmap_beta_oct_description": "Pengguna terpilih menguji profil, kecocokan, dan alur UX.",
-  "roadmap_app_testing_title": "September 2025 â€” Pengujian aplikasi",
+  "roadmap_app_testing_title": "September 2025 — Pengujian aplikasi",
   "roadmap_app_testing_description": "QA internal untuk memastikan performa, stabilitas, dan proses onboarding lancar.",
-  "roadmap_social_media_title": "Mei 2025 â€” Mulai konten media sosial",
+  "roadmap_social_media_title": "Mei 2025 — Mulai konten media sosial",
   "roadmap_social_media_description": "Branding, posting teaser, kampanye kesadaran.",
-  "roadmap_development_title": "Maret 2025 â€” Mulai pengembangan",
+  "roadmap_development_title": "Maret 2025 — Mulai pengembangan",
   "roadmap_development_description": "Arsitektur inti, desain basis data, autentikasi & logika komunikasi.",
-  "roadmap_idea_title": "Januari 2025 â€” Ide toNikah lahir",
+  "roadmap_idea_title": "Januari 2025 — Ide toNikah lahir",
   "roadmap_idea_description": "Konsep lahir: platform perjodohan halal modern dengan profil nyata.",
-  "about_tonikah_description": "toNikah bukan sekadar aplikasi perjodohan biasa â€” ini adalah platform yang memiliki tujuan jelas, dibuat khusus untuk muslim yang mencari pernikahan (nikah), bukan pacaran atau hubungan kasual. Berlandaskan nilai-nilai Islam dan dirancang untuk generasi modern, toNikah menawarkan pengalaman yang penuh hormat, ramah pengguna, dan berkelas bagi mereka yang serius menuju nikah.",
+  "about_tonikah_description": "toNikah bukan sekadar aplikasi perjodohan biasa — ini adalah platform yang memiliki tujuan jelas, dibuat khusus untuk muslim yang mencari pernikahan (nikah), bukan pacaran atau hubungan kasual. Berlandaskan nilai-nilai Islam dan dirancang untuk generasi modern, toNikah menawarkan pengalaman yang penuh hormat, ramah pengguna, dan berkelas bagi mereka yang serius menuju nikah.",
   "footer_about_us": "Tentang kami",
   "footer_privacy_policy": "Kebijakan privasi",
   "footer_terms_of_use": "Ketentuan penggunaan",
@@ -1376,8 +1377,8 @@
   "privacy_helper": "Jangan tinggalkan halaman ini, proses ini mungkin memakan beberapa detik.",
   "privacy_private": "Pribadi",
   "privacy_public": "Publik",
-  "privacy_changing_to": "Mengubah privasi menjadi â†’ {pkey}",
-  "privacy_updated_to": "Privasi diperbarui menjadi â†’ {pkey}",
+  "privacy_changing_to": "Mengubah privasi menjadi → {pkey}",
+  "privacy_updated_to": "Privasi diperbarui menjadi → {pkey}",
   "privacy_error": "Tidak dapat memperbarui privasi. Coba lagi.",
   "headline_too_long": "Maksimal 80 karakter.",
   "bio_too_long": "Maksimal 600 karakter.",
@@ -1458,7 +1459,7 @@
   "prays_on_time": "Shalat tepat waktu",
   "prays_sometimes": "Shalat kadang-kadang",
   "jummah_regular": "Rutine shalat Jumat",
-  "quran_recitation": "Membaca Al-Qurâ€™an",
+  "quran_recitation": "Membaca Al-Qur’an",
   "dhikr_regular": "Rutine berdzikir",
   "fasts_ramadan": "Puasa Ramadhan",
   "fasts_sunnah": "Puasa sunnah",
@@ -1544,7 +1545,7 @@
   "max_2_files": "Maksimal 2 file.",
   "max_5mb_each": "Setiap file tidak boleh melebihi 5MB",
   "max_15mb_each": "Gambar tidak boleh melebihi 15MB",
-  "please_wait_if_2s": "<strong>Harap tungguâ€¦</strong><br>Foto besar atau HEIF/HEIC mungkin memerlukan waktu lebih lama. Kami sedang mengonversi foto Anda ke JPEG.",
+  "please_wait_if_2s": "<strong>Harap tunggu…</strong><br>Foto besar atau HEIF/HEIC mungkin memerlukan waktu lebih lama. Kami sedang mengonversi foto Anda ke JPEG.",
   "preparing_photo": "Menyiapkan foto...",
   "support_form_title": "Kirim masalah atau pertanyaan Anda di bawah ini dan tim kami akan segera merespons.",
   "cannot_change": "Tidak dapat diubah",
@@ -1760,7 +1761,7 @@
   "clear_all": "Hapus semua",
   "blocked_users": "Pengguna diblokir",
   "saved": "Disimpan",
-  "message_compose_placeholder": "Tulis pesan perkenalan yang sopan â€” bagikan kenapa kamu tertarik.",
+  "message_compose_placeholder": "Tulis pesan perkenalan yang sopan — bagikan kenapa kamu tertarik.",
   "message_compose_hint": "Enter untuk baris baru, baris kosong untuk paragraf.",
   "blocked": "Pengguna diblokir",
   "back": "Kembali",
@@ -1917,17 +1918,17 @@
   },
   "home_page": {
     "section_labels": {
-      "platform": "01 Â· The platform",
-      "promise": "02 Â· Our promise",
-      "how_it_works": "03 Â· How it works",
-      "trust": "04 Â· Trust & privacy",
-      "membership": "05 Â· Membership",
-      "apart": "06 Â· What sets us apart"
+      "platform": "01 · The platform",
+      "promise": "02 · Our promise",
+      "how_it_works": "03 · How it works",
+      "trust": "04 · Trust & privacy",
+      "membership": "05 · Membership",
+      "apart": "06 · What sets us apart"
     },
     "no_match": {
       "heading1": "No Match Games.",
       "heading2": "Just Nikah.",
-      "bullet1": "One intro message per person â€” no spam",
+      "bullet1": "One intro message per person — no spam",
       "bullet2": "Everyone gets equal visibility",
       "bullet3": "No popularity contests or like counts"
     },
@@ -1947,16 +1948,16 @@
       "heading2": "Everything unlocked.",
       "why_title": "Why only paid membership?",
       "cta": "Get Started Today",
-      "f1": "Unlimited profile browsing â€” no paywalls",
+      "f1": "Unlimited profile browsing — no paywalls",
       "f2": "One respectful intro per person",
       "f3": "100% selfie-verified community",
       "f4": "Private gallery with per-person access",
       "f5": "Add family references and wali",
-      "f6": "Direct messaging â€” no match gates",
+      "f6": "Direct messaging — no match gates",
       "f7": "Cancel anytime, no lock-in"
     },
     "blog": {
-      "eyebrow": "â€” Read & learn",
+      "eyebrow": "— Read & learn",
       "title": "Latest from the journal",
       "subtitle": "Articles on Nikah, identity, and Muslim life.",
       "view_all": "Explore all articles"
@@ -1965,36 +1966,36 @@
       "pillar_global": "Global Muslim Community",
       "pillar_privacy": "Privacy First",
       "pillar_halal": "Halal by Design",
-      "live_badge": "We're Live â€” May 5, 2026",
+      "live_badge": "We're Live — May 5, 2026",
       "heading1": "We made it.",
       "heading2": "toNikah is open.",
       "subtitle_pre": "For every Muslim who believed the search for a spouse should feel",
       "subtitle_highlight": "dignified, not desperate",
-      "subtitle_post": "â€” welcome home.",
+      "subtitle_post": "— welcome home.",
       "beta_badge": "Beta",
-      "beta_heading1": "You're not just a user â€”",
+      "beta_heading1": "You're not just a user —",
       "beta_heading2": "you're a founder.",
-      "beta_body": "We're in beta, and that makes you special. We're young, we're learning, and yes â€” there may be the occasional bug. If something feels off, please don't close the tab in frustration. Come tell us. Every report, every message, every piece of feedback is a brick in this house we're building together. Let's build the most halal, most honest place to find your spouse â€” together. JazakAllah khayran for your trust and patience. It truly means everything to us. ðŸ¤",
+      "beta_body": "We're in beta, and that makes you special. We're young, we're learning, and yes — there may be the occasional bug. If something feels off, please don't close the tab in frustration. Come tell us. Every report, every message, every piece of feedback is a brick in this house we're building together. Let's build the most halal, most honest place to find your spouse — together. JazakAllah khayran for your trust and patience. It truly means everything to us. 🤍",
       "beta_cta": "Share feedback or report a bug",
-      "join_cta": "Join toNikah â€” it's free to start",
-      "join_sub": "No credit card required Â· Cancel anytime"
+      "join_cta": "Join toNikah — it's free to start",
+      "join_sub": "No credit card required · Cancel anytime"
     },
     "faq": {
-      "eyebrow": "â€” Frequently asked",
+      "eyebrow": "— Frequently asked",
       "title": "Questions, answered.",
       "subtitle": "Everything you need to know before signing up.",
       "q1": "How does selfie verification work?",
-      "a1": "During signup, you capture a live selfie that we compare against your profile photos. Only verified members can browse or message â€” no bots, no catfishing, no second accounts.",
+      "a1": "During signup, you capture a live selfie that we compare against your profile photos. Only verified members can browse or message — no bots, no catfishing, no second accounts.",
       "q2": "Why is toNikah a paid-only community?",
-      "a2": "A small membership fee filters out curiosity signups and keeps the community focused on Nikah. Everyone you meet has committed something real to be here â€” that changes the conversations.",
+      "a2": "A small membership fee filters out curiosity signups and keeps the community focused on Nikah. Everyone you meet has committed something real to be here — that changes the conversations.",
       "q3": "How is this different from dating apps?",
       "a3": "No swiping. No popularity scores. No matching gates. You browse every profile, send one respectful intro per person, and if they reply, the conversation begins. Built for Nikah, not entertainment.",
       "q4": "Who sees my photos?",
       "a4": "You control per-person visibility. Grant access to specific people, set a time window, or revoke at any moment. Your private gallery stays private until you decide otherwise.",
       "q5": "Can family members be involved?",
-      "a5": "Yes. You can nominate a wali or family reference on your profile, and members can contact them directly â€” keeping the process transparent and in line with Islamic tradition.",
+      "a5": "Yes. You can nominate a wali or family reference on your profile, and members can contact them directly — keeping the process transparent and in line with Islamic tradition.",
       "q6": "What if the person doesn't reply?",
-      "a6": "That's okay â€” intent matters both ways. Their profile returns to your browse list, and you can focus on others. No badges, no penalties, no pressure."
+      "a6": "That's okay — intent matters both ways. Their profile returns to your browse list, and you can focus on others. No badges, no penalties, no pressure."
     },
     "verified_tabs": {
       "tab1": "Selfie check",
@@ -2021,15 +2022,15 @@
       "o6": "Photos exposed to anyone who matches",
       "u1": "Browse every profile, no swipe gates",
       "u2": "Unlimited access on one simple plan",
-      "u3": "Equal visibility â€” no scoring system",
+      "u3": "Equal visibility — no scoring system",
       "u4": "Direct intro message, no match required",
       "u5": "100% selfie-verified members only",
       "u6": "Per-person photo access with time limits"
     },
     "app_download": {
-      "eyebrow": "â€” Coming soon",
+      "eyebrow": "— Coming soon",
       "title": "Take toNikah with you.",
-      "desc": "Browse, chat, and stay connected wherever you are. Our mobile app launches alongside the platform â€” same privacy, same respect, now in your pocket.",
+      "desc": "Browse, chat, and stay connected wherever you are. Our mobile app launches alongside the platform — same privacy, same respect, now in your pocket.",
       "app_store_pre": "Download on",
       "app_store": "App Store",
       "google_pre": "Get it on",
@@ -2047,11 +2048,11 @@
       "no_tricks": "No hidden tiers. No ads. No tricks."
     },
     "testimonials": {
-      "eyebrow": "â€” Loved by the community",
+      "eyebrow": "— Loved by the community",
       "title": "Real people. Real intent.",
       "t1": "Finally a platform that respects the intent of Nikah. The selfie verification and no-swipe system made me feel safe from day one.",
-      "t2": "One intro message per profile forces you to be thoughtful. No swiping fatigue, no popularity contests â€” just real people with real intent.",
-      "t3": "The private gallery control is brilliant â€” I decide who sees my photos and for how long. That kind of respect for privacy is rare.",
+      "t2": "One intro message per profile forces you to be thoughtful. No swiping fatigue, no popularity contests — just real people with real intent.",
+      "t3": "The private gallery control is brilliant — I decide who sees my photos and for how long. That kind of respect for privacy is rare.",
       "t4": "A paid-only community keeps it serious. Everyone here is ready for Nikah, not timepass. The price is more than fair.",
       "verified": "Verified"
     },
@@ -2110,7 +2111,7 @@
   "auth": {
     "login_title": "Login",
     "signup_title": "Join toNikah",
-    "signup_subtitle": "Your journey to â†’ Nikah begins here.",
+    "signup_subtitle": "Your journey to → Nikah begins here.",
     "email_placeholder": "Enter Email",
     "password_placeholder": "Password",
     "confirm_password_placeholder": "Confirm password",
@@ -2284,7 +2285,7 @@
   },
   "step_9": {
     "title": "Who Is Creating This Profile?",
-    "subtitle": "Let us know who is operating this profile â€” yourself or someone on your behalf.",
+    "subtitle": "Let us know who is operating this profile — yourself or someone on your behalf.",
     "profile_manager": "Profile Manager",
     "finish": "Finish",
     "self": "Self",
@@ -2499,7 +2500,7 @@
   "image_moderation_contact_info": "Informasi kontak atau kode QR",
   "image_moderation_presentation_mismatch": "Foto mungkin tidak sesuai dengan gender profil",
   "image_moderation_checking": "Memeriksa foto",
-  "image_moderation_checking_hint": "Pemeriksaan keamanan otomatis sedang berlangsung. Biasanya hanya membutuhkan beberapa detik.",
+  "image_moderation_checking_hint": "Pemeriksaan keamanan otomatis sedang berlangsung. Biasanya hanya membutuhkan beberapa detik. Anda tetap dapat menggunakan aplikasi selama pemeriksaan berlangsung.",
   "image_moderation_pending_hint": "Foto ini menunggu peninjauan dan disembunyikan dari anggota lain.",
   "image_moderation_submitted_review": "Foto dikirim untuk ditinjau.",
   "image_moderation_approved_toast": "Foto disetujui dan sekarang terlihat di profil Anda.",
@@ -2529,50 +2530,50 @@
   "explore_location_unavailable": "Kami tidak dapat memperoleh lokasi Anda saat ini. Pindah ke area terbuka lalu coba lagi.",
   "explore_location_network_error": "Kami tidak dapat memverifikasi lokasi Anda. Periksa koneksi lalu coba lagi.",
   "open_settings": "Buka Pengaturan",
-  "image_moderation_rejected_toast": "Foto ditolak dan dihapus dari galeri Anda."
-  ,"checkout_untrusted_url": "Checkout aman mengembalikan alamat yang tidak valid."
-  ,"membership_refresh_failed": "Keanggotaan tidak dapat diperbarui. Coba lagi."
-  ,"refreshing_membership": "Memperbarui keanggotaan..."
-  ,"payment_may_be_processing": "Pembayaran mungkin masih diproses. Perbarui sebelum memulai checkout lain."
-  ,"refresh_membership": "Perbarui keanggotaan"
-  ,"choose_payment_method": "Pilih cara membayar"
-  ,"pay_with_app_store": "Bayar dengan App Store"
-  ,"pay_with_google_play": "Bayar dengan Google Play"
-  ,"pay_with_card": "Bayar dengan kartu"
-  ,"app_store_payment_description": "Gunakan akun Apple dan metode pembayaran App Store Anda."
-  ,"google_play_payment_description": "Gunakan akun Google dan metode pembayaran Google Play Anda."
-  ,"card_payment_description": "Lanjutkan di browser dengan pembayaran web yang aman."
-  ,"payment_choice_ios_note": "Pembelian App Store ditangani oleh Apple. Pembayaran kartu membuka pembayaran web yang aman."
-  ,"payment_choice_android_note": "Pembelian Google Play ditangani oleh Google. Pembayaran kartu membuka pembayaran web yang aman."
-  ,"processing_payment": "Memproses pembayaran..."
-  ,"membership_purchase_success": "Keanggotaan Anda aktif."
-  ,"payment_not_completed": "Pembayaran belum selesai"
-  ,"native_purchase_failed": "Kami belum dapat mengonfirmasi pembelian ini. Periksa keanggotaan Anda sebelum mencoba lagi, atau hubungi dukungan."
-  ,"restore_purchases": "Pulihkan pembelian"
-  ,"restoring_purchases": "Memulihkan pembelian..."
-  ,"purchases_restored": "Keanggotaan Anda telah dipulihkan."
-  ,"no_purchases_to_restore": "Tidak ditemukan pembelian keanggotaan aktif."
-  ,"restore_purchases_failed": "Pembelian tidak dapat dipulihkan. Silakan coba lagi nanti."
-  ,"payment_pending_store": "Pembayaran toko Anda tertunda. Keanggotaan aktif setelah dikonfirmasi."
-  ,"error_gift_redeem_failed": "Kartu hadiah tidak dapat ditukarkan. Coba lagi."
-  ,"error_too_many_attempts": "Terlalu banyak percobaan. Coba lagi nanti."
-  ,"free": "Gratis"
-  ,"gift_card_code_label": "Kode kartu hadiah"
-  ,"gift_card_helper": "Masukkan kode kartu hadiah dan PIN 4 digit."
-  ,"gift_card_pin_label": "PIN 4 digit"
-  ,"gift_card_processing": "Kartu hadiah diterima. Keanggotaan sedang diaktifkan."
-  ,"gift_code_invalid_length": "Masukkan kode kartu hadiah 8 karakter."
-  ,"gift_pin_invalid_length": "Masukkan PIN kartu hadiah 4 digit."
-  ,"gift_redeemed_success": "Kartu hadiah ditukarkan. Keanggotaan Anda aktif."
-  ,"history_load_failed": "Riwayat keanggotaan tidak dapat dimuat."
-  ,"loading_payment_options": "Memuat opsi pembayaran..."
-  ,"membership_ends": "Berakhir"
-  ,"membership_history": "Riwayat keanggotaan"
-  ,"membership_history_description": "Pembelian dan hadiah keanggotaan Anda."
-  ,"no_membership_history": "Belum ada riwayat keanggotaan"
-  ,"no_membership_history_description": "Pembelian, kartu hadiah, uji coba, dan pemberian admin akan muncul di sini."
-  ,"payment_not_available_region": "Paket ini belum tersedia untuk dibeli di wilayah Anda."
-  ,"payment_options_unavailable": "Opsi pembayaran tidak dapat dimuat. Tarik ke bawah untuk mencoba lagi."
-  ,"redeem_gift_card": "Tukarkan kartu hadiah"
-  ,"redeeming_gift_card": "Menukarkan..."
+  "image_moderation_rejected_toast": "Foto ditolak dan dihapus dari galeri Anda.",
+  "checkout_untrusted_url": "Checkout aman mengembalikan alamat yang tidak valid.",
+  "membership_refresh_failed": "Keanggotaan tidak dapat diperbarui. Coba lagi.",
+  "refreshing_membership": "Memperbarui keanggotaan...",
+  "payment_may_be_processing": "Pembayaran mungkin masih diproses. Perbarui sebelum memulai checkout lain.",
+  "refresh_membership": "Perbarui keanggotaan",
+  "choose_payment_method": "Pilih cara membayar",
+  "pay_with_app_store": "Bayar dengan App Store",
+  "pay_with_google_play": "Bayar dengan Google Play",
+  "pay_with_card": "Bayar dengan kartu",
+  "app_store_payment_description": "Gunakan akun Apple dan metode pembayaran App Store Anda.",
+  "google_play_payment_description": "Gunakan akun Google dan metode pembayaran Google Play Anda.",
+  "card_payment_description": "Lanjutkan di browser dengan pembayaran web yang aman.",
+  "payment_choice_ios_note": "Pembelian App Store ditangani oleh Apple. Pembayaran kartu membuka pembayaran web yang aman.",
+  "payment_choice_android_note": "Pembelian Google Play ditangani oleh Google. Pembayaran kartu membuka pembayaran web yang aman.",
+  "processing_payment": "Memproses pembayaran...",
+  "membership_purchase_success": "Keanggotaan Anda aktif.",
+  "payment_not_completed": "Pembayaran belum selesai",
+  "native_purchase_failed": "Kami belum dapat mengonfirmasi pembelian ini. Periksa keanggotaan Anda sebelum mencoba lagi, atau hubungi dukungan.",
+  "restore_purchases": "Pulihkan pembelian",
+  "restoring_purchases": "Memulihkan pembelian...",
+  "purchases_restored": "Keanggotaan Anda telah dipulihkan.",
+  "no_purchases_to_restore": "Tidak ditemukan pembelian keanggotaan aktif.",
+  "restore_purchases_failed": "Pembelian tidak dapat dipulihkan. Silakan coba lagi nanti.",
+  "payment_pending_store": "Pembayaran toko Anda tertunda. Keanggotaan aktif setelah dikonfirmasi.",
+  "error_gift_redeem_failed": "Kartu hadiah tidak dapat ditukarkan. Coba lagi.",
+  "error_too_many_attempts": "Terlalu banyak percobaan. Coba lagi nanti.",
+  "free": "Gratis",
+  "gift_card_code_label": "Kode kartu hadiah",
+  "gift_card_helper": "Masukkan kode kartu hadiah dan PIN 4 digit.",
+  "gift_card_pin_label": "PIN 4 digit",
+  "gift_card_processing": "Kartu hadiah diterima. Keanggotaan sedang diaktifkan.",
+  "gift_code_invalid_length": "Masukkan kode kartu hadiah 8 karakter.",
+  "gift_pin_invalid_length": "Masukkan PIN kartu hadiah 4 digit.",
+  "gift_redeemed_success": "Kartu hadiah ditukarkan. Keanggotaan Anda aktif.",
+  "history_load_failed": "Riwayat keanggotaan tidak dapat dimuat.",
+  "loading_payment_options": "Memuat opsi pembayaran...",
+  "membership_ends": "Berakhir",
+  "membership_history": "Riwayat keanggotaan",
+  "membership_history_description": "Pembelian dan hadiah keanggotaan Anda.",
+  "no_membership_history": "Belum ada riwayat keanggotaan",
+  "no_membership_history_description": "Pembelian, kartu hadiah, uji coba, dan pemberian admin akan muncul di sini.",
+  "payment_not_available_region": "Paket ini belum tersedia untuk dibeli di wilayah Anda.",
+  "payment_options_unavailable": "Opsi pembayaran tidak dapat dimuat. Tarik ke bawah untuk mencoba lagi.",
+  "redeem_gift_card": "Tukarkan kartu hadiah",
+  "redeeming_gift_card": "Menukarkan..."
 }

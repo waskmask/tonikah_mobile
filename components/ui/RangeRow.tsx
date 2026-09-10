@@ -22,6 +22,9 @@ type RangeRowProps = {
     mutedColor: string;
     /** Label shown when the full range is selected (default: t('any')). */
     anyLabel?: string;
+    /** Unframed, divider-based treatment used by full-width editing surfaces. */
+    presentation?: 'card' | 'band';
+    isRTL?: boolean;
 };
 
 /** Dual-thumb range slider card, shared by the explore filters and the
@@ -44,6 +47,8 @@ export function RangeRow({
     cardColor,
     mutedColor,
     anyLabel,
+    presentation = 'card',
+    isRTL = false,
 }: RangeRowProps) {
     const [trackWidth, setTrackWidth] = useState(0);
     const isAny = valueMin === defaultMin && valueMax === defaultMax;
@@ -68,14 +73,20 @@ export function RangeRow({
 
     return (
         <View
-            style={[styles.rangeCard, { backgroundColor: cardColor, borderColor }]}
+            style={[
+                presentation === 'band' ? styles.rangeBand : styles.rangeCard,
+                {
+                    backgroundColor: presentation === 'band' ? 'transparent' : cardColor,
+                    borderColor,
+                },
+            ]}
             accessibilityRole="adjustable"
             accessibilityLabel={label}
             accessibilityValue={{ text: valueText }}
         >
             <View style={styles.rangeHeader}>
-                <Text variant="body-sm" className="font-body-bold" style={styles.rangeTitle}>{label}</Text>
-                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? mutedColor : primaryColor }]}>
+                <Text variant="body-sm" className="font-body-bold" style={[styles.rangeTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? mutedColor : primaryColor, textAlign: isRTL ? 'left' : 'right' }]}>
                     {valueText}
                 </Text>
             </View>
@@ -118,6 +129,13 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 8,
         paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 12,
+        minHeight: 112,
+    },
+    rangeBand: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 16,
         paddingTop: 14,
         paddingBottom: 12,
         minHeight: 112,

@@ -123,7 +123,7 @@ const RESOURCES = {
 
 const initI18n = async () => {
     // Try to load saved language
-    let savedLanguage = await AsyncStorage.getItem("user-language");
+    let savedLanguage = await AsyncStorage.getItem("user-language").catch(() => null);
 
     // Detect device language
     const locales = Localization.getLocales();
@@ -153,6 +153,6 @@ const initI18n = async () => {
     });
 };
 
-initI18n();
+export const i18nReady = initI18n();
 
 export default i18n;

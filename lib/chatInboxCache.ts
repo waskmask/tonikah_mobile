@@ -27,3 +27,8 @@ export async function saveCachedInbox(userId: string, inbox: CachedInbox): Promi
         sent: inbox.sent.slice(0, 30),
     });
 }
+
+export async function clearCachedInbox(userId: string): Promise<void> {
+    if (!userId) return;
+    await storage.removeItem(keyFor(userId));
+}

@@ -99,3 +99,17 @@ export async function clearChatMediaCache() {
     if (!FileSystem.documentDirectory) return;
     await FileSystem.deleteAsync(ROOT_DIR, { idempotent: true }).catch(() => undefined);
 }
+
+export async function clearChatMediaCacheForUser(userId: string) {
+    if (!FileSystem.documentDirectory || !userId) return;
+    const dir = await FileSystem.getInfoAsync(ROOT_DIR);
+    if (!dir.exists) return;
+
+    const prefix = `${safePart(userId)}_`;
+    const files = await FileSystem.readDirectoryAsync(ROOT_DIR);
+    await Promise.all(
+        files
+            .filter((file) => file.startsWith(prefix))
+            .map((file) => FileSystem.deleteAsync(`${ROOT_DIR}${file}`, { idempotent: true }).catch(() => undefined)),
+    );
+}

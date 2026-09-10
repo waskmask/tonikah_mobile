@@ -3,11 +3,13 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DevSettings, I18nManager } from "react-native";
 import i18n from "i18next";
+import { i18nReady } from "@/lib/i18n";
 import * as Updates from "expo-updates";
 
 interface LanguageState {
     currentLanguage: string;
     isRTL: boolean;
+    isReady: boolean;
     setLanguage: (lng: string, currentPath?: string) => Promise<void>;
 }
 
@@ -39,7 +41,7 @@ function reloadApp() {
  * flipped in RTL; iOS never does this). Fabric reads that flag only when the
  * surface starts, so the first RTL boot after this ships needs one reload too.
  */
-async function syncNativeRTL(currentLanguage: string) {
+async function syncNativeRTL(currentLanguage: string): Promise<boolean> {
     const shouldBeRTL = currentLanguage === "ar";
 
     // Persists a pref consumed at the next surface start
@@ -56,16 +58,22 @@ async function syncNativeRTL(currentLanguage: string) {
             needsReload = true;
         }
     }
-    if (!needsReload) return;
+    if (!needsReload) return true;
 
     // One attempt per 15s — if the native flags can't take effect, don't reload-loop
     const last = Number(await AsyncStorage.getItem(RTL_SYNC_ATTEMPT_KEY).catch(() => null)) || 0;
-    if (Date.now() - last < 15_000) return;
+    if (Date.now() - last < 15_000) {
+        if (__DEV__) {
+            console.warn('[Language] RTL reload cooldown active; continuing to avoid a reload loop.');
+        }
+        return true;
+    }
     await AsyncStorage.setItem(RTL_SYNC_ATTEMPT_KEY, String(Date.now())).catch(() => { });
 
     I18nManager.allowRTL(shouldBeRTL);
     I18nManager.forceRTL(shouldBeRTL);
     reloadApp();
+    return false;
 }
 
 export const useLanguageStore = create<LanguageState>()(
@@ -73,6 +81,7 @@ export const useLanguageStore = create<LanguageState>()(
         (set, get) => ({
             currentLanguage: i18n.language || "en",
             isRTL: I18nManager.isRTL,
+            isReady: false,
             setLanguage: async (lng: string, currentPath?: string) => {
                 const previousLanguage = get().currentLanguage;
                 if (lng === previousLanguage) return;
@@ -91,15 +100,38 @@ export const useLanguageStore = create<LanguageState>()(
 
                 }
 
-                set({ currentLanguage: lng, isRTL });
+                set({ currentLanguage: lng, isRTL, isReady: false });
                 reloadApp();
             },
         }),
         {
             name: "tonikah-language-preference",
             storage: createJSONStorage(() => AsyncStorage),
+            partialize: (state) => ({ currentLanguage: state.currentLanguage }),
             onRehydrateStorage: () => (state) => {
-                void syncNativeRTL(state?.currentLanguage || i18n.language || "en");
+                void (async () => {
+                    try {
+                        await i18nReady;
+                        const savedLanguage = await AsyncStorage.getItem('user-language').catch(() => null);
+                        const currentLanguage = savedLanguage || i18n.language || state?.currentLanguage || 'en';
+                        await i18n.changeLanguage(currentLanguage);
+                        const canRender = await syncNativeRTL(currentLanguage);
+                        if (!canRender) return;
+                        useLanguageStore.setState({
+                            currentLanguage,
+                            isRTL: currentLanguage === 'ar',
+                            isReady: true,
+                        });
+                    } catch (error) {
+                        if (__DEV__) console.warn('[Language] Startup synchronization failed:', error);
+                        const fallbackLanguage = state?.currentLanguage || 'en';
+                        useLanguageStore.setState({
+                            currentLanguage: fallbackLanguage,
+                            isRTL: fallbackLanguage === 'ar',
+                            isReady: true,
+                        });
+                    }
+                })();
             },
         }
     )

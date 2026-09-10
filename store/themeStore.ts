@@ -7,7 +7,9 @@ type ThemeMode = "light" | "dark" | "system";
 
 interface ThemeState {
     mode: ThemeMode;
+    isHydrated: boolean;
     setMode: (mode: ThemeMode) => void;
+    setHydrated: (value: boolean) => void;
     toggleMode: () => void;
 }
 
@@ -15,7 +17,9 @@ export const useThemeStore = create<ThemeState>()(
     persist(
         (set, get) => ({
             mode: "system",
+            isHydrated: false,
             setMode: (mode) => set({ mode }),
+            setHydrated: (value) => set({ isHydrated: value }),
             toggleMode: () => {
                 const { mode } = get();
                 if (mode === "light") set({ mode: "dark" });
@@ -30,6 +34,10 @@ export const useThemeStore = create<ThemeState>()(
         {
             name: "tonikah-theme-preference",
             storage: createJSONStorage(() => AsyncStorage),
+            partialize: (state) => ({ mode: state.mode }),
+            onRehydrateStorage: () => () => {
+                useThemeStore.setState({ isHydrated: true });
+            },
         }
     )
 );

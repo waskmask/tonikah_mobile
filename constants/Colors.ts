@@ -126,7 +126,7 @@ export const Colors = {
                 borderStrong: "#4A4136",
             },
             accent: {
-                link: "#4B68C4",
+                link: "#9BB0FF",
                 success: "#10B981",
                 warning: "#F59E0B",
                 error: "#EF4444",
@@ -165,10 +165,10 @@ export const Colors = {
                 border: "rgba(33, 29, 24, 0.98)",
             },
             toast: {
-                success: { bg: "rgba(20, 83, 45, 0.35)", border: "#22C55E", text: "#BBF7D0", icon: "#4ADE80" },
-                error: { bg: "rgba(127, 29, 29, 0.35)", border: "#EF4444", text: "#FECACA", icon: "#F87171" },
-                warning: { bg: "rgba(120, 53, 15, 0.35)", border: "#F59E0B", text: "#FDE68A", icon: "#FBBF24" },
-                info: { bg: "rgba(30, 58, 138, 0.35)", border: "#3B82F6", text: "#BFDBFE", icon: "#60A5FA" },
+                success: { bg: "#173226", border: "#35B66A", text: "#F7FAF8", icon: "#56D487" },
+                error: { bg: "#3A2023", border: "#E85D68", text: "#FFF7F7", icon: "#FF7A83" },
+                warning: { bg: "#3A2D1B", border: "#D99A2B", text: "#FFF9ED", icon: "#F2B84B" },
+                info: { bg: "#1D2E45", border: "#4A8ED8", text: "#F6F9FD", icon: "#73AEEF" },
             },
             explore: {
                 screen: "#141210",

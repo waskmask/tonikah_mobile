@@ -84,7 +84,7 @@ export function useToast() {
         if (globalToastRef) globalToastRef.hide();
     }, []);
 
-    return { show, hide };
+    return useMemo(() => ({ show, hide }), [show, hide]);
 }
 
 export type { ToastType };

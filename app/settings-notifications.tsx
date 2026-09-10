@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Monitor, Moon, Sun } from 'lucide-react-native';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
@@ -24,6 +24,22 @@ export default function SettingsNotificationsScreen() {
     const toast = useToast();
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [notificationsBusy, setNotificationsBusy] = useState(false);
+    const [themeChanging, setThemeChanging] = useState<'light' | 'dark' | 'system' | null>(null);
+    const themeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => {
+        if (themeTimer.current) clearTimeout(themeTimer.current);
+    }, []);
+
+    const changeTheme = (nextTheme: 'light' | 'dark' | 'system') => {
+        if (themeChanging || theme === nextTheme) return;
+        setThemeChanging(nextTheme);
+        setTheme(nextTheme);
+        themeTimer.current = setTimeout(() => {
+            setThemeChanging(null);
+            themeTimer.current = null;
+        }, 300);
+    };
 
     const refreshNotificationStatus = useCallback(async () => {
         const status = await getPushNotificationStatus();
@@ -97,19 +113,25 @@ export default function SettingsNotificationsScreen() {
                             active={theme === 'light'}
                             icon={Sun}
                             label={t('theme_light', 'Light')}
-                            onPress={() => setTheme('light')}
+                            loading={themeChanging === 'light'}
+                            disabled={themeChanging !== null}
+                            onPress={() => changeTheme('light')}
                         />
                         <ThemeSegment
                             active={theme === 'dark'}
                             icon={Moon}
                             label={t('theme_dark', 'Dark')}
-                            onPress={() => setTheme('dark')}
+                            loading={themeChanging === 'dark'}
+                            disabled={themeChanging !== null}
+                            onPress={() => changeTheme('dark')}
                         />
                         <ThemeSegment
                             active={theme === 'system'}
                             icon={Monitor}
                             label={t('theme_system', 'System')}
-                            onPress={() => setTheme('system')}
+                            loading={themeChanging === 'system'}
+                            disabled={themeChanging !== null}
+                            onPress={() => changeTheme('system')}
                         />
                     </View>
                 </SectionCard>
@@ -123,18 +145,23 @@ function ThemeSegment({
     icon: Icon,
     label,
     onPress,
+    disabled,
+    loading,
 }: {
     active: boolean;
     icon: typeof Sun;
     label: string;
     onPress: () => void;
+    disabled?: boolean;
+    loading?: boolean;
 }) {
     const colors = useColors();
     return (
         <Pressable
             onPress={onPress}
+            disabled={disabled}
             accessibilityRole="button"
-            accessibilityState={{ selected: active }}
+            accessibilityState={{ selected: active, disabled, busy: loading }}
             accessibilityLabel={label}
             style={{
                 flex: 1,
@@ -149,11 +176,15 @@ function ThemeSegment({
                 borderColor: active ? colors.brand.bg.border : 'transparent',
             }}
         >
-            <Icon
-                size={scale(16)}
-                color={active ? colors.chrome.common.textStrong : colors.brand.text.muted}
-                strokeWidth={1.9}
-            />
+            {loading ? (
+                <ActivityIndicator size="small" color={colors.chrome.primary} />
+            ) : (
+                <Icon
+                    size={scale(16)}
+                    color={active ? colors.chrome.common.textStrong : colors.brand.text.muted}
+                    strokeWidth={1.9}
+                />
+            )}
             <Text
                 variant="caption"
                 className="font-body-semi"

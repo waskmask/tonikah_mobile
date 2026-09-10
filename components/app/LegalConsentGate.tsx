@@ -12,8 +12,8 @@ import { scale } from '@/hooks/useResponsive';
 
 /**
  * Blocking modal shown when the accepted terms/privacy versions are older than
- * the current ones (parity with the web LegalConsentGate). Mounted once in the
- * tabs layout so it only gates the logged-in app.
+ * the current ones (parity with the web LegalConsentGate). Mounted once beside
+ * the root navigator so every authenticated route shares the same gate.
  */
 export function LegalConsentGate() {
     const colors = useColors();

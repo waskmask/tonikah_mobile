@@ -282,8 +282,11 @@ export function MultiSelectSheet({
                                         <Text
                                             variant="body"
                                             style={[
-                                                // Dark ink in light mode, warm white in dark mode
-                                                { flex: 1, marginLeft: scale(12), color: palette.brand.text.body },
+                                                styles.optionLabel,
+                                                {
+                                                    color: palette.brand.text.body,
+                                                    textAlign: isRTL ? 'right' : 'left',
+                                                },
                                                 isChecked && { color: palette.chrome.primary },
                                             ]}
                                         >
@@ -426,8 +429,14 @@ const styles = StyleSheet.create({
     option: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: scale(12),
+        minHeight: scale(44),
         paddingHorizontal: scale(20),
         paddingVertical: scale(13),
+    },
+    optionLabel: {
+        flex: 1,
+        minWidth: 0,
     },
     drawerList: {
         flex: 1,
@@ -436,6 +445,7 @@ const styles = StyleSheet.create({
     checkbox: {
         width: scale(20),
         height: scale(20),
+        flexShrink: 0,
         borderRadius: scale(6),
         borderWidth: 1,
         alignItems: 'center',

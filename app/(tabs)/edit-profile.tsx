@@ -1699,6 +1699,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   rowChevron: {
+    alignSelf: "flex-start",
     flexShrink: 0,
   },
   rowContent: {

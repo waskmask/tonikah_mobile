@@ -1,23 +1,17 @@
 import { useEffect } from "react";
 import { useColorScheme } from "nativewind";
 import { useThemeStore } from "@/store/themeStore";
-import { useSystemColorScheme } from "@/hooks/useSystemColorScheme";
 
 /** Keeps NativeWind `dark:` classes aligned with the Zustand theme store. */
 export function ThemeSync() {
     const mode = useThemeStore((state) => state.mode);
-    const systemScheme = useSystemColorScheme();
     const { setColorScheme } = useColorScheme();
 
     useEffect(() => {
-        const resolved =
-            mode === "system"
-                ? systemScheme === "dark"
-                    ? "dark"
-                    : "light"
-                : mode;
-        setColorScheme(resolved);
-    }, [mode, systemScheme, setColorScheme]);
+        // Passing "system" removes the previous app override and lets the OS
+        // appearance drive both NativeWind and React Native color-scheme hooks.
+        setColorScheme(mode);
+    }, [mode, setColorScheme]);
 
     return null;
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleProp, ViewStyle } from 'react-native';
+import { AccessibilityState, Pressable, StyleProp, ViewStyle } from 'react-native';
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 /** App-wide press spring so every tappable "moves the same". */
@@ -14,6 +14,7 @@ type PressableScaleProps = {
     containerStyle?: StyleProp<ViewStyle>;
     accessibilityLabel?: string;
     accessibilityRole?: 'button' | 'image';
+    accessibilityState?: AccessibilityState;
     activeScale?: number;
     onLongPress?: () => void;
     delayLongPress?: number;
@@ -28,6 +29,7 @@ export function PressableScale({
     containerStyle,
     accessibilityLabel,
     accessibilityRole,
+    accessibilityState,
     activeScale = 0.9,
     onLongPress,
     delayLongPress,
@@ -47,6 +49,7 @@ export function PressableScale({
             style={containerStyle}
             accessibilityLabel={accessibilityLabel}
             accessibilityRole={accessibilityRole}
+            accessibilityState={accessibilityState}
             onPressIn={() => { scaleValue.value = withSpring(activeScale, PRESS_SPRING); }}
             onPressOut={() => { scaleValue.value = withSpring(1, PRESS_SPRING); }}
         >

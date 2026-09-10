@@ -34,6 +34,14 @@ type PendingNativePurchase = {
 };
 
 const PENDING_PURCHASE_KEY = 'membership.nativePurchase.pending.v1';
+const CONNECTION_RETRY_DELAY_MS = 60_000;
+
+type IapModule = typeof import('react-native-iap');
+
+let connectedIap: IapModule | null = null;
+let connectionPromise: Promise<IapModule> | null = null;
+let connectionError: unknown = null;
+let connectionRetryAt = 0;
 
 function nativeKind(): NativeStoreKind | null {
     if (Platform.OS === 'ios') return 'apple_iap';
@@ -58,6 +66,31 @@ export function nativeProductConfig(
 async function loadIap() {
     if (!nativeKind()) throw new Error('native_store_unavailable');
     return import('react-native-iap');
+}
+
+async function getConnectedIap(): Promise<IapModule> {
+    if (connectedIap) return connectedIap;
+    if (connectionPromise) return connectionPromise;
+    if (connectionError && Date.now() < connectionRetryAt) throw connectionError;
+
+    connectionPromise = (async () => {
+        const iap = await loadIap();
+        await iap.initConnection();
+        connectedIap = iap;
+        connectionError = null;
+        connectionRetryAt = 0;
+        return iap;
+    })();
+
+    try {
+        return await connectionPromise;
+    } catch (error) {
+        connectionError = error;
+        connectionRetryAt = Date.now() + CONNECTION_RETRY_DELAY_MS;
+        throw error;
+    } finally {
+        connectionPromise = null;
+    }
 }
 
 async function savePendingPurchase(value: PendingNativePurchase) {
@@ -117,8 +150,7 @@ export async function fetchNativeMembershipProducts(
     configs: NativeProductConfig[],
 ): Promise<Record<string, NativeStoreProduct>> {
     if (!configs.length) return {};
-    const iap = await loadIap();
-    await iap.initConnection();
+    const iap = await getConnectedIap();
     const groups = ['in-app', 'subs'] as const;
     const fetched = await Promise.all(groups.map(async (type) => {
         const skus = [...new Set(
@@ -141,8 +173,7 @@ export async function fetchNativeMembershipProducts(
 
 export async function getNativeStorefrontCountryCode(): Promise<string> {
     if (!nativeKind()) return '';
-    const iap = await loadIap();
-    await iap.initConnection();
+    const iap = await getConnectedIap();
     return String(await iap.getStorefront() || '').trim().toUpperCase();
 }
 
@@ -153,8 +184,7 @@ export async function purchaseNativeMembership(
     const provider = nativeKind();
     if (!provider) throw new Error('native_store_unavailable');
 
-    const iap = await loadIap();
-    await iap.initConnection();
+    const iap = await getConnectedIap();
     const intent = await membershipService.createNativePurchaseIntent({
         provider,
         planSlug,
@@ -253,8 +283,7 @@ export async function recoverPendingNativeMembershipPurchase(): Promise<Purchase
     }
     if (pending.provider !== nativeKind()) return null;
 
-    const iap = await loadIap();
-    await iap.initConnection();
+    const iap = await getConnectedIap();
     const purchases = await iap.getAvailablePurchases();
     const purchase = purchases.find((candidate) => purchaseMatchesIntent(candidate, pending));
     if (!purchase) return null;
@@ -264,9 +293,16 @@ export async function recoverPendingNativeMembershipPurchase(): Promise<Purchase
 }
 
 export async function closeNativeMembershipStore() {
-    if (!nativeKind()) return;
-    const iap = await loadIap();
-    await iap.endConnection();
+    if (!connectedIap) return;
+    const iap = connectedIap;
+    connectedIap = null;
+    connectionPromise = null;
+    try {
+        await iap.endConnection();
+    } finally {
+        connectionError = null;
+        connectionRetryAt = 0;
+    }
 }
 
 export function isPurchaseCancelled(error: unknown) {

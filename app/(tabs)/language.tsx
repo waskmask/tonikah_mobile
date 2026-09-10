@@ -8,20 +8,9 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { space } from '@/constants/uiTokens';
+import { SUPPORTED_APP_LANGUAGES } from '@/lib/languageNames';
 
-const LANGUAGES = [
-    { code: 'en', key: 'English', fallback: 'English' },
-    { code: 'ar', key: 'Arabic', fallback: 'العربية' },
-    { code: 'fr', key: 'French', fallback: 'Français' },
-    { code: 'de', key: 'German', fallback: 'Deutsch' },
-    { code: 'tr', key: 'Turkish', fallback: 'Türkçe' },
-    { code: 'id', key: 'Indonesian', fallback: 'Indonesian' },
-    { code: 'es', key: 'Spanish', fallback: 'Español' },
-    { code: 'it', key: 'Italian', fallback: 'Italiano' },
-    { code: 'pl', key: 'Polish', fallback: 'Polski' },
-    { code: 'pt', key: 'Portuguese', fallback: 'Português' },
-    { code: 'ru', key: 'Russian', fallback: 'Русский' },
-];
+const LANGUAGES = SUPPORTED_APP_LANGUAGES;
 
 function textValue(value: unknown, fallback: string) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
@@ -51,7 +40,7 @@ export default function LanguageScreen() {
                 {LANGUAGES.map((language, index) => {
                     const active = language.code === currentLanguage;
                     const loading = savingCode === language.code;
-                    const label = textValue(t(language.key), language.fallback);
+                    const label = textValue(t(language.translationKey), language.name);
 
                     return (
                         <Pressable

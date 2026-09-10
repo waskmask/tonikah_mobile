@@ -137,7 +137,10 @@ export function EmailVerificationRequiredBanner({
                         </Pressable>
                         <Pressable
                             accessibilityRole="button"
-                            onPress={() => router.push('/change-email' as any)}
+                            onPress={() => {
+                                onDismiss?.();
+                                router.push('/change-email' as any);
+                            }}
                             style={({ pressed }) => [
                                 styles.button,
                                 styles.outlineButton,

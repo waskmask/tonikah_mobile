@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale } from '@/hooks/useResponsive';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
+import { t } from '@/lib/profileDisplay';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -84,7 +85,7 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                 animatedStyle
             ]}
         >
-            <Pressable onPress={hideToast} style={styles.pressable}>
+            <Pressable onPress={hideToast} style={styles.pressable} accessible={false}>
                 <View
                     style={[
                         styles.card,
@@ -98,6 +99,8 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                     <Icon size={scale(24)} color={toastStyle.icon} />
                     <Text
                         variant="body-sm"
+                        accessibilityRole="alert"
+                        accessibilityLiveRegion="assertive"
                         style={{
                             flex: 1,
                             marginHorizontal: scale(12),
@@ -107,7 +110,13 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                     >
                         {message}
                     </Text>
-                    <Pressable onPress={hideToast} hitSlop={10} style={styles.dismiss}>
+                    <Pressable
+                        onPress={hideToast}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('close', 'Close')}
+                        hitSlop={10}
+                        style={styles.dismiss}
+                    >
                         <X size={scale(20)} color={toastStyle.icon} />
                     </Pressable>
                 </View>

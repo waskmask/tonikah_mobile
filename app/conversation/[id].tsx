@@ -85,6 +85,7 @@ import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
 import { QualifiedPhotoRequiredNotice } from '@/components/app/QualifiedPhotoRequiredNotice';
+import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
 import { useMessagingAccessExpiry, useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
@@ -232,9 +233,15 @@ export default function ConversationScreen() {
     const { requireVerified } = useEmailVerificationGuard();
     const eligibility = useMessagingEligibilityStatus();
     useMessagingAccessExpiry();
-    const membershipBlocked = eligibility.messagingAccess?.required === true
+    const emailVerified = eligibility.data
+        ? eligibility.emailVerified
+        : Boolean(user?.email_verified ?? user?.emailVerified);
+    const emailBlocked = !eligibility.isLoading && !emailVerified;
+    const membershipBlocked = emailVerified
+        && eligibility.messagingAccess?.required === true
         && !canOpenMessaging(eligibility.messagingAccess);
     const membershipAccessUnavailable = !eligibility.isLoading
+        && !emailBlocked
         && eligibility.isError
         && !eligibility.messagingAccess;
     const showPhotoGate =
@@ -390,7 +397,7 @@ export default function ConversationScreen() {
     }, [recorderState.durationMillis, recorderState.isRecording, recordingBusy, voicePanelOpen]);
 
     const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
-        if (!id || id === 'new' || membershipBlocked) return;
+        if (!id || id === 'new' || emailBlocked || membershipBlocked || membershipAccessUnavailable) return;
         const cursor = mode === 'append' ? nextCursor : null;
         const [metaRes, messageRes] = await Promise.all([
             mode === 'replace' ? chatService.conversation(id) : Promise.resolve(null),
@@ -414,7 +421,7 @@ export default function ConversationScreen() {
         } else if (messageRes.message !== 'network_error') {
             Alert.alert(t('error', 'Error'), apiMessage(messageRes.message));
         }
-    }, [eligibility, id, membershipBlocked, nextCursor]);
+    }, [eligibility, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, nextCursor]);
 
     useEffect(() => {
         if (!membershipBlocked) return;
@@ -526,7 +533,15 @@ export default function ConversationScreen() {
 
     const socket = useChatSocket({
         conversationId: id !== 'new' ? id : null,
-        enabled: Boolean(user && id && id !== 'new' && !membershipBlocked),
+        enabled: Boolean(
+            user
+            && id
+            && id !== 'new'
+            && !eligibility.isLoading
+            && !emailBlocked
+            && !membershipBlocked
+            && !membershipAccessUnavailable
+        ),
         onMessage: handleSocketMessage,
         onMessageUnsent: handleSocketUnsent,
         onMessageUpdated: handleSocketMessageUpdated,
@@ -554,7 +569,7 @@ export default function ConversationScreen() {
         isNearBottomRef.current = true;
         (async () => {
             if (eligibility.isLoading) return;
-            if (membershipBlocked || membershipAccessUnavailable) {
+            if (emailBlocked || membershipBlocked || membershipAccessUnavailable) {
                 setLoading(false);
                 setMessagesReady(false);
                 return;
@@ -588,14 +603,14 @@ export default function ConversationScreen() {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [eligibility.isLoading, id, membershipAccessUnavailable, membershipBlocked, user?._id, user?.id]);
+    }, [eligibility.isLoading, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, user?._id, user?.id]);
 
     // Persist the newest slice locally so the next open is instant.
     useEffect(() => {
-        if (!id || id === 'new' || !messagesReady || membershipBlocked || membershipAccessUnavailable) return;
+        if (!id || id === 'new' || !messagesReady || emailBlocked || membershipBlocked || membershipAccessUnavailable) return;
         const userId = String(user?._id || user?.id || '');
         void saveCachedMessages(userId, id, items);
-    }, [items, id, membershipAccessUnavailable, membershipBlocked, messagesReady, user?._id, user?.id]);
+    }, [items, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, messagesReady, user?._id, user?.id]);
 
     useEffect(() => {
         if (!viewOnce) return;
@@ -1396,6 +1411,25 @@ export default function ConversationScreen() {
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.primary} />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (emailBlocked) {
+        return (
+            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+                <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
+                    <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
+                        {isRTL ? <ChevronRight size={24} color={colors.text} /> : <ChevronLeft size={24} color={colors.text} />}
+                    </Pressable>
+                </View>
+                <View style={styles.gateContent}>
+                    <EmailVerificationRequiredBanner
+                        email={eligibility.email || user?.email}
+                        title={t('verify_email_full_chat_title', 'Verify your email to use full chat')}
+                        message={t('verify_email_full_chat_message', 'Please verify your email before opening conversations or sending messages.')}
+                    />
                 </View>
             </SafeAreaView>
         );
@@ -2698,6 +2732,7 @@ const styles = StyleSheet.create({
         right: -scale(4),
     },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    gateContent: { flex: 1, justifyContent: 'center', paddingHorizontal: scale(16) },
     header: {
         minHeight: scale(56),
         flexDirection: 'row',

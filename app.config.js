@@ -1,10 +1,27 @@
 const fs = require('fs');
 const path = require('path');
+const { withAndroidManifest } = require('@expo/config-plugins');
 
 const googleServicesPath = './google-services.json';
 const iosGoogleServicesPath = './GoogleService-Info.plist';
 const hasGoogleServicesFile = fs.existsSync(path.resolve(__dirname, googleServicesPath));
 const hasIosGoogleServicesFile = fs.existsSync(path.resolve(__dirname, iosGoogleServicesPath));
+
+const withPhoneOnlyAndroid = (config) =>
+    withAndroidManifest(config, (androidConfig) => {
+        androidConfig.modResults.manifest['supports-screens'] = [
+            {
+                $: {
+                    'android:smallScreens': 'true',
+                    'android:normalScreens': 'true',
+                    'android:largeScreens': 'false',
+                    'android:xlargeScreens': 'false',
+                    'android:anyDensity': 'true',
+                },
+            },
+        ];
+        return androidConfig;
+    });
 
 module.exports = ({ config }) => {
     return {
@@ -23,6 +40,7 @@ module.exports = ({ config }) => {
             'expo-notifications',
             'expo-status-bar',
             'expo-web-browser',
+            withPhoneOnlyAndroid,
         ],
         ios: {
             ...config.ios,

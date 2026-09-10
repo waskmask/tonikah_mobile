@@ -71,3 +71,9 @@ export async function clearAllCachedMessages(userId: string): Promise<void> {
     const matching = keys.filter((key) => key.startsWith(prefix));
     if (matching.length) await AsyncStorage.multiRemove(matching);
 }
+
+export async function clearEveryCachedMessage(): Promise<void> {
+    const keys = await AsyncStorage.getAllKeys();
+    const matching = keys.filter((key) => key.startsWith('chat:msgs:'));
+    if (matching.length) await AsyncStorage.multiRemove(matching);
+}

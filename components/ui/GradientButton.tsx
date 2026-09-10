@@ -27,6 +27,8 @@ interface GradientButtonProps {
     height?: number;
     /** Title font size in design pt (scaled per screen). Defaults to the text variant size. */
     textSize?: number;
+    /** Expands the touch target without changing the visible button size. */
+    hitSlop?: number;
 }
 
 export const GradientButton: React.FC<GradientButtonProps> = ({
@@ -42,6 +44,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
     containerStyle,
     height,
     textSize,
+    hitSlop,
 }) => {
     const { isRTL } = useLanguage();
     const palette = useColors();
@@ -79,8 +82,14 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                 containerStyle,
             ]}
         >
-            <View style={styles.shadowWrapper}>
+            <View
+                style={[
+                    styles.shadowWrapper,
+                    hitSlop ? { paddingVertical: hitSlop } : undefined,
+                ]}
+            >
                 <TouchableOpacity
+                    hitSlop={hitSlop}
                     onPress={() => {
                         if (!disabled && !loading) lightImpact();
                         onPress();

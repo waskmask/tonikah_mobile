@@ -49,6 +49,7 @@ import {
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { queryClient } from '@/lib/queryClient';
 import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
+import { withMessagingAccessClock } from '@/lib/messagingAccess';
 
 type CheckoutState = 'idle' | 'creating' | 'browser_open' | 'refreshing' | 'pending';
 
@@ -85,7 +86,9 @@ function overviewFromResponse(response: any): MembershipOverview {
             daysLeft: Math.max(0, Number(source?.trial?.daysLeft || 0)),
         },
         historyCount: Math.max(0, Number(source?.historyCount || 0)),
-        messagingAccess: source?.messagingAccess,
+        messagingAccess: source?.messagingAccess
+            ? withMessagingAccessClock(source.messagingAccess)
+            : undefined,
         trialOffer: source?.trialOffer,
     };
 }
@@ -393,10 +396,11 @@ export default function MembershipsScreen() {
                 Alert.alert(t('error', 'Error'), apiMessage(response.message));
                 return;
             }
-            if (response.messagingAccess) {
+            const messagingAccess = response.messagingAccess;
+            if (messagingAccess) {
                 queryClient.setQueryData<CurrentUserStatus>(CURRENT_USER_STATUS_QUERY_KEY, (current) => ({
                     ...(current || {}),
-                    messagingAccess: response.messagingAccess,
+                    messagingAccess: withMessagingAccessClock(messagingAccess),
                     trialOffer: response.trialOffer,
                 }));
             }

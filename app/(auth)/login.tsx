@@ -39,6 +39,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginScreen() {
     const { t, isRTL, currentLanguage } = useLanguage();
     const colors = useColors();
+    const compactButtonHitSlop = Math.max(2, (44 - scale(40)) / 2);
     const reduceMotion = useReducedMotion();
     const iconMuted = colors.brand.text.muted;
     const { login, googleAuth } = useAuthStore();
@@ -68,7 +69,6 @@ export default function LoginScreen() {
         const result = await login(data.email.toLowerCase().trim(), data.password);
 
         if (result.success) {
-            router.replace('/');
             return;
         }
 
@@ -101,7 +101,6 @@ export default function LoginScreen() {
         setGoogleLoading(false);
 
         if (result.success) {
-            router.replace('/');
             return;
         }
 
@@ -124,10 +123,7 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                     bottomOffset={scale(24)}
                 >
-                    <AuthTopBar
-                        leftLabel={t('sign_up')}
-                        onLeftPress={() => router.push('/(auth)/signup')}
-                    />
+                    <AuthTopBar />
 
                     {/* Content Area */}
                     <View className="px-8 items-center flex-1 pb-10">
@@ -141,7 +137,7 @@ export default function LoginScreen() {
                                 className="mt-2 text-center"
                                 style={{ color: colors.brand.text.subtitle }}
                             >
-                                {t('login_subtitle', 'Sign in to continue your journey')}
+                                {t('login_subtitle', 'Log in to your account')}
                             </Text>
                         </Animated.View>
 
@@ -226,6 +222,7 @@ export default function LoginScreen() {
                                     widthMode="full"
                                     height={40}
                                     textSize={15}
+                                    hitSlop={compactButtonHitSlop}
                                 />
                             </View>
 
@@ -245,7 +242,13 @@ export default function LoginScreen() {
                                 onPress={handleGoogleSignIn}
                                 disabled={isGoogleLoading}
                                 activeScale={0.98}
-                                containerStyle={{ width: '100%', marginTop: scale(24) }}
+                                hitSlop={compactButtonHitSlop}
+                                containerStyle={{
+                                    width: '100%',
+                                    minHeight: 44,
+                                    justifyContent: 'center',
+                                    marginTop: scale(24),
+                                }}
                                 style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
@@ -279,6 +282,42 @@ export default function LoginScreen() {
                             <View style={{ width: '100%', marginTop: scale(14) }}>
                                 <GoogleConsentNotice />
                             </View>
+
+                            <PressableScale
+                                onPress={() => router.push('/(auth)/signup')}
+                                activeScale={0.98}
+                                hitSlop={compactButtonHitSlop}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('create_account')}
+                                containerStyle={{
+                                    width: '100%',
+                                    minHeight: 44,
+                                    justifyContent: 'center',
+                                    marginTop: scale(18),
+                                }}
+                                style={{
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '100%',
+                                    height: scale(40),
+                                    borderRadius: scale(20),
+                                    borderWidth: 1,
+                                    borderColor: colors.brand.text.heading,
+                                    backgroundColor: 'transparent',
+                                    paddingHorizontal: scale(20),
+                                }}
+                            >
+                                <Text
+                                    variant="body"
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.85}
+                                    className="font-body-semi text-center"
+                                    style={{ color: colors.brand.text.heading, fontSize: scale(15) }}
+                                >
+                                    {t('create_account')}
+                                </Text>
+                            </PressableScale>
                         </Animated.View>
 
                     </View>

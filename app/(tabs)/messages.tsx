@@ -48,7 +48,7 @@ import { useConnectivity } from '@/hooks/useConnectivity';
 import { CachedInbox, loadCachedInbox, saveCachedInbox } from '@/lib/chatInboxCache';
 import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
 import { useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
-import { canOpenMessaging, shouldShowMembershipPromo } from '@/lib/messagingAccess';
+import { canOpenMessaging, shouldRedactMessagingContent, shouldShowMembershipPromo } from '@/lib/messagingAccess';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 
 const TABS: Array<{ key: ConversationTab; labelKey: string; fallback: string; Icon: any }> = [
@@ -124,6 +124,10 @@ export default function MessagesScreen() {
     const [membershipPromoVisible, setMembershipPromoVisible] = useState(false);
     const inboxCacheReadyRef = useRef(false);
     const previousConnectivityRef = useRef(connectivityStatus);
+    const previewsLocked = shouldRedactMessagingContent(
+        eligibility.messagingAccess,
+        eligibility.isLoading,
+    );
 
     const colors = {
         // Warm surface so messages matches the unified warm chrome
@@ -264,9 +268,9 @@ export default function MessagesScreen() {
     }, []);
 
     useEffect(() => {
-        if (!inboxCacheReadyRef.current || !userId) return;
+        if (!inboxCacheReadyRef.current || !userId || previewsLocked) return;
         void saveCachedInbox(userId, { conversations, requests, sent, nextCursor, slots });
-    }, [conversations, nextCursor, requests, sent, slots, userId]);
+    }, [conversations, nextCursor, previewsLocked, requests, sent, slots, userId]);
 
     useEffect(() => {
         const previous = previousConnectivityRef.current;
@@ -540,6 +544,7 @@ export default function MessagesScreen() {
                         conversation={item}
                         variant={activeTab}
                         colors={colors}
+                        previewLocked={previewsLocked}
                         onPress={() => void handleOpenConversation(item)}
                         onAccept={() => runRequestAction(item, 'accept')}
                         onDecline={() => runRequestAction(item, 'decline')}
@@ -561,6 +566,7 @@ function ConversationRow({
     conversation,
     variant,
     colors,
+    previewLocked,
     onPress,
     onAccept,
     onDecline,
@@ -569,6 +575,7 @@ function ConversationRow({
     conversation: Conversation;
     variant: ConversationTab;
     colors: Record<string, string>;
+    previewLocked: boolean;
     onPress: () => void;
     onAccept: () => void;
     onDecline: () => void;
@@ -580,7 +587,9 @@ function ConversationRow({
     const initial = otherName(conversation).trim().charAt(0).toUpperCase() || '?';
     const isRequest = variant === 'requests' || variant === 'sent';
     const isDeleted = !!other.account_deleted;
-    const preview = translateChatText(conversation.lastMessagePreview || (variant === 'requests' ? 'sent_you_a_message' : ''));
+    const preview = previewLocked
+        ? t('chat:membership_required_title', 'Membership required')
+        : translateChatText(conversation.lastMessagePreview || (variant === 'requests' ? 'sent_you_a_message' : ''));
 
     return (
         <View style={[styles.rowWrap, { borderBottomColor: colors.divider }]}>

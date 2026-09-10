@@ -1,6 +1,5 @@
 import { Tabs } from "expo-router";
 import { BottomTabBar } from "@/components/app/BottomTabBar";
-import { LegalConsentGate } from "@/components/app/LegalConsentGate";
 import { usePeriodicLocationRefresh } from "@/hooks/usePeriodicLocationRefresh";
 import { AppMenuProvider } from "@/components/app/AppMenuProvider";
 import { MembershipAccessListener } from "@/components/app/MembershipAccessListener";
@@ -10,7 +9,6 @@ export default function TabsLayout() {
 
     return (
         <AppMenuProvider>
-        <LegalConsentGate />
         <MembershipAccessListener />
         <Tabs
             screenOptions={{

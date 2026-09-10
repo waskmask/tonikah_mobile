@@ -2,7 +2,7 @@ import { useThemeStore } from "@/store/themeStore";
 import { useSystemColorScheme } from "@/hooks/useSystemColorScheme";
 
 export const useTheme = () => {
-    const { mode, setMode, toggleMode } = useThemeStore();
+    const { mode, isHydrated, setMode, toggleMode } = useThemeStore();
     const systemColorScheme = useSystemColorScheme();
 
     // Compute isDark based on mode and system preference
@@ -16,6 +16,7 @@ export const useTheme = () => {
     return {
         theme: mode,
         isDark,
+        isReady: isHydrated,
         toggleTheme: toggleMode,
         setTheme: setMode,
     };

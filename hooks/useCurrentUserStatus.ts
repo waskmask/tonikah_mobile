@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import type { MessagingAccess, TrialOffer } from '@/lib/messagingAccess';
-import { accessExpiresIn, canOpenMessaging } from '@/lib/messagingAccess';
+import { accessExpiresIn, canOpenMessaging, withMessagingAccessClock } from '@/lib/messagingAccess';
 import { useAuthStore } from '@/store/authStore';
 
 export type PhotoQualificationStatus =
@@ -36,7 +36,10 @@ export async function fetchCurrentUserStatus(): Promise<CurrentUserStatus> {
     if (!response.success) {
         throw new Error(response.message || 'current_user_status_failed');
     }
-    return response as CurrentUserStatus;
+    const status = response as CurrentUserStatus;
+    return status.messagingAccess
+        ? { ...status, messagingAccess: withMessagingAccessClock(status.messagingAccess) }
+        : status;
 }
 
 export function useCurrentUserStatus() {

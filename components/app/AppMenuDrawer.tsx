@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -10,12 +10,9 @@ import {
     Languages,
     LifeBuoy,
     LogOut,
-    Monitor,
-    Moon,
     PencilLine,
     Settings,
     Sparkles,
-    Sun,
     User,
     X,
 } from 'lucide-react-native';
@@ -61,7 +58,7 @@ function textValue(value: unknown, fallback: string) {
 
 export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
     const { t, isRTL } = useLanguage();
-    const { isDark, theme, setTheme } = useTheme();
+    const { isDark } = useTheme();
     const { logout, isLoading } = useAuthStore();
     const pathname = usePathname();
     const reduceMotion = useReducedMotion();
@@ -88,10 +85,10 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     const surfaceColor = isDark ? '#1B1713' : '#FFFFFF';
     const borderColor = isDark ? '#3A332B' : '#E8E8E6';
     const headingColor = isDark ? '#E8E1D6' : '#241E17';
-    const mutedColor = isDark ? '#A99C8D' : '#6F746F';
     const overlayColor = isDark ? 'rgba(2, 6, 23, 0.58)' : 'rgba(24, 19, 14, 0.45)';
 
     const navigate = (href: Href) => {
+        if (isLoading) return;
         onClose();
         requestAnimationFrame(() => {
             if (href === '/(tabs)/edit-profile') {
@@ -106,9 +103,8 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     };
 
     const handleLogout = async () => {
-        onClose();
+        if (isLoading) return;
         await logout();
-        router.replace('/(auth)/login');
     };
 
     return (
@@ -118,11 +114,13 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
             animationType="none"
             statusBarTranslucent
             onShow={() => completeInteraction('drawer', 'visible')}
-            onRequestClose={onClose}
+            onRequestClose={() => {
+                if (!isLoading) onClose();
+            }}
         >
             <View style={styles.modalRoot}>
                 <Animated.View style={[styles.overlay, { backgroundColor: overlayColor }, overlayStyle]}>
-                    <Pressable style={styles.overlayPressable} onPress={onClose} />
+                    <Pressable style={styles.overlayPressable} onPress={onClose} disabled={isLoading} />
                 </Animated.View>
                 <AnimatedSafeAreaView
                     edges={['top', 'bottom']}
@@ -146,7 +144,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                         >
                             {textValue(t('menu'), 'Menu')}
                         </Text>
-                        <Pressable onPress={onClose} style={styles.closeButton} hitSlop={10}>
+                        <Pressable onPress={onClose} disabled={isLoading} style={styles.closeButton} hitSlop={10}>
                             <X size={24} color={headingColor} strokeWidth={2.1} />
                         </Pressable>
                     </View>
@@ -155,6 +153,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                         <MenuRow
                             icon={User}
                             label={textValue(t('my_profile'), 'My profile')}
+                            disabled={isLoading}
                             onPress={() => navigate('/(tabs)/profile')}
                         />
 
@@ -163,6 +162,7 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                                 key={item.labelKey}
                                 icon={item.icon}
                                 label={textValue(t(item.labelKey), item.fallback)}
+                                disabled={isLoading}
                                 onPress={() => navigate(item.href)}
                             />
                         ))}
@@ -172,26 +172,19 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
                                 key={item.labelKey}
                                 icon={item.icon}
                                 label={textValue(t(item.labelKey), item.fallback)}
+                                disabled={isLoading}
                                 onPress={() => navigate(item.href)}
                             />
                         ))}
                     </ScrollView>
 
                     <View style={[styles.footer, { borderTopColor: borderColor }]}>
-                        <View style={[styles.themeRow, { flexDirection: 'row' }]}>
-                            <Text variant="body-sm" className="font-body-semi" style={[styles.themeLabel, { color: mutedColor }]}>
-                                {textValue(t('theme'), 'Theme')}
-                            </Text>
-                            <View style={[styles.themeSegment, { backgroundColor: isDark ? '#211D18' : '#F3F3F1', flexDirection: 'row' }]}>
-                                <ThemeButton active={theme === 'light'} icon={Sun} onPress={() => setTheme('light')} />
-                                <ThemeButton active={theme === 'dark'} icon={Moon} onPress={() => setTheme('dark')} />
-                                <ThemeButton active={theme === 'system'} icon={Monitor} onPress={() => setTheme('system')} />
-                            </View>
-                        </View>
                         <MenuRow
                             icon={LogOut}
                             label={isLoading ? textValue(t('please_wait'), 'Please wait') : textValue(t('logout'), 'Logout')}
                             danger
+                            disabled={isLoading}
+                            loading={isLoading}
                             onPress={handleLogout}
                         />
                     </View>
@@ -201,40 +194,20 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     );
 }
 
-function ThemeButton({ active, icon: Icon, onPress }: { active: boolean; icon: LucideIcon; onPress: () => void }) {
-    const { isDark } = useTheme();
-    const iconColor = active ? (isDark ? '#E8E1D6' : '#241E17') : isDark ? '#A99C8D' : '#6F746F';
-
-    return (
-        <Pressable
-            onPress={onPress}
-            style={[
-                styles.themeButton,
-                active && {
-                    backgroundColor: isDark ? '#3A332B' : '#FFFFFF',
-                    shadowColor: '#000000',
-                    shadowOpacity: isDark ? 0 : 0.08,
-                    shadowRadius: scale(8),
-                    shadowOffset: { width: 0, height: 2 },
-                    elevation: 2,
-                },
-            ]}
-        >
-            <Icon size={scale(18)} color={iconColor} strokeWidth={1.9} />
-        </Pressable>
-    );
-}
-
 function MenuRow({
     icon: Icon,
     label,
     onPress,
     danger = false,
+    disabled = false,
+    loading = false,
 }: {
     icon: LucideIcon;
     label: string;
     onPress: () => void;
     danger?: boolean;
+    disabled?: boolean;
+    loading?: boolean;
 }) {
     const { isDark } = useTheme();
     const { currentLanguage, isRTL } = useLanguage();
@@ -244,6 +217,10 @@ function MenuRow({
     return (
         <Pressable
             onPress={onPress}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ disabled, busy: loading }}
             style={({ pressed }) => [
                 styles.menuRow,
                 pressed && { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(37,50,43,0.04)' },
@@ -251,7 +228,11 @@ function MenuRow({
         >
             <View style={[styles.rowContent, { flexDirection: 'row' }]}>
                 <View style={[styles.iconSlot, isRTL ? styles.iconSlotRtl : styles.iconSlotLtr]}>
-                    <Icon size={20} color={color} strokeWidth={1.85} />
+                    {loading ? (
+                        <ActivityIndicator size="small" color={color} />
+                    ) : (
+                        <Icon size={20} color={color} strokeWidth={1.85} />
+                    )}
                 </View>
                 <Text
                     variant="body"
@@ -339,31 +320,7 @@ const styles = StyleSheet.create({
     footer: {
         borderTopWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: scale(24),
-        paddingTop: scale(16),
+        paddingTop: scale(8),
         paddingBottom: scale(18),
-    },
-    themeRow: {
-        minHeight: scale(50),
-        alignItems: 'center',
-        gap: scale(12),
-        marginBottom: scale(8),
-    },
-    themeLabel: {
-        flex: 1,
-        fontSize: 14,
-        lineHeight: 18,
-    },
-    themeSegment: {
-        borderRadius: scale(999),
-        padding: scale(4),
-        alignItems: 'center',
-        gap: scale(2),
-    },
-    themeButton: {
-        width: scale(36),
-        height: scale(36),
-        borderRadius: scale(18),
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 });

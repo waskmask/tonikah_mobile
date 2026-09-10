@@ -201,6 +201,8 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         borderColor={colors.brand.bg.border}
                         cardColor={colors.chrome.common.card}
                         mutedColor={colors.chrome.common.textMuted}
+                        presentation="band"
+                        isRTL={isRTL}
                     />
                     <RangeRow
                         label={t('height', 'Height')}
@@ -219,6 +221,8 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         borderColor={colors.brand.bg.border}
                         cardColor={colors.chrome.common.card}
                         mutedColor={colors.chrome.common.textMuted}
+                        presentation="band"
+                        isRTL={isRTL}
                     />
                     {(Object.keys(LABELS) as FilterSelectKey[]).map((key) => (
                         <SelectRow
@@ -229,7 +233,6 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                             isRTL={isRTL}
                             primaryColor={colors.chrome.primary}
                             borderColor={colors.brand.bg.border}
-                            cardColor={colors.chrome.common.card}
                             mutedColor={colors.chrome.common.textSubtle}
                             onOpen={() => openSelect(key)}
                             onClear={() => updateSelect(key, [])}
@@ -273,7 +276,6 @@ function SelectRow({
     isRTL,
     primaryColor,
     borderColor,
-    cardColor,
     mutedColor,
     onOpen,
     onClear,
@@ -284,7 +286,6 @@ function SelectRow({
     isRTL: boolean;
     primaryColor: string;
     borderColor: string;
-    cardColor: string;
     mutedColor: string;
     onOpen: () => void;
     onClear: () => void;
@@ -293,13 +294,27 @@ function SelectRow({
         ? values.map((value) => options.find((item) => item.value === value)?.label || value).join(', ')
         : t('no_preference', 'No preference');
     return (
-        <Pressable onPress={onOpen} style={[styles.row, { backgroundColor: cardColor, borderColor, flexDirection: 'row' }]}>
-            <View style={{ flex: 1 }}>
+        <Pressable
+            onPress={onOpen}
+            accessibilityRole="button"
+            accessibilityLabel={`${label}, ${text}`}
+            style={[styles.row, { borderColor }]}
+        >
+            <View style={styles.rowText}>
                 <Text variant="body-sm" className="font-body-bold" style={[styles.selectTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
                 <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? primaryColor : mutedColor, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
             </View>
             {values.length > 0 ? (
-                <Pressable onPress={onClear} style={styles.rowIcon}>
+                <Pressable
+                    onPress={(event) => {
+                        event.stopPropagation();
+                        onClear();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('clear', 'Clear')} ${label}`}
+                    hitSlop={6}
+                    style={styles.rowIcon}
+                >
                     <X size={16} color={primaryColor} />
                 </Pressable>
             ) : (
@@ -334,20 +349,26 @@ const styles = StyleSheet.create({
     },
     title: { fontSize: 14, lineHeight: 18, textAlign: 'center' },
     closeButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-    content: { padding: 12, gap: 9, paddingBottom: 18 },
+    content: { paddingBottom: 18 },
     row: {
-        borderWidth: 1,
-        borderRadius: 8,
-        minHeight: 76,
-        paddingHorizontal: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        minHeight: 72,
+        paddingHorizontal: 16,
         paddingVertical: 12,
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    rowText: {
+        flex: 1,
+        minWidth: 0,
     },
     rowIcon: {
-        width: 32,
-        height: 32,
+        width: 44,
+        height: 44,
+        marginTop: -6,
+        marginHorizontal: -6,
+        flexShrink: 0,
         alignItems: 'center',
         justifyContent: 'center',
     },

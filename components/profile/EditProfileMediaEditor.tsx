@@ -99,12 +99,6 @@ export function ProfileMediaEditor({
     const surface = colors.chrome.common.card;
     const mutedSurface = colors.brand.bg.surface;
     const mutedText = colors.brand.text.subtitle;
-    const hasActiveModeration = gallery.some((item) =>
-        isGalleryModerationActive(item.moderationMeta?.status),
-    );
-    const hasPendingReview = gallery.some(
-        (item) => item.safe === false && !isGalleryModerationActive(item.moderationMeta?.status),
-    );
     const busy =
         loading ||
         busySlot !== null ||
@@ -433,7 +427,37 @@ export function ProfileMediaEditor({
                                 ) : null}
 
                                 {item && (checking || underReview) ? (
-                                    <View
+                                    <Pressable
+                                        onPress={(event) => {
+                                            event.stopPropagation();
+                                            const title = checking
+                                                ? t('image_moderation_checking', 'Checking photo')
+                                                : t('moderation_text_under_review', 'Under review');
+                                            const hint = checking
+                                                ? t(
+                                                    'image_moderation_checking_hint',
+                                                    'Automatic safety check in progress. You can continue using the app.',
+                                                )
+                                                : t(
+                                                    'image_moderation_pending_hint',
+                                                    'This photo is waiting for review and is hidden from other members.',
+                                                );
+                                            showToast(`${title}\n${hint}`, 'warning', 5000);
+                                        }}
+                                        accessibilityRole="button"
+                                        hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                                        accessibilityLabel={checking
+                                            ? t('image_moderation_checking', 'Checking photo')
+                                            : t('moderation_text_under_review', 'Under review')}
+                                        accessibilityHint={checking
+                                            ? t(
+                                                'image_moderation_checking_hint',
+                                                'Automatic safety check in progress. You can continue using the app.',
+                                            )
+                                            : t(
+                                                'image_moderation_pending_hint',
+                                                'This photo is waiting for review and is hidden from other members.',
+                                            )}
                                         style={[
                                             styles.moderationBadge,
                                             { backgroundColor: warningColors.bg },
@@ -460,7 +484,7 @@ export function ProfileMediaEditor({
                                                 ? t('image_moderation_checking', 'Checking photo')
                                                 : t('moderation_text_under_review', 'Under review')}
                                         </Text>
-                                    </View>
+                                    </Pressable>
                                 ) : null}
 
                                 {item ? (
@@ -509,42 +533,6 @@ export function ProfileMediaEditor({
                     })}
                 </View>
             )}
-
-            {hasActiveModeration || hasPendingReview ? (
-                <View
-                    style={[
-                        styles.moderationNotice,
-                        {
-                            backgroundColor: warningColors.bg,
-                            borderColor: warningColors.border,
-                        },
-                    ]}
-                >
-                    {hasActiveModeration ? (
-                        <ActivityIndicator size="small" color={warningColors.icon} />
-                    ) : (
-                        <AlertCircle size={scale(20)} color={warningColors.icon} />
-                    )}
-                    <View style={styles.noticeCopy}>
-                        <Text variant="body-sm" className="font-body-semi" style={{ color: warningColors.text }}>
-                            {hasActiveModeration
-                                ? t('image_moderation_checking', 'Checking photo')
-                                : t('moderation_text_under_review', 'Under review')}
-                        </Text>
-                        <Text variant="caption" style={{ color: warningColors.text }}>
-                            {hasActiveModeration
-                                ? t(
-                                    'image_moderation_checking_hint',
-                                    'Automatic safety check in progress. You can continue using the app.',
-                                )
-                                : t(
-                                    'image_moderation_pending_hint',
-                                    'This photo is waiting for review and is hidden from other members.',
-                                )}
-                        </Text>
-                    </View>
-                </View>
-            ) : null}
 
             {requiredError ? (
                 <Text variant="caption" style={{ color: colors.brand.accent.error }}>
@@ -767,20 +755,6 @@ const styles = StyleSheet.create({
     },
     deleteSpinner: {
         transform: [{ scale: 0.78 }],
-    },
-    moderationNotice: {
-        minHeight: scale(76),
-        borderWidth: 1,
-        borderRadius: scale(10),
-        paddingHorizontal: scale(12),
-        paddingVertical: scale(11),
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: scale(10),
-    },
-    noticeCopy: {
-        flex: 1,
-        gap: scale(3),
     },
     privacyRow: {
         minHeight: scale(84),

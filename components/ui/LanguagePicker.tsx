@@ -15,20 +15,9 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
 import { ChevronDown, Check, Languages } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SUPPORTED_APP_LANGUAGES } from '@/lib/languageNames';
 
-const LANGUAGES = [
-    { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'ar', name: 'العربية', flag: '🇸🇦' },
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'id', name: 'Bahasa Indonesia', flag: '🇮🇩' },
-    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-    { code: 'pl', name: 'Polski', flag: '🇵🇱' },
-    { code: 'pt', name: 'Português', flag: '🇵🇹' },
-    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-    { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
-];
+const LANGUAGES = SUPPORTED_APP_LANGUAGES;
 
 type LanguagePickerProps = {
     variant?: 'default' | 'icon';

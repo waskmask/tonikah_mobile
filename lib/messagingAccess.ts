@@ -9,6 +9,7 @@ export type MessagingAccess = {
     billingMode?: 'one_time' | 'recurring';
     autoRenew?: boolean;
     renewalStatus?: string | null;
+    clientClockOffsetMs?: number;
 };
 
 export type TrialOffer = {
@@ -17,24 +18,46 @@ export type TrialOffer = {
     durationDays: number;
 };
 
+export function withMessagingAccessClock(
+    access: MessagingAccess,
+    receivedAt = Date.now(),
+): MessagingAccess {
+    if (Number.isFinite(access.clientClockOffsetMs)) return access;
+    const evaluated = new Date(access.evaluatedAt).getTime();
+    return {
+        ...access,
+        clientClockOffsetMs: Number.isFinite(evaluated) ? evaluated - receivedAt : 0,
+    };
+}
+
+function serverNow(access: MessagingAccess, now: number) {
+    const offset = Number(access.clientClockOffsetMs);
+    return now + (Number.isFinite(offset) ? offset : 0);
+}
+
 export function canOpenMessaging(access?: MessagingAccess | null, now = Date.now()) {
     if (!access) return false;
     if (!access.required) return true;
     if (!access.allowed || !access.membershipActive) return false;
-    const evaluated = new Date(access.evaluatedAt).getTime();
     const expires = access.validUntil ? new Date(access.validUntil).getTime() : NaN;
     if (!Number.isFinite(expires)) return false;
-    const serverOffset = Number.isFinite(evaluated) ? evaluated - now : 0;
-    return now + serverOffset < expires;
+    return serverNow(access, now) < expires;
 }
 
 export function accessExpiresIn(access?: MessagingAccess | null, now = Date.now()) {
     if (!access?.validUntil) return null;
-    const evaluated = new Date(access.evaluatedAt).getTime();
     const expires = new Date(access.validUntil).getTime();
     if (!Number.isFinite(expires)) return null;
-    const serverOffset = Number.isFinite(evaluated) ? evaluated - now : 0;
-    return Math.max(0, expires - (now + serverOffset));
+    return Math.max(0, expires - serverNow(access, now));
+}
+
+export function shouldRedactMessagingContent(
+    access?: MessagingAccess | null,
+    statusLoading = false,
+    now = Date.now(),
+) {
+    if (statusLoading || !access) return true;
+    return access.required && !canOpenMessaging(access, now);
 }
 
 const promoKey = (userId: string) => `membership-message-promo:${userId}`;

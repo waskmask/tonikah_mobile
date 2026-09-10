@@ -29,6 +29,28 @@ function flat(obj, prefix = "") {
   return out;
 }
 
+const cp1252Bytes = new Map([
+  ["€", 0x80], ["‚", 0x82], ["ƒ", 0x83], ["„", 0x84], ["…", 0x85],
+  ["†", 0x86], ["‡", 0x87], ["ˆ", 0x88], ["‰", 0x89], ["Š", 0x8a],
+  ["‹", 0x8b], ["Œ", 0x8c], ["Ž", 0x8e], ["‘", 0x91], ["’", 0x92],
+  ["“", 0x93], ["”", 0x94], ["•", 0x95], ["–", 0x96], ["—", 0x97],
+  ["˜", 0x98], ["™", 0x99], ["š", 0x9a], ["›", 0x9b], ["œ", 0x9c],
+  ["ž", 0x9e], ["Ÿ", 0x9f],
+]);
+
+function recoverMojibake(value) {
+  if (typeof value !== "string") return value;
+  const bytes = [];
+  for (const char of value) {
+    const code = char.codePointAt(0);
+    if (code <= 0xff) bytes.push(code);
+    else if (cp1252Bytes.has(char)) bytes.push(cp1252Bytes.get(char));
+    else return value;
+  }
+  const candidate = Buffer.from(bytes).toString("utf8");
+  return candidate.includes("\uFFFD") ? value : candidate;
+}
+
 const namespaces = ["common", "chat", "countries", "nationalities", "designations", "ethnic_group", "ethnic_groups", "languages"];
 const langs = fs.readdirSync(path.join(root, "locales")).filter((d) => fs.statSync(path.join(root, "locales", d)).isDirectory());
 
@@ -94,6 +116,23 @@ for (const ns of namespaces) {
     }
   }
 }
+
+console.log("\n=== MOJIBAKE AUDIT");
+let mojibakeCount = 0;
+for (const ns of namespaces) {
+  for (const lang of langs) {
+    const p = path.join(root, "locales", lang, `${ns}.json`);
+    if (!fs.existsSync(p)) continue;
+    const values = flat(readJson(p));
+    for (const [key, value] of Object.entries(values)) {
+      if (recoverMojibake(value) === value) continue;
+      mojibakeCount += 1;
+      if (mojibakeCount <= 30) console.log(`${lang}/${ns}:${key}`);
+    }
+  }
+}
+console.log(`Detected ${mojibakeCount} recoverable mojibake values`);
+if (mojibakeCount > 0) hasErrors = true;
 
 console.log("\n=== COMMON.JSON TOP MISSING KEY PREFIXES (ar sample)");
 const arCommon = flat(readJson(path.join(root, "locales/ar/common.json")));

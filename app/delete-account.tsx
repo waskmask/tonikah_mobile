@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
 import { Trash2, X } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
@@ -61,7 +60,6 @@ export default function DeleteAccountScreen() {
         if (result.success) {
             toast.show(apiMessage(result.message || 'account_deleted'), 'success', 3000);
             await logout();
-            router.replace('/(auth)/login' as any);
             return;
         }
         setDeleting(false);

@@ -110,7 +110,6 @@ export default function SettingsAccountScreen() {
                         setLoggingOutAll(false);
                         if (result.success) {
                             toast.show(t('all_sessions_revoked', 'You have been logged out on all devices.'), 'success', 3000);
-                            router.replace('/(auth)/login');
                             return;
                         }
                         toast.show(t('all_sessions_revoke_failed', 'Could not log out all devices. Please try again.'), 'error', 3500);

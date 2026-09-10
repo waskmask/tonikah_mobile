@@ -18,7 +18,7 @@ export interface ApiResponse<T = any> {
     [key: string]: any; // Catch-all for extra top-level fields like `user` or `accessToken`
 }
 
-type RefreshResult = {
+export type RefreshResult = {
     accessToken: string | null;
     reason?: 'unauthorized' | 'network_error';
 };
@@ -37,6 +37,7 @@ let unauthorizedPromise: Promise<void> | null = null;
 let tokenCache: StoredTokens | null = null;
 let tokenHydrationPromise: Promise<StoredTokens> | null = null;
 let tokenCacheGeneration = 0;
+let terminalSessionHandled = false;
 
 const readStoredTokens = async (): Promise<StoredTokens> => {
     if (tokenCache) return tokenCache;
@@ -65,6 +66,7 @@ const addRefreshSubscriber = (cb: (result: RefreshResult) => void) => {
 };
 
 const clearStoredTokens = async () => {
+    terminalSessionHandled = true;
     tokenCacheGeneration += 1;
     tokenCache = { accessToken: null, refreshToken: null };
     tokenHydrationPromise = null;
@@ -85,6 +87,10 @@ const notifyUnauthorized = async () => {
 };
 
 const handleTerminalUnauthorized = async (): Promise<RefreshResult> => {
+    if (terminalSessionHandled) {
+        return { accessToken: null, reason: 'unauthorized' };
+    }
+    terminalSessionHandled = true;
     await clearStoredTokens();
     await notifyUnauthorized();
     return { accessToken: null, reason: 'unauthorized' };
@@ -151,11 +157,7 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
 };
 
 const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
-    const { refreshToken } = await readStoredTokens();
-
-    if (!refreshToken) {
-        return handleTerminalUnauthorized();
-    }
+    if (terminalSessionHandled) return { accessToken: null, reason: 'unauthorized' };
 
     if (isRefreshing) {
         return new Promise(resolve => {
@@ -164,9 +166,30 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
     }
 
     isRefreshing = true;
+    const refreshGeneration = tokenCacheGeneration;
     let result: RefreshResult = { accessToken: null, reason: 'network_error' };
 
     try {
+        const { refreshToken } = await readStoredTokens();
+
+        // Logout or a newer login won while SecureStore was being read.
+        if (refreshGeneration !== tokenCacheGeneration || terminalSessionHandled) {
+            result = { accessToken: null, reason: 'unauthorized' };
+            return result;
+        }
+
+        if (!refreshToken) {
+            if (__DEV__) {
+                console.warn('[Auth] Refresh rejected', {
+                    endpoint: '/app-user/mobile/refresh',
+                    status: null,
+                    reason: 'missing_refresh_token',
+                });
+            }
+            result = await handleTerminalUnauthorized();
+            return result;
+        }
+
         recordApiRequest('/app-user/mobile/refresh');
         const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
             method: 'POST',
@@ -181,15 +204,38 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
         const refreshData = await refreshRes.json().catch(() => ({}));
 
         if (refreshRes.ok && refreshData.success && refreshData.accessToken) {
-            await api.setTokens(refreshData.accessToken, refreshData.refreshToken || refreshToken);
-            result = { accessToken: refreshData.accessToken };
+            // Never let a late refresh response resurrect a session after logout
+            // or overwrite tokens from a newer login.
+            if (refreshGeneration === tokenCacheGeneration && !terminalSessionHandled) {
+                await api.setTokens(refreshData.accessToken, refreshData.refreshToken || refreshToken);
+                result = { accessToken: refreshData.accessToken };
+            } else {
+                result = { accessToken: null, reason: 'unauthorized' };
+            }
         } else if (refreshRes.status === 401 || refreshRes.status === 403) {
-            result = await handleTerminalUnauthorized();
+            if (refreshGeneration !== tokenCacheGeneration || terminalSessionHandled) {
+                result = { accessToken: null, reason: 'unauthorized' };
+            } else {
+                if (__DEV__) {
+                    console.warn('[Auth] Refresh rejected', {
+                        endpoint: '/app-user/mobile/refresh',
+                        status: refreshRes.status,
+                        reason: typeof refreshData.message === 'string'
+                            ? refreshData.message
+                            : 'unauthorized',
+                    });
+                }
+                result = await handleTerminalUnauthorized();
+            }
         }
     } catch {
-        // Keep credentials on transient network/provider failures. A later request can retry.
-        connectivity.markOffline();
-        result = { accessToken: null, reason: 'network_error' };
+        if (refreshGeneration !== tokenCacheGeneration || terminalSessionHandled) {
+            result = { accessToken: null, reason: 'unauthorized' };
+        } else {
+            // Keep credentials on transient network/provider failures. A later request can retry.
+            connectivity.markOffline();
+            result = { accessToken: null, reason: 'network_error' };
+        }
     } finally {
         isRefreshing = false;
         onRefreshed(result);
@@ -333,6 +379,7 @@ export const api = {
     delete: (endpoint: string) => apiRequest(endpoint, { method: 'DELETE' }),
     deleteWithBody: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'DELETE', body: JSON.stringify(body) }),
     setTokens: async (access: string, refresh: string) => {
+        terminalSessionHandled = false;
         tokenCacheGeneration += 1;
         tokenCache = { accessToken: access, refreshToken: refresh };
         tokenHydrationPromise = null;
@@ -340,6 +387,7 @@ export const api = {
     },
     getTokens: readStoredTokens,
     refreshAccessToken,
+    refreshSession: refreshAccessTokenResult,
     handleUnauthorized: async () => {
         await handleTerminalUnauthorized();
     },
