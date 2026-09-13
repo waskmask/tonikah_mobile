@@ -142,7 +142,7 @@ export function useExploreLocationGate() {
             }
 
             let permission = await Location.getForegroundPermissionsAsync();
-            if (permission.status === Location.PermissionStatus.UNDETERMINED && permission.canAskAgain) {
+            if (permission.status !== Location.PermissionStatus.GRANTED && permission.canAskAgain) {
                 permission = await Location.requestForegroundPermissionsAsync();
             }
             if (permission.status !== Location.PermissionStatus.GRANTED) {

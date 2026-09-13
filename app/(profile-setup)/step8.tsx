@@ -203,14 +203,43 @@ export default function Step8() {
         }
     };
 
+    const requestDeviceLocationServices = async () => {
+        if (Platform.OS !== 'android') {
+            await Linking.openSettings();
+            return;
+        }
+
+        try {
+            await Location.enableNetworkProviderAsync();
+            await detectCurrentLocation();
+        } catch {
+            // Declining the native prompt should leave the recovery state visible.
+        }
+    };
+
     const openLocationSettings = async () => {
-        if (locationRecovery === 'services_disabled' && Platform.OS === 'android') {
+        if (locationRecovery === 'services_disabled') {
+            await requestDeviceLocationServices();
+            return;
+        }
+
+        if (locationRecovery === 'permission_denied') {
             try {
-                await Location.enableNetworkProviderAsync();
-                await detectCurrentLocation();
-                return;
+                const permission = await Location.getForegroundPermissionsAsync();
+                if (permission.status !== Location.PermissionStatus.GRANTED && permission.canAskAgain) {
+                    const requested = await Location.requestForegroundPermissionsAsync();
+                    if (requested.status === Location.PermissionStatus.GRANTED) {
+                        await detectCurrentLocation();
+                    }
+                    return;
+                }
+
+                if (permission.status === Location.PermissionStatus.GRANTED) {
+                    await detectCurrentLocation();
+                    return;
+                }
             } catch {
-                // Fall through to the app settings when the native prompt is unavailable.
+                // App settings is the remaining route when Android blocks another prompt.
             }
         }
 
@@ -218,10 +247,34 @@ export default function Step8() {
             await Linking.openSettings();
         } catch {
             toast.show(
-                t('common:device_location_services_disabled', { defaultValue: 'Please turn on device location services and try again.' }),
+                t('common:location_permission_required', { defaultValue: 'Location permission is required to continue.' }),
                 'error',
             );
         }
+    };
+
+    const retryLocationAccess = async () => {
+        if (locationRecovery === 'services_disabled') {
+            await requestDeviceLocationServices();
+            return;
+        }
+
+        if (locationRecovery === 'permission_denied') {
+            try {
+                const permission = await Location.getForegroundPermissionsAsync();
+                if (permission.status !== Location.PermissionStatus.GRANTED && permission.canAskAgain) {
+                    const requested = await Location.requestForegroundPermissionsAsync();
+                    if (requested.status === Location.PermissionStatus.GRANTED) {
+                        await detectCurrentLocation();
+                    }
+                    return;
+                }
+            } catch {
+                // The standard retry below preserves the current recovery state.
+            }
+        }
+
+        await detectCurrentLocation();
     };
 
     const recoveryMessage = locationRecovery
@@ -325,7 +378,7 @@ export default function Step8() {
                                 ),
                                 {
                                     label: t('btn_try_again', { defaultValue: 'Try Again' }),
-                                    onPress: detectCurrentLocation,
+                                    onPress: retryLocationAccess,
                                     variant: 'secondary' as const,
                                     disabled: detectingLocation,
                                     loading: detectingLocation,

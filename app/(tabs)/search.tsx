@@ -57,18 +57,75 @@ export default function ExploreScreen() {
     const { openMenu } = useAppMenu();
     const { state: locationState, retry: retryLocation, retrying: locationRetrying } = useExploreLocationGate();
 
+    const requestDeviceLocationServices = useCallback(async () => {
+        if (Platform.OS !== 'android') {
+            await Linking.openSettings();
+            return;
+        }
+
+        try {
+            await Location.enableNetworkProviderAsync();
+            await retryLocation();
+        } catch {
+            // Declining the native prompt should leave the user on this recovery screen.
+        }
+    }, [retryLocation]);
+
     const openLocationSettings = useCallback(async () => {
-        if (locationState === 'services_disabled' && Platform.OS === 'android') {
+        if (locationState === 'services_disabled') {
+            await requestDeviceLocationServices();
+            return;
+        }
+
+        if (locationState === 'permission_denied') {
             try {
-                await Location.enableNetworkProviderAsync();
-                await retryLocation();
-                return;
+                const permission = await Location.getForegroundPermissionsAsync();
+                if (permission.status !== Location.PermissionStatus.GRANTED && permission.canAskAgain) {
+                    const requested = await Location.requestForegroundPermissionsAsync();
+                    if (requested.status === Location.PermissionStatus.GRANTED) {
+                        await retryLocation();
+                    }
+                    return;
+                }
+
+                if (permission.status === Location.PermissionStatus.GRANTED) {
+                    await retryLocation();
+                    return;
+                }
             } catch {
-                // Fall through to app settings when Android cannot show its location prompt.
+                // When Android cannot request again, app settings is the only recovery route.
+            }
+
+            await Linking.openSettings();
+            return;
+        }
+
+        await Linking.openSettings();
+    }, [locationState, requestDeviceLocationServices, retryLocation]);
+
+    const retryLocationAccess = useCallback(async () => {
+        if (locationState === 'services_disabled') {
+            await requestDeviceLocationServices();
+            return;
+        }
+
+        if (locationState === 'permission_denied') {
+            try {
+                const permission = await Location.getForegroundPermissionsAsync();
+                if (permission.status !== Location.PermissionStatus.GRANTED && permission.canAskAgain) {
+                    const requested = await Location.requestForegroundPermissionsAsync();
+                    if (requested.status === Location.PermissionStatus.GRANTED) {
+                        await retryLocation();
+                    }
+                    return;
+                }
+            } catch {
+                // The regular retry below keeps the current recovery state visible.
             }
         }
-        await Linking.openSettings();
-    }, [locationState, retryLocation]);
+
+        await retryLocation();
+    }, [locationState, requestDeviceLocationServices, retryLocation]);
     const user = useAuthStore((state) => state.user);
     const refreshUser = useAuthStore((state) => state.refreshUser);
     const emailVerified = Boolean(user?.email_verified ?? user?.emailVerified);
@@ -360,12 +417,12 @@ export default function ExploreScreen() {
                     ) : (
                         <EmptyState
                             icon={<MapPin size={scale(30)} color={palette.chrome.primary} strokeWidth={1.8} />}
-                            title={t('explore_location_required_title', 'Location is needed for Explore')}
+                            title={t('explore_location_required_title', 'Location access is required')}
                             description={
                                 locationState === 'permission_denied'
-                                    ? t('explore_location_permission_denied', 'Allow location access in Settings to discover relevant profiles.')
+                                    ? t('explore_location_permission_denied', 'Allow location access to continue to Explore. This is required to verify your current city.')
                                     : locationState === 'services_disabled'
-                                        ? t('explore_location_services_disabled', 'Turn on device location services to use Explore.')
+                                        ? t('explore_location_services_disabled', 'Turn on device location to continue. Explore is unavailable while location is off.')
                                         : locationState === 'network_error'
                                             ? t('explore_location_network_error', 'We could not verify your location. Check your connection and try again.')
                                             : t('explore_location_unavailable', 'We could not get your current location. Move to an open area and try again.')
@@ -378,7 +435,7 @@ export default function ExploreScreen() {
                                     label: locationRetrying
                                         ? t('please_wait', 'Please wait...')
                                         : t('btn_try_again', 'Try Again'),
-                                    onPress: () => void retryLocation(),
+                                    onPress: () => void retryLocationAccess(),
                                     variant: 'secondary' as const,
                                     disabled: locationRetrying,
                                     loading: locationRetrying,

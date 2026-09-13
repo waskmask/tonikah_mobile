@@ -25,6 +25,7 @@ import {
   Languages,
   Lock,
   MapPin,
+  Mic,
   Moon,
   Plane,
   Puzzle,
@@ -41,7 +42,7 @@ import {
 import { AppBackTitleBar } from "@/components/app/AppBackTitleBar";
 import { EditProfileMediaEditor } from "@/components/profile/EditProfileMediaEditor";
 import { ProfileCompletionBar } from "@/components/profile/ProfileCompletionBar";
-import { ProfileSummaryEditor } from "@/components/profile/ProfileSummaryEditor";
+import { ProfileSummaryEditor, type ProfileSummaryEditorHandle } from "@/components/profile/ProfileSummaryEditor";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { IncomeEditSheet } from "@/components/ui/IncomeEditSheet";
 import { MultiSelectOption, MultiSelectSheet } from "@/components/ui/MultiSelectSheet";
@@ -52,9 +53,11 @@ import { COUNTRY_OPTIONS, LANGUAGE_OPTIONS, NATIONALITY_OPTIONS } from "@/consta
 import { Typography } from "@/constants/typography";
 import { useEmailVerificationGuard } from "@/hooks/useEmailVerificationGuard";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useMasterdataLists } from "@/hooks/useMasterdataLists";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
+import { useUnsavedNavigationGuard } from "@/hooks/useUnsavedNavigationGuard";
 import { type GalleryItem, type GalleryPrivacy, type GalleryResponse } from "@/lib/galleryService";
 import {
   buildMissingImpactGroups,
@@ -432,9 +435,12 @@ export default function EditProfileScreen() {
     cachedProfile?.annual_income?.currency || "USD",
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [masterdata, setMasterdata] = useState<Record<string, any[]>>(() =>
-    queryClient.getQueryData<Record<string, any[]>>(queryKeys.masterdata.editProfile(currentLanguage)) || {},
-  );
+  const {
+    data: masterdata,
+    statusByType: masterdataStatus,
+    retry: retryMasterdata,
+    revalidate: revalidateMasterdata,
+  } = useMasterdataLists(MASTER_TYPES, currentLanguage);
   const [activeSingleField, setActiveSingleField] = useState<string | null>(null);
   const [activeMultiField, setActiveMultiField] = useState<string | null>(null);
   const [companySheetOpen, setCompanySheetOpen] = useState(false);
@@ -445,8 +451,45 @@ export default function EditProfileScreen() {
   const [loading, setLoading] = useState(!cachedProfile);
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
+  const [summaryDirty, setSummaryDirty] = useState(false);
+  const [summaryConfirmSaving, setSummaryConfirmSaving] = useState(false);
+  const [summaryDiscarding, setSummaryDiscarding] = useState(false);
+  const summaryEditorRef = useRef<ProfileSummaryEditorHandle>(null);
   const initialLoadStartedRef = useRef(false);
   const hasCachedProfileRef = useRef(Boolean(cachedProfile));
+  const leaveEditProfile = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace(returnHref as any);
+  }, [returnHref]);
+  const summaryNavigation = useUnsavedNavigationGuard({
+    dirty: summaryDirty,
+    leaveFallback: leaveEditProfile,
+  });
+
+  const saveSummaryAndLeave = useCallback(async () => {
+    if (summaryConfirmSaving) return;
+    setSummaryConfirmSaving(true);
+    try {
+      const saved = await summaryEditorRef.current?.save();
+      if (saved) summaryNavigation.leave();
+      else summaryNavigation.stay();
+    } finally {
+      setSummaryConfirmSaving(false);
+    }
+  }, [summaryConfirmSaving, summaryNavigation]);
+
+  const discardSummaryAndLeave = useCallback(() => {
+    if (summaryDiscarding) return;
+    setSummaryDiscarding(true);
+    requestAnimationFrame(() => {
+      summaryEditorRef.current?.discard();
+      summaryNavigation.leave();
+      setTimeout(() => setSummaryDiscarding(false), 500);
+    });
+  }, [summaryDiscarding, summaryNavigation]);
 
   const t = useCallback(
     (key: string, fallback?: string, options?: Record<string, any>) =>
@@ -455,35 +498,6 @@ export default function EditProfileScreen() {
   );
 
   const fallbackText = useMemo(() => t("not_set", NOT_SET), [currentLanguage]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadMasterdata = async () => {
-      const data = await queryClient.fetchQuery({
-        queryKey: queryKeys.masterdata.editProfile(currentLanguage),
-        staleTime: 24 * 60 * 60_000,
-        queryFn: async () => {
-          const entries = await Promise.all(
-            MASTER_TYPES.map(async (type) => {
-              const response = await profileService.fetchMasterdata(type);
-              if (!response.success) throw new Error(response.message || `masterdata_${type}_failed`);
-              return [type, response.data || []] as const;
-            }),
-          );
-          return Object.fromEntries(entries);
-        },
-      });
-
-      if (!cancelled) setMasterdata(data);
-    };
-
-    void loadMasterdata().catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentLanguage]);
 
   const loadCompletion = useCallback(
     async (nextProfile: any = {}, nextGallery: GalleryItem[] = []) => {
@@ -516,7 +530,9 @@ export default function EditProfileScreen() {
     if (showLoader) setLoading(true);
     try {
       const response = await profileService.fetchMe();
-      const nextProfile = response.user?.profile || response.profile || {};
+      if (!response.success) throw new Error(response.message || "profile_load_failed");
+      const nextProfile = response.user?.profile || response.profile;
+      if (!nextProfile) throw new Error("profile_load_failed");
       const nextGallery = Array.isArray(nextProfile.gallery) ? nextProfile.gallery : [];
       setProfile(nextProfile);
       setGallery(nextGallery);
@@ -538,10 +554,11 @@ export default function EditProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      revalidateMasterdata();
       const showLoader = !initialLoadStartedRef.current && !hasCachedProfileRef.current;
       initialLoadStartedRef.current = true;
       void loadProfile(showLoader);
-    }, [loadProfile]),
+    }, [loadProfile, revalidateMasterdata]),
   );
 
   const makeTranslatedOptions = useCallback(
@@ -719,7 +736,7 @@ export default function EditProfileScreen() {
             label: t("profile.mother_tongue", "Mother tongue"),
             value: formatSelect(profile?.mother_tongue, fallbackText),
             completionKey: "mother_tongue",
-            icon: Languages,
+            icon: Mic,
           },
           {
             id: "languages_spoken",
@@ -973,6 +990,8 @@ export default function EditProfileScreen() {
   const activeSingleTitle = activeSingleField ? rowById.get(activeSingleField)?.label || "" : "";
   const activeMultiTitle = activeMultiField ? rowById.get(activeMultiField)?.label || "" : "";
   const activeMultiMax = activeMultiField === "nationality" || activeMultiField === "ethnic_group" ? 2 : 5;
+  const activeSingleMasterType = activeSingleField && MASTER_FIELDS.has(activeSingleField) ? activeSingleField : null;
+  const activeMultiMasterType = activeMultiField && MASTER_FIELDS.has(activeMultiField) ? activeMultiField : null;
 
   const onGalleryChange = useCallback(
     (payload: { gallery: GalleryItem[]; privacy: GalleryPrivacy; avatarUuid?: string | null }) => {
@@ -1265,11 +1284,6 @@ export default function EditProfileScreen() {
       return;
     }
 
-    if (!fieldOptions[row.id]?.length) {
-      toast.show(t("profile.field_editor_unavailable", "Options are still loading. Please try again."), "info");
-      return;
-    }
-
     if (["nationality", "languages_spoken", "ethnic_group"].includes(row.id)) {
       setActiveMultiField(row.id);
       return;
@@ -1378,7 +1392,6 @@ export default function EditProfileScreen() {
     title: string;
     items: any[];
     type: "hobby" | "faith";
-    route: string;
     emptyLabel: string;
     impact: number;
   }) => {
@@ -1388,7 +1401,13 @@ export default function EditProfileScreen() {
       // Pressable shell only — layout on the inner View (see field rows)
       <Pressable
         key={config.key}
-        onPress={() => router.push(config.route as any)}
+        onPress={() => router.push({
+          pathname: "/(tabs)/hobbies-faith",
+          params: {
+            section: config.type === "hobby" ? "hobbies" : "faith",
+            returnTo: "/(tabs)/edit-profile",
+          },
+        })}
         accessibilityRole="button"
         accessibilityLabel={config.title}
         accessibilityHint={config.impact ? `+${config.impact}%` : undefined}
@@ -1425,7 +1444,7 @@ export default function EditProfileScreen() {
             {chips.map((item, index) => (
               <View
                 key={`${config.key}-${item.slug}-${index}`}
-                style={[styles.chip, { borderColor: colors.border, backgroundColor: colors.background }]}
+                style={[styles.chip, { backgroundColor: colors.surface }]}
               >
                 <Text style={styles.chipEmoji}>{item.emoji}</Text>
                 <Text style={[styles.chipLabel, { color: colors.text }]} numberOfLines={1}>
@@ -1455,8 +1474,10 @@ export default function EditProfileScreen() {
       </Text>
       <View style={styles.summaryContent}>
         <ProfileSummaryEditor
+          ref={summaryEditorRef}
           profile={profile}
           onSaved={loadProfile}
+          onDirtyChange={setSummaryDirty}
           headlineImpact={missingKeySet.has("profile_headline") ? missingImpacts.profile_headline || 0 : 0}
           bioImpact={missingKeySet.has("bio") ? missingImpacts.bio || 0 : 0}
         />
@@ -1469,7 +1490,6 @@ export default function EditProfileScreen() {
     title: t("hobbies", "Hobbies"),
     items: Array.isArray(profile?.hobbies) ? profile.hobbies : [],
     type: "hobby",
-    route: "/(tabs)/my-hobbies",
     emptyLabel: t("click_add_hobbies", "Tap to add your hobbies"),
     impact: hobbiesMissing ? missingImpacts.hobbies || 0 : 0,
   });
@@ -1479,7 +1499,6 @@ export default function EditProfileScreen() {
     title: t("faith_in_daily_life", "Faith in Daily Life"),
     items: Array.isArray(profile?.faith_in_daily_life) ? profile.faith_in_daily_life : [],
     type: "faith",
-    route: "/(tabs)/faith",
     emptyLabel: t("click_add_faith", "Tap to add how faith shapes your daily life"),
     // Faith is not part of profile completion today; if the backend ever adds
     // it to missingKeys the badge appears automatically
@@ -1491,7 +1510,7 @@ export default function EditProfileScreen() {
       <AppBackTitleBar
         title={t("edit_profile", "Edit profile")}
         fallbackHref="/(tabs)/profile"
-        onBack={() => router.replace(returnHref as any)}
+        onBack={summaryNavigation.requestClose}
       />
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
@@ -1509,17 +1528,13 @@ export default function EditProfileScreen() {
               : null
           }
         >
-          {mediaMissing && missingImpacts.media ? (
-            <View style={styles.mediaBadgeRow}>
-              <ImpactBadge value={missingImpacts.media} />
-            </View>
-          ) : null}
           <EditProfileMediaEditor
             canUsePrivateGallery={String(profile?.gender || "").toLowerCase() === "female"}
             gender={String(profile?.gender || "").toLowerCase() === "female" ? "female" : "male"}
             guidelinesIdentity={String(authUser?._id || authUser?.email || "current-user")}
             initialGallery={gallery}
             initialPrivacy={privacy}
+            completionImpact={mediaMissing ? missingImpacts.media || 0 : 0}
             onGalleryChange={onGalleryChange}
           />
         </View>
@@ -1554,6 +1569,9 @@ export default function EditProfileScreen() {
         selected={activeSingleField ? selectedSingleValue(activeSingleField) : undefined}
         title={activeSingleTitle}
         searchEnabled={activeSingleOptions.length > 8}
+        loading={Boolean(activeSingleMasterType && masterdataStatus[activeSingleMasterType] === "loading")}
+        error={Boolean(activeSingleMasterType && masterdataStatus[activeSingleMasterType] === "error")}
+        onRetry={activeSingleMasterType ? () => retryMasterdata(activeSingleMasterType) : undefined}
       />
 
       <MultiSelectSheet
@@ -1567,6 +1585,9 @@ export default function EditProfileScreen() {
         title={activeMultiTitle}
         maxSelections={activeMultiMax}
         searchEnabled
+        loading={Boolean(activeMultiMasterType && masterdataStatus[activeMultiMasterType] === "loading")}
+        error={Boolean(activeMultiMasterType && masterdataStatus[activeMultiMasterType] === "error")}
+        onRetry={activeMultiMasterType ? () => retryMasterdata(activeMultiMasterType) : undefined}
       />
 
       <TextEditSheet
@@ -1637,6 +1658,19 @@ export default function EditProfileScreen() {
         )}
         confirmLabel={t("open_settings", "Open Settings")}
         cancelLabel={t("cancel", "Cancel")}
+      />
+
+      <ConfirmSheet
+        visible={summaryNavigation.confirmationVisible}
+        onClose={summaryNavigation.stay}
+        onCancel={discardSummaryAndLeave}
+        onConfirm={() => void saveSummaryAndLeave()}
+        title={t("unsaved_changes_title", "Unsaved changes")}
+        message={t("unsaved_changes_message", "Save your changes before leaving?")}
+        confirmLabel={t("save", "Save")}
+        cancelLabel={t("discard", "Discard")}
+        confirmLoading={summaryConfirmSaving}
+        cancelLoading={summaryDiscarding}
       />
     </View>
   );
@@ -1752,11 +1786,6 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     marginTop: 0,
   },
-  mediaBadgeRow: {
-    alignItems: "flex-end",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
   chipHeaderRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -1778,7 +1807,6 @@ const styles = StyleSheet.create({
   chip: {
     alignItems: "center",
     borderRadius: 999,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 6,
     maxWidth: "100%",

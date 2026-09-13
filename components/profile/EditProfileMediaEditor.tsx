@@ -39,6 +39,7 @@ type Props = {
     guidelinesIdentity?: string;
     autoShowGuidelines?: boolean;
     requiredError?: string;
+    completionImpact?: number;
     onGalleryChange?: (payload: { gallery: GalleryItem[]; privacy: GalleryPrivacy; avatarUuid?: string | null }) => void;
     onBusyChange?: (busy: boolean) => void;
 };
@@ -64,6 +65,7 @@ export function ProfileMediaEditor({
     guidelinesIdentity = 'current-user',
     autoShowGuidelines = true,
     requiredError,
+    completionImpact = 0,
     onGalleryChange,
     onBusyChange,
 }: Props) {
@@ -325,7 +327,12 @@ export function ProfileMediaEditor({
         try {
             const res = await galleryService.updatePrivacy(next);
             if (res.success) {
-                showToast(t('privacy_updated_to', 'Privacy updated.', { pkey: t(`privacy_${next}`, next) }), 'success', 2500);
+                showToast(
+                    t('privacy_updated_to', 'Privacy updated.', { pkey: t(`privacy_${next}`, next) }),
+                    'success',
+                    2500,
+                    { icon: next === 'private' ? 'lock' : 'unlock' },
+                );
                 await refreshGallery(false);
             } else {
                 setPrivacy(previous);
@@ -356,11 +363,18 @@ export function ProfileMediaEditor({
             ]}
         >
             <View style={styles.sectionHeader}>
-                <Text variant="body" className="font-body-bold" style={styles.sectionTitle}>
-                    {variant === 'onboarding'
-                        ? t('upload_images_to_profile', 'Upload images to your profile')
-                        : t('photo_gallery', 'Photo gallery')}
-                </Text>
+                <View style={styles.titleGroup}>
+                    <Text variant="body" className="font-body-bold" style={styles.sectionTitle}>
+                        {variant === 'onboarding'
+                            ? t('upload_images_to_profile', 'Upload images to your profile')
+                            : t('photo_gallery', 'Photo gallery')}
+                    </Text>
+                    {variant === 'edit-profile' && completionImpact > 0 ? (
+                        <View style={[styles.impactBadge, { backgroundColor: colors.chrome.primary }]}>
+                            <Text style={styles.impactBadgeText}>{`\u2066+${completionImpact}%\u2069`}</Text>
+                        </View>
+                    ) : null}
+                </View>
                 <View style={styles.headerActions}>
                     <Text variant="caption" style={{ color: mutedText }}>
                         {gallery.length}/{GALLERY_MAX_SLOTS}
@@ -645,10 +659,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    titleGroup: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(8),
+    },
     sectionTitle: {
         fontSize: scale(16),
         lineHeight: scale(21),
         flexShrink: 1,
+    },
+    impactBadge: {
+        minHeight: scale(24),
+        borderRadius: scale(999),
+        paddingHorizontal: scale(10),
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    impactBadgeText: {
+        color: '#FFFFFF',
+        fontSize: scale(11),
+        lineHeight: scale(14),
+        includeFontPadding: false,
+        fontWeight: '700',
+        writingDirection: 'ltr',
     },
     headerActions: {
         flexDirection: 'row',

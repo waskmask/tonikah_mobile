@@ -4,7 +4,6 @@ import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Ban,
-    BookHeart,
     CreditCard,
     Handshake,
     Languages,
@@ -35,8 +34,7 @@ type MenuItem = {
 };
 
 const QUICK_ITEMS: MenuItem[] = [
-    { href: '/(tabs)/my-hobbies', labelKey: 'hobbies', fallback: 'Hobbies', icon: Sparkles },
-    { href: '/(tabs)/faith', labelKey: 'faith_in_daily_life', fallback: 'Faith in Daily Life', icon: BookHeart },
+    { href: '/(tabs)/hobbies-faith', labelKey: 'hobbies_and_faith', fallback: 'Hobbies & Faith', icon: Sparkles },
     { href: '/(tabs)/partner-preference', labelKey: 'partner_preference', fallback: 'Partner Preference', icon: Handshake },
     { href: '/(tabs)/language', labelKey: 'language', fallback: 'Language', icon: Languages },
 ];
@@ -94,6 +92,13 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
             if (href === '/(tabs)/edit-profile') {
                 router.push({
                     pathname: '/(tabs)/edit-profile',
+                    params: { returnTo: pathname },
+                });
+                return;
+            }
+            if (href === '/(tabs)/hobbies-faith') {
+                router.push({
+                    pathname: '/(tabs)/hobbies-faith',
                     params: { returnTo: pathname },
                 });
                 return;

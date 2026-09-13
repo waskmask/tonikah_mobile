@@ -33,6 +33,10 @@ import {
 import { useAuthStore } from '@/store/authStore';
 
 export type SummaryField = 'headline' | 'bio';
+export type ProfileSummaryEditorHandle = {
+    save: (submitAnyway?: boolean) => Promise<boolean>;
+    discard: () => void;
+};
 
 /** Minimum meaningful bio length, enforced in the inline (My Profile) editor */
 const BIO_MIN = 30;
@@ -52,19 +56,21 @@ type Props = {
     /** "+N%" completion badge next to the labels while the field is missing. */
     headlineImpact?: number;
     bioImpact?: number;
+    onDirtyChange?: (dirty: boolean) => void;
 };
 
 /** Shared Headline + Bio editor used by Edit Profile and My Profile.
     Owns prefill from pending/rejected moderation candidates, validation,
     RTL/LTR direction, the moderation warning modal and submit-anyway. */
-export function ProfileSummaryEditor({
+export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle, Props>(function ProfileSummaryEditor({
     profile,
     fields = ['headline', 'bio'],
     onSaved,
     variant = 'card',
     headlineImpact = 0,
     bioImpact = 0,
-}: Props) {
+    onDirtyChange,
+}, ref) {
     const palette = useColors();
     const { isDark } = useTheme();
     const { currentLanguage } = useLanguage();
@@ -77,6 +83,8 @@ export function ProfileSummaryEditor({
     const [headline, setHeadline] = useState('');
     const [bio, setBio] = useState('');
     const [initialValues, setInitialValues] = useState({ headline: '', bio: '' });
+    const draftValuesRef = useRef({ headline: '', bio: '' });
+    const initialValuesRef = useRef({ headline: '', bio: '' });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [focusedField, setFocusedField] = useState<SummaryField | null>(null);
@@ -93,9 +101,25 @@ export function ProfileSummaryEditor({
     useEffect(() => {
         const nextHeadline = cleanProfileText(moderationCandidateForEditing(moderationMeta.profileHeadline) || profile?.profile_headline || '');
         const nextBio = cleanProfileMultilineText(moderationCandidateForEditing(moderationMeta.bio) || profile?.bio || '');
-        setHeadline(nextHeadline);
-        setBio(nextBio);
-        setInitialValues({ headline: nextHeadline, bio: nextBio });
+        const currentDraft = draftValuesRef.current;
+        const currentInitial = initialValuesRef.current;
+        const keepHeadlineDraft = currentDraft.headline !== currentInitial.headline;
+        const keepBioDraft = currentDraft.bio !== currentInitial.bio;
+        const nextInitial = {
+            headline: keepHeadlineDraft ? currentInitial.headline : nextHeadline,
+            bio: keepBioDraft ? currentInitial.bio : nextBio,
+        };
+
+        if (!keepHeadlineDraft) {
+            draftValuesRef.current.headline = nextHeadline;
+            setHeadline(nextHeadline);
+        }
+        if (!keepBioDraft) {
+            draftValuesRef.current.bio = nextBio;
+            setBio(nextBio);
+        }
+        initialValuesRef.current = nextInitial;
+        setInitialValues(nextInitial);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [profile]);
 
@@ -129,6 +153,10 @@ export function ProfileSummaryEditor({
     const bioBelowMin = inline && showBio && bioCount > 0 && bioCount < BIO_MIN;
     const canSave = dirty && !saving && !(inline && showBio && bioCount < BIO_MIN);
 
+    useEffect(() => {
+        onDirtyChange?.(dirty);
+    }, [dirty, onDirtyChange]);
+
     function validate() {
         const nextErrors: Record<string, string> = {};
         if (showHeadline) {
@@ -154,8 +182,8 @@ export function ProfileSummaryEditor({
     }
 
     async function save(submitAnyway = false) {
-        if (!validate()) return;
-        if (!dirty) return;
+        if (!validate()) return false;
+        if (!dirty) return false;
         setSaving(true);
         try {
             // Only changed fields are submitted — an unchanged field would
@@ -177,13 +205,16 @@ export function ProfileSummaryEditor({
                 } else {
                     toast.show(apiMessage(String(res.message || ''), t('profile.update_error', 'Could not update profile.')), 'error');
                 }
-                return;
+                return false;
             }
             setModerationWarning(null);
             Keyboard.dismiss();
             // Update baselines immediately so Save disables without waiting
             // for the parent's profile refetch
-            setInitialValues({ headline, bio });
+            const savedValues = { headline, bio };
+            draftValuesRef.current = { ...savedValues };
+            initialValuesRef.current = { ...savedValues };
+            setInitialValues({ ...savedValues });
             await refreshUser().catch(() => undefined);
             const latestModeration =
                 useAuthStore.getState().user?.profile?.contentModeration || {};
@@ -197,12 +228,26 @@ export function ProfileSummaryEditor({
                 'success',
             );
             await onSaved?.();
+            return true;
         } catch {
             toast.show(t('profile.update_error', 'Could not update profile.'), 'error');
+            return false;
         } finally {
             setSaving(false);
         }
     }
+
+    function discard() {
+        const savedValues = initialValuesRef.current;
+        draftValuesRef.current = { ...savedValues };
+        setHeadline(savedValues.headline);
+        setBio(savedValues.bio);
+        setErrors({});
+        setModerationWarning(null);
+        Keyboard.dismiss();
+    }
+
+    React.useImperativeHandle(ref, () => ({ save, discard }));
 
     function focusModeratedField(field: TextModerationWarning['field'] | undefined) {
         const target = field === 'bio' ? bioInputRef : headlineInputRef;
@@ -255,7 +300,9 @@ export function ProfileSummaryEditor({
                         ref={headlineInputRef}
                         value={headline}
                         onChangeText={(value) => {
-                            setHeadline(trimToNonSpaceLimit(value, HEADLINE_MAX));
+                            const nextHeadline = trimToNonSpaceLimit(value, HEADLINE_MAX);
+                            draftValuesRef.current.headline = nextHeadline;
+                            setHeadline(nextHeadline);
                             if (errors.headline) setErrors((current) => ({ ...current, headline: '' }));
                         }}
                         onFocus={() => setFocusedField('headline')}
@@ -313,7 +360,9 @@ export function ProfileSummaryEditor({
                         ref={bioInputRef}
                         value={bio}
                         onChangeText={(value) => {
-                            setBio(trimToNonSpaceLimit(normalizeProfileText(value), BIO_MAX));
+                            const nextBio = trimToNonSpaceLimit(normalizeProfileText(value), BIO_MAX);
+                            draftValuesRef.current.bio = nextBio;
+                            setBio(nextBio);
                             if (errors.bio) setErrors((current) => ({ ...current, bio: '' }));
                         }}
                         onFocus={() => setFocusedField('bio')}
@@ -402,7 +451,7 @@ export function ProfileSummaryEditor({
             />
         </View>
     );
-}
+});
 
 const styles = StyleSheet.create({
     labelRow: {

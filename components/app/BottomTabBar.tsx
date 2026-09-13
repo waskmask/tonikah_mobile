@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { NavigationTypeTokens } from '@/constants/uiTokens';
 import { completeInteraction, markInteraction } from '@/lib/performanceDiagnostics';
+import { scheduleIdleWork } from '@/lib/idleWork';
 
 const ACTIVE_STROKE = 2;
 const INACTIVE_STROKE = 1.8;
@@ -134,6 +135,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     // switches keep the icon so there is no one-frame spinner flash.
     const [spinnerRoute, setSpinnerRoute] = useState<string | null>(null);
     const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const profilePreloadRequestedRef = useRef(false);
     const activeRouteName = state.routes[state.index]?.name;
     const queryClient = useQueryClient();
     const { data: unreadCount = 0 } = useQuery({
@@ -174,6 +176,26 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     useEffect(() => () => {
         if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
     }, []);
+
+    useEffect(() => {
+        if (activeRouteName === 'profile' || profilePreloadRequestedRef.current) return undefined;
+        let cancelled = false;
+        let preloadTimer: ReturnType<typeof setTimeout> | null = null;
+        const cancelIdleWork = scheduleIdleWork(() => {
+            preloadTimer = setTimeout(() => {
+                if (!cancelled && activeRouteName !== 'profile') {
+                    profilePreloadRequestedRef.current = true;
+                    navigation.preload?.('profile');
+                }
+            }, 600);
+        });
+
+        return () => {
+            cancelled = true;
+            cancelIdleWork();
+            if (preloadTimer) clearTimeout(preloadTimer);
+        };
+    }, [activeRouteName, navigation]);
 
     const handleUnread = useCallback((payload: any) => {
         queryClient.setQueryData(queryKeys.chat.unreadCount, unreadFromResponse(payload));

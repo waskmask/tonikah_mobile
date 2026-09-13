@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from './Text';
-import { AlertCircle, CheckCircle2, AlertTriangle, Info, X } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, AlertTriangle, Info, Lock, Unlock, X } from 'lucide-react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -17,6 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type ToastIcon = 'lock' | 'unlock';
 
 export interface ToastProps {
     visible: boolean;
@@ -24,6 +25,7 @@ export interface ToastProps {
     type?: ToastType;
     onDismiss: () => void;
     duration?: number;
+    icon?: ToastIcon;
 }
 
 const TOAST_ICONS = {
@@ -33,13 +35,18 @@ const TOAST_ICONS = {
     info: Info,
 };
 
-export function Toast({ visible, message, type = 'info', onDismiss, duration = 4000 }: ToastProps) {
+const CUSTOM_TOAST_ICONS = {
+    lock: Lock,
+    unlock: Unlock,
+};
+
+export function Toast({ visible, message, type = 'info', onDismiss, duration = 4000, icon }: ToastProps) {
     const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
     const colors = useColors();
     const translateY = useSharedValue(-150);
     const toastStyle = colors.chrome.toast[type];
-    const Icon = TOAST_ICONS[type];
+    const Icon = icon ? CUSTOM_TOAST_ICONS[icon] : TOAST_ICONS[type];
 
     useEffect(() => {
         if (visible) {

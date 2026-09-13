@@ -30,6 +30,7 @@ export const profileService = {
 
     // Masterdata endpoints
     fetchMasterdata: (type: string): Promise<ApiResponse> => api.get(`/masterdata/${type}`),
+    fetchMasterdataVersion: (): Promise<ApiResponse> => api.get('/masterdata/version'),
 
     // Google Places endpoints through the backend proxy.
     fetchPlaceAutocomplete: (input: string, language = 'en'): Promise<ApiResponse> =>

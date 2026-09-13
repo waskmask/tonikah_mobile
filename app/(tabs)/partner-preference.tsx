@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { TextModerationWarningModal } from '@/components/app/TextModerationWarningModal';
 import { UnderReviewPill } from '@/components/app/UnderReviewPill';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
 import { MultiSelectSheet } from '@/components/ui/MultiSelectSheet';
 import { RangeRow } from '@/components/ui/RangeRow';
 import { useTheme } from '@/hooks/useTheme';
@@ -39,6 +40,7 @@ import { profileService } from '@/lib/profileService';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useToast } from '@/hooks/useToast';
+import { useUnsavedNavigationGuard } from '@/hooks/useUnsavedNavigationGuard';
 import { getTextDirection, localeTextDirection } from '@/lib/textDirection';
 import {
     getTextModerationWarning,
@@ -61,6 +63,7 @@ export default function PartnerPreferenceScreen() {
     const [state, setState] = useState<PartnerPrefState>(defaultPartnerPrefState());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [confirmSaving, setConfirmSaving] = useState(false);
     const [activeSheet, setActiveSheet] = useState<SheetKey>(null);
     const [ethnicMaster, setEthnicMaster] = useState<any[]>([]);
     const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
@@ -116,6 +119,14 @@ export default function PartnerPreferenceScreen() {
     );
 
     const dirty = baselineRef.current !== null && serializePartnerPrefState(state) !== baselineRef.current;
+    const leavePartnerPreference = useCallback(() => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/(tabs)/edit-profile');
+    }, []);
+    const unsavedNavigation = useUnsavedNavigationGuard({
+        dirty,
+        leaveFallback: leavePartnerPreference,
+    });
 
     // Male users cannot prefer "married" women; female users can (co-wife)
     const maritalOptions = useMemo(
@@ -141,8 +152,8 @@ export default function PartnerPreferenceScreen() {
     };
 
     const save = async (submitAnyway = false) => {
-        if (saving) return;
-        if (!requireVerified('save')) return;
+        if (saving) return false;
+        if (!requireVerified('save')) return false;
         setSaving(true);
         try {
             const payload = buildPartnerPrefPayload(state);
@@ -171,6 +182,7 @@ export default function PartnerPreferenceScreen() {
                     'success',
                     3000,
                 );
+                return true;
             } else {
                 const warning = getTextModerationWarning(res);
                 if (warning) {
@@ -178,11 +190,25 @@ export default function PartnerPreferenceScreen() {
                 } else {
                     Alert.alert(t('error', 'Error'), apiMessage(res.message));
                 }
+                return false;
             }
         } catch {
             toast.show(t('something_went_wrong', 'Something went wrong.'), 'error');
+            return false;
         } finally {
             setSaving(false);
+        }
+    };
+
+    const saveAndLeave = async () => {
+        if (confirmSaving) return;
+        setConfirmSaving(true);
+        try {
+            const saved = await save();
+            if (saved) unsavedNavigation.leave();
+            else unsavedNavigation.stay();
+        } finally {
+            setConfirmSaving(false);
         }
     };
 
@@ -232,7 +258,11 @@ export default function PartnerPreferenceScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
-            <AppBackTitleBar title={t('partner_preference', 'Partner Preference')} />
+            <AppBackTitleBar
+                title={t('partner_preference', 'Partner Preference')}
+                fallbackHref="/(tabs)/edit-profile"
+                onBack={unsavedNavigation.requestClose}
+            />
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(14), paddingBottom: scale(24), gap: scale(12) }}
@@ -396,6 +426,18 @@ export default function PartnerPreferenceScreen() {
                 }}
                 onClose={() => setModerationWarning(null)}
                 onSubmitAnyway={() => void save(true)}
+            />
+
+            <ConfirmSheet
+                visible={unsavedNavigation.confirmationVisible}
+                onClose={unsavedNavigation.stay}
+                onCancel={unsavedNavigation.leave}
+                onConfirm={() => void saveAndLeave()}
+                title={t('unsaved_changes_title', 'Unsaved changes')}
+                message={t('unsaved_changes_message', 'Save your changes before leaving?')}
+                confirmLabel={t('save', 'Save')}
+                cancelLabel={t('discard', 'Discard')}
+                confirmLoading={confirmSaving}
             />
         </View>
     );

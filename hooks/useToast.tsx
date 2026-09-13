@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Toast, ToastType } from '@/components/ui/Toast';
+import { Toast, ToastIcon, ToastType } from '@/components/ui/Toast';
 
 interface ToastState {
     visible: boolean;
     message: string;
     type: ToastType;
     duration: number;
+    icon?: ToastIcon;
 }
 
 type ToastHandle = {
-    show: (message: string, type?: ToastType, duration?: number) => void;
+    show: (message: string, type?: ToastType, duration?: number, options?: { icon?: ToastIcon }) => void;
     hide: () => void;
 };
 
@@ -22,10 +23,11 @@ export function ToastProvider() {
         message: '',
         type: 'info',
         duration: 4000,
+        icon: undefined,
     });
 
-    const show = useCallback((message: string, type: ToastType = 'info', duration: number = 4000) => {
-        setState({ visible: true, message, type, duration });
+    const show = useCallback((message: string, type: ToastType = 'info', duration: number = 4000, options?: { icon?: ToastIcon }) => {
+        setState({ visible: true, message, type, duration, icon: options?.icon });
     }, []);
 
     const hide = useCallback(() => {
@@ -51,6 +53,7 @@ export function ToastProvider() {
             message={state.message}
             type={state.type}
             duration={state.duration}
+            icon={state.icon}
             onDismiss={hide}
         />
     );
@@ -59,9 +62,9 @@ export function ToastProvider() {
 /** Imperative access from event handlers without hook wiring — proxies the
     same global ref the hook uses. */
 export const toast: ToastHandle = {
-    show: (message, type = 'info', duration = 4000) => {
+    show: (message, type = 'info', duration = 4000, options) => {
         if (globalToastRef) {
-            globalToastRef.show(message, type, duration);
+            globalToastRef.show(message, type, duration, options);
         } else {
             console.warn('ToastProvider is not mounted. Cannot show toast:', message);
         }
@@ -72,9 +75,9 @@ export const toast: ToastHandle = {
 };
 
 export function useToast() {
-    const show = useCallback((message: string, type: ToastType = 'info', duration: number = 4000) => {
+    const show = useCallback((message: string, type: ToastType = 'info', duration: number = 4000, options?: { icon?: ToastIcon }) => {
         if (globalToastRef) {
-            globalToastRef.show(message, type, duration);
+            globalToastRef.show(message, type, duration, options);
         } else {
             console.warn('ToastProvider is not mounted. Cannot show toast:', message);
         }
@@ -87,4 +90,4 @@ export function useToast() {
     return useMemo(() => ({ show, hide }), [show, hide]);
 }
 
-export type { ToastType };
+export type { ToastIcon, ToastType };

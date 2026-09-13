@@ -9,6 +9,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     Dimensions,
+    ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeIn, SlideInDown, SlideInLeft, SlideInRight } from 'react-native-reanimated';
 import { Text } from './Text';
@@ -38,6 +39,9 @@ interface MultiSelectSheetProps {
     searchEnabled?: boolean;
     searchPlaceholder?: string;
     presentation?: 'sheet' | 'drawer';
+    loading?: boolean;
+    error?: boolean;
+    onRetry?: () => void;
 }
 
 const normalizeSearchText = (value: string) =>
@@ -58,6 +62,9 @@ export function MultiSelectSheet({
     searchEnabled = true,
     searchPlaceholder = 'Search...',
     presentation,
+    loading = false,
+    error = false,
+    onRetry,
 }: MultiSelectSheetProps) {
     const { isDark } = useTheme();
     const palette = useColors();
@@ -296,10 +303,32 @@ export function MultiSelectSheet({
                                 );
                             }}
                             ListEmptyComponent={
-                                <View style={{ padding: scale(24), alignItems: 'center' }}>
-                                    <Text variant="body-sm" style={{ color: palette.brand.text.muted }}>
-                                        {t('no_results_found', 'No results found')}
-                                    </Text>
+                                <View style={styles.loadState}>
+                                    {loading ? (
+                                        <>
+                                            <ActivityIndicator color={palette.chrome.primary} />
+                                            <Text variant="body-sm" style={{ color: palette.brand.text.muted }}>
+                                                {t('options_loading', 'Loading options...')}
+                                            </Text>
+                                        </>
+                                    ) : error ? (
+                                        <>
+                                            <Text variant="body-sm" align="center" style={{ color: palette.brand.text.muted }}>
+                                                {t('options_load_error', 'Could not load options')}
+                                            </Text>
+                                            {onRetry ? (
+                                                <Pressable onPress={onRetry} accessibilityRole="button" style={styles.retryButton}>
+                                                    <Text variant="body-sm" className="font-body-semi" style={{ color: palette.chrome.primary }}>
+                                                        {t('btn_try_again', 'Try again')}
+                                                    </Text>
+                                                </Pressable>
+                                            ) : null}
+                                        </>
+                                    ) : (
+                                        <Text variant="body-sm" style={{ color: palette.brand.text.muted }}>
+                                            {t('no_results_found', 'No results found')}
+                                        </Text>
+                                    )}
                                 </View>
                             }
                         />
@@ -318,7 +347,7 @@ export function MultiSelectSheet({
                             <GradientButton
                                 title={t('done', 'Done')}
                                 onPress={handleDone}
-                                disabled={localSelected.length === 0}
+                                disabled={loading || error || localSelected.length === 0}
                                 widthMode="full"
                                 height={40}
                                 textSize={15}
@@ -332,6 +361,19 @@ export function MultiSelectSheet({
 }
 
 const styles = StyleSheet.create({
+    loadState: {
+        minHeight: scale(160),
+        padding: scale(24),
+        gap: scale(12),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    retryButton: {
+        minHeight: scale(40),
+        paddingHorizontal: scale(16),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     modalRoot: {
         flex: 1,
     },

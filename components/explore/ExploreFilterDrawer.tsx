@@ -7,11 +7,10 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { MultiSelectSheet, MultiSelectOption } from '@/components/ui/MultiSelectSheet';
 import { RangeRow } from '@/components/ui/RangeRow';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useMasterdataLists } from '@/hooks/useMasterdataLists';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
-import { useToast } from '@/hooks/useToast';
-import { profileService } from '@/lib/profileService';
 import { t } from '@/lib/profileDisplay';
 import {
     ExploreFilterState,
@@ -34,14 +33,10 @@ type Props = {
     onApply: (next: ExploreFilterState, params: Record<string, string | number>) => void;
 };
 
-type MasterState = {
-    sect: any[];
-    education: any[];
-    ethnic_group: any[];
-    following: any[];
-};
-
 type DrawerOption = MultiSelectOption & { key?: string };
+
+const EXPLORE_MASTER_TYPES = ['sect', 'education', 'ethnic_group', 'following'] as const;
+const EXPLORE_MASTER_FIELDS = new Set<FilterSelectKey>(EXPLORE_MASTER_TYPES);
 
 const LABELS: Record<FilterSelectKey, string> = {
     country: 'country',
@@ -56,40 +51,21 @@ const LABELS: Record<FilterSelectKey, string> = {
 export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props) {
     const { isDark } = useTheme();
     const colors = useColors();
-    const { isRTL } = useLanguage();
-    const toast = useToast();
+    const { currentLanguage, isRTL } = useLanguage();
     const [draft, setDraft] = useState<ExploreFilterState>(state);
     const [activeSelect, setActiveSelect] = useState<FilterSelectKey | null>(null);
-    const [master, setMaster] = useState<MasterState>({ sect: [], education: [], ethnic_group: [], following: [] });
-
-    useEffect(() => {
-        if (visible) setDraft(state);
-    }, [state, visible]);
+    const {
+        data: master,
+        statusByType: masterdataStatus,
+        retry: retryMasterdata,
+        revalidate: revalidateMasterdata,
+    } = useMasterdataLists(EXPLORE_MASTER_TYPES, currentLanguage);
 
     useEffect(() => {
         if (!visible) return;
-        let mounted = true;
-        Promise.all([
-            profileService.fetchMasterdata('sect'),
-            profileService.fetchMasterdata('education'),
-            profileService.fetchMasterdata('ethnic_group'),
-            profileService.fetchMasterdata('following'),
-        ]).then(([sect, education, ethnic, following]) => {
-            if (!mounted) return;
-            setMaster({
-                sect: sect.data || [],
-                education: education.data || [],
-                ethnic_group: ethnic.data || [],
-                following: following.data || [],
-            });
-        }).catch(() => {
-            if (!mounted) return;
-            toast.show(t('filter_data_unavailable', 'Some filter data is unavailable. Please try again.'), 'warning');
-        });
-        return () => {
-            mounted = false;
-        };
-    }, [state, toast, visible]);
+        setDraft(state);
+        revalidateMasterdata();
+    }, [revalidateMasterdata, state, visible]);
 
     const options = useMemo<Record<FilterSelectKey, DrawerOption[]>>(() => {
         const country = countryOptions();
@@ -148,12 +124,9 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
 
     const activeCount = activeExploreFilterCount(draft);
     const activeOptions = activeSelect ? options[activeSelect] : [];
+    const activeMasterType = activeSelect && EXPLORE_MASTER_FIELDS.has(activeSelect) ? activeSelect : null;
 
     const openSelect = (key: FilterSelectKey) => {
-        if (options[key].length === 0) {
-            toast.show(t('filter_data_unavailable', 'No data is available for this filter right now.'), 'warning');
-            return;
-        }
         setActiveSelect(key);
     };
 
@@ -241,7 +214,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                 </ScrollView>
 
                 <View style={[styles.footer, { backgroundColor: colors.chrome.header.background, borderTopColor: colors.brand.bg.border }]}>
-                    <GradientButton title={t('show_results', 'Show results')} onPress={apply} widthMode="full" />
+                    <GradientButton title={t('apply_filters', 'Apply filters')} onPress={apply} widthMode="full" />
                 </View>
 
                 {activeSelect ? (
@@ -255,6 +228,9 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         searchEnabled={['country', 'education', 'ethnic_group'].includes(activeSelect)}
                         searchPlaceholder={t('search', 'Search...')}
                         presentation="drawer"
+                        loading={Boolean(activeMasterType && masterdataStatus[activeMasterType] === 'loading')}
+                        error={Boolean(activeMasterType && masterdataStatus[activeMasterType] === 'error')}
+                        onRetry={activeMasterType ? () => retryMasterdata(activeMasterType) : undefined}
                     />
                 ) : null}
             </SafeAreaView>
@@ -292,7 +268,7 @@ function SelectRow({
 }) {
     const text = values.length
         ? values.map((value) => options.find((item) => item.value === value)?.label || value).join(', ')
-        : t('no_preference', 'No preference');
+        : t('any', 'Any');
     return (
         <Pressable
             onPress={onOpen}

@@ -147,7 +147,7 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
         clearTimeout(id);
         return response;
     } catch (error: any) {
-        connectivity.markOffline();
+        void connectivity.confirmRequestFailure();
         clearTimeout(id);
         if (error.name === 'AbortError') {
             throw new Error('timeout');
@@ -233,7 +233,7 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
             result = { accessToken: null, reason: 'unauthorized' };
         } else {
             // Keep credentials on transient network/provider failures. A later request can retry.
-            connectivity.markOffline();
+            void connectivity.confirmRequestFailure();
             result = { accessToken: null, reason: 'network_error' };
         }
     } finally {
@@ -348,7 +348,7 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
         };
 
         xhr.onerror = () => {
-            connectivity.markOffline();
+            void connectivity.confirmRequestFailure();
             resolve({
                 success: false,
                 message: 'network_error',
@@ -358,7 +358,7 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
         };
 
         xhr.ontimeout = () => {
-            connectivity.markOffline();
+            void connectivity.confirmRequestFailure();
             resolve({
                 success: false,
                 message: 'network_error',

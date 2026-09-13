@@ -42,6 +42,7 @@ import {
     MapPin,
     Menu,
     MessageCircle,
+    Mic,
     Moon,
     MoreVertical,
     Pencil,
@@ -763,7 +764,13 @@ export function UserProfileView({
                     type="faith"
                     isDark={isDark}
                     isRTL={isRTL}
-                    action={isOwnProfile ? { label: t('edit', 'Edit'), onPress: () => router.push('/(tabs)/faith') } : undefined}
+                    action={isOwnProfile ? {
+                        label: t('edit', 'Edit'),
+                        onPress: () => router.push({
+                            pathname: '/(tabs)/hobbies-faith',
+                            params: { section: 'faith', returnTo: '/(tabs)/profile' },
+                        }),
+                    } : undefined}
                 />
                 <SectionFacts title={t('education_career', 'Education & Career')} facts={facts.career} isDark={isDark} isRTL={isRTL} />
                 <SectionFacts title={t('background', 'Background')} facts={facts.background} isDark={isDark} isRTL={isRTL} />
@@ -775,7 +782,13 @@ export function UserProfileView({
                     type="hobby"
                     isDark={isDark}
                     isRTL={isRTL}
-                    action={isOwnProfile ? { label: t('edit', 'Edit'), onPress: () => router.push('/(tabs)/my-hobbies') } : undefined}
+                    action={isOwnProfile ? {
+                        label: t('edit', 'Edit'),
+                        onPress: () => router.push({
+                            pathname: '/(tabs)/hobbies-faith',
+                            params: { section: 'hobbies', returnTo: '/(tabs)/profile' },
+                        }),
+                    } : undefined}
                 />
                 {showPartnerPreference ? (
                     <Section
@@ -1456,7 +1469,7 @@ function ChipSection({
         >
             <View style={[styles.chipWrap, { flexDirection: 'row' }]}>
                 {clean.map((item, index) => (
-                    <View key={`${type}-${item.slug}-${index}`} style={[styles.chip, styles.emojiChip, { backgroundColor: palette.brand.bg.surface, borderColor: palette.brand.bg.border }]}>
+                    <View key={`${type}-${item.slug}-${index}`} style={[styles.chip, styles.emojiChip, { backgroundColor: palette.chrome.common.card }]}>
                         <Text style={styles.emojiText}>{item.emoji}</Text>
                         <Text variant="body-sm" style={styles.emojiChipLabel}>{item.label}</Text>
                     </View>
@@ -1485,10 +1498,10 @@ function Section({
 }) {
     const palette = useColors();
     const backgroundColor = highlight
-        ? blendHexColors(palette.chrome.primary, palette.chrome.common.card, isDark ? 0.11 : 0.06)
-        : palette.chrome.common.card;
+        ? blendHexColors(palette.chrome.primary, palette.brand.bg.surface, isDark ? 0.11 : 0.06)
+        : palette.brand.bg.surface;
     const borderColor = highlight
-        ? blendHexColors(palette.chrome.primary, palette.chrome.common.card, isDark ? 0.3 : 0.22)
+        ? blendHexColors(palette.chrome.primary, palette.brand.bg.surface, isDark ? 0.3 : 0.22)
         : palette.brand.bg.border;
     return (
         <View
@@ -1676,7 +1689,7 @@ function buildFacts(profile: any, isOwnProfile = false) {
         background: compact([
             { icon: ShieldCheck, label: t('nationality', 'Nationality'), value: countryList(profile?.nationality) },
             { icon: Home, label: t('grew_up_in', 'Grew up in'), value: translateCountry(profile?.grew_up_in) },
-            { icon: Languages, label: t('mother_tongue', 'Mother tongue'), value: common(profile?.mother_tongue) },
+            { icon: Mic, label: t('mother_tongue', 'Mother tongue'), value: common(profile?.mother_tongue) },
             { icon: Languages, label: t('languages_spoken', 'Languages'), value: listText((profile?.languages_spoken || []).map(displayText)) },
             gender === 'female'
                 ? {
@@ -1917,10 +1930,10 @@ const styles = StyleSheet.create({
     // Pinned line height — Noto Sans Arabic's natural metrics add ~6dp of air
     factLabel: { color: '#8A8073', textTransform: 'uppercase', letterSpacing: 1.2, fontSize: scale(13), lineHeight: scale(17), includeFontPadding: false, flexShrink: 1 },
     chipWrap: { flexWrap: 'wrap', gap: scale(8) },
-    chip: { borderWidth: 1, borderRadius: scale(999), paddingHorizontal: scale(12), paddingVertical: scale(8) },
-    emojiChip: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
-    emojiText: { fontSize: scale(15), lineHeight: scale(18) },
-    emojiChipLabel: { fontWeight: '400' },
+    chip: { borderRadius: scale(999), paddingHorizontal: scale(10), paddingVertical: scale(6) },
+    emojiChip: { flexDirection: 'row', alignItems: 'center', gap: scale(5) },
+    emojiText: { fontSize: scale(13), lineHeight: scale(18) },
+    emojiChipLabel: { fontWeight: '400', lineHeight: scale(18) },
     profileFooterActionWrap: {
         borderTopWidth: 1,
         paddingHorizontal: scale(18),
