@@ -10,8 +10,8 @@ import { t } from '@/lib/profileDisplay';
 
 export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
     const { isDark } = useTheme();
-    const surface = isDark ? '#1B1713' : '#FFFFFF';
-    const border = isDark ? '#3A332B' : '#E8E1D6';
+    const surface = isDark ? '#1D1D1F' : '#FFFFFF';
+    const border = isDark ? '#303033' : '#EEEEEE';
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -21,12 +21,12 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
                     <View style={styles.header}>
                         <View>
                             <Text variant="h3" style={styles.title}>{t('tour_title', 'Quick guide')}</Text>
-                            <Text variant="body-sm" style={{ color: isDark ? '#A99C8D' : '#7D7266', marginTop: scale(3) }}>
+                            <Text variant="body-sm" style={{ color: isDark ? '#B0B0B5' : '#7D7266', marginTop: scale(3) }}>
                                 {t('tour_intro', 'Learn what each action does.')}
                             </Text>
                         </View>
                         <Pressable onPress={onClose} style={styles.close}>
-                            <X size={scale(20)} color={isDark ? '#E8E1D6' : '#241E17'} />
+                            <X size={scale(20)} color={isDark ? '#E5E5E7' : '#241E17'} />
                         </Pressable>
                     </View>
 
@@ -57,13 +57,13 @@ function TourRow({ icon, title, body, gradient = false }: { icon: React.ReactNod
                     {icon}
                 </LinearGradient>
             ) : (
-                <View style={[styles.iconWrap, { backgroundColor: isDark ? '#211D18' : '#FDF0F3' }]}>
+                <View style={[styles.iconWrap, { backgroundColor: isDark ? '#18181A' : '#FDF0F3' }]}>
                     {icon}
                 </View>
             )}
             <View style={{ flex: 1 }}>
                 <Text variant="body" className="font-body-semi">{title}</Text>
-                <Text variant="body-sm" style={{ color: isDark ? '#A99C8D' : '#7D7266', marginTop: scale(2), lineHeight: scale(19) }}>
+                <Text variant="body-sm" style={{ color: isDark ? '#B0B0B5' : '#7D7266', marginTop: scale(2), lineHeight: scale(19) }}>
                     {body}
                 </Text>
             </View>
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     overlay: {
         flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: 'rgba(24, 19, 14,0.45)',
+        backgroundColor: 'rgba(16, 16, 17,0.45)',
     },
     sheet: {
         borderTopLeftRadius: scale(20),

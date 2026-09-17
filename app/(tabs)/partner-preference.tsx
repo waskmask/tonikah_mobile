@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
@@ -10,17 +11,19 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
 import { MultiSelectSheet } from '@/components/ui/MultiSelectSheet';
 import { RangeRow } from '@/components/ui/RangeRow';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { TextEditSheet } from '@/components/ui/TextEditSheet';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
 import { LANGUAGE_OPTIONS } from '@/constants/profileOptions';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { masterOptions, staticOptions } from '@/lib/exploreFilters';
 import {
     buildPartnerPrefPayload,
+    buildPartnerPrefPatch,
     countCharacters,
     defaultPartnerPrefState,
     formatHeightLabel,
@@ -36,12 +39,14 @@ import {
     serializePartnerPrefState,
     trimToCharacterLimit,
 } from '@/lib/partnerPreference';
+import { cleanProfileTextForSave, plainTextFromFormattedInput } from '@/lib/profileValidation';
 import { profileService } from '@/lib/profileService';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useToast } from '@/hooks/useToast';
 import { useUnsavedNavigationGuard } from '@/hooks/useUnsavedNavigationGuard';
-import { getTextDirection, localeTextDirection } from '@/lib/textDirection';
+import { localeUsesLatinScript } from '@/lib/textDirection';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     getTextModerationWarning,
     moderationCandidateForEditing,
@@ -52,30 +57,46 @@ import {
 type SheetKey = 'marital' | 'languages' | 'ethnic' | null;
 
 export default function PartnerPreferenceScreen() {
+    const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
     const { isDark } = useTheme();
     const colors = useColors();
     const primary = colors.chrome.primary;
     const { currentLanguage } = useLanguage();
-    const { user, refreshUser } = useAuthStore();
+    const { user, refreshUser, patchUserProfile } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
+    const insets = useSafeAreaInsets();
 
     const [state, setState] = useState<PartnerPrefState>(defaultPartnerPrefState());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [confirmSaving, setConfirmSaving] = useState(false);
     const [activeSheet, setActiveSheet] = useState<SheetKey>(null);
+    const [aboutSheetOpen, setAboutSheetOpen] = useState(false);
     const [ethnicMaster, setEthnicMaster] = useState<any[]>([]);
     const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
-    const aboutInputRef = useRef<TextInput>(null);
     const initialLoadRef = useRef(true);
     const baselineRef = useRef<string | null>(null);
+    const baselineStateRef = useRef<PartnerPrefState | null>(null);
+    const pendingAboutSubmissionRef = useRef<string | null>(null);
+    const stateRef = useRef(state);
+    stateRef.current = state;
+    const returnHref = useMemo(() => {
+        const candidate = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+        if (
+            !candidate ||
+            !candidate.startsWith('/') ||
+            candidate.includes('://') ||
+            candidate.includes('partner-preference')
+        ) {
+            return '/(tabs)/profile';
+        }
+        return candidate;
+    }, [returnTo]);
 
     const myGender = String(user?.profile?.gender || '').toLowerCase();
     const aboutModerationMeta = user?.profile?.contentModeration?.partnerPreferenceAboutPartner;
     const aboutPendingReview = Boolean(pendingModerationCandidate(aboutModerationMeta));
-    const aboutDirection = getTextDirection(state.about, localeTextDirection(currentLanguage));
-
     useEffect(() => {
         let mounted = true;
         profileService
@@ -93,24 +114,37 @@ export default function PartnerPreferenceScreen() {
 
     const loadPreference = useCallback(async () => {
         if (initialLoadRef.current) setLoading(true);
-        await refreshUser().catch(() => undefined);
-        const res = await profileService.fetchPartnerPreference();
-        const latestProfile = useAuthStore.getState().user?.profile;
-        // The owner keeps editing their pending/rejected candidate, not the
-        // old approved text other users still see.
-        const candidate = moderationCandidateForEditing(
-            latestProfile?.contentModeration?.partnerPreferenceAboutPartner,
-        );
-        const hydrated = hydratePartnerPrefState(
-            res.partner_preference,
-            String(latestProfile?.gender || ''),
-            candidate,
-        );
-        setState(hydrated);
-        baselineRef.current = serializePartnerPrefState(hydrated);
-        setLoading(false);
-        initialLoadRef.current = false;
-    }, [refreshUser]);
+        try {
+            await refreshUser().catch(() => undefined);
+            const res = await profileService.fetchPartnerPreference();
+            const latestProfile = useAuthStore.getState().user?.profile;
+            // The owner keeps editing their pending/rejected candidate, not the
+            // old approved text other users still see.
+            const candidate = moderationCandidateForEditing(
+                latestProfile?.contentModeration?.partnerPreferenceAboutPartner,
+            );
+            const hydrated = hydratePartnerPrefState(
+                res.partner_preference,
+                String(latestProfile?.gender || ''),
+                candidate,
+            );
+            const hasLocalDraft = baselineRef.current !== null
+                && serializePartnerPrefState(stateRef.current) !== baselineRef.current;
+            if (hasLocalDraft) return;
+            setState(hydrated);
+            stateRef.current = hydrated;
+            baselineStateRef.current = hydrated;
+            baselineRef.current = serializePartnerPrefState(hydrated);
+        } catch (error) {
+            toast.show(
+                apiMessage(String((error as any)?.message || ''), t('something_went_wrong', 'Something went wrong.')),
+                'error',
+            );
+        } finally {
+            setLoading(false);
+            initialLoadRef.current = false;
+        }
+    }, [refreshUser, toast]);
 
     useFocusEffect(
         useCallback(() => {
@@ -120,9 +154,8 @@ export default function PartnerPreferenceScreen() {
 
     const dirty = baselineRef.current !== null && serializePartnerPrefState(state) !== baselineRef.current;
     const leavePartnerPreference = useCallback(() => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/(tabs)/edit-profile');
-    }, []);
+        router.replace(returnHref as any);
+    }, [returnHref]);
     const unsavedNavigation = useUnsavedNavigationGuard({
         dirty,
         leaveFallback: leavePartnerPreference,
@@ -156,7 +189,10 @@ export default function PartnerPreferenceScreen() {
         if (!requireVerified('save')) return false;
         setSaving(true);
         try {
-            const payload = buildPartnerPrefPayload(state);
+            const normalizedPayload = buildPartnerPrefPayload(state);
+            const payload = baselineStateRef.current
+                ? buildPartnerPrefPatch(state, baselineStateRef.current)
+                : normalizedPayload;
             const res = await profileService.savePartnerPreference({
                 ...payload,
                 clientLocale: currentLanguage,
@@ -164,8 +200,9 @@ export default function PartnerPreferenceScreen() {
             });
             if (res.success) {
                 setModerationWarning(null);
-                const nextState = { ...state, about: payload.about_partner };
+                const nextState = { ...state, about: normalizedPayload.about_partner };
                 setState(nextState);
+                baselineStateRef.current = nextState;
                 // Rebase immediately so Save disables without waiting on refetch
                 baselineRef.current = serializePartnerPrefState(nextState);
                 await refreshUser();
@@ -200,6 +237,85 @@ export default function PartnerPreferenceScreen() {
         }
     };
 
+    const saveAbout = async (value: string, submitAnyway = false) => {
+        if (saving) return false;
+        if (!requireVerified('save')) return false;
+        const nextAbout = trimToCharacterLimit(cleanProfileTextForSave(value), PP_ABOUT_MAX);
+        pendingAboutSubmissionRef.current = nextAbout;
+        setSaving(true);
+        try {
+            const res = await profileService.savePartnerPreference({
+                about_partner: nextAbout,
+                clientLocale: currentLanguage,
+                ...(submitAnyway ? { submitAnyway: true } : {}),
+            });
+            if (res.success === false) {
+                const warning = getTextModerationWarning(res);
+                if (warning) setModerationWarning(warning);
+                else toast.show(apiMessage(String(res.message || ''), t('something_went_wrong', 'Something went wrong.')), 'error');
+                return false;
+            }
+
+            setModerationWarning(null);
+            pendingAboutSubmissionRef.current = null;
+            const currentState = stateRef.current;
+            const nextState = { ...currentState, about: nextAbout };
+            const nextBaseline = {
+                ...(baselineStateRef.current || currentState),
+                about: nextAbout,
+            };
+            setState(nextState);
+            stateRef.current = nextState;
+            baselineStateRef.current = nextBaseline;
+            baselineRef.current = serializePartnerPrefState(nextBaseline);
+            const currentProfile = useAuthStore.getState().user?.profile || {};
+            const nextPartnerPreference = {
+                ...(currentProfile.partner_preference || currentProfile.partnerPreference || {}),
+                ...(res.partner_preference || {}),
+                about_partner: nextAbout,
+            };
+            const optimisticModeration = submitAnyway
+                ? {
+                    ...(currentProfile.contentModeration || {}),
+                    partnerPreferenceAboutPartner: {
+                        ...(currentProfile.contentModeration?.partnerPreferenceAboutPartner || {}),
+                        moderationStatus: 'pending_review',
+                        candidateValue: nextAbout,
+                        adminReview: {
+                            ...(currentProfile.contentModeration?.partnerPreferenceAboutPartner?.adminReview || {}),
+                            status: 'pending',
+                        },
+                    },
+                }
+                : currentProfile.contentModeration;
+            patchUserProfile({
+                partner_preference: nextPartnerPreference,
+                ...(optimisticModeration ? { contentModeration: optimisticModeration } : {}),
+            });
+            const savedForReview = Boolean(
+                pendingModerationCandidate(
+                    optimisticModeration?.partnerPreferenceAboutPartner,
+                ),
+            );
+            toast.show(
+                submitAnyway || savedForReview
+                    ? t('moderation_submit_anyway_success', 'Submitted for review.')
+                    : t('profile.profile_updated', 'Profile updated.'),
+                'success',
+            );
+            setAboutSheetOpen(false);
+            setTimeout(() => {
+                void refreshUser().catch(() => undefined);
+            }, 0);
+            return true;
+        } catch {
+            toast.show(t('something_went_wrong', 'Something went wrong.'), 'error');
+            return false;
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const saveAndLeave = async () => {
         if (confirmSaving) return;
         setConfirmSaving(true);
@@ -216,12 +332,31 @@ export default function PartnerPreferenceScreen() {
         setState(defaultPartnerPrefState());
     };
 
-    const remaining = PP_ABOUT_MAX - countCharacters(state.about);
-
     if (loading) {
         return (
-            <View style={[styles.center, { backgroundColor: colors.brand.bg.surface }]}>
-                <ActivityIndicator color={primary} />
+            <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
+                <AppBackTitleBar
+                    title={t('partner_preference', 'Partner Preference')}
+                    fallbackHref={returnHref as any}
+                />
+                <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={styles.skeletonContainer}
+                    showsVerticalScrollIndicator={false}
+                    pointerEvents="none"
+                >
+                    <Skeleton height={scale(68)} borderRadius={8} />
+                    <Skeleton height={scale(112)} borderRadius={8} />
+                    <Skeleton height={scale(112)} borderRadius={8} />
+                    <Skeleton height={scale(76)} borderRadius={8} />
+                    <Skeleton height={scale(76)} borderRadius={8} />
+                    <Skeleton height={scale(76)} borderRadius={8} />
+                    <Skeleton height={scale(174)} borderRadius={8} />
+                </ScrollView>
+                <View style={[styles.footer, { backgroundColor: colors.chrome.header.background, borderTopColor: colors.brand.bg.border, paddingBottom: Math.max(insets.bottom, scale(12)) }]}>
+                    <Skeleton width={scale(96)} height={scale(44)} borderRadius={9999} />
+                    <Skeleton height={scale(44)} borderRadius={9999} style={{ flex: 1 }} />
+                </View>
             </View>
         );
     }
@@ -260,16 +395,18 @@ export default function PartnerPreferenceScreen() {
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar
                 title={t('partner_preference', 'Partner Preference')}
-                fallbackHref="/(tabs)/edit-profile"
+                fallbackHref={returnHref as any}
                 onBack={unsavedNavigation.requestClose}
             />
-            <ScrollView
+            <KeyboardAwareScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(14), paddingBottom: scale(24), gap: scale(12) }}
+                contentContainerStyle={styles.content}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                bottomOffset={scale(24)}
             >
-                <View style={[styles.introCard, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
+                <View style={[styles.introSection, { borderBottomColor: colors.brand.bg.border }]}>
                     <Text variant="body-sm" className="font-body-bold">
                         {t('pp_ideal_title', 'Describe your ideal partner')}
                     </Text>
@@ -295,6 +432,8 @@ export default function PartnerPreferenceScreen() {
                     borderColor={colors.brand.bg.border}
                     cardColor={colors.chrome.common.card}
                     mutedColor={colors.chrome.common.textMuted}
+                    presentation="band"
+                    insetDivider
                 />
 
                 <RangeRow
@@ -314,6 +453,8 @@ export default function PartnerPreferenceScreen() {
                     borderColor={colors.brand.bg.border}
                     cardColor={colors.chrome.common.card}
                     mutedColor={colors.chrome.common.textMuted}
+                    presentation="band"
+                    insetDivider
                 />
 
                 <SelectField
@@ -341,42 +482,19 @@ export default function PartnerPreferenceScreen() {
                     }}
                 />
 
-                <View style={[styles.aboutCard, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
-                    <View style={styles.aboutLabelRow}>
-                        <Text variant="body-sm" className="font-body-semi">{t('about_partner', 'About partner')}</Text>
-                        {aboutPendingReview ? <UnderReviewPill /> : null}
-                    </View>
-                    <TextInput
-                        ref={aboutInputRef}
-                        value={state.about}
-                        onChangeText={(value) =>
-                            setState((current) => ({ ...current, about: trimToCharacterLimit(value, PP_ABOUT_MAX) }))
-                        }
-                        placeholder={t('about_partner_placeholder', 'Describe the qualities you are looking for')}
-                        placeholderTextColor={colors.brand.text.muted}
-                        multiline
-                        textAlignVertical="top"
-                        style={[
-                            styles.aboutInput,
-                            {
-                                color: colors.brand.text.body,
-                                borderColor: colors.brand.bg.border,
-                                fontFamily: aboutDirection === 'rtl' ? Typography.font.arabic.regular : Typography.font.body.regular,
-                                textAlign: aboutDirection === 'rtl' ? 'right' : 'left',
-                                writingDirection: aboutDirection,
-                            },
-                        ]}
-                    />
-                    <Text
-                        variant="caption"
-                        style={[styles.aboutCounter, { color: remaining <= 10 ? colors.brand.accent.error : colors.brand.text.muted }]}
-                    >
-                        {`${remaining} ${t('characters_remaining', 'characters remaining')}`}
-                    </Text>
-                </View>
-            </ScrollView>
+                <SelectField
+                    label={t('about_partner', 'About partner')}
+                    summary={state.about || t('about_partner_placeholder', 'Describe the qualities you are looking for')}
+                    hasSelection={Boolean(state.about)}
+                    pendingReview={aboutPendingReview}
+                    summaryLines={2}
+                    accentSelection={false}
+                    showDivider={false}
+                    onPress={() => setAboutSheetOpen(true)}
+                />
+            </KeyboardAwareScrollView>
 
-            <View style={[styles.footer, { backgroundColor: colors.chrome.header.background, borderTopColor: colors.brand.bg.border }]}>
+            <View style={[styles.footer, { backgroundColor: colors.chrome.header.background, borderTopColor: colors.brand.bg.border, paddingBottom: Math.max(insets.bottom, scale(12)) }]}>
                 <Pressable
                     onPress={clearAll}
                     disabled={saving}
@@ -412,20 +530,40 @@ export default function PartnerPreferenceScreen() {
                     selected={sheetConfig.selected}
                     title={sheetConfig.title}
                     maxSelections={sheetConfig.max}
+                    allowEmptySelection
                     searchEnabled={sheetConfig.searchEnabled}
                     searchPlaceholder={t('search', 'Search...')}
                 />
             ) : null}
+
+            <TextEditSheet
+                visible={aboutSheetOpen}
+                title={t('about_partner', 'About partner')}
+                initialValue={state.about}
+                placeholder={t('about_partner_placeholder', 'Describe the qualities you are looking for')}
+                maxNonSpace={PP_ABOUT_MAX}
+                multiline
+                minInputHeight={scale(150)}
+                presentation="drawer"
+                saving={saving}
+                pendingReview={aboutPendingReview}
+                sanitizeValue={(value) => trimToCharacterLimit(plainTextFromFormattedInput(value), PP_ABOUT_MAX)}
+                countValue={countCharacters}
+                onClose={() => {
+                    if (!saving) setAboutSheetOpen(false);
+                }}
+                onSave={(value) => void saveAbout(value)}
+            />
 
             <TextModerationWarningModal
                 warning={moderationWarning}
                 submitting={saving}
                 onEdit={() => {
                     setModerationWarning(null);
-                    setTimeout(() => aboutInputRef.current?.focus(), 150);
+                    setAboutSheetOpen(true);
                 }}
                 onClose={() => setModerationWarning(null)}
-                onSubmitAnyway={() => void save(true)}
+                onSubmitAnyway={() => void saveAbout(pendingAboutSubmissionRef.current ?? state.about, true)}
             />
 
             <ConfirmSheet
@@ -447,15 +585,24 @@ function SelectField({
     label,
     summary,
     hasSelection,
+    pendingReview = false,
+    summaryLines = 1,
+    accentSelection = true,
+    showDivider = true,
     onPress,
 }: {
     label: string;
     summary: string;
     hasSelection: boolean;
+    pendingReview?: boolean;
+    summaryLines?: number;
+    accentSelection?: boolean;
+    showDivider?: boolean;
     onPress: () => void;
 }) {
     const colors = useColors();
-    const { isRTL } = useLanguage();
+    const { isRTL, currentLanguage } = useLanguage();
+    const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     return (
         // Pressable shell only — layout on the inner View (Pressable can drop
         // function/array layout styles on this build)
@@ -466,17 +613,37 @@ function SelectField({
             style={({ pressed }) => (pressed ? { opacity: 0.85 } : null)}
         >
             <View
-                style={[
-                    styles.selectRow,
-                    { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border },
-                ]}
+                style={styles.selectRow}
             >
             <View style={styles.selectRowBody}>
-                <Text variant="body-sm" className="font-body-bold" style={styles.selectRowTitle}>{label}</Text>
+                <View style={styles.selectLabelLine}>
+                    <Text
+                        variant="body-sm"
+                        className="font-body-bold"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.86}
+                        style={[
+                            styles.selectRowTitle,
+                            usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
+                            { color: colors.chrome.common.textMuted },
+                        ]}
+                    >
+                        {label}
+                    </Text>
+                    {pendingReview ? <UnderReviewPill iconOnly iconSize={21} /> : null}
+                </View>
                 <Text
                     variant="body-sm"
-                    numberOfLines={1}
-                    style={{ color: hasSelection ? colors.chrome.primary : colors.chrome.common.textMuted, marginTop: scale(3) }}
+                    numberOfLines={summaryLines}
+                    style={{
+                        color: hasSelection
+                            ? accentSelection
+                                ? colors.chrome.primary
+                                : colors.brand.text.body
+                            : colors.chrome.common.textMuted,
+                        marginTop: scale(3),
+                    }}
                 >
                     {summary}
                 </Text>
@@ -486,67 +653,59 @@ function SelectField({
                 color={colors.chrome.common.textMuted}
                 style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }}
             />
+            {showDivider ? (
+                <View
+                    pointerEvents="none"
+                    style={[styles.fieldDivider, { backgroundColor: colors.brand.bg.border }]}
+                />
+            ) : null}
             </View>
         </Pressable>
     );
 }
 
 const styles = StyleSheet.create({
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    introCard: {
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+    content: {
+        paddingBottom: scale(24),
+    },
+    skeletonContainer: {
+        paddingHorizontal: scale(14),
+        paddingTop: scale(14),
+        paddingBottom: scale(24),
+        gap: scale(12),
+    },
+    introSection: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: scale(16),
+        paddingVertical: scale(16),
     },
     selectRow: {
-        borderWidth: 1,
-        borderRadius: 8,
         minHeight: 76,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+        paddingHorizontal: scale(16),
+        paddingVertical: scale(16),
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+        position: 'relative',
+    },
+    fieldDivider: {
+        position: 'absolute',
+        start: scale(16),
+        end: scale(16),
+        bottom: 0,
+        height: StyleSheet.hairlineWidth,
     },
     selectRowBody: { flex: 1, minWidth: 0 },
-    selectRowTitle: { fontSize: 14, lineHeight: 20 },
-    aboutCard: {
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingTop: 14,
-        paddingBottom: 12,
-    },
-    aboutLabelRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: scale(8),
-        marginBottom: scale(8),
-    },
-    aboutInput: {
-        minHeight: scale(120),
-        borderWidth: 1,
-        borderRadius: scale(10),
-        paddingHorizontal: scale(12),
-        paddingTop: scale(10),
-        fontSize: scale(14),
-        lineHeight: scale(21),
-        includeFontPadding: false,
-    },
-    aboutCounter: {
-        marginTop: scale(6),
-        textAlign: 'right',
-        writingDirection: 'ltr',
-    },
+    selectLabelLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: scale(8) },
+    selectRowTitle: { fontSize: 13, lineHeight: 17 },
+    latinFieldLabel: { letterSpacing: 1.2, textTransform: 'uppercase' },
+    naturalFieldLabel: { letterSpacing: 0, textTransform: 'none' },
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(10),
         paddingHorizontal: scale(14),
         paddingVertical: scale(12),
-        borderTopWidth: StyleSheet.hairlineWidth,
     },
     clearButton: {
         minWidth: scale(96),

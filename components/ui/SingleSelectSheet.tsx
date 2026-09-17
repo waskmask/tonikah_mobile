@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
     View,
     Pressable,
@@ -9,17 +9,18 @@ import {
     KeyboardAvoidingView,
     Platform,
     Dimensions,
-    ActivityIndicator,
 } from 'react-native';
 import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetBackdropProps,
     BottomSheetFlatList,
     BottomSheetTextInput,
+    useBottomSheetTimingConfigs,
 } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { SlideInLeft, SlideInRight } from 'react-native-reanimated';
+import Animated, { Easing, SlideInLeft, SlideInRight } from 'react-native-reanimated';
 import { Text } from './Text';
+import { Skeleton } from './Skeleton';
 import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
@@ -36,6 +37,7 @@ export interface SelectOption {
     label: string;
     description?: string;
     key?: string;
+    destructive?: boolean;
 }
 
 interface SingleSelectSheetProps {
@@ -52,6 +54,7 @@ interface SingleSelectSheetProps {
     loading?: boolean;
     error?: boolean;
     onRetry?: () => void;
+    optionMode?: 'select' | 'action';
 }
 
 const normalizeSearchText = (value: string) =>
@@ -75,6 +78,7 @@ export function SingleSelectSheet({
     loading = false,
     error = false,
     onRetry,
+    optionMode = 'select',
 }: SingleSelectSheetProps) {
     const { isDark } = useTheme();
     const palette = useColors();
@@ -84,8 +88,22 @@ export function SingleSelectSheet({
     const searchFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const optionFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.medium;
     const [search, setSearch] = useState('');
-    const resolvedPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
+    const sheetRef = useRef<BottomSheet>(null);
+    const nextPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
+    const wasVisibleRef = useRef(false);
+    const openPresentationRef = useRef(nextPresentation);
+    const isOpening = visible && !wasVisibleRef.current;
+    if (!visible || isOpening) openPresentationRef.current = nextPresentation;
+    const resolvedPresentation = visible ? openPresentationRef.current : nextPresentation;
     const isDrawer = resolvedPresentation === 'drawer';
+    const animationConfigs = useBottomSheetTimingConfigs({
+        duration: 220,
+        easing: Easing.bezier(0.32, 0.72, 0, 1),
+    });
+
+    React.useEffect(() => {
+        wasVisibleRef.current = visible;
+    }, [visible]);
 
     // Snapshot of the selection, taken when the drawer opens: that option is
     // pinned to the top so users can find their current choice in long lists
@@ -136,10 +154,17 @@ export function SingleSelectSheet({
     );
 
     const renderOption = ({ item }: { item: SelectOption }) => {
-        const isActive = item.value === selected;
+        const isActive = optionMode === 'select' && item.value === selected;
+        const optionColor = item.destructive
+            ? palette.brand.accent.error
+            : isActive
+                ? palette.chrome.primary
+                : palette.brand.text.body;
         return (
             <Pressable
                 onPress={() => handleSelect(item.value)}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
                 style={[
                     styles.option,
                     { flexDirection: 'row' },
@@ -155,8 +180,8 @@ export function SingleSelectSheet({
                                 fontSize: scale(15),
                                 fontFamily: optionFontFamily,
                                 textAlign: isRTL ? 'right' : 'left',
+                                color: optionColor,
                             },
-                            isActive && { color: palette.chrome.primary },
                         ]}
                     >
                         {item.label}
@@ -175,7 +200,7 @@ export function SingleSelectSheet({
                     )}
                 </View>
                 {/* Radio indicator: outline when idle, gradient-filled when chosen */}
-                {isActive ? (
+                {optionMode === 'action' ? null : isActive ? (
                     <View style={styles.radioActive}>
                         <LinearGradient
                             colors={[palette.brand.gradient.start, palette.brand.gradient.end]}
@@ -197,16 +222,20 @@ export function SingleSelectSheet({
         );
     };
 
-    const emptyList = (
+    const initialLoading = loading && options.length === 0;
+    const loadingSkeleton = (
+        <View style={styles.skeletonList} pointerEvents="none">
+            {[0, 1, 2].map((index) => (
+                <View key={index} style={styles.skeletonRow}>
+                    <Skeleton height={scale(16)} width={`${68 - index * 8}%`} borderRadius={scale(6)} />
+                    <Skeleton height={scale(20)} width={scale(20)} borderRadius={scale(10)} />
+                </View>
+            ))}
+        </View>
+    );
+    const emptyList = initialLoading ? loadingSkeleton : (
         <View style={styles.loadState}>
-            {loading ? (
-                <>
-                    <ActivityIndicator color={palette.chrome.primary} />
-                    <Text variant="body-sm" style={{ color: palette.brand.text.muted }}>
-                        {t('options_loading', 'Loading options...')}
-                    </Text>
-                </>
-            ) : error ? (
+            {error ? (
                 <>
                     <Text variant="body-sm" align="center" style={{ color: palette.brand.text.muted }}>
                         {t('options_load_error', 'Could not load options')}
@@ -233,13 +262,34 @@ export function SingleSelectSheet({
         (sum, option) => sum + (option.description ? scale(66) : scale(48)),
         0,
     );
-    const sheetHeight = Math.max(
+    const contentSheetHeight = Math.max(
         Math.min(
             scale(88) + (searchEnabled ? scale(54) : 0) + insets.bottom + rowsHeight,
             Dimensions.get('window').height * 0.75,
         ),
         minHeight || scale(180),
     );
+    const loadingSheetHeight = Math.min(
+        scale(280) + insets.bottom,
+        Dimensions.get('window').height * 0.48,
+    );
+    const sheetHeight = initialLoading ? loadingSheetHeight : contentSheetHeight;
+    const snapPoints = useMemo(() => [sheetHeight], [sheetHeight]);
+    const previousSheetHeightRef = useRef(sheetHeight);
+    React.useEffect(() => {
+        // The sheet already mounts at the current snap point. Resnapping while
+        // its opening animation is running makes it jump on slower devices.
+        if (!visible || isDrawer || isOpening) {
+            previousSheetHeightRef.current = sheetHeight;
+            return;
+        }
+        if (previousSheetHeightRef.current === sheetHeight) return;
+        previousSheetHeightRef.current = sheetHeight;
+        const frame = requestAnimationFrame(() => {
+            sheetRef.current?.snapToIndex(0, animationConfigs);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [animationConfigs, isDrawer, isOpening, sheetHeight, visible]);
 
     // ---- Sheet mode: gorhom BottomSheet inside a native RN Modal ----
     // The BottomSheetModal portal can render UNDER expo-router's native screen
@@ -257,8 +307,10 @@ export function SingleSelectSheet({
             >
                 <GestureHandlerRootView style={{ flex: 1 }}>
                     <BottomSheet
-                        snapPoints={[sheetHeight]}
+                        ref={sheetRef}
+                        snapPoints={snapPoints}
                         index={0}
+                        animationConfigs={animationConfigs}
                         enablePanDownToClose
                         enableDynamicSizing={false}
                         onClose={onClose}
@@ -332,7 +384,9 @@ export function SingleSelectSheet({
     }
 
     // ---- Drawer mode: full-screen slide-in with search ----
-    const drawerEntering = isRTL ? SlideInLeft.duration(220) : SlideInRight.duration(220);
+    const drawerEntering = isRTL
+        ? SlideInLeft.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1))
+        : SlideInRight.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1));
 
     return (
         <Modal
@@ -441,6 +495,17 @@ const styles = StyleSheet.create({
         gap: scale(12),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    skeletonList: {
+        paddingTop: scale(4),
+    },
+    skeletonRow: {
+        minHeight: scale(48),
+        paddingHorizontal: scale(20),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: scale(16),
     },
     retryButton: {
         minHeight: scale(40),

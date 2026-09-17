@@ -31,25 +31,34 @@ export function useMasterdataLists(types: readonly string[], language: string) {
     const [statusByType, setStatusByType] = useState<Record<string, MasterdataLoadStatus>>(initial.status);
 
     const publish = useCallback((type: string, items: MasterdataItem[]) => {
-        setData((current) => ({ ...current, [type]: items }));
+        setData((current) => current[type] === items ? current : { ...current, [type]: items });
         queryClient.setQueryData<Record<string, MasterdataItem[]>>(
             queryKeys.masterdata.editProfile(language),
-            (current = {}) => ({ ...current, [type]: items }),
+            (current = {}) => current[type] === items ? current : { ...current, [type]: items },
         );
     }, [language]);
 
-    const loadType = useCallback(async (type: string, generation: number, force = false) => {
+    const setStatus = useCallback((type: string, status: MasterdataLoadStatus) => {
+        setStatusByType((current) => current[type] === status ? current : { ...current, [type]: status });
+    }, []);
+
+    const loadType = useCallback(async (
+        type: string,
+        generation: number,
+        force = false,
+        versionPromise: Promise<string | null> = fetchMasterdataVersion(),
+    ) => {
         const cached = await readMasterdataCache(type, language);
         if (generation !== generationRef.current) return;
 
         if (cached) {
             publish(type, cached.items);
-            setStatusByType((current) => ({ ...current, [type]: 'ready' }));
+            setStatus(type, 'ready');
         } else {
-            setStatusByType((current) => ({ ...current, [type]: 'loading' }));
+            setStatus(type, 'loading');
         }
 
-        const serverVersion = await fetchMasterdataVersion();
+        const serverVersion = await versionPromise;
         if (generation !== generationRef.current) return;
         const versionChanged = Boolean(serverVersion && cached?.version !== serverVersion);
         if (!force && cached && isMasterdataFresh(cached) && !versionChanged) return;
@@ -58,12 +67,17 @@ export function useMasterdataLists(types: readonly string[], language: string) {
             const fresh = await refreshMasterdata(type, language, serverVersion);
             if (generation !== generationRef.current) return;
             publish(type, fresh.items);
-            setStatusByType((current) => ({ ...current, [type]: 'ready' }));
+            setStatus(type, 'ready');
         } catch {
             if (generation !== generationRef.current) return;
-            setStatusByType((current) => ({ ...current, [type]: cached ? 'ready' : 'error' }));
+            setStatus(type, cached ? 'ready' : 'error');
         }
-    }, [language, publish]);
+    }, [language, publish, setStatus]);
+
+    const loadAll = useCallback((generation: number) => {
+        const versionPromise = fetchMasterdataVersion();
+        types.forEach((type) => void loadType(type, generation, false, versionPromise));
+    }, [loadType, typesKey]);
 
     useEffect(() => {
         const generation = generationRef.current + 1;
@@ -71,11 +85,11 @@ export function useMasterdataLists(types: readonly string[], language: string) {
         const next = initialState(types, language);
         setData(next.data);
         setStatusByType(next.status);
-        types.forEach((type) => void loadType(type, generation));
+        loadAll(generation);
         return () => {
             if (generationRef.current === generation) generationRef.current += 1;
         };
-    }, [language, loadType, typesKey]);
+    }, [language, loadAll, typesKey]);
 
     const retry = useCallback((type: string) => {
         const generation = generationRef.current;
@@ -85,8 +99,8 @@ export function useMasterdataLists(types: readonly string[], language: string) {
 
     const revalidate = useCallback(() => {
         const generation = generationRef.current;
-        types.forEach((type) => void loadType(type, generation));
-    }, [loadType, typesKey]);
+        loadAll(generation);
+    }, [loadAll]);
 
     return { data, statusByType, retry, revalidate };
 }

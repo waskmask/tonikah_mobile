@@ -47,7 +47,7 @@ export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
 
     const iconChipBg = colors.brand.bg.surface;
     const iconChipBorder = colors.brand.bg.border;
-    // header.icon: #5C5348 light / #D8CFC2 dark — darker than text.subtitle in light mode
+    // Header icons stay stronger than subtitle text in both themes.
     const iconColor = colors.chrome.header.icon;
 
     return (

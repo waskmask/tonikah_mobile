@@ -27,11 +27,11 @@ import { Typography } from "@/constants/typography";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Design-handoff tokens (hands_off/onboarding_screens) — warm cream / warm
-// charcoal palette local to onboarding; the coral accent stays shared.
+// Onboarding keeps its expressive coral treatment while sharing the app's
+// white light canvas and charcoal dark canvas.
 const TOKENS = {
     light: {
-        bg: "#FBF6F0",
+        bg: "#FFFFFF",
         glowColor: "#FF9678",
         glowOpacity: 0.09,
         fg: "#141826",
@@ -46,19 +46,19 @@ const TOKENS = {
         contrastBtnText: "#FFFFFF",
     },
     dark: {
-        bg: "#141210",
+        bg: "#101011",
         glowColor: "#FF786E",
         glowOpacity: 0.05,
-        fg: "#F4EEE6",
-        eyebrow: "#B7A99A",
-        muted: "rgba(244,238,230,0.64)",
-        wordmark: "#FDF6EE",
-        line: "rgba(255,220,200,0.24)",
-        lattice: "rgba(255,220,200,0.07)",
-        dot: "rgba(255,245,235,0.20)",
-        terms: "#F4EEE6",
-        contrastBtnBg: "#F4EEE6",
-        contrastBtnText: "#141826",
+        fg: "#F5F5F5",
+        eyebrow: "#B0B0B5",
+        muted: "rgba(229,229,231,0.64)",
+        wordmark: "#F5F5F5",
+        line: "rgba(229,229,231,0.24)",
+        lattice: "rgba(229,229,231,0.07)",
+        dot: "rgba(229,229,231,0.20)",
+        terms: "#F5F5F5",
+        contrastBtnBg: "#F5F5F5",
+        contrastBtnText: "#101011",
     },
 };
 

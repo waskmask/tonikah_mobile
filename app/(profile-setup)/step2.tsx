@@ -40,7 +40,7 @@ export default function Step2() {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const isFemale = gender === 'female';
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     const languageOptions = useMemo(() => {
         return LANGUAGE_OPTIONS.map((key) => ({

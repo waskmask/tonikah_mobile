@@ -12,6 +12,7 @@ import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
+import { localeUsesLatinScript } from '@/lib/textDirection';
 import {
     ExploreFilterState,
     FilterSelectKey,
@@ -197,16 +198,19 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         presentation="band"
                         isRTL={isRTL}
                     />
-                    {(Object.keys(LABELS) as FilterSelectKey[]).map((key) => (
+                    {(Object.keys(LABELS) as FilterSelectKey[]).map((key, index, keys) => (
                         <SelectRow
                             key={key}
                             label={t(LABELS[key], LABELS[key].replace(/_/g, ' '))}
                             values={draft[key]}
                             options={options[key]}
+                            currentLanguage={currentLanguage}
                             isRTL={isRTL}
                             primaryColor={colors.chrome.primary}
+                            labelColor={colors.chrome.common.textMuted}
                             borderColor={colors.brand.bg.border}
                             mutedColor={colors.chrome.common.textSubtle}
+                            isLast={index === keys.length - 1}
                             onOpen={() => openSelect(key)}
                             onClear={() => updateSelect(key, [])}
                         />
@@ -249,23 +253,30 @@ function SelectRow({
     label,
     values,
     options,
+    currentLanguage,
     isRTL,
     primaryColor,
+    labelColor,
     borderColor,
     mutedColor,
+    isLast,
     onOpen,
     onClear,
 }: {
     label: string;
     values: string[];
     options: DrawerOption[];
+    currentLanguage: string;
     isRTL: boolean;
     primaryColor: string;
+    labelColor: string;
     borderColor: string;
     mutedColor: string;
+    isLast: boolean;
     onOpen: () => void;
     onClear: () => void;
 }) {
+    const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     const text = values.length
         ? values.map((value) => options.find((item) => item.value === value)?.label || value).join(', ')
         : t('any', 'Any');
@@ -274,30 +285,44 @@ function SelectRow({
             onPress={onOpen}
             accessibilityRole="button"
             accessibilityLabel={`${label}, ${text}`}
-            style={[styles.row, { borderColor }]}
+            style={[styles.row, { borderColor }, isLast && styles.lastRow]}
         >
             <View style={styles.rowText}>
-                <Text variant="body-sm" className="font-body-bold" style={[styles.selectTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+                <Text
+                    variant="body-sm"
+                    className="font-body-bold"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.86}
+                    style={[
+                        styles.selectTitle,
+                        usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
+                        { color: labelColor, textAlign: isRTL ? 'right' : 'left' },
+                    ]}
+                >
+                    {label}
+                </Text>
                 <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? primaryColor : mutedColor, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
             </View>
-            {values.length > 0 ? (
-                <Pressable
-                    onPress={(event) => {
-                        event.stopPropagation();
-                        onClear();
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('clear', 'Clear')} ${label}`}
-                    hitSlop={6}
-                    style={styles.rowIcon}
-                >
-                    <X size={16} color={primaryColor} />
-                </Pressable>
-            ) : (
+            <View style={styles.rowActions}>
+                {values.length > 0 ? (
+                    <Pressable
+                        onPress={(event) => {
+                            event.stopPropagation();
+                            onClear();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('clear', 'Clear')} ${label}`}
+                        hitSlop={6}
+                        style={styles.rowIcon}
+                    >
+                        <X size={16} color={primaryColor} />
+                    </Pressable>
+                ) : null}
                 <View style={styles.rowIcon}>
                     <ChevronLeft size={18} color={mutedColor} style={{ transform: [{ rotate: isRTL ? '0deg' : '180deg' }] }} />
                 </View>
-            )}
+            </View>
         </Pressable>
     );
 }
@@ -330,10 +355,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
         minHeight: 72,
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 16,
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 10,
+    },
+    lastRow: {
+        borderBottomWidth: 0,
     },
     rowText: {
         flex: 1,
@@ -348,9 +376,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    rowActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexShrink: 0,
+    },
     selectTitle: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 13,
+        lineHeight: 17,
+    },
+    latinFieldLabel: {
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+    },
+    naturalFieldLabel: {
+        letterSpacing: 0,
+        textTransform: 'none',
     },
     footer: {
         borderTopWidth: 1,

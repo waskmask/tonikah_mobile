@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import {
     buildPartnerPrefPayload,
+    buildPartnerPrefPatch,
     cmToFtIn,
     defaultPartnerPrefState,
     formatHeightLabel,
@@ -14,6 +15,7 @@ import {
     countCharacters,
     PP_ABOUT_MAX,
 } from '../lib/partnerPreference';
+import { plainTextFromFormattedInput } from '../lib/profileValidation';
 
 // -- cmToFtIn (web-exact incl. 12" carry) ------------------------------------
 assert.equal(cmToFtIn(170), `5'7"`);
@@ -50,6 +52,26 @@ assert.equal(payload.height.from.label, `${cmToFtIn(155)} (155 cm)`);
 assert.equal(payload.height.to.label, `${cmToFtIn(180)} (180 cm)`);
 assert.equal(payload.about_partner, 'Kind and practising.');
 assert.deepEqual(payload.languages_spoken, ['arabic', 'urdu']); // raw slugs, untranslated
+
+const formattedAbout = buildPartnerPrefPayload({
+    ...state,
+    about: '<p>Kind and <strong>honest</strong>.</p><p>**Family oriented**</p>',
+});
+assert.equal(formattedAbout.about_partner, 'Kind and honest.\n\nFamily oriented');
+assert.equal(plainTextFromFormattedInput('first_last_name'), 'first_last_name');
+assert.equal(plainTextFromFormattedInput('<script>bad()</script><strong>Safe</strong>'), ' Safe');
+
+// -- One category can be cleared without changing the others -----------------
+const clearedEthnicPayload = buildPartnerPrefPayload({ ...state, ethnic: [] });
+assert.deepEqual(clearedEthnicPayload.ethnic_group_ids, []);
+assert.deepEqual(clearedEthnicPayload.marital_status, ['never_married']);
+assert.deepEqual(clearedEthnicPayload.languages_spoken, ['arabic', 'urdu']);
+
+const ageOnlyPatch = buildPartnerPrefPatch({ ...state, ageTo: 35 }, state);
+assert.deepEqual(ageOnlyPatch, { age: { from: 25, to: 35 } });
+
+const clearOnlyEthnicPatch = buildPartnerPrefPatch({ ...state, ethnic: [] }, state);
+assert.deepEqual(clearOnlyEthnicPatch, { ethnic_group_ids: [] });
 
 // -- Hydration clamps out-of-range server values -----------------------------
 const clamped = hydratePartnerPrefState(

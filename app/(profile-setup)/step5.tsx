@@ -24,7 +24,7 @@ export default function Step5() {
     const { t, i18n } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     const [education, setEducation] = useState('');
     const [occupation, setOccupation] = useState('');

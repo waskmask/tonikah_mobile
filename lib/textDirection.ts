@@ -11,6 +11,17 @@ const RTL_LOCALES = new Set([
     'ur',
     'yi',
 ]);
+const LATIN_SCRIPT_LOCALES = new Set([
+    'de',
+    'en',
+    'es',
+    'fr',
+    'id',
+    'it',
+    'pl',
+    'pt',
+    'tr',
+]);
 const LETTER_REGEX = new RegExp(String.fromCharCode(92) + 'p{L}', 'u');
 
 function isRtlCodePoint(codePoint: number): boolean {
@@ -27,6 +38,11 @@ function isRtlCodePoint(codePoint: number): boolean {
 export function localeTextDirection(locale?: string): TextDirection {
     const language = String(locale || '').toLowerCase().split(/[-_]/)[0];
     return RTL_LOCALES.has(language) ? 'rtl' : 'ltr';
+}
+
+export function localeUsesLatinScript(locale?: string): boolean {
+    const language = String(locale || '').toLowerCase().split(/[-_]/)[0];
+    return LATIN_SCRIPT_LOCALES.has(language);
 }
 
 export function getTextDirection(

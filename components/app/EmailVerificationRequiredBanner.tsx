@@ -70,7 +70,7 @@ export function EmailVerificationRequiredBanner({
     const muted = colors.brand.text.subtitle;
     const accent = colors.chrome.primary;
     const iconBackground = isDark ? 'rgba(243,75,111,0.16)' : 'rgba(243,75,111,0.10)';
-    const darkButton = '#141210';
+    const darkButton = '#101011';
     const outline = isDark ? colors.brand.text.heading : darkButton;
 
     return (

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
     View,
     Pressable,
@@ -11,8 +11,16 @@ import {
     Dimensions,
     ActivityIndicator,
 } from 'react-native';
-import Animated, { FadeIn, SlideInDown, SlideInLeft, SlideInRight } from 'react-native-reanimated';
+import BottomSheet, {
+    BottomSheetBackdrop,
+    BottomSheetBackdropProps,
+    BottomSheetFlatList,
+    BottomSheetTextInput,
+    useBottomSheetTimingConfigs,
+} from '@gorhom/bottom-sheet';
+import Animated, { Easing, FadeIn, SlideInDown, SlideInLeft, SlideInRight } from 'react-native-reanimated';
 import { Text } from './Text';
+import { Skeleton } from './Skeleton';
 import { GradientButton } from './GradientButton';
 import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -20,6 +28,7 @@ import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { Search, X, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Typography } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
 
@@ -36,6 +45,7 @@ interface MultiSelectSheetProps {
     selected: string[];
     title: string;
     maxSelections?: number;
+    allowEmptySelection?: boolean;
     searchEnabled?: boolean;
     searchPlaceholder?: string;
     presentation?: 'sheet' | 'drawer';
@@ -59,6 +69,7 @@ export function MultiSelectSheet({
     selected: initialSelected,
     title,
     maxSelections,
+    allowEmptySelection = false,
     searchEnabled = true,
     searchPlaceholder = 'Search...',
     presentation,
@@ -72,12 +83,19 @@ export function MultiSelectSheet({
     const insets = useSafeAreaInsets();
     const searchFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const [search, setSearch] = useState('');
+    const sheetRef = React.useRef<BottomSheet>(null);
     const [localSelected, setLocalSelected] = useState<string[]>(initialSelected);
     const resolvedPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
     const isDrawer = resolvedPresentation === 'drawer';
+    const animationConfigs = useBottomSheetTimingConfigs({
+        duration: 220,
+        easing: Easing.bezier(0.32, 0.72, 0, 1),
+    });
     // Reanimated `entering` starts when the view mounts inside the modal
     // window — effect-driven animations race the window and look stuck.
-    const drawerEntering = isRTL ? SlideInLeft.duration(220) : SlideInRight.duration(220);
+    const drawerEntering = isRTL
+        ? SlideInLeft.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1))
+        : SlideInRight.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1));
 
     // Sync when initial changes
     React.useEffect(() => {
@@ -136,6 +154,205 @@ export function MultiSelectSheet({
         setSearch('');
     };
 
+    const renderBackdrop = useCallback(
+        (props: BottomSheetBackdropProps) => (
+            <BottomSheetBackdrop
+                {...props}
+                appearsOnIndex={0}
+                disappearsOnIndex={-1}
+                pressBehavior="close"
+                opacity={0.4}
+            />
+        ),
+        [],
+    );
+
+    const initialLoading = loading && options.length === 0;
+    const rowsHeight = options.length * scale(48);
+    const contentSheetHeight = Math.max(
+        Math.min(
+            scale(166) + (searchEnabled ? scale(54) : 0) + insets.bottom + rowsHeight,
+            Dimensions.get('window').height * 0.75,
+        ),
+        scale(240),
+    );
+    const loadingSheetHeight = Math.min(
+        scale(350) + insets.bottom,
+        Dimensions.get('window').height * 0.55,
+    );
+    const sheetHeight = initialLoading ? loadingSheetHeight : contentSheetHeight;
+    const previousSheetHeightRef = React.useRef(sheetHeight);
+    React.useEffect(() => {
+        if (!visible || isDrawer) {
+            previousSheetHeightRef.current = sheetHeight;
+            return;
+        }
+        if (previousSheetHeightRef.current === sheetHeight) return;
+        previousSheetHeightRef.current = sheetHeight;
+        const frame = requestAnimationFrame(() => {
+            sheetRef.current?.snapToPosition(sheetHeight, animationConfigs);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [animationConfigs, isDrawer, sheetHeight, visible]);
+
+    const sheetEmptyState = initialLoading ? (
+        <View style={styles.skeletonList} pointerEvents="none">
+            {[0, 1, 2].map((index) => (
+                <View key={index} style={styles.skeletonRow}>
+                    <Skeleton height={scale(20)} width={scale(20)} borderRadius={scale(6)} />
+                    <Skeleton height={scale(16)} width={`${68 - index * 8}%`} borderRadius={scale(6)} />
+                </View>
+            ))}
+        </View>
+    ) : (
+        <View style={styles.loadState}>
+            <Text variant="body-sm" align="center" style={{ color: palette.brand.text.muted }}>
+                {error
+                    ? t('options_load_error', 'Could not load options')
+                    : t('no_results_found', 'No results found')}
+            </Text>
+            {error && onRetry ? (
+                <Pressable onPress={onRetry} accessibilityRole="button" style={styles.retryButton}>
+                    <Text variant="body-sm" className="font-body-semi" style={{ color: palette.chrome.primary }}>
+                        {t('btn_try_again', 'Try again')}
+                    </Text>
+                </Pressable>
+            ) : null}
+        </View>
+    );
+
+    if (!isDrawer) {
+        return (
+            <Modal
+                visible={visible}
+                transparent
+                animationType="none"
+                statusBarTranslucent
+                navigationBarTranslucent
+                hardwareAccelerated
+                onRequestClose={handleClose}
+            >
+                <GestureHandlerRootView style={styles.modalRoot}>
+                    <BottomSheet
+                        ref={sheetRef}
+                        snapPoints={[sheetHeight]}
+                        index={0}
+                        animationConfigs={animationConfigs}
+                        enablePanDownToClose
+                        enableDynamicSizing={false}
+                        onClose={handleClose}
+                        backdropComponent={renderBackdrop}
+                        backgroundStyle={{ backgroundColor: palette.chrome.common.card }}
+                        handleIndicatorStyle={{ backgroundColor: palette.brand.text.muted }}
+                        keyboardBehavior="extend"
+                        keyboardBlurBehavior="restore"
+                        android_keyboardInputMode="adjustResize"
+                    >
+                        <View style={styles.header}>
+                            <Text variant="body-sm" className="font-body-bold" style={styles.sheetTitle}>
+                                {title}
+                            </Text>
+                            <Pressable onPress={handleClose} hitSlop={12}>
+                                <X size={scale(20)} color={palette.brand.text.subtitle} />
+                            </Pressable>
+                        </View>
+
+                        {searchEnabled && (
+                            <View style={[styles.searchContainer, { borderBottomColor: palette.brand.bg.border }]}>
+                                <Search size={scale(16)} color={palette.brand.text.muted} />
+                                <BottomSheetTextInput
+                                    value={search}
+                                    onChangeText={setSearch}
+                                    placeholder={searchPlaceholder}
+                                    placeholderTextColor={palette.brand.text.muted}
+                                    style={[
+                                        styles.searchInput,
+                                        {
+                                            color: palette.brand.text.body,
+                                            fontFamily: searchFontFamily,
+                                            textAlign: isRTL ? 'right' : 'left',
+                                        },
+                                    ]}
+                                />
+                                {search.length > 0 && (
+                                    <Pressable onPress={() => setSearch('')} hitSlop={8}>
+                                        <X size={scale(14)} color={palette.brand.text.muted} />
+                                    </Pressable>
+                                )}
+                            </View>
+                        )}
+
+                        <BottomSheetFlatList
+                            data={filtered}
+                            keyExtractor={(item: MultiSelectOption) => item.value}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="always"
+                            initialNumToRender={16}
+                            ListEmptyComponent={sheetEmptyState}
+                            renderItem={({ item }: { item: MultiSelectOption }) => {
+                                const isChecked = localSelected.includes(item.value);
+                                const isMaxed = !isChecked && maxSelections
+                                    ? localSelected.length >= maxSelections
+                                    : false;
+                                return (
+                                    <Pressable
+                                        onPress={() => toggleItem(item.value)}
+                                        disabled={isMaxed}
+                                        style={[
+                                            styles.option,
+                                            isMaxed && { opacity: 0.4 },
+                                            isChecked && { backgroundColor: palette.chrome.common.primaryTint },
+                                        ]}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.checkbox,
+                                                {
+                                                    borderColor: isChecked ? palette.chrome.primary : palette.brand.text.muted,
+                                                    backgroundColor: isChecked ? palette.chrome.primary : 'transparent',
+                                                },
+                                            ]}
+                                        >
+                                            {isChecked && (
+                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} strokeWidth={3} />
+                                            )}
+                                        </View>
+                                        <Text
+                                            variant="body"
+                                            style={[
+                                                styles.optionLabel,
+                                                { color: palette.brand.text.body, textAlign: isRTL ? 'right' : 'left' },
+                                                isChecked && { color: palette.chrome.primary },
+                                            ]}
+                                        >
+                                            {item.label}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            }}
+                        />
+
+                        <View style={[styles.footer, { paddingBottom: insets.bottom + scale(10) }]}>
+                            <Text variant="caption" align="center" style={[styles.countText, { color: palette.brand.text.muted }]}>
+                                {maxSelections
+                                    ? `${localSelected.length}/${maxSelections} ${t('selected', 'selected')}`
+                                    : `${localSelected.length} ${t('selected', 'selected')}`}
+                            </Text>
+                            <GradientButton
+                                title={t('done', 'Done')}
+                                onPress={handleDone}
+                                disabled={loading || error || (!allowEmptySelection && localSelected.length === 0)}
+                                widthMode="full"
+                                height={40}
+                                textSize={15}
+                            />
+                        </View>
+                    </BottomSheet>
+                </GestureHandlerRootView>
+            </Modal>
+        );
+    }
+
     return (
         <Modal
             visible={visible}
@@ -148,7 +365,7 @@ export function MultiSelectSheet({
             hardwareAccelerated
             onRequestClose={handleClose}
         >
-            <View style={isDrawer ? styles.drawerOverlay : styles.modalRoot}>
+            <GestureHandlerRootView style={isDrawer ? styles.drawerOverlay : styles.modalRoot}>
                 {!isDrawer && (
                     <Animated.View entering={FadeIn.duration(140)} style={styles.backdrop}>
                         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
@@ -160,7 +377,11 @@ export function MultiSelectSheet({
                     pointerEvents="box-none"
                 >
                     <Animated.View
-                        entering={isDrawer ? drawerEntering : SlideInDown.duration(240)}
+                        entering={
+                            isDrawer
+                                ? drawerEntering
+                                : SlideInDown.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1))
+                        }
                         style={[
                             isDrawer ? styles.drawer : styles.sheet,
                             { backgroundColor: palette.chrome.common.card },
@@ -245,10 +466,10 @@ export function MultiSelectSheet({
                             data={filtered}
                             keyExtractor={(item) => item.value}
                             showsVerticalScrollIndicator={false}
-                            style={isDrawer ? styles.drawerList : { maxHeight: scale(350) }}
-                            keyboardShouldPersistTaps="handled"
+                            style={isDrawer ? styles.drawerList : styles.sheetList}
+                            keyboardShouldPersistTaps="always"
+                            nestedScrollEnabled
                             initialNumToRender={16}
-                            removeClippedSubviews
                             renderItem={({ item }) => {
                                 const isChecked = localSelected.includes(item.value);
                                 const isMaxed = !isChecked && maxSelections
@@ -347,7 +568,7 @@ export function MultiSelectSheet({
                             <GradientButton
                                 title={t('done', 'Done')}
                                 onPress={handleDone}
-                                disabled={loading || error || localSelected.length === 0}
+                                disabled={loading || error || (!allowEmptySelection && localSelected.length === 0)}
                                 widthMode="full"
                                 height={40}
                                 textSize={15}
@@ -355,7 +576,7 @@ export function MultiSelectSheet({
                         </View>
                     </Animated.View>
                 </KeyboardAvoidingView>
-            </View>
+            </GestureHandlerRootView>
         </Modal>
     );
 }
@@ -367,6 +588,16 @@ const styles = StyleSheet.create({
         gap: scale(12),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    skeletonList: {
+        paddingTop: scale(4),
+    },
+    skeletonRow: {
+        minHeight: scale(48),
+        paddingHorizontal: scale(20),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(12),
     },
     retryButton: {
         minHeight: scale(40),
@@ -399,7 +630,6 @@ const styles = StyleSheet.create({
     sheet: {
         borderTopLeftRadius: scale(20),
         borderTopRightRadius: scale(20),
-        paddingBottom: scale(34),
         maxHeight: '85%',
     },
     drawer: {
@@ -482,6 +712,10 @@ const styles = StyleSheet.create({
     },
     drawerList: {
         flex: 1,
+    },
+    sheetList: {
+        flexShrink: 1,
+        maxHeight: scale(350),
     },
     // Same size + stroke as the single-select radio
     checkbox: {

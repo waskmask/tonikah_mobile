@@ -175,7 +175,7 @@ export default function Step1() {
     const getDisplayLabel = (value: string, opts: SelectOption[]) =>
         opts.find((o) => o.value === value)?.label || '';
 
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     return (
         <SafeAreaView className="flex-1 bg-brand-bg-primary">

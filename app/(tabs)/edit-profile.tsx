@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
   Pressable,
+  RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
@@ -43,6 +44,7 @@ import { AppBackTitleBar } from "@/components/app/AppBackTitleBar";
 import { EditProfileMediaEditor } from "@/components/profile/EditProfileMediaEditor";
 import { ProfileCompletionBar } from "@/components/profile/ProfileCompletionBar";
 import { ProfileSummaryEditor, type ProfileSummaryEditorHandle } from "@/components/profile/ProfileSummaryEditor";
+import { CompletionImpactBadge } from "@/components/profile/CompletionImpactBadge";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
 import { IncomeEditSheet } from "@/components/ui/IncomeEditSheet";
 import { MultiSelectOption, MultiSelectSheet } from "@/components/ui/MultiSelectSheet";
@@ -54,11 +56,13 @@ import { Typography } from "@/constants/typography";
 import { useEmailVerificationGuard } from "@/hooks/useEmailVerificationGuard";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useMasterdataLists } from "@/hooks/useMasterdataLists";
+import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { useUnsavedNavigationGuard } from "@/hooks/useUnsavedNavigationGuard";
 import { type GalleryItem, type GalleryPrivacy, type GalleryResponse } from "@/lib/galleryService";
+import { isQualifiedGalleryImage } from "@/lib/galleryQualification";
 import {
   buildMissingImpactGroups,
   calculateWeightedMissingImpacts,
@@ -76,8 +80,8 @@ import {
 import { profileService } from "@/lib/profileService";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
+import { localeUsesLatinScript } from "@/lib/textDirection";
 import {
-  extractModerationRejection,
   getTextModerationWarning,
   moderationCandidateForEditing,
   pendingModerationCandidate,
@@ -93,6 +97,8 @@ import {
   isAllowedProfileText,
   MAX_INCOME,
   parseAmount,
+  plainTextFromFormattedInput,
+  trimToNonSpaceLimit,
 } from "@/lib/profileValidation";
 import { useAuthStore } from "@/store/authStore";
 
@@ -129,12 +135,12 @@ const NOT_SET = "Not set";
 const PRIMARY = "#F34B6F";
 
 const themeColors = (isDark: boolean) => ({
-  background: isDark ? "#211D18" : "#F7F3ED",
-  surface: isDark ? "#141210" : "#FFFFFF",
-  card: isDark ? "#1B1713" : "#F7F3ED",
-  border: isDark ? "#3A332B" : "#E8E1D6",
-  text: isDark ? "#F7F3ED" : "#201B15",
-  muted: isDark ? "#A99C8D" : "#7D7266",
+  background: isDark ? "#101011" : "#FFFFFF",
+  surface: isDark ? "#18181A" : "#FFFFFF",
+  card: isDark ? "#1D1D1F" : "#FFFFFF",
+  border: isDark ? "#303033" : "#EEEEEE",
+  text: isDark ? "#E5E5E7" : "#201B15",
+  muted: isDark ? "#B0B0B5" : "#7D7266",
   primary: PRIMARY,
 });
 
@@ -203,6 +209,8 @@ const hasValue = (value: unknown) => {
 const localCompletion = (profile: any, gallery: GalleryItem[]): CompletionState => {
   const gender = profile?.gender;
   const keys = completionFields(gender);
+  const qualifiedGallery = gallery.filter(isQualifiedGalleryImage);
+  const avatarUuid = profile?.avatar?.uuid;
   const checks: Record<string, boolean> = {
     profileName: hasValue(profile?.profileName || profile?.profile_name),
     gender: hasValue(profile?.gender),
@@ -230,8 +238,10 @@ const localCompletion = (profile: any, gallery: GalleryItem[]): CompletionState 
     prayers: hasValue(profile?.prayers),
     smoking: hasValue(profile?.smoking),
     alcohol: hasValue(profile?.alcohol),
-    avatar: hasValue(profile?.avatar) || gallery.some((item) => item.isPrimary),
-    gallery: gallery.length > 0,
+    avatar: Boolean(
+      avatarUuid && qualifiedGallery.some((item) => item.uuid === avatarUuid),
+    ),
+    gallery: qualifiedGallery.length > 0,
     bio: hasValue(profile?.bio),
     profile_headline: hasValue(profile?.profile_headline),
     profile_manager: hasValue(profile?.profile_manager),
@@ -386,12 +396,15 @@ async function withLocationTimeout<T>(promise: Promise<T>, timeoutMs = 12000): P
 export default function EditProfileScreen() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const { isDark } = useTheme();
+  const palette = useColors();
   const { currentLanguage, isRTL } = useLanguage();
+  const usesLatinLabels = localeUsesLatinScript(currentLanguage);
   const { scale } = useResponsive();
   const colors = useMemo(() => themeColors(isDark), [isDark]);
   const toast = useToast();
   const { requireVerified } = useEmailVerificationGuard();
   const refreshUser = useAuthStore((state) => state.refreshUser);
+  const patchUserProfile = useAuthStore((state) => state.patchUserProfile);
   const authUser = useAuthStore((state) => state.user);
   const returnHref = useMemo(() => {
     const candidate = Array.isArray(returnTo) ? returnTo[0] : returnTo;
@@ -449,6 +462,7 @@ export default function EditProfileScreen() {
   const [locationSettingsOpen, setLocationSettingsOpen] = useState(false);
   const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
   const [loading, setLoading] = useState(!cachedProfile);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
   const [summaryDirty, setSummaryDirty] = useState(false);
@@ -456,17 +470,15 @@ export default function EditProfileScreen() {
   const [summaryDiscarding, setSummaryDiscarding] = useState(false);
   const summaryEditorRef = useRef<ProfileSummaryEditorHandle>(null);
   const initialLoadStartedRef = useRef(false);
+  const masterdataFocusStartedRef = useRef(false);
   const hasCachedProfileRef = useRef(Boolean(cachedProfile));
   const leaveEditProfile = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
     router.replace(returnHref as any);
   }, [returnHref]);
   const summaryNavigation = useUnsavedNavigationGuard({
     dirty: summaryDirty,
     leaveFallback: leaveEditProfile,
+    redirectRemovalToFallback: true,
   });
 
   const saveSummaryAndLeave = useCallback(async () => {
@@ -554,12 +566,28 @@ export default function EditProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      revalidateMasterdata();
+      if (masterdataFocusStartedRef.current) {
+        revalidateMasterdata();
+      } else {
+        masterdataFocusStartedRef.current = true;
+      }
       const showLoader = !initialLoadStartedRef.current && !hasCachedProfileRef.current;
       initialLoadStartedRef.current = true;
       void loadProfile(showLoader);
     }, [loadProfile, revalidateMasterdata]),
   );
+
+  const refreshBlocked = saving || Boolean(savingField) || summaryDirty;
+  const refreshProfile = useCallback(async () => {
+    if (refreshBlocked || refreshing) return;
+    setRefreshing(true);
+    try {
+      revalidateMasterdata();
+      await loadProfile(false);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadProfile, refreshBlocked, refreshing, revalidateMasterdata]);
 
   const makeTranslatedOptions = useCallback(
     (values: readonly string[], namespace?: string): SelectOption[] =>
@@ -785,7 +813,7 @@ export default function EditProfileScreen() {
           {
             id: "ethnic_group",
             label: t("profile.ethnic_group", "Ethnic group"),
-            value: formatSelect(profile?.ethnic_group, fallbackText),
+            value: formatList(profile?.ethnic_group, fallbackText),
             completionKey: "ethnic_group",
             icon: Users,
           },
@@ -1036,8 +1064,6 @@ export default function EditProfileScreen() {
         if (response.success === false) {
           const warning = getTextModerationWarning(response);
           if (warning) {
-            const rejection = extractModerationRejection(response);
-            if (rejection) setErrors((current) => ({ ...current, ...rejection.fieldErrors }));
             setModerationWarning(warning);
           } else {
             toast.show(apiMessage(String(response.message || ""), t("profile.update_error", "Could not update profile.")), "error");
@@ -1047,21 +1073,28 @@ export default function EditProfileScreen() {
         setModerationWarning(null);
         setCompany(cleaned);
         setCompanySheetOpen(false);
-        const nextProfile = response.profile || response.user?.profile || { ...(profile || {}), company: cleaned };
+        const nextProfile = {
+          ...(profile || {}),
+          ...(response.profile || response.user?.profile || {}),
+          company: cleaned,
+        };
         setProfile(nextProfile);
-        await refreshUser();
+        patchUserProfile(nextProfile);
         const savedForReview = Boolean(
-          pendingModerationCandidate(
-            useAuthStore.getState().user?.profile?.contentModeration?.company,
-          ),
+          pendingModerationCandidate(nextProfile.contentModeration?.company),
         );
-        await loadCompletion(nextProfile, gallery);
         toast.show(
           submitAnyway || savedForReview
             ? t("moderation_submit_anyway_success", "Submitted for review.")
             : t("profile.profile_updated", "Profile updated."),
           "success",
         );
+        setTimeout(() => {
+          void Promise.allSettled([
+            refreshUser(),
+            loadCompletion(nextProfile, gallery),
+          ]);
+        }, 0);
       } catch (error) {
         toast.show(apiMessage(String((error as any)?.message || ""), t("profile.update_error", "Could not update profile.")), "error");
       } finally {
@@ -1303,12 +1336,19 @@ export default function EditProfileScreen() {
   const renderFieldSection = (section: { title: string; rows: FieldRow[] }) => (
     <View
       key={section.title}
-      style={[styles.sectionCard, { borderColor: colors.border, backgroundColor: colors.background }]}
+      style={[styles.sectionCard, styles.fieldSection, { borderColor: colors.border, backgroundColor: colors.background }]}
     >
       <Text
         variant="caption"
         className="font-body-semi"
-        style={[styles.sectionTitle, { color: colors.muted, fontSize: scale(13) }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.86}
+        style={[
+          styles.sectionTitle,
+          usesLatinLabels ? styles.latinSectionLabel : styles.naturalLabel,
+          { color: palette.chrome.common.textStrong, fontSize: scale(16), lineHeight: scale(21) },
+        ]}
       >
         {section.title}
       </Text>
@@ -1319,11 +1359,12 @@ export default function EditProfileScreen() {
         const notSet = row.value === fallbackText;
 
         return (
-          // Pressable is only a shell: on this build a Pressable with
-          // function/array styles can drop its layout styles, stacking the
-          // row into a column — layout lives on the inner plain View
+          <Fragment key={row.id}>
+          {index > 0 ? (
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border }]} />
+          ) : null}
+          {/* Pressable is only the interaction shell; row layout stays on the inner View. */}
           <Pressable
-            key={row.id}
             onPress={() => openFieldEditor(row)}
             disabled={Boolean(savingField)}
             accessibilityRole="button"
@@ -1335,7 +1376,6 @@ export default function EditProfileScreen() {
             <View
               style={[
                 styles.row,
-                index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
                 missing && { backgroundColor: "rgba(243,75,111,0.07)" },
               ]}
             >
@@ -1347,7 +1387,7 @@ export default function EditProfileScreen() {
                     : {
                         backgroundColor: isDark
                           ? "rgba(255,255,255,0.06)"
-                          : "rgba(24,19,14,0.06)",
+                          : "rgba(16,16,17,0.06)",
                       },
                 ]}
               >
@@ -1355,9 +1395,20 @@ export default function EditProfileScreen() {
               </View>
               <View style={styles.rowContent}>
                 <View style={styles.rowTop}>
-                  <Text style={[styles.rowLabel, { color: colors.muted }]}>{row.label}</Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.86}
+                    style={[
+                      styles.rowLabel,
+                      usesLatinLabels ? styles.latinFieldLabel : styles.naturalLabel,
+                      { color: palette.chrome.common.textMuted },
+                    ]}
+                  >
+                    {row.label}
+                  </Text>
                   {row.locked ? <Lock size={12} color={colors.muted} /> : null}
-                  {row.pendingReview ? <UnderReviewPill interactive={false} /> : null}
+                  {row.pendingReview ? <UnderReviewPill interactive={false} iconOnly iconSize={21} /> : null}
                 </View>
                 <Text
                   numberOfLines={1}
@@ -1370,7 +1421,7 @@ export default function EditProfileScreen() {
                   {row.value}
                 </Text>
               </View>
-              {impact ? <ImpactBadge value={impact} /> : null}
+              {impact ? <CompletionImpactBadge value={impact} /> : null}
               {savingField === row.id ? (
                 <ActivityIndicator color={colors.primary} size="small" />
               ) : row.locked ? null : (
@@ -1382,6 +1433,7 @@ export default function EditProfileScreen() {
               )}
             </View>
           </Pressable>
+          </Fragment>
         );
       })}
     </View>
@@ -1428,11 +1480,19 @@ export default function EditProfileScreen() {
           <Text
             variant="caption"
             className="font-body-semi"
-            style={[styles.sectionTitle, styles.chipHeaderTitle, { color: colors.muted, fontSize: scale(13) }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.86}
+            style={[
+              styles.sectionTitle,
+              styles.chipHeaderTitle,
+              usesLatinLabels ? styles.latinSectionLabel : styles.naturalLabel,
+              { color: palette.chrome.common.textStrong, fontSize: scale(16), lineHeight: scale(21) },
+            ]}
           >
             {config.title}
           </Text>
-          {config.impact ? <ImpactBadge value={config.impact} /> : null}
+          {config.impact ? <CompletionImpactBadge value={config.impact} /> : null}
           {isRTL ? (
             <ChevronLeft size={19} color={colors.muted} style={styles.rowChevron} />
           ) : (
@@ -1464,18 +1524,14 @@ export default function EditProfileScreen() {
   };
 
   const summaryCard = (
-    <View style={[styles.sectionCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
-      <Text
-        variant="caption"
-        className="font-body-semi"
-        style={[styles.sectionTitle, { color: colors.muted, fontSize: scale(13) }]}
-      >
-        {t("profile.profile_summary", "Profile summary")}
-      </Text>
+    <View style={[styles.sectionCard, styles.summarySection, { borderColor: colors.border, backgroundColor: colors.background }]}>
       <View style={styles.summaryContent}>
         <ProfileSummaryEditor
           ref={summaryEditorRef}
           profile={profile}
+          onOptimisticSave={(patch) => {
+            setProfile((current: any) => ({ ...(current || {}), ...patch }));
+          }}
           onSaved={loadProfile}
           onDirtyChange={setSummaryDirty}
           headlineImpact={missingKeySet.has("profile_headline") ? missingImpacts.profile_headline || 0 : 0}
@@ -1518,8 +1574,20 @@ export default function EditProfileScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         bottomOffset={scale(24)}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void refreshProfile()}
+            enabled={!refreshBlocked}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.background}
+          />
+        )}
       >
-        <ProfileCompletionBar percent={completion.percent} />
+        {Math.round(completion.percent) < 100 ? (
+          <ProfileCompletionBar percent={completion.percent} />
+        ) : null}
 
         <View
           style={
@@ -1596,9 +1664,11 @@ export default function EditProfileScreen() {
         initialValue={company}
         placeholder={t("profile.company", "Company")}
         maxNonSpace={COMPANY_MAX}
+        presentation="drawer"
         saving={saving}
         pendingReview={companyPending}
         errorText={errors.company || undefined}
+        sanitizeValue={(value) => trimToNonSpaceLimit(plainTextFromFormattedInput(value), COMPANY_MAX)}
         onClose={() => {
           if (saving) return;
           setCompanySheetOpen(false);
@@ -1633,9 +1703,9 @@ export default function EditProfileScreen() {
         title={t("profile.current_location", "Current location")}
         message={t(
           "profile.location_edit_from_device",
-          "Location editing will use your device location. We will open this as a dedicated edit screen.",
+          "We'll use your device's current location to update your city.",
         )}
-        confirmLabel={t("continue", "Continue")}
+        confirmLabel={t("use_current_location", "Use current location")}
         cancelLabel={t("cancel", "Cancel")}
       />
 
@@ -1676,14 +1746,6 @@ export default function EditProfileScreen() {
   );
 }
 
-function ImpactBadge({ value }: { value: number }) {
-  return (
-    <View style={styles.impactBadge} accessibilityLabel={`+${value}%`}>
-      <Text style={styles.impactBadgeText}>{`\u2066+${value}%\u2069`}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   center: {
     alignItems: "center",
@@ -1699,28 +1761,43 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderRadius: 0,
     marginTop: 0,
-    paddingTop: 20,
-    paddingBottom: 8,
+    paddingTop: 22,
+    // The final row contributes 12px, for 22px from value to separator.
+    paddingBottom: 10,
     paddingHorizontal: 0,
   },
   sectionTitle: {
     fontSize: 13,
-    letterSpacing: 2,
     marginBottom: 8,
     paddingHorizontal: 16,
-    textTransform: "uppercase",
   },
+  latinSectionLabel: { letterSpacing: 0, textTransform: "none" },
+  latinFieldLabel: { letterSpacing: 1.2, textTransform: "uppercase" },
+  naturalLabel: { letterSpacing: 0, textTransform: "none" },
   summaryContent: {
-    paddingHorizontal: 18,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    // Combined with the section and row padding, the final edge is 22px.
+    paddingBottom: 0,
+  },
+  summarySection: {
+    // The first row contributes 12px, for 22px from separator to label.
+    paddingTop: 10,
+  },
+  fieldSection: {
+    // Field rows own their 22px bottom edge spacing.
+    paddingBottom: 0,
+  },
+  fieldDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 16,
   },
   row: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
-    minHeight: 72,
+    minHeight: 85,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 22,
     width: "100%",
   },
   // Neutral rounded-square tile; brand tint only when the field is missing
@@ -1751,9 +1828,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: Typography.font.body.bold,
     fontWeight: "700",
-    letterSpacing: 1.5,
     lineHeight: 17,
-    textTransform: "uppercase",
     flexShrink: 1,
   },
   rowValue: {
@@ -1764,23 +1839,6 @@ const styles = StyleSheet.create({
   },
   rowValueNotSet: {
     opacity: 0.55,
-  },
-  impactBadge: {
-    backgroundColor: PRIMARY,
-    height: 24,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  impactBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    lineHeight: 14,
-    includeFontPadding: false,
-    fontFamily: Typography.font.body.bold,
-    fontWeight: "700",
-    writingDirection: "ltr",
   },
   mediaMissingWrap: {
     borderRadius: 0,

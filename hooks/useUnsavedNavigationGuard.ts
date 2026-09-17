@@ -4,22 +4,20 @@ import { useNavigation } from 'expo-router';
 type Options = {
     dirty: boolean;
     leaveFallback: () => void;
+    redirectRemovalToFallback?: boolean;
 };
 
 /** Intercepts header, hardware, gesture, and dispatched navigation while a
     screen has an unsaved draft. The caller owns the confirmation UI. */
-export function useUnsavedNavigationGuard({ dirty, leaveFallback }: Options) {
+export function useUnsavedNavigationGuard({
+    dirty,
+    leaveFallback,
+    redirectRemovalToFallback = false,
+}: Options) {
     const navigation = useNavigation();
     const [confirmationVisible, setConfirmationVisible] = useState(false);
     const pendingActionRef = useRef<any>(null);
     const allowRemovalRef = useRef(false);
-
-    useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
-        if (!dirty || allowRemovalRef.current) return;
-        event.preventDefault();
-        pendingActionRef.current = event.data.action;
-        setConfirmationVisible(true);
-    }), [dirty, navigation]);
 
     const allowAndRun = useCallback((action: () => void) => {
         allowRemovalRef.current = true;
@@ -28,6 +26,20 @@ export function useUnsavedNavigationGuard({ dirty, leaveFallback }: Options) {
             allowRemovalRef.current = false;
         }, 0);
     }, []);
+
+    useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
+        if (allowRemovalRef.current) return;
+        if (dirty) {
+            event.preventDefault();
+            pendingActionRef.current = event.data.action;
+            setConfirmationVisible(true);
+            return;
+        }
+        if (redirectRemovalToFallback) {
+            event.preventDefault();
+            allowAndRun(leaveFallback);
+        }
+    }), [allowAndRun, dirty, leaveFallback, navigation, redirectRemovalToFallback]);
 
     const requestClose = useCallback(() => {
         if (dirty) {
@@ -48,10 +60,11 @@ export function useUnsavedNavigationGuard({ dirty, leaveFallback }: Options) {
         pendingActionRef.current = null;
         setConfirmationVisible(false);
         allowAndRun(() => {
-            if (pendingAction) navigation.dispatch(pendingAction);
+            if (redirectRemovalToFallback) leaveFallback();
+            else if (pendingAction) navigation.dispatch(pendingAction);
             else leaveFallback();
         });
-    }, [allowAndRun, leaveFallback, navigation]);
+    }, [allowAndRun, leaveFallback, navigation, redirectRemovalToFallback]);
 
     return {
         confirmationVisible,

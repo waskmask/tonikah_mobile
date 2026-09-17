@@ -149,6 +149,10 @@ export default function ProfileScreen() {
         }
     }, [loadProfile]);
 
+    const applyProfilePatch = useCallback((patch: Record<string, any>) => {
+        setProfile((current) => current ? { ...current, ...patch } : current);
+    }, []);
+
     const openEditProfile = useCallback(() => {
         router.push({
             pathname: '/(tabs)/edit-profile',
@@ -187,6 +191,7 @@ export default function ProfileScreen() {
                     refreshing={refreshing}
                     onRefresh={refresh}
                     onReconcile={loadProfile}
+                    onProfilePatch={applyProfilePatch}
                 />
             </DevRenderProfiler>
         </View>

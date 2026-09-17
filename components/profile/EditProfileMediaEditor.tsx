@@ -4,12 +4,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ArrowUp, ImagePlus, Info, Lock, Star, Trash2, Unlock } from 'lucide-react-native';
+import { AlertCircle, ImagePlus, Info, Lock, Star, Unlock } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
+import { CompletionImpactBadge } from '@/components/profile/CompletionImpactBadge';
 import { SingleSelectSheet } from '@/components/ui/SingleSelectSheet';
 import { GalleryCropModal } from '@/components/app/GalleryCropModal';
 import { MediaGuidelinesModal } from '@/components/app/MediaGuidelinesModal';
 import { galleryService, GalleryItem, GalleryPrivacy, GalleryResponse } from '@/lib/galleryService';
+import { hasQualifiedGalleryImage, isQualifiedGalleryImage } from '@/lib/galleryQualification';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
@@ -19,6 +21,8 @@ import { isGalleryModerationActive } from '@/hooks/useGalleryModeration';
 import { scale } from '@/hooks/useResponsive';
 import { CURRENT_USER_STATUS_QUERY_KEY } from '@/hooks/useCurrentUserStatus';
 import { queryKeys } from '@/lib/queryKeys';
+import { Typography } from '@/constants/typography';
+import { localeUsesLatinScript } from '@/lib/textDirection';
 
 const GALLERY_MAX_SLOTS = 3;
 const GALLERY_SOURCE_MAX_BYTES = 15 * 1024 * 1024;
@@ -72,6 +76,7 @@ export function ProfileMediaEditor({
     const { isDark } = useTheme();
     const colors = useColors();
     const { currentLanguage, isRTL } = useLanguage();
+    const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     const { show: showToast } = useToast();
     const queryClient = useQueryClient();
     const [privacy, setPrivacy] = useState<GalleryPrivacy>(canUsePrivateGallery ? initialPrivacy : 'public');
@@ -96,11 +101,13 @@ export function ProfileMediaEditor({
         () => Array.from({ length: GALLERY_MAX_SLOTS }, (_, index) => gallery[index] ?? null),
         [gallery]
     );
+    const hasApprovedGalleryImage = hasQualifiedGalleryImage(gallery);
 
     const borderColor = colors.brand.bg.border;
     const surface = colors.chrome.common.card;
     const mutedSurface = colors.brand.bg.surface;
     const mutedText = colors.brand.text.subtitle;
+    const emptySlotBorder = isDark ? colors.brand.text.subtitle : '#8F877D';
     const busy =
         loading ||
         busySlot !== null ||
@@ -143,9 +150,11 @@ export function ProfileMediaEditor({
     const applyGalleryResponse = useCallback((res: GalleryResponse) => {
         if (res.success) {
             const nextGallery = normalizeGallery(res.gallery || []);
-            // Male accounts and empty galleries are always represented as public
+            // Male accounts and galleries without an approved photo are always public.
             const nextPrivacy: GalleryPrivacy =
-                canUsePrivateGallery && nextGallery.length > 0 && res.privacy === 'private' ? 'private' : 'public';
+                canUsePrivateGallery && hasQualifiedGalleryImage(nextGallery) && res.privacy === 'private'
+                    ? 'private'
+                    : 'public';
             setPrivacy(nextPrivacy);
             setGallery(nextGallery);
             onGalleryChangeRef.current?.({
@@ -315,9 +324,14 @@ export function ProfileMediaEditor({
         const next = privacy === 'private' ? 'public' : 'private';
         if (next === 'private') {
             if (!canUsePrivateGallery) return;
-            // Local guard mirrors the API rule: a private gallery needs a photo
-            if (gallery.length === 0) {
-                showToast(t('private_gallery_requires_image', 'Upload at least one photo before making your gallery private.'), 'error');
+            if (!hasApprovedGalleryImage) {
+                showToast(
+                    t(
+                        'private_gallery_requires_image',
+                        'Add and receive approval for at least one photo before making your gallery private.',
+                    ),
+                    'info',
+                );
                 return;
             }
         }
@@ -370,9 +384,7 @@ export function ProfileMediaEditor({
                             : t('photo_gallery', 'Photo gallery')}
                     </Text>
                     {variant === 'edit-profile' && completionImpact > 0 ? (
-                        <View style={[styles.impactBadge, { backgroundColor: colors.chrome.primary }]}>
-                            <Text style={styles.impactBadgeText}>{`\u2066+${completionImpact}%\u2069`}</Text>
-                        </View>
+                        <CompletionImpactBadge value={completionImpact} />
                     ) : null}
                 </View>
                 <View style={styles.headerActions}>
@@ -408,13 +420,20 @@ export function ProfileMediaEditor({
                             busySlot === index ||
                             deleting ||
                             primaryUuid === uuid;
-                        const primary = Boolean(item?.isPrimary || index === 0);
+                        const primary = Boolean(item && isQualifiedGalleryImage(item) && item.isPrimary);
                         return (
                             <Pressable
                                 key={uuid || `slot-${index}`}
                                 onPress={() => pickImage(index)}
                                 disabled={busy}
-                                style={[styles.slot, { borderColor, backgroundColor: mutedSurface }]}
+                                style={[
+                                    styles.slot,
+                                    item ? styles.filledSlot : styles.emptySlotFrame,
+                                    {
+                                        borderColor: item ? borderColor : emptySlotBorder,
+                                        backgroundColor: mutedSurface,
+                                    },
+                                ]}
                             >
                                 {src ? (
                                     <Image source={{ uri: src }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -428,19 +447,22 @@ export function ProfileMediaEditor({
                                 )}
 
                                 {primary && item ? (
-                                    <View style={styles.primaryBadge}>
-                                        <Star size={scale(11)} color={colors.chrome.common.inverseText} fill={colors.chrome.common.inverseText} />
-                                        <Text style={styles.primaryText}>{t('primary', 'Primary')}</Text>
+                                    <View
+                                        style={styles.primaryBadge}
+                                        accessible
+                                        accessibilityLabel={t('primary', 'Primary')}
+                                    >
+                                        <Star size={scale(13)} color={colors.chrome.common.inverseText} fill={colors.chrome.common.inverseText} />
                                     </View>
                                 ) : null}
 
-                                {busySlot === index || primaryUuid === uuid ? (
+                                {busy ? (
                                     <View style={styles.busyOverlay}>
                                         <ActivityIndicator color={colors.chrome.common.inverseText} />
                                     </View>
                                 ) : null}
 
-                                {item && (checking || underReview) ? (
+                                {item && !busy && (checking || underReview) ? (
                                     <Pressable
                                         onPress={(event) => {
                                             event.stopPropagation();
@@ -501,47 +523,6 @@ export function ProfileMediaEditor({
                                     </Pressable>
                                 ) : null}
 
-                                {item ? (
-                                    <View style={styles.slotActions}>
-                                        {!primary && !checking && !underReview ? (
-                                            <Pressable
-                                                onPress={(event) => {
-                                                    event.stopPropagation();
-                                                    if (uuid) void makePrimary(uuid);
-                                                }}
-                                                disabled={busy}
-                                                style={styles.slotAction}
-                                                hitSlop={8}
-                                                accessibilityRole="button"
-                                                accessibilityLabel={t('make_primary', 'Make primary')}
-                                            >
-                                                <ArrowUp size={scale(15)} color={colors.chrome.common.inverseText} />
-                                            </Pressable>
-                                        ) : <View />}
-                                        <Pressable
-                                            onPress={(event) => {
-                                                event.stopPropagation();
-                                                if (uuid) void removeImage(uuid);
-                                            }}
-                                            disabled={busy}
-                                            style={[styles.slotAction, styles.deleteAction]}
-                                            hitSlop={8}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={t('delete_photo', 'Delete photo')}
-                                            accessibilityState={{ disabled: busy, busy: deleting }}
-                                        >
-                                            {deleting ? (
-                                                <ActivityIndicator
-                                                    size="small"
-                                                    color={colors.chrome.common.inverseText}
-                                                    style={styles.deleteSpinner}
-                                                />
-                                            ) : (
-                                                <Trash2 size={scale(14)} color={colors.chrome.common.inverseText} />
-                                            )}
-                                        </Pressable>
-                                    </View>
-                                ) : null}
                             </Pressable>
                         );
                     })}
@@ -555,33 +536,163 @@ export function ProfileMediaEditor({
             ) : null}
 
             {canUsePrivateGallery ? (
-                <View style={[styles.privacyRow, { borderColor, backgroundColor: mutedSurface }]}>
-                    <View style={[styles.privacyIcon, { backgroundColor: surface }]}>
-                        {privacy === 'private' ? <Lock size={scale(18)} color={colors.brand.text.subtitle} /> : <Unlock size={scale(18)} color={colors.brand.text.subtitle} />}
+                <View
+                    style={variant === 'edit-profile'
+                        ? [
+                            styles.privacySection,
+                            {
+                                borderColor,
+                                backgroundColor: privacy === 'private'
+                                    ? colors.brand.bg.surface
+                                    : warningColors.bg,
+                            },
+                        ]
+                        : undefined}
+                >
+                    {variant === 'edit-profile' ? (
+                        <Text
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.86}
+                            style={[
+                                styles.privacySectionTitle,
+                                {
+                                    color: privacy === 'private'
+                                        ? colors.chrome.common.textStrong
+                                        : warningColors.text,
+                                },
+                            ]}
+                        >
+                            {t('gallery_privacy_section', 'Gallery privacy')}
+                        </Text>
+                    ) : null}
+                    <View
+                        style={variant === 'edit-profile'
+                            ? styles.privacyFieldRow
+                            : [styles.privacyRow, { borderColor, backgroundColor: mutedSurface }]}
+                    >
+                    <View
+                        style={[
+                            variant === 'edit-profile' ? styles.privacyFieldIcon : styles.privacyIcon,
+                            {
+                                backgroundColor: variant === 'edit-profile'
+                                    ? privacy === 'private'
+                                        ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(16,16,17,0.06)')
+                                        : (isDark ? 'rgba(242,184,75,0.16)' : 'rgba(245,158,11,0.14)')
+                                    : surface,
+                            },
+                        ]}
+                    >
+                        {privacy === 'private' ? (
+                            <Lock
+                                size={scale(18)}
+                                color={colors.brand.text.subtitle}
+                            />
+                        ) : (
+                            <Unlock
+                                size={scale(18)}
+                                color={variant === 'edit-profile' ? warningColors.icon : colors.brand.text.subtitle}
+                            />
+                        )}
                     </View>
-                    <View style={{ flex: 1 }}>
-                        <Text variant="body-sm" className="font-body-semi">{t('gallery_privacy_title', 'Keep my photos private')}</Text>
-                        <Text variant="caption" style={{ color: mutedText, marginTop: scale(2) }}>
-                            {gallery.length > 0
+                    <View style={styles.privacyContent}>
+                        <Text
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.86}
+                            style={[
+                                styles.privacyFieldLabel,
+                                usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
+                                {
+                                    color: variant === 'edit-profile' && privacy !== 'private'
+                                        ? warningColors.text
+                                        : colors.chrome.common.textMuted,
+                                },
+                            ]}
+                        >
+                            {t('gallery_privacy_title', 'Keep my photos private')}
+                        </Text>
+                        <Text
+                            style={[
+                                styles.privacyFieldValue,
+                                {
+                                    color: variant === 'edit-profile' && privacy !== 'private'
+                                        ? warningColors.text
+                                        : mutedText,
+                                },
+                            ]}
+                        >
+                            {hasApprovedGalleryImage
                                 ? t('gallery_privacy_note', 'Your images will remain blurred for all members unless you approve visibility.')
-                                : t('private_gallery_requires_image', 'Upload at least one photo before making your gallery private.')}
+                                : t(
+                                    'private_gallery_requires_image',
+                                    'Add and receive approval for at least one photo before making your gallery private.',
+                                )}
                         </Text>
                     </View>
                     <Pressable
                         onPress={togglePrivacy}
-                        disabled={privacyBusy || gallery.length === 0}
+                        disabled={privacyBusy}
                         accessibilityRole="switch"
-                        accessibilityState={{ checked: privacy === 'private', disabled: privacyBusy || gallery.length === 0 }}
+                        accessibilityState={{
+                            checked: privacy === 'private',
+                            disabled: privacyBusy,
+                            busy: privacyBusy,
+                        }}
                         style={[
                             styles.switchTrack,
                             {
-                                backgroundColor: privacy === 'private' ? colors.chrome.primary : colors.brand.bg.border,
-                                opacity: privacyBusy || gallery.length === 0 ? 0.55 : 1,
+                                backgroundColor: privacy === 'private'
+                                    ? colors.chrome.primary
+                                    : variant === 'edit-profile'
+                                        ? '#FFFFFF'
+                                        : colors.brand.bg.border,
+                                borderColor: privacy !== 'private' && variant === 'edit-profile'
+                                    ? warningColors.border
+                                    : 'transparent',
+                                borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
+                                opacity: privacy !== 'private' && !hasApprovedGalleryImage ? 0.55 : 1,
                             },
                         ]}
                     >
-                        <View style={[styles.switchThumb, privacy === 'private' && styles.switchThumbOn]} />
+                        {privacyBusy ? (
+                            <View
+                                style={[
+                                    styles.switchThumb,
+                                    styles.switchLoaderThumb,
+                                    privacy === 'private' && styles.switchThumbOn,
+                                    {
+                                        borderColor: privacy !== 'private' && variant === 'edit-profile'
+                                            ? warningColors.border
+                                            : 'transparent',
+                                        borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
+                                    },
+                                ]}
+                            >
+                                <ActivityIndicator
+                                    size="small"
+                                    color={privacy === 'private'
+                                        ? colors.chrome.primary
+                                        : warningColors.icon}
+                                />
+                            </View>
+                        ) : (
+                            <View
+                                style={[
+                                    styles.switchThumb,
+                                    privacy === 'private' && styles.switchThumbOn,
+                                    {
+                                        backgroundColor: colors.chrome.common.inverseText,
+                                        borderColor: privacy !== 'private' && variant === 'edit-profile'
+                                            ? warningColors.border
+                                            : 'transparent',
+                                        borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
+                                    },
+                                ]}
+                            />
+                        )}
                     </Pressable>
+                    </View>
                 </View>
             ) : null}
 
@@ -590,8 +701,17 @@ export function ProfileMediaEditor({
                 onClose={() => setSourceSlot(null)}
                 onSelect={(source) => {
                     const slot = sourceSlot;
+                    const selectedItem = slot === null ? null : gallery[slot];
                     setSourceSlot(null);
                     if (slot === null) return;
+                    if (source === 'primary') {
+                        if (selectedItem?.uuid) void makePrimary(selectedItem.uuid);
+                        return;
+                    }
+                    if (source === 'delete') {
+                        if (selectedItem?.uuid) void removeImage(selectedItem.uuid);
+                        return;
+                    }
                     // Let the sheet dismiss before presenting the system picker
                     // or camera; simultaneous presentation fails on iOS.
                     setTimeout(() => {
@@ -602,8 +722,20 @@ export function ProfileMediaEditor({
                 options={[
                     { value: 'camera', label: t('take_photo', 'Take a photo') },
                     { value: 'gallery', label: t('choose_from_gallery', 'Choose from gallery') },
+                    ...(sourceSlot !== null && gallery[sourceSlot]
+                        && !gallery[sourceSlot]?.isPrimary
+                        && sourceSlot !== 0
+                        && isQualifiedGalleryImage(gallery[sourceSlot])
+                        ? [{ value: 'primary', label: t('make_primary', 'Make primary') }]
+                        : []),
+                    ...(sourceSlot !== null && gallery[sourceSlot]
+                        ? [{ value: 'delete', label: t('delete_photo', 'Delete photo'), destructive: true }]
+                        : []),
                 ]}
-                title={t('add_photo', 'Add photo')}
+                title={sourceSlot !== null && gallery[sourceSlot]
+                    ? t('photo_options', 'Photo options')
+                    : t('add_photo', 'Add photo')}
+                optionMode="action"
             />
 
             <GalleryCropModal
@@ -645,7 +777,7 @@ const styles = StyleSheet.create({
     section: {
         borderTopWidth: 1,
         borderRadius: 0,
-        paddingHorizontal: scale(18),
+        paddingHorizontal: scale(16),
         paddingVertical: scale(20),
         gap: scale(12),
     },
@@ -671,22 +803,6 @@ const styles = StyleSheet.create({
         lineHeight: scale(21),
         flexShrink: 1,
     },
-    impactBadge: {
-        minHeight: scale(24),
-        borderRadius: scale(999),
-        paddingHorizontal: scale(10),
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-    },
-    impactBadgeText: {
-        color: '#FFFFFF',
-        fontSize: scale(11),
-        lineHeight: scale(14),
-        includeFontPadding: false,
-        fontWeight: '700',
-        writingDirection: 'ltr',
-    },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -710,9 +826,15 @@ const styles = StyleSheet.create({
     slot: {
         flex: 1,
         aspectRatio: 3 / 4,
-        borderWidth: 1,
         borderRadius: scale(12),
         overflow: 'hidden',
+    },
+    filledSlot: {
+        borderWidth: 1,
+    },
+    emptySlotFrame: {
+        borderWidth: 2,
+        borderStyle: 'dashed',
     },
     emptySlot: {
         flex: 1,
@@ -725,46 +847,18 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: scale(8),
         left: scale(8),
-        flexDirection: 'row',
+        width: scale(28),
+        height: scale(28),
         alignItems: 'center',
-        gap: scale(3),
-        borderRadius: scale(999),
-        backgroundColor: 'rgba(24, 19, 14,0.72)',
-        paddingHorizontal: scale(7),
-        paddingVertical: scale(4),
-    },
-    primaryText: {
-        color: '#FFFFFF',
-        fontSize: scale(10),
-        lineHeight: scale(12),
-        fontWeight: '700',
+        justifyContent: 'center',
+        borderRadius: scale(14),
+        backgroundColor: 'rgba(16, 16, 17,0.72)',
     },
     busyOverlay: {
         ...StyleSheet.absoluteFill,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(24, 19, 14,0.48)',
-    },
-    slotActions: {
-        position: 'absolute',
-        left: scale(8),
-        right: scale(8),
-        top: scale(8),
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: scale(6),
-    },
-    slotAction: {
-        width: scale(30),
-        height: scale(30),
-        borderRadius: scale(15),
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(24, 19, 14,0.72)',
-    },
-    deleteAction: {
-        backgroundColor: '#E11D48',
+        backgroundColor: 'rgba(16, 16, 17,0.48)',
     },
     moderationBadge: {
         position: 'absolute',
@@ -790,9 +884,6 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.62 }],
         marginHorizontal: -scale(3),
     },
-    deleteSpinner: {
-        transform: [{ scale: 0.78 }],
-    },
     privacyRow: {
         minHeight: scale(84),
         borderWidth: 1,
@@ -802,6 +893,64 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(12),
+    },
+    privacySection: {
+        borderTopWidth: 1,
+        marginHorizontal: scale(-16),
+        marginBottom: scale(-20),
+        marginTop: scale(10),
+        paddingTop: scale(22),
+    },
+    privacySectionTitle: {
+        paddingHorizontal: scale(16),
+        marginBottom: scale(2),
+        fontSize: scale(16),
+        lineHeight: scale(21),
+        fontFamily: Typography.font.body.semi,
+        fontWeight: '600',
+    },
+    privacyFieldRow: {
+        minHeight: scale(85),
+        paddingHorizontal: scale(16),
+        paddingVertical: scale(22),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(12),
+    },
+    privacyContent: {
+        flex: 1,
+        minWidth: 0,
+        gap: scale(3),
+    },
+    privacyFieldLabel: {
+        flexShrink: 1,
+        fontSize: scale(13),
+        lineHeight: scale(17),
+        fontFamily: Typography.font.body.bold,
+        fontWeight: '700',
+    },
+    latinFieldLabel: {
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+    },
+    naturalFieldLabel: {
+        letterSpacing: 0,
+        textTransform: 'none',
+    },
+    privacyFieldValue: {
+        fontSize: scale(13),
+        lineHeight: scale(18),
+        fontFamily: Typography.font.body.regular,
+        fontWeight: '400',
+    },
+    privacyFieldIcon: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(8),
+        alignSelf: 'flex-start',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
     },
     privacyIcon: {
         width: scale(42),
@@ -815,6 +964,12 @@ const styles = StyleSheet.create({
         height: scale(28),
         borderRadius: scale(14),
         padding: scale(3),
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    switchLoaderThumb: {
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     switchThumb: {
         width: scale(22),

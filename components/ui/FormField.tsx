@@ -94,7 +94,7 @@ export function SelectField({
                     marginTop: scale(22),
                     gap: scale(10),
                     backgroundColor: 'transparent',
-                    borderBottomColor: hasError ? '#EF4444' : isDark ? '#3A332B' : '#E8E1D6',
+                    borderBottomColor: hasError ? '#EF4444' : isDark ? '#303033' : '#EEEEEE',
                 },
             ]}
         >
@@ -109,8 +109,8 @@ export function SelectField({
                         fontFamily: valueFont,
                     },
                     value
-                        ? { color: isDark ? '#E8E1D6' : '#201B15' }
-                        : { color: isDark ? '#A99C8D' : '#5C5348' },
+                        ? { color: isDark ? '#E5E5E7' : '#201B15' }
+                        : { color: isDark ? '#B0B0B5' : '#5C5348' },
                 ]}
             >
                 {value || (required ? `${placeholder} *` : placeholder)}

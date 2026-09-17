@@ -11,7 +11,15 @@ import { t } from '@/lib/profileDisplay';
     moderation. Tapping explains why the old text is still public.
     Pass interactive={false} inside touchable rows so the pill doesn't
     swallow the row's tap. */
-export function UnderReviewPill({ interactive = true }: { interactive?: boolean }) {
+export function UnderReviewPill({
+    interactive = true,
+    iconOnly = false,
+    iconSize = 19,
+}: {
+    interactive?: boolean;
+    iconOnly?: boolean;
+    iconSize?: number;
+}) {
     const palette = useColors();
     const reviewColor = palette.brand.accent.error;
 
@@ -32,20 +40,24 @@ export function UnderReviewPill({ interactive = true }: { interactive?: boolean 
             accessibilityLabel={t('moderation_text_under_review', 'Under review')}
             hitSlop={interactive ? 6 : undefined}
             style={[
-                styles.pill,
+                iconOnly ? styles.iconOnly : styles.pill,
                 {
-                    backgroundColor: palette.chrome.common.dangerTint,
+                    backgroundColor: iconOnly
+                        ? 'transparent'
+                        : palette.chrome.common.dangerTint,
                 },
             ]}
         >
-            <CircleAlert size={scale(12)} color={reviewColor} strokeWidth={2.5} />
-            <Text
-                variant="caption"
-                className="font-body-bold"
-                style={[styles.label, { color: reviewColor }]}
-            >
-                {t('moderation_text_under_review', 'Under review')}
-            </Text>
+            <CircleAlert size={scale(iconOnly ? iconSize : 12)} color={reviewColor} strokeWidth={2.5} />
+            {!iconOnly ? (
+                <Text
+                    variant="caption"
+                    className="font-body-bold"
+                    style={[styles.label, { color: reviewColor }]}
+                >
+                    {t('moderation_text_under_review', 'Under review')}
+                </Text>
+            ) : null}
         </Pressable>
     );
 }
@@ -53,7 +65,13 @@ export function UnderReviewPill({ interactive = true }: { interactive?: boolean 
 /** Subtle inline info icon next to owner-visible pending text (headline/bio).
     Tapping explains that others still see the previous approved text —
     mirrors ModerationUnderReviewIcon in the Next.js web app. */
-export function UnderReviewInfoIcon({ style }: { style?: StyleProp<ViewStyle> }) {
+export function UnderReviewInfoIcon({
+    style,
+    warning = false,
+}: {
+    style?: StyleProp<ViewStyle>;
+    warning?: boolean;
+}) {
     const palette = useColors();
 
     return (
@@ -73,7 +91,11 @@ export function UnderReviewInfoIcon({ style }: { style?: StyleProp<ViewStyle> })
             hitSlop={8}
             style={[styles.infoIcon, style]}
         >
-            <Info size={scale(15)} color={palette.brand.text.muted} />
+            {warning ? (
+                <CircleAlert size={scale(17)} color={palette.brand.accent.error} strokeWidth={2.5} />
+            ) : (
+                <Info size={scale(15)} color={palette.brand.text.muted} />
+            )}
         </Pressable>
     );
 }
@@ -82,6 +104,13 @@ const styles = StyleSheet.create({
     infoIcon: {
         padding: scale(2),
         alignSelf: 'flex-start',
+    },
+    iconOnly: {
+        width: scale(32),
+        height: scale(32),
+        borderRadius: 9999,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     pill: {
         height: scale(24),

@@ -60,6 +60,7 @@ import {
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
+import { Divider } from '@/components/ui/Divider';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale, wp } from '@/hooks/useResponsive';
@@ -71,6 +72,7 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { isGalleryModerationActive } from '@/hooks/useGalleryModeration';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
+import { profileService } from '@/lib/profileService';
 import { chatService, normalizeConversation } from '@/lib/chatService';
 import {
     apiMessage,
@@ -99,7 +101,7 @@ import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { emojiChipItem } from '@/lib/profileEmoji';
 import { formatProfileManagerBadge } from '@/lib/profileManager';
 import { ProfileManagerBadge } from '@/components/profile/ProfileManagerBadge';
-import { getTextDirection, localeTextDirection } from '@/lib/textDirection';
+import { getTextDirection, localeTextDirection, localeUsesLatinScript } from '@/lib/textDirection';
 import { pendingModerationCandidate } from '@/lib/textModeration';
 import { UnderReviewInfoIcon, UnderReviewPill } from '@/components/app/UnderReviewPill';
 import { ProfileSummaryEditor, SummaryField } from '@/components/profile/ProfileSummaryEditor';
@@ -107,6 +109,11 @@ import { ReportSheet, ReportTarget } from '@/components/profile/ReportSheet';
 import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
 import { useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
 import { canOpenMessaging } from '@/lib/messagingAccess';
+import {
+    buildMissingImpactGroups,
+    calculateWeightedMissingImpacts,
+    MISSING_IMPACT_WEIGHTS,
+} from '@/lib/profileCompletionImpact';
 
 type Fact = { icon: LucideIcon; label: string; value: string; underReview?: boolean };
 type PendingProfileToast = {
@@ -152,9 +159,13 @@ export type UserProfileViewProps = {
     refreshing?: boolean;
     onRefresh?: () => void | Promise<void>;
     onReconcile?: () => void | Promise<void>;
+    onProfilePatch?: (patch: Record<string, any>) => void;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const PROFILE_COMPLETION_IMPACT_GROUPS = buildMissingImpactGroups([{
+    rows: Object.keys(MISSING_IMPACT_WEIGHTS).map((completionKey) => ({ completionKey })),
+}]);
 
 export function UserProfileView({
     userId,
@@ -171,6 +182,7 @@ export function UserProfileView({
     refreshing = false,
     onRefresh,
     onReconcile,
+    onProfilePatch,
 }: UserProfileViewProps) {
     const { isDark } = useTheme();
     const colors = useColors();
@@ -201,6 +213,7 @@ export function UserProfileView({
     const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
     const [blockBusy, setBlockBusy] = useState(false);
     const [unblockBusy, setUnblockBusy] = useState(false);
+    const [summaryImpacts, setSummaryImpacts] = useState<Record<string, number>>({});
     const scrollOffsetRef = useRef(0);
 
     const resolvedUserId = userId || profileId(initialProfile);
@@ -284,6 +297,7 @@ export function UserProfileView({
     const bioCandidate = pendingModerationCandidate(ownerModerationMeta.bio);
     const headline = cleanProfileText(headlineCandidate || profile?.profile_headline);
     const bio = bioCandidate ? cleanProfileMultilineText(bioCandidate) : bioText(profile);
+    const bioParagraphs = bio ? bio.split(/\n(?:[ \t]*\n)+/) : [];
     // A field is missing only when there is no approved value AND no pending
     // candidate; then the owner gets the real editor inline in About Me.
     const missingSummaryFields: SummaryField[] = isOwnProfile
@@ -292,6 +306,39 @@ export function UserProfileView({
             ...(!bio ? ['bio'] : []),
         ] as SummaryField[])
         : [];
+    const headlineMissing = missingSummaryFields.includes('headline');
+    const bioMissing = missingSummaryFields.includes('bio');
+
+    useEffect(() => {
+        if (!isOwnProfile || (!headlineMissing && !bioMissing)) {
+            setSummaryImpacts({});
+            return;
+        }
+
+        let active = true;
+        void profileService.fetchProfileCompletion()
+            .then((response) => {
+                if (!active) return;
+                const data = response.completion || response.profileCompletion || response.data;
+                const missingKeys = Array.isArray(data?.missingKeys)
+                    ? data.missingKeys
+                    : Array.isArray(data?.missing)
+                        ? data.missing
+                        : [];
+                setSummaryImpacts(calculateWeightedMissingImpacts(
+                    Number(data?.percent ?? data?.percentage ?? 0),
+                    missingKeys,
+                    PROFILE_COMPLETION_IMPACT_GROUPS,
+                ));
+            })
+            .catch(() => {
+                if (active) setSummaryImpacts({});
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [bioMissing, headlineMissing, isOwnProfile]);
     const bioDirection = getTextDirection(bio, localeTextDirection(currentLanguage));
     const blocked = profile?.blocked === true;
 
@@ -709,45 +756,58 @@ export function UserProfileView({
                     moderation state — no separate banner below the gallery */}
 
                 {(headline || bio || missingSummaryFields.length > 0) ? (
-                    <Section title={t('about_me', 'About me')} isDark={isDark}>
+                    <Section title={t('about_me', 'About')} isDark={isDark}>
                         {headline ? (
                             headlineCandidate ? (
                                 <View style={styles.moderatedTextRow}>
-                                    <UnderReviewInfoIcon style={styles.moderatedTextIcon} />
-                                    <Text variant="h3" style={[styles.headline, styles.moderatedText]}>{headline}</Text>
+                                    <UnderReviewInfoIcon warning style={styles.moderatedTextIcon} />
+                                    <Text variant="h3" className="font-heading" style={[styles.headline, styles.moderatedText]}>{headline}</Text>
                                 </View>
                             ) : (
-                                <Text variant="h3" style={styles.headline}>{headline}</Text>
+                                <Text variant="h3" className="font-heading" style={styles.headline}>{headline}</Text>
                             )
-                        ) : null}
-                        {bio ? (
-                            <View style={styles.bioBox}>
-                                <View style={styles.bioAccent} />
-                                <View style={styles.bioBody}>
-                                <View style={styles.moderatedTextRow}>
-                                    {bioCandidate ? <UnderReviewInfoIcon style={styles.moderatedTextIcon} /> : null}
-                                    <Text
-                                        variant="body"
-                                        style={[
-                                            styles.bioText,
-                                            styles.moderatedText,
-                                            {
-                                                textAlign: bioDirection === 'rtl' ? 'right' : 'left',
-                                                writingDirection: bioDirection,
-                                            },
-                                        ]}
-                                    >
-                                        {bio}
-                                    </Text>
-                                </View>
-                                </View>
-                            </View>
-                        ) : null}
-                        {missingSummaryFields.length > 0 ? (
+                        ) : missingSummaryFields.includes('headline') ? (
                             <ProfileSummaryEditor
                                 profile={profile}
                                 fields={missingSummaryFields}
-                                variant="inline"
+                                variant="card"
+                                headlineImpact={summaryImpacts.profile_headline || 0}
+                                bioImpact={summaryImpacts.bio || 0}
+                                onOptimisticSave={onProfilePatch}
+                                onSaved={async () => {
+                                    await onRefresh?.();
+                                }}
+                            />
+                        ) : null}
+                        {bio ? (
+                            <View style={styles.moderatedTextRow}>
+                                {bioCandidate ? <UnderReviewInfoIcon warning style={styles.moderatedTextIcon} /> : null}
+                                <View style={styles.bioParagraphs}>
+                                    {bioParagraphs.map((paragraph, index) => (
+                                        <Text
+                                            key={index}
+                                            variant="body"
+                                            style={[
+                                                styles.bioText,
+                                                index < bioParagraphs.length - 1 && styles.bioParagraphGap,
+                                                {
+                                                    textAlign: bioDirection === 'rtl' ? 'right' : 'left',
+                                                    writingDirection: bioDirection,
+                                                },
+                                            ]}
+                                        >
+                                            {paragraph}
+                                        </Text>
+                                    ))}
+                                </View>
+                            </View>
+                        ) : headline && missingSummaryFields.includes('bio') ? (
+                            <ProfileSummaryEditor
+                                profile={profile}
+                                fields={['bio']}
+                                variant="card"
+                                bioImpact={summaryImpacts.bio || 0}
+                                onOptimisticSave={onProfilePatch}
                                 onSaved={async () => {
                                     await onRefresh?.();
                                 }}
@@ -798,7 +858,10 @@ export function UserProfileView({
                         extraBottomPadding={isOwnProfile ? 20 : 0}
                         action={isOwnProfile ? {
                             label: t('edit', 'Edit'),
-                            onPress: () => router.push('/(tabs)/partner-preference'),
+                            onPress: () => router.push({
+                                pathname: '/(tabs)/partner-preference',
+                                params: { returnTo: '/(tabs)/profile' },
+                            }),
                         } : undefined}
                     >
                         {partnerAbout ? (
@@ -832,12 +895,7 @@ export function UserProfileView({
                                     </Text>
                                 </View>
                                 {partnerFacts.length > 0 ? (
-                                    <View
-                                        style={[
-                                            styles.partnerPreferenceDivider,
-                                            { backgroundColor: colors.chrome.common.primaryTint },
-                                        ]}
-                                    />
+                                    <Divider style={styles.partnerPreferenceDivider} />
                                 ) : null}
                             </>
                         ) : null}
@@ -1329,7 +1387,7 @@ function ProfileGallery({
                     );
                 })}
             </GHScrollView>
-            <LinearGradient colors={['rgba(24, 19, 14,0.02)', 'rgba(24, 19, 14,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
+            <LinearGradient colors={['rgba(16, 16, 17,0.02)', 'rgba(16, 16, 17,0.72)']} style={styles.galleryGradient} pointerEvents="none" />
             <View style={styles.galleryBadges}>
                 {photos.length > 0 ? (
                     <View style={styles.photoCount}>
@@ -1418,6 +1476,8 @@ function SectionFacts({
 
 function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
     const palette = useColors();
+    const { currentLanguage } = useLanguage();
+    const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     if (!facts.length) return null;
     return (
         <View style={styles.factList}>
@@ -1427,7 +1487,20 @@ function FactRows({ facts, isRTL }: { facts: Fact[]; isRTL: boolean }) {
                     <View key={`${fact.label}-${fact.value}`} style={styles.factRow}>
                         <View style={styles.factLabelRow}>
                             <Icon size={scale(15)} color={palette.chrome.common.textMuted} />
-                            <Text variant="caption" className="font-body-semi" style={[styles.factLabel, { color: palette.chrome.common.textMuted }]}>{fact.label}</Text>
+                            <Text
+                                variant="caption"
+                                className="font-body-semi"
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.86}
+                                style={[
+                                    styles.factLabel,
+                                    usesLatinLabels ? styles.latinFieldLabel : styles.naturalLabel,
+                                    { color: palette.chrome.common.textMuted },
+                                ]}
+                            >
+                                {fact.label}
+                            </Text>
                             {fact.underReview ? <UnderReviewPill /> : null}
                         </View>
                             {/* Content-sized value inside a row: the row's main axis mirrors
@@ -1487,6 +1560,7 @@ function Section({
     icon: SectionIcon,
     highlight = false,
     extraBottomPadding = 0,
+    hideTitle = false,
 }: {
     title: string;
     children: React.ReactNode;
@@ -1495,8 +1569,11 @@ function Section({
     icon?: LucideIcon;
     highlight?: boolean;
     extraBottomPadding?: number;
+    hideTitle?: boolean;
 }) {
     const palette = useColors();
+    const { currentLanguage } = useLanguage();
+    const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     const backgroundColor = highlight
         ? blendHexColors(palette.chrome.primary, palette.brand.bg.surface, isDark ? 0.11 : 0.06)
         : palette.brand.bg.surface;
@@ -1508,11 +1585,11 @@ function Section({
             style={[
                 styles.section,
                 highlight && styles.highlightedSection,
-                extraBottomPadding > 0 && { paddingBottom: scale(20 + extraBottomPadding) },
+                extraBottomPadding > 0 && { paddingBottom: scale(22 + extraBottomPadding) },
                 { backgroundColor, borderTopColor: borderColor, borderBottomColor: borderColor },
             ]}
         >
-            <View style={styles.sectionHeader}>
+            {!hideTitle ? <View style={styles.sectionHeader}>
                 <View style={styles.sectionTitleRow}>
                     {SectionIcon ? (
                         <SectionIcon
@@ -1524,7 +1601,14 @@ function Section({
                     <Text
                         variant="caption"
                         className="font-body-semi"
-                        style={[styles.sectionTitle, { color: highlight ? palette.chrome.primary : palette.chrome.common.textStrong }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.86}
+                        style={[
+                            styles.sectionTitle,
+                            usesLatinLabels ? styles.latinSectionLabel : styles.naturalLabel,
+                            { color: palette.chrome.common.textStrong },
+                        ]}
                     >
                         {title}
                     </Text>
@@ -1537,7 +1621,7 @@ function Section({
                         </Text>
                     </Pressable>
                 ) : null}
-            </View>
+            </View> : null}
             {children}
         </View>
     );
@@ -1835,7 +1919,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scale(8),
     },
-    photoCount: { minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(24, 19, 14,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
+    photoCount: { minWidth: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(16, 16, 17,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(8) },
     galleryIdentity: { position: 'absolute', left: scale(18), right: scale(18), bottom: scale(18) },
     trustRow: {
         flexDirection: 'row',
@@ -1859,8 +1943,9 @@ const styles = StyleSheet.create({
     heroLocationFlag: { lineHeight: scale(18) },
     section: {
         borderTopWidth: 1,
-        paddingHorizontal: scale(18),
-        paddingVertical: scale(20),
+        paddingHorizontal: scale(16),
+        paddingTop: scale(22),
+        paddingBottom: scale(28),
     },
     highlightedSection: { borderBottomWidth: 1 },
     sectionHeader: {
@@ -1868,7 +1953,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: scale(12),
-        marginBottom: scale(18),
+        marginBottom: scale(24),
     },
     sectionTitleRow: {
         flex: 1,
@@ -1877,7 +1962,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scale(7),
     },
-    sectionTitle: { textTransform: 'uppercase', letterSpacing: 2, color: '#241E17', fontSize: scale(13), flexShrink: 1 },
+    sectionTitle: { color: '#241E17', fontSize: scale(16), lineHeight: scale(21), flexShrink: 1 },
+    latinSectionLabel: { textTransform: 'none', letterSpacing: 0 },
+    latinFieldLabel: { textTransform: 'uppercase', letterSpacing: 1.2 },
+    naturalLabel: { textTransform: 'none', letterSpacing: 0 },
     sectionAction: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1886,7 +1974,7 @@ const styles = StyleSheet.create({
         paddingVertical: scale(3),
     },
     sectionActionText: { color: '#F34B6F' },
-    headline: { fontSize: scale(20), lineHeight: scale(25), marginBottom: scale(10) },
+    headline: { fontSize: scale(18), lineHeight: scale(23), marginBottom: scale(16) },
     // Inline info icon + text for owner-visible pending moderation text
     moderatedTextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(5) },
     moderatedTextIcon: { marginTop: scale(3) },
@@ -1896,27 +1984,11 @@ const styles = StyleSheet.create({
     factValueText: { flexShrink: 1 },
     factValueIndented: { paddingStart: scale(22) },
     factValueTextCompact: { lineHeight: scale(20), includeFontPadding: false },
-    // start/end so native RTL mirrors the accent bar (quote icon removed by design)
-    // Accent bar is a real element (not a border) so its side stays fully
-    // square; only the trailing side of the card is rounded
-    bioBox: {
-        flexDirection: 'row',
-        borderTopEndRadius: scale(8),
-        borderBottomEndRadius: scale(8),
-        overflow: 'hidden',
-    },
-    bioAccent: {
-        width: 4,
-        backgroundColor: '#F34B6F',
-    },
-    bioBody: {
-        flex: 1,
-        backgroundColor: 'rgba(243,75,111,0.04)',
-        padding: scale(14),
-    },
+    bioParagraphs: { flex: 1, minWidth: 0 },
+    bioParagraphGap: { marginBottom: scale(12) },
     // Partner-about reuses bioText directly, but stays unframed.
-    bioText: { fontSize: scale(15), lineHeight: scale(22), fontStyle: 'italic' },
-    partnerPreferenceDivider: { height: StyleSheet.hairlineWidth, marginTop: scale(18), marginBottom: scale(18) },
+    bioText: { fontSize: scale(15), lineHeight: scale(22), fontStyle: 'normal' },
+    partnerPreferenceDivider: { marginTop: scale(18), marginBottom: scale(18) },
     moderatedLabelRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1928,7 +2000,7 @@ const styles = StyleSheet.create({
     factRow: { width: '100%' },
     factLabelRow: { flexDirection: 'row', alignItems: 'center', gap: scale(7), marginBottom: scale(3) },
     // Pinned line height — Noto Sans Arabic's natural metrics add ~6dp of air
-    factLabel: { color: '#8A8073', textTransform: 'uppercase', letterSpacing: 1.2, fontSize: scale(13), lineHeight: scale(17), includeFontPadding: false, flexShrink: 1 },
+    factLabel: { color: '#737378', fontSize: scale(13), lineHeight: scale(17), includeFontPadding: false, flexShrink: 1 },
     chipWrap: { flexWrap: 'wrap', gap: scale(8) },
     chip: { borderRadius: scale(999), paddingHorizontal: scale(10), paddingVertical: scale(6) },
     emojiChip: { flexDirection: 'row', alignItems: 'center', gap: scale(5) },
@@ -1981,7 +2053,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(24, 19, 14,0.28)',
+        backgroundColor: 'rgba(16, 16, 17,0.28)',
     },
     profileMenu: {
         position: 'absolute',
@@ -2042,7 +2114,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
     profileMenuItemPressed: {
-        backgroundColor: 'rgba(160, 146, 128,0.12)',
+        backgroundColor: 'rgba(160, 160, 168,0.12)',
     },
     confirmLayer: {
         flex: 1,
@@ -2056,7 +2128,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(24, 19, 14,0.42)',
+        backgroundColor: 'rgba(16, 16, 17,0.42)',
     },
     confirmCard: {
         width: '100%',
@@ -2108,7 +2180,7 @@ const styles = StyleSheet.create({
     messageOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: 'rgba(24, 19, 14,0.35)',
+        backgroundColor: 'rgba(16, 16, 17,0.35)',
     },
     messageBackdrop: {
         ...StyleSheet.absoluteFill,

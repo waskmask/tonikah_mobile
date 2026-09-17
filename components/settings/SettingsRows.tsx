@@ -197,7 +197,7 @@ export function SettingsValueRow({
     const colors = useColors();
     return (
         <View style={{ marginTop: scale(10) }}>
-            <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>{label}</Text>
+            <Text variant="caption" style={{ color: colors.chrome.common.textMuted }}>{label}</Text>
             {custom || <Text variant="body" style={{ marginTop: scale(4) }}>{value}</Text>}
             {note ? (
                 <Text variant="caption" style={{ marginTop: scale(4), color: colors.brand.text.muted }}>
@@ -221,7 +221,7 @@ export function SettingsLockedRow({ label, value }: { label: string; value: stri
             style={{ marginTop: scale(10) }}
         >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: scale(8) }}>
-                <Text variant="caption" style={{ color: colors.brand.text.subtitle, flex: 1 }}>
+                <Text variant="caption" style={{ color: colors.chrome.common.textMuted, flex: 1 }}>
                     {label}
                 </Text>
                 <Lock size={scale(13)} color={colors.brand.text.muted} />

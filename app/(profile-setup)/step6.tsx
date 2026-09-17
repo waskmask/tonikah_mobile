@@ -55,7 +55,7 @@ export default function Step6() {
     const { t, i18n } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     const [sect, setSect] = useState('');
     const [maslak, setMaslak] = useState('');

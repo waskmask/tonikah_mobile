@@ -112,7 +112,7 @@ export function ProfileListCard({
                     contentFit="cover"
                 />
                 <LinearGradient
-                    colors={['rgba(24, 19, 14,0.04)', 'rgba(24, 19, 14,0.18)', 'rgba(24, 19, 14,0.82)']}
+                    colors={['rgba(16, 16, 17,0.04)', 'rgba(16, 16, 17,0.18)', 'rgba(16, 16, 17,0.82)']}
                     locations={[0, 0.48, 1]}
                     style={StyleSheet.absoluteFill}
                 />
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
         width: scale(24),
         height: scale(24),
         borderRadius: scale(12),
-        backgroundColor: 'rgba(24, 19, 14,0.76)',
+        backgroundColor: 'rgba(16, 16, 17,0.76)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
         top: scale(10),
         minHeight: scale(32),
         borderRadius: scale(999),
-        backgroundColor: 'rgba(24, 19, 14,0.54)',
+        backgroundColor: 'rgba(16, 16, 17,0.54)',
         paddingHorizontal: scale(12),
         alignItems: 'center',
         justifyContent: 'center',
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     },
     location: {
         flexShrink: 1,
-        color: '#E8E1D6',
+        color: '#E5E5E7',
         fontSize: scale(11),
         lineHeight: scale(15),
         fontWeight: '600',
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
         maxWidth: '100%',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.24)',
-        backgroundColor: 'rgba(24, 19, 14,0.34)',
+        backgroundColor: 'rgba(16, 16, 17,0.34)',
         borderRadius: scale(999),
         paddingHorizontal: scale(8),
         paddingVertical: scale(3),

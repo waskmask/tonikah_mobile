@@ -27,6 +27,7 @@ interface AuthState {
     restoreSession: () => Promise<void>;
     refreshUser: () => Promise<AuthResponse>;
     setUser: (user: User) => void;
+    patchUserProfile: (patch: Record<string, any>) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -36,6 +37,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     isRestoringSession: true,
 
     setUser: (user: User) => set({ user, isAuthenticated: true }),
+    patchUserProfile: (patch) => set((state) => ({
+        user: state.user
+            ? {
+                ...state.user,
+                profile: {
+                    ...(state.user.profile || {}),
+                    ...patch,
+                },
+            }
+            : null,
+    })),
 
     login: async (email, password) => {
         set({ isLoading: true });

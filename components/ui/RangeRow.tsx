@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { PanResponder, StyleSheet, View } from 'react-native';
 import { Text } from './Text';
 import { t } from '@/lib/profileDisplay';
+import { useLanguage } from '@/hooks/useLanguage';
+import { localeUsesLatinScript } from '@/lib/textDirection';
 
 type RangeRowProps = {
     label: string;
@@ -24,6 +26,7 @@ type RangeRowProps = {
     anyLabel?: string;
     /** Unframed, divider-based treatment used by full-width editing surfaces. */
     presentation?: 'card' | 'band';
+    insetDivider?: boolean;
     isRTL?: boolean;
 };
 
@@ -48,8 +51,11 @@ export function RangeRow({
     mutedColor,
     anyLabel,
     presentation = 'card',
+    insetDivider = false,
     isRTL = false,
 }: RangeRowProps) {
+    const { currentLanguage } = useLanguage();
+    const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     const [trackWidth, setTrackWidth] = useState(0);
     const isAny = valueMin === defaultMin && valueMax === defaultMax;
     const minLabel = formatValue ? formatValue(valueMin) : `${valueMin}${unit ? ` ${unit}` : ''}`;
@@ -57,24 +63,74 @@ export function RangeRow({
     const valueText = isAny ? (anyLabel ?? t('any', 'Any')) : `${minLabel} - ${maxLabel}`;
     const minPct = ((valueMin - min) / (max - min)) * 100;
     const maxPct = ((valueMax - min) / (max - min)) * 100;
+    const activeThumbRef = useRef<'min' | 'max' | null>(null);
+    const trackPageXRef = useRef(0);
+    const valuesRef = useRef({ min: valueMin, max: valueMax });
+    valuesRef.current = { min: valueMin, max: valueMax };
 
-    const setValueFromX = (x: number) => {
+    const valueFromX = (x: number) => {
         if (!trackWidth) return;
         const raw = min + (Math.max(0, Math.min(trackWidth, x)) / trackWidth) * (max - min);
-        const nextValue = Math.round(raw / step) * step;
-        const distanceToMin = Math.abs(nextValue - valueMin);
-        const distanceToMax = Math.abs(nextValue - valueMax);
-        if (distanceToMin <= distanceToMax) {
-            onChange(Math.min(nextValue, valueMax - step), valueMax);
+        return min + Math.round((raw - min) / step) * step;
+    };
+
+    const beginDrag = (x: number) => {
+        const nextValue = valueFromX(x);
+        if (nextValue == null) return;
+        const current = valuesRef.current;
+        activeThumbRef.current = Math.abs(nextValue - current.min) <= Math.abs(nextValue - current.max)
+            ? 'min'
+            : 'max';
+        updateDrag(x);
+    };
+
+    const updateDrag = (x: number) => {
+        const nextValue = valueFromX(x);
+        if (nextValue == null || !activeThumbRef.current) return;
+        const current = valuesRef.current;
+        if (activeThumbRef.current === 'min') {
+            const nextMin = Math.min(nextValue, current.max - step);
+            valuesRef.current = { min: nextMin, max: current.max };
+            onChange(nextMin, current.max);
         } else {
-            onChange(valueMin, Math.max(nextValue, valueMin + step));
+            const nextMax = Math.max(nextValue, current.min + step);
+            valuesRef.current = { min: current.min, max: nextMax };
+            onChange(current.min, nextMax);
         }
     };
+
+    const endDrag = () => {
+        activeThumbRef.current = null;
+    };
+
+    const dragHandlersRef = useRef({ beginDrag, updateDrag, endDrag });
+    dragHandlersRef.current = { beginDrag, updateDrag, endDrag };
+    const panResponder = useMemo(
+        () => PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onStartShouldSetPanResponderCapture: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponderCapture: () => true,
+            onPanResponderTerminationRequest: () => false,
+            onPanResponderGrant: (event) => {
+                const { locationX, pageX } = event.nativeEvent;
+                trackPageXRef.current = pageX - locationX;
+                dragHandlersRef.current.beginDrag(locationX);
+            },
+            onPanResponderMove: (event) => {
+                dragHandlersRef.current.updateDrag(event.nativeEvent.pageX - trackPageXRef.current);
+            },
+            onPanResponderRelease: () => dragHandlersRef.current.endDrag(),
+            onPanResponderTerminate: () => dragHandlersRef.current.endDrag(),
+        }),
+        [],
+    );
 
     return (
         <View
             style={[
                 presentation === 'band' ? styles.rangeBand : styles.rangeCard,
+                presentation === 'band' && insetDivider && styles.rangeBandInset,
                 {
                     backgroundColor: presentation === 'band' ? 'transparent' : cardColor,
                     borderColor,
@@ -85,7 +141,20 @@ export function RangeRow({
             accessibilityValue={{ text: valueText }}
         >
             <View style={styles.rangeHeader}>
-                <Text variant="body-sm" className="font-body-bold" style={[styles.rangeTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+                <Text
+                    variant="body-sm"
+                    className="font-body-bold"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.86}
+                    style={[
+                        styles.rangeTitle,
+                        usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
+                        { color: mutedColor, textAlign: isRTL ? 'right' : 'left' },
+                    ]}
+                >
+                    {label}
+                </Text>
                 <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? mutedColor : primaryColor, textAlign: isRTL ? 'left' : 'right' }]}>
                     {valueText}
                 </Text>
@@ -93,13 +162,11 @@ export function RangeRow({
             <View
                 style={styles.sliderBox}
                 onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-                onStartShouldSetResponder={() => true}
-                onMoveShouldSetResponder={() => true}
-                onResponderGrant={(event) => setValueFromX(event.nativeEvent.locationX)}
-                onResponderMove={(event) => setValueFromX(event.nativeEvent.locationX)}
+                {...panResponder.panHandlers}
             >
-                <View style={[styles.sliderTrack, { backgroundColor: isDark ? '#3A332B' : '#E4E8ED' }]} />
+                <View pointerEvents="none" style={[styles.sliderTrack, { backgroundColor: isDark ? '#303033' : '#E4E8ED' }]} />
                 <View
+                    pointerEvents="none"
                     style={[
                         styles.sliderActiveTrack,
                         {
@@ -109,17 +176,23 @@ export function RangeRow({
                         },
                     ]}
                 />
-                <View style={[styles.sliderThumb, { left: `${minPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
-                <View style={[styles.sliderThumb, { left: `${maxPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
+                <View pointerEvents="none" style={[styles.sliderThumb, { left: `${minPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
+                <View pointerEvents="none" style={[styles.sliderThumb, { left: `${maxPct}%`, borderColor: primaryColor, shadowColor: primaryColor }]} />
             </View>
             <View style={styles.rangeValues}>
-                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#A99C8D' : mutedColor }}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#B0B0B5' : mutedColor }}>
                     {formatValue ? formatValue(min) : String(min)}
                 </Text>
-                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#A99C8D' : mutedColor }}>
+                <Text variant="caption" className="font-body-semi" style={{ color: isDark ? '#B0B0B5' : mutedColor }}>
                     {formatValue ? formatValue(max) : String(max)}
                 </Text>
             </View>
+            {presentation === 'band' && insetDivider ? (
+                <View
+                    pointerEvents="none"
+                    style={[styles.insetDivider, { backgroundColor: borderColor }]}
+                />
+            ) : null}
         </View>
     );
 }
@@ -140,6 +213,17 @@ const styles = StyleSheet.create({
         paddingBottom: 12,
         minHeight: 112,
     },
+    rangeBandInset: {
+        borderBottomWidth: 0,
+        position: 'relative',
+    },
+    insetDivider: {
+        position: 'absolute',
+        start: 16,
+        end: 16,
+        bottom: 0,
+        height: StyleSheet.hairlineWidth,
+    },
     rangeHeader: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -147,36 +231,47 @@ const styles = StyleSheet.create({
         marginBottom: 18,
     },
     rangeTitle: {
-        fontSize: 14,
-        lineHeight: 20,
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        lineHeight: 17,
+    },
+    latinFieldLabel: {
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+    },
+    naturalFieldLabel: {
+        letterSpacing: 0,
+        textTransform: 'none',
     },
     rangeValue: {
+        flexShrink: 0,
         fontSize: 14,
         lineHeight: 20,
     },
     // Numeric ranges keep LTR orientation in RTL locales (like media controls)
     sliderBox: {
-        height: 24,
+        height: 30,
         justifyContent: 'center',
-        marginHorizontal: 12,
+        marginHorizontal: 15,
         direction: 'ltr',
     },
     sliderTrack: {
-        height: 4,
+        height: 3,
         borderRadius: 2,
     },
     sliderActiveTrack: {
         position: 'absolute',
-        height: 4,
+        height: 3,
         borderRadius: 2,
     },
     sliderThumb: {
         position: 'absolute',
-        width: 24,
-        height: 24,
-        marginLeft: -12,
-        borderRadius: 12,
-        borderWidth: 2.5,
+        width: 30,
+        height: 30,
+        marginLeft: -15,
+        borderRadius: 15,
+        borderWidth: 1,
         backgroundColor: '#FFFFFF',
         shadowOpacity: 0.2,
         shadowRadius: 8,

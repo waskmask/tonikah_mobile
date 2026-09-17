@@ -25,7 +25,7 @@ export function Skeleton({ width = '100%', height = scale(16), borderRadius = sc
     return (
         <Reanimated.View
             style={[
-                { width, height, borderRadius, backgroundColor: colors.brand.bg.border },
+                { width, height, borderRadius, backgroundColor: colors.chrome.common.skeleton },
                 animated,
                 style,
             ]}

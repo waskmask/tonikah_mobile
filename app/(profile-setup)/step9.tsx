@@ -100,7 +100,7 @@ export default function Step9() {
                                         flexDirection: 'row',
                                         borderColor: isActive
                                             ? palette.chrome.primary
-                                            : isDark ? palette.brand.bg.border : '#E8E1D6',
+                                            : palette.brand.bg.border,
                                         backgroundColor: isActive
                                             ? palette.chrome.common.primaryTint
                                             : 'transparent',

@@ -22,7 +22,7 @@ import { completeInteraction, markInteraction } from '@/lib/performanceDiagnosti
 import { scheduleIdleWork } from '@/lib/idleWork';
 
 const ACTIVE_STROKE = 2;
-const INACTIVE_STROKE = 1.8;
+const INACTIVE_STROKE = 1.5;
 
 /** #RRGGBB -> #RRGGBBAA; anything else returned untouched. */
 function hexWithAlpha(color: string, alpha: number) {
@@ -63,59 +63,66 @@ type MySummary = {
     completionPercent: number;
 };
 
-/** Me tab: the user's avatar inside a ring that fills with profile
-    completion — a quiet, permanent nudge to finish the profile. */
+/** Me tab: incomplete profiles show completion around the avatar; completed
+    profiles use the same visual size as the other tab icons without a ring. */
 function AvatarTabIcon({
     uri,
     percent,
     active,
     ringColor,
     trackColor,
+    completedBorderColor,
 }: {
     uri: string;
     percent: number;
     active: boolean;
     ringColor: string;
     trackColor: string;
+    completedBorderColor: string;
 }) {
     const box = scale(27);
     const strokeWidth = 2;
     const radius = (box - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const clamped = Math.min(100, Math.max(0, percent));
-    const avatarSize = box - scale(7);
+    const showCompletionRing = clamped < 100;
+    const avatarSize = showCompletionRing ? box - scale(7) : scale(23);
 
     return (
         <View style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}>
-            <Svg width={box} height={box} style={StyleSheet.absoluteFill}>
-                <Circle
-                    cx={box / 2}
-                    cy={box / 2}
-                    r={radius}
-                    stroke={trackColor}
-                    strokeWidth={strokeWidth}
-                    fill="none"
-                />
-                <Circle
-                    cx={box / 2}
-                    cy={box / 2}
-                    r={radius}
-                    stroke={ringColor}
-                    strokeWidth={strokeWidth}
-                    strokeDasharray={`${circumference}`}
-                    strokeDashoffset={circumference * (1 - clamped / 100)}
-                    strokeLinecap="round"
-                    fill="none"
-                    // Progress starts at 12 o'clock
-                    transform={`rotate(-90 ${box / 2} ${box / 2})`}
-                />
-            </Svg>
+            {showCompletionRing ? (
+                <Svg width={box} height={box} style={StyleSheet.absoluteFill}>
+                    <Circle
+                        cx={box / 2}
+                        cy={box / 2}
+                        r={radius}
+                        stroke={trackColor}
+                        strokeWidth={strokeWidth}
+                        fill="none"
+                    />
+                    <Circle
+                        cx={box / 2}
+                        cy={box / 2}
+                        r={radius}
+                        stroke={ringColor}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={`${circumference}`}
+                        strokeDashoffset={circumference * (1 - clamped / 100)}
+                        strokeLinecap="round"
+                        fill="none"
+                        // Progress starts at 12 o'clock
+                        transform={`rotate(-90 ${box / 2} ${box / 2})`}
+                    />
+                </Svg>
+            ) : null}
             <Image
                 source={{ uri }}
                 style={{
                     width: avatarSize,
                     height: avatarSize,
                     borderRadius: avatarSize / 2,
+                    borderWidth: showCompletionRing ? 0 : 0.5,
+                    borderColor: completedBorderColor,
                     opacity: active ? 1 : 0.88,
                 }}
                 contentFit="cover"
@@ -281,6 +288,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                                             active={isActive}
                                             ringColor={tabChrome.active}
                                             trackColor={hexWithAlpha(tabChrome.inactive, 0.3)}
+                                            completedBorderColor={tabChrome.inactive}
                                         />
                                     ) : (
                                         <item.Icon

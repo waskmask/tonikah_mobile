@@ -80,10 +80,10 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
         transform: [{ translateX: (1 - progress.value) * DRAWER_WIDTH * (isRTL ? -1 : 1) }],
     }));
 
-    const surfaceColor = isDark ? '#1B1713' : '#FFFFFF';
-    const borderColor = isDark ? '#3A332B' : '#E8E8E6';
-    const headingColor = isDark ? '#E8E1D6' : '#241E17';
-    const overlayColor = isDark ? 'rgba(2, 6, 23, 0.58)' : 'rgba(24, 19, 14, 0.45)';
+    const surfaceColor = isDark ? '#1D1D1F' : '#FFFFFF';
+    const borderColor = isDark ? '#303033' : '#EEEEEE';
+    const headingColor = isDark ? '#E5E5E7' : '#241E17';
+    const overlayColor = isDark ? 'rgba(0, 0, 0, 0.58)' : 'rgba(16, 16, 17, 0.45)';
 
     const navigate = (href: Href) => {
         if (isLoading) return;
@@ -99,6 +99,13 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
             if (href === '/(tabs)/hobbies-faith') {
                 router.push({
                     pathname: '/(tabs)/hobbies-faith',
+                    params: { returnTo: pathname },
+                });
+                return;
+            }
+            if (href === '/(tabs)/partner-preference') {
+                router.push({
+                    pathname: '/(tabs)/partner-preference',
                     params: { returnTo: pathname },
                 });
                 return;
@@ -216,7 +223,7 @@ function MenuRow({
 }) {
     const { isDark } = useTheme();
     const { currentLanguage, isRTL } = useLanguage();
-    const color = danger ? '#E64E67' : isDark ? '#E8E1D6' : '#241E17';
+    const color = danger ? '#E64E67' : isDark ? '#E5E5E7' : '#241E17';
     const fontFamily = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.semi;
 
     return (

@@ -64,7 +64,7 @@ export const Input: React.FC<InputProps> = ({
                             ? '#EF4444'
                             : isFocused
                                 ? '#F34B6F'
-                                : isDark ? '#3A332B' : '#E8E1D6',
+                                : isDark ? '#303033' : '#EEEEEE',
                     },
                 ]}
             >
@@ -79,7 +79,7 @@ export const Input: React.FC<InputProps> = ({
                     // Darker placeholder for readability; weight stays light via the
                     // regular input font (RN can't style placeholder weight separately)
                     placeholder={required && placeholder ? `${placeholder} *` : placeholder}
-                    placeholderTextColor={isDark ? '#A99C8D' : '#5C5348'}
+                    placeholderTextColor={isDark ? '#B0B0B5' : '#5C5348'}
                     onFocus={(e: any) => {
                         setIsFocused(true);
                         onFocus?.(e);
@@ -99,7 +99,7 @@ export const Input: React.FC<InputProps> = ({
                         // pushes the text away from the underline
                         paddingVertical: 0,
                         fontFamily: inputFontFamily,
-                        color: isDark ? '#E8E1D6' : '#201B15',
+                        color: isDark ? '#E5E5E7' : '#201B15',
                         textAlign: isRTL ? 'right' : 'left',
                         writingDirection: isRTL ? 'rtl' : 'ltr',
                     }}

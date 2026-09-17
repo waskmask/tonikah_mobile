@@ -25,7 +25,7 @@ export default function Step4() {
     const { t, i18n } = useTranslation(['common', 'ethnic_groups']);
     const { isDark } = useTheme();
     const { setProfileData, masterdata, setMasterdata } = useProfileSetupStore();
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     const [height, setHeight] = useState('');
     const [complexion, setComplexion] = useState('');

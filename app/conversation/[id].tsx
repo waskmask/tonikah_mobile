@@ -2831,7 +2831,7 @@ const styles = StyleSheet.create({
         paddingVertical: scale(8),
         marginBottom: scale(4),
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(160, 146, 128,0.24)',
+        borderColor: 'rgba(160, 160, 168,0.24)',
     },
     viewOnceIconBadge: {
         width: scale(34),
@@ -2849,7 +2849,7 @@ const styles = StyleSheet.create({
         width: scale(34),
         height: scale(34),
         borderRadius: scale(17),
-        backgroundColor: 'rgba(24, 19, 14,0.70)',
+        backgroundColor: 'rgba(16, 16, 17,0.70)',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -3023,7 +3023,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(24, 19, 14,0.28)',
+        backgroundColor: 'rgba(16, 16, 17,0.28)',
     },
     conversationMenu: {
         position: 'absolute',
@@ -3081,7 +3081,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
     },
     conversationMenuItemPressed: {
-        backgroundColor: 'rgba(160, 146, 128,0.12)',
+        backgroundColor: 'rgba(160, 160, 168,0.12)',
     },
     conversationMenuLinks: {
         paddingHorizontal: scale(10),
@@ -3099,7 +3099,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        backgroundColor: 'rgba(24, 19, 14,0.35)',
+        backgroundColor: 'rgba(16, 16, 17,0.35)',
     },
     messageMenuSheet: {
         borderTopLeftRadius: scale(18),
@@ -3121,7 +3121,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(5),
         paddingVertical: scale(5),
         marginBottom: scale(8),
-        backgroundColor: 'rgba(160, 146, 128,0.12)',
+        backgroundColor: 'rgba(160, 160, 168,0.12)',
     },
     quickReactionButton: {
         width: scale(42),
@@ -3130,7 +3130,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    quickReactionPressed: { backgroundColor: 'rgba(160, 146, 128,0.18)' },
+    quickReactionPressed: { backgroundColor: 'rgba(160, 160, 168,0.18)' },
     quickReactionText: { fontSize: scale(22), lineHeight: scale(26) },
     messageActionItem: {
         width: '100%',
@@ -3152,7 +3152,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(14), lineHeight: scale(18), fontWeight: '400' },
-    messageActionPressed: { backgroundColor: 'rgba(160, 146, 128,0.12)' },
+    messageActionPressed: { backgroundColor: 'rgba(160, 160, 168,0.12)' },
     replyQuote: {
         borderLeftWidth: scale(3),
         borderRadius: scale(8),

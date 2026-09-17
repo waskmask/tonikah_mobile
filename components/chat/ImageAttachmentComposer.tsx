@@ -138,7 +138,7 @@ export function ImageAttachmentComposer({
                             >
                                 <ViewOnceIcon
                                     size={scale(36)}
-                                    color={viewOnce ? colors.primary : '#D8CFC2'}
+                                    color={viewOnce ? colors.primary : '#DEDEE2'}
                                     active={viewOnce}
                                 />
                             </Pressable>
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
         width: scale(42),
         height: scale(42),
         borderRadius: scale(21),
-        backgroundColor: 'rgba(24, 19, 14,0.55)',
+        backgroundColor: 'rgba(16, 16, 17,0.55)',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 2,

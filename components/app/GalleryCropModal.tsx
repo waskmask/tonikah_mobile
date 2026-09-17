@@ -33,6 +33,12 @@ type Offset = {
     y: number;
 };
 
+type PreviewTransform = {
+    offset: Offset;
+    zoom: number;
+    rotation: number;
+};
+
 type Labels = {
     title: string;
     subtitle: string;
@@ -56,6 +62,14 @@ type Props = {
 
 function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
+}
+
+function sameSize(a: Size, b: Size) {
+    return a.width === b.width && a.height === b.height;
+}
+
+function sameOffset(a: Offset, b: Offset) {
+    return a.x === b.x && a.y === b.y;
 }
 
 function getMetrics(natural: Size, frame: Size, zoom: number) {
@@ -127,6 +141,9 @@ export function GalleryCropModal({
     const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
     const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+    const sliderOriginXRef = useRef(0);
+    const pendingZoomRef = useRef<number | null>(null);
+    const zoomFrameRef = useRef<number | null>(null);
     const [natural, setNatural] = useState<Size>({ width: 0, height: 0 });
     const [frame, setFrame] = useState<Size>({ width: 0, height: 0 });
     const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
@@ -134,41 +151,77 @@ export function GalleryCropModal({
     const [rotation, setRotation] = useState(0);
     const [sliderWidth, setSliderWidth] = useState(0);
     const [processing, setProcessing] = useState(false);
+    const initializedImageRef = useRef<string | null>(null);
+    const submittedPreviewRef = useRef<PreviewTransform | null>(null);
+    const interactionRef = useRef({ natural, frame, offset, zoom, rotation, sliderWidth });
+    interactionRef.current = { natural, frame, offset, zoom, rotation, sliderWidth };
 
     // Same pairs as the app theme tokens (see edit-profile themeColors)
-    const backgroundColor = isDark ? '#0E0C09' : '#FFFFFF';
-    const textStrong = isDark ? '#E8E1D6' : '#201B15';
-    const textMuted = isDark ? '#A99C8D' : '#7D7266';
-    const surface = isDark ? '#1B1713' : '#F4EEE6';
-    const border = isDark ? '#3A332B' : '#E8E1D6';
-    const metrics = useMemo(() => getRotatedMetrics(natural, frame, zoom, rotation), [frame, natural, rotation, zoom]);
+    const backgroundColor = isDark ? '#101011' : '#FFFFFF';
+    const textStrong = isDark ? '#E5E5E7' : '#201B15';
+    const textMuted = isDark ? '#B0B0B5' : '#7D7266';
+    const surface = isDark ? '#1D1D1F' : '#FFFFFF';
+    const border = isDark ? '#303033' : '#EEEEEE';
     const busy = uploading || processing;
-    const zoomPercent = ((zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100;
+    const submittedPreview = busy ? submittedPreviewRef.current : null;
+    const previewOffset = submittedPreview?.offset ?? offset;
+    const previewZoom = submittedPreview?.zoom ?? zoom;
+    const previewRotation = submittedPreview?.rotation ?? rotation;
+    const metrics = useMemo(() => getRotatedMetrics(natural, frame, zoom, rotation), [frame, natural, rotation, zoom]);
+    const previewMetrics = useMemo(
+        () => getRotatedMetrics(natural, frame, previewZoom, previewRotation),
+        [frame, natural, previewRotation, previewZoom],
+    );
+    const zoomPercent = ((previewZoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100;
 
     useEffect(() => {
-        if (!visible) return;
-        setOffset({ x: 0, y: 0 });
-        setZoom(1);
-        setRotation(0);
-        setProcessing(false);
+        if (!visible) {
+            if (zoomFrameRef.current !== null) {
+                cancelAnimationFrame(zoomFrameRef.current);
+                zoomFrameRef.current = null;
+            }
+            pendingZoomRef.current = null;
+            initializedImageRef.current = null;
+            submittedPreviewRef.current = null;
+            return;
+        }
+        if (initializedImageRef.current === imageUri) return;
+        initializedImageRef.current = imageUri;
+        submittedPreviewRef.current = null;
+        setOffset((current) => sameOffset(current, { x: 0, y: 0 }) ? current : { x: 0, y: 0 });
+        setZoom((current) => current === 1 ? current : 1);
+        setRotation((current) => current === 0 ? current : 0);
+        setProcessing((current) => current ? false : current);
 
         if (sourceSize?.width && sourceSize?.height) {
-            setNatural(sourceSize);
+            setNatural((current) => sameSize(current, sourceSize) ? current : sourceSize);
             return;
         }
 
         if (imageUri) {
             RNImage.getSize(
                 imageUri,
-                (width, height) => setNatural({ width, height }),
-                () => setNatural({ width: 0, height: 0 })
+                (width, height) => setNatural((current) => {
+                    const next = { width, height };
+                    return sameSize(current, next) ? current : next;
+                }),
+                () => setNatural((current) => sameSize(current, { width: 0, height: 0 })
+                    ? current
+                    : { width: 0, height: 0 })
             );
         }
-    }, [imageUri, sourceSize, visible]);
+    }, [imageUri, sourceSize?.height, sourceSize?.width, visible]);
 
     useEffect(() => {
-        setOffset((current) => clampOffset(current, natural, frame, zoom, rotation));
-    }, [frame, natural, rotation, zoom]);
+        setOffset((current) => {
+            const next = clampOffset(current, natural, frame, zoom, rotation);
+            return sameOffset(current, next) ? current : next;
+        });
+    }, [frame, natural, rotation]);
+
+    useEffect(() => () => {
+        if (zoomFrameRef.current !== null) cancelAnimationFrame(zoomFrameRef.current);
+    }, []);
 
     const panResponder = useMemo(
         () =>
@@ -176,43 +229,80 @@ export function GalleryCropModal({
                 onStartShouldSetPanResponder: () => true,
                 onMoveShouldSetPanResponder: () => true,
                 onPanResponderGrant: (event) => {
+                    const current = interactionRef.current;
                     dragStart.current = {
                         x: event.nativeEvent.pageX,
                         y: event.nativeEvent.pageY,
-                        offsetX: offset.x,
-                        offsetY: offset.y,
+                        offsetX: current.offset.x,
+                        offsetY: current.offset.y,
                     };
                 },
                 onPanResponderMove: (event) => {
+                    const current = interactionRef.current;
                     const next = {
                         x: dragStart.current.offsetX + event.nativeEvent.pageX - dragStart.current.x,
                         y: dragStart.current.offsetY + event.nativeEvent.pageY - dragStart.current.y,
                     };
-                    setOffset(clampOffset(next, natural, frame, zoom, rotation));
+                    const clamped = clampOffset(
+                        next,
+                        current.natural,
+                        current.frame,
+                        current.zoom,
+                        current.rotation,
+                    );
+                    setOffset((previous) => sameOffset(previous, clamped) ? previous : clamped);
                 },
             }),
-        [frame, natural, offset.x, offset.y, rotation, zoom]
+        []
     );
 
     const sliderPanResponder = useMemo(
         () =>
             PanResponder.create({
                 onStartShouldSetPanResponder: () => true,
+                onStartShouldSetPanResponderCapture: () => true,
                 onMoveShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponderCapture: () => true,
+                onPanResponderTerminationRequest: () => false,
                 onPanResponderGrant: (event) => {
-                    setZoomFromSlider(event.nativeEvent.locationX);
+                    sliderOriginXRef.current = event.nativeEvent.pageX - event.nativeEvent.locationX;
+                    setZoomFromPageX(event.nativeEvent.pageX);
                 },
                 onPanResponderMove: (event) => {
-                    setZoomFromSlider(event.nativeEvent.locationX);
+                    setZoomFromPageX(event.nativeEvent.pageX);
                 },
             }),
-        [sliderWidth]
+        []
     );
 
-    function setZoomFromSlider(locationX: number) {
-        if (!sliderWidth) return;
-        const percent = clamp(locationX / sliderWidth, 0, 1);
-        setZoom(MIN_ZOOM + percent * (MAX_ZOOM - MIN_ZOOM));
+    function setZoomFromPageX(pageX: number) {
+        const width = interactionRef.current.sliderWidth;
+        if (!width) return;
+        const percent = clamp((pageX - sliderOriginXRef.current) / width, 0, 1);
+        const next = MIN_ZOOM + percent * (MAX_ZOOM - MIN_ZOOM);
+        pendingZoomRef.current = next;
+        if (zoomFrameRef.current !== null) return;
+
+        zoomFrameRef.current = requestAnimationFrame(() => {
+            zoomFrameRef.current = null;
+            const queuedZoom = pendingZoomRef.current;
+            pendingZoomRef.current = null;
+            if (queuedZoom === null) return;
+
+            const current = interactionRef.current;
+            interactionRef.current = { ...current, zoom: queuedZoom };
+            setZoom((value) => Math.abs(value - queuedZoom) < 0.0001 ? value : queuedZoom);
+            setOffset((value) => {
+                const clamped = clampOffset(
+                    value,
+                    current.natural,
+                    current.frame,
+                    queuedZoom,
+                    current.rotation,
+                );
+                return sameOffset(value, clamped) ? value : clamped;
+            });
+        });
     }
 
     function rotateImage() {
@@ -223,6 +313,11 @@ export function GalleryCropModal({
     async function cropAndUpload() {
         if (!imageUri || !natural.width || !natural.height || !frame.width || !frame.height || busy) return;
 
+        submittedPreviewRef.current = {
+            offset: { ...offset },
+            zoom,
+            rotation,
+        };
         setProcessing(true);
 
         try {
@@ -257,6 +352,7 @@ export function GalleryCropModal({
         } catch (error: any) {
             onError(error?.message);
         } finally {
+            submittedPreviewRef.current = null;
             setProcessing(false);
         }
     }
@@ -302,23 +398,27 @@ export function GalleryCropModal({
                 <View style={styles.cropArea}>
                     <View
                         style={[styles.cropFrame, { backgroundColor: surface }]}
+                        pointerEvents={busy ? 'none' : 'auto'}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
-                            setFrame({ width, height });
+                            setFrame((current) => {
+                                const next = { width, height };
+                                return sameSize(current, next) ? current : next;
+                            });
                         }}
                         {...panResponder.panHandlers}
                     >
-                        {imageUri && metrics.imageWidth ? (
+                        {imageUri && previewMetrics.imageWidth ? (
                             <View
                                 style={[
                                     styles.cropImageWrap,
                                     {
-                                        width: metrics.imageWidth,
-                                        height: metrics.imageHeight,
-                                        left: frame.width / 2 - metrics.imageWidth / 2 + offset.x,
-                                        top: frame.height / 2 - metrics.imageHeight / 2 + offset.y,
+                                        width: previewMetrics.imageWidth,
+                                        height: previewMetrics.imageHeight,
+                                        left: frame.width / 2 - previewMetrics.imageWidth / 2 + previewOffset.x,
+                                        top: frame.height / 2 - previewMetrics.imageHeight / 2 + previewOffset.y,
                                         transform: [
-                                            { rotate: `${rotation}deg` },
+                                            { rotate: `${previewRotation}deg` },
                                         ],
                                     },
                                 ]}
@@ -348,18 +448,22 @@ export function GalleryCropModal({
                 <View style={styles.controls}>
                     <View
                         style={styles.sliderHitArea}
-                        onLayout={(event) => setSliderWidth(event.nativeEvent.layout.width)}
+                        pointerEvents={busy ? 'none' : 'auto'}
+                        onLayout={(event) => {
+                            const width = event.nativeEvent.layout.width;
+                            setSliderWidth((current) => current === width ? current : width);
+                        }}
                         {...sliderPanResponder.panHandlers}
                     >
-                        <View style={[styles.zoomTrack, { backgroundColor: border }]}>
+                        <View pointerEvents="none" style={[styles.zoomTrack, { backgroundColor: border }]}>
                             <View style={[styles.zoomFill, { width: `${zoomPercent}%` }]} />
                             <View
                                 style={[
                                     styles.zoomThumb,
                                     {
                                         left: `${zoomPercent}%`,
-                                        borderColor: isDark ? '#3A332B' : '#D9E1EC',
-                                        backgroundColor: isDark ? '#E8E1D6' : '#FFFFFF',
+                                        borderColor: isDark ? '#303033' : textStrong,
+                                        backgroundColor: isDark ? '#E5E5E7' : '#FFFFFF',
                                     },
                                 ]}
                             />
@@ -371,7 +475,7 @@ export function GalleryCropModal({
                         style={[styles.rotateButton, { borderColor: border }]}
                         accessibilityLabel={labels.rotate}
                     >
-                        <RotateCw size={scale(21)} color={textStrong} />
+                        <RotateCw size={scale(22)} color={textStrong} />
                     </Pressable>
                 </View>
 
@@ -509,9 +613,9 @@ const styles = StyleSheet.create({
         paddingBottom: scale(18),
     },
     rotateButton: {
-        width: scale(44),
-        height: scale(44),
-        borderRadius: scale(22),
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
         borderWidth: 1,
         borderColor: '#E8E1D6',
         alignItems: 'center',
@@ -534,14 +638,14 @@ const styles = StyleSheet.create({
     },
     zoomThumb: {
         position: 'absolute',
-        top: scale(-8),
-        marginLeft: scale(-11),
-        width: scale(22),
-        height: scale(22),
-        borderRadius: scale(11),
+        top: scale(-11),
+        marginLeft: scale(-14),
+        width: scale(28),
+        height: scale(28),
+        borderRadius: scale(14),
         borderWidth: 1,
         backgroundColor: '#FFFFFF',
-        shadowColor: '#141210',
+        shadowColor: '#101011',
         shadowOpacity: 0.14,
         shadowRadius: 4,
         shadowOffset: { width: 0, height: 2 },

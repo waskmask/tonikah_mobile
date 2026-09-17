@@ -11,7 +11,7 @@ export const PP_AGE_MAX = 80;
 export const PP_HEIGHT_MIN_CM = 130;
 export const PP_HEIGHT_MAX_CM = 213;
 export const PP_MAX_SELECTIONS = 5;
-export const PP_ABOUT_MAX = 200;
+export const PP_ABOUT_MAX = 500;
 
 export const PP_MARITAL_OPTIONS = [
     'never_married',
@@ -163,4 +163,23 @@ export function buildPartnerPrefPayload(state: PartnerPrefState) {
         ethnic_group_ids: state.ethnic,
         about_partner: trimToCharacterLimit(cleanProfileTextForSave(state.about), PP_ABOUT_MAX),
     };
+}
+
+/** Minimal PATCH payload: omitted categories remain untouched by the API. */
+export function buildPartnerPrefPatch(current: PartnerPrefState, baseline: PartnerPrefState) {
+    const next = buildPartnerPrefPayload(current);
+    const previous = buildPartnerPrefPayload(baseline);
+    const patch: Partial<typeof next> = {};
+
+    if (JSON.stringify(next.age) !== JSON.stringify(previous.age)) patch.age = next.age;
+    if (JSON.stringify(next.height) !== JSON.stringify(previous.height)) patch.height = next.height;
+
+    const sameValues = (a: string[], b: string[]) =>
+        JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+    if (!sameValues(next.marital_status, previous.marital_status)) patch.marital_status = next.marital_status;
+    if (!sameValues(next.languages_spoken, previous.languages_spoken)) patch.languages_spoken = next.languages_spoken;
+    if (!sameValues(next.ethnic_group_ids, previous.ethnic_group_ids)) patch.ethnic_group_ids = next.ethnic_group_ids;
+    if (next.about_partner !== previous.about_partner) patch.about_partner = next.about_partner;
+
+    return patch;
 }

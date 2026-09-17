@@ -3,6 +3,7 @@ import { Modal as RNModal, View, TouchableOpacity, ScrollView } from "react-nati
 import { Text } from "./Text";
 import { scale } from "@/hooks/useResponsive";
 import { X } from "lucide-react-native";
+import { useColors } from "@/hooks/useColors";
 
 interface ModalProps {
     visible: boolean;
@@ -12,6 +13,8 @@ interface ModalProps {
 }
 
 export const Modal: React.FC<ModalProps> = ({ visible, onClose, title, children }) => {
+    const colors = useColors();
+
     return (
         <RNModal
             visible={visible}
@@ -30,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({ visible, onClose, title, children 
                     <View className="flex-row items-center justify-between px-6 py-5 border-b border-brand-bg-border">
                         <Text variant="h3">{title}</Text>
                         <TouchableOpacity onPress={onClose} className="p-1">
-                            <X size={scale(24)} stroke="#A99C8D" />
+                            <X size={scale(24)} stroke={colors.chrome.common.iconNeutral} />
                         </TouchableOpacity>
                     </View>
 

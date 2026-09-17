@@ -392,7 +392,7 @@ export default function Step8() {
                             style={[
                                 styles.locationButton,
                                 {
-                                    borderBottomColor: errors.city ? '#EF4444' : isDark ? '#3A332B' : '#E8E1D6',
+                                    borderBottomColor: errors.city ? '#EF4444' : isDark ? '#303033' : '#EEEEEE',
                                     opacity: detectingLocation ? 0.65 : 1,
                                 },
                             ]}
@@ -401,7 +401,7 @@ export default function Step8() {
                                 variant="body-sm"
                                 numberOfLines={2}
                                 style={{
-                                    color: city ? (isDark ? '#E8E1D6' : '#201B15') : (isDark ? '#A99C8D' : '#5C5348'),
+                                    color: city ? (isDark ? '#E5E5E7' : '#201B15') : (isDark ? '#B0B0B5' : '#5C5348'),
                                     flex: 1,
                                 }}
                             >

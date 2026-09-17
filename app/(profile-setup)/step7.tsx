@@ -23,7 +23,7 @@ export default function Step7() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
     const { setProfileData } = useProfileSetupStore();
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     const [smoking, setSmoking] = useState('');
     const [alcohol, setAlcohol] = useState('');

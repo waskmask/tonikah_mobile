@@ -93,7 +93,7 @@ function Circle({
         tone === 'view'
             ? colors.brand.gradient.start
             : isDark
-                ? '#2C2925'
+                ? '#29292C'
                 : '#FFFFFF';
     const buttonShadow =
         tone === 'view'
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
         borderRadius: scale(999),
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#2C2925',
+        backgroundColor: '#29292C',
         borderTopWidth: 1,
         borderTopColor: 'rgba(255,255,255,0.08)',
         borderBottomWidth: 1,

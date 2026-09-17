@@ -17,7 +17,7 @@ export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
     const { isRTL, currentLanguage } = useLanguage();
     const { isDark } = useTheme();
     // Explicit colors, no theme classes — must be visible in both modes
-    const linkColor = isDark ? '#F4EEE6' : '#1B1713';
+    const linkColor = isDark ? '#F5F5F5' : '#1B1713';
     const linkFont = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.bold;
     const Arrow = isRTL ? ChevronRight : ChevronLeft;
 

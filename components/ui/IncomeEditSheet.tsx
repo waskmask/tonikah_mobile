@@ -4,6 +4,7 @@ import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetBackdropProps,
     BottomSheetView,
+    useBottomSheetTimingConfigs,
 } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { X } from 'lucide-react-native';
@@ -14,6 +15,7 @@ import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 import { formatAmount } from '@/lib/profileValidation';
+import { Easing } from 'react-native-reanimated';
 
 type Props = {
     visible: boolean;
@@ -44,6 +46,10 @@ export function IncomeEditSheet({
     const insets = useSafeAreaInsets();
     const [currency, setCurrency] = useState(initialCurrency);
     const [amount, setAmount] = useState(initialAmount);
+    const animationConfigs = useBottomSheetTimingConfigs({
+        duration: 220,
+        easing: Easing.bezier(0.32, 0.72, 0, 1),
+    });
 
     useEffect(() => {
         if (visible) {
@@ -82,6 +88,7 @@ export function IncomeEditSheet({
                 <BottomSheet
                     snapPoints={[sheetHeight]}
                     index={0}
+                    animationConfigs={animationConfigs}
                     enablePanDownToClose={!saving}
                     enableDynamicSizing={false}
                     onClose={onClose}

@@ -24,7 +24,7 @@ export default function Step3() {
     const { t } = useTranslation('common');
     const { isDark } = useTheme();
     const { gender, setProfileData } = useProfileSetupStore();
-    const iconColor = isDark ? '#A99C8D' : '#7D7266';
+    const iconColor = isDark ? '#B0B0B5' : '#7D7266';
 
     const [maritalStatus, setMaritalStatus] = useState('');
     const [hasChildren, setHasChildren] = useState('');

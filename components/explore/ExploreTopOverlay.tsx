@@ -20,8 +20,8 @@ export function ExploreTopOverlay({
 }) {
     const colors = useColors();
     const { isDark } = useTheme();
-    // Light: dark icon on warm grey chip; dark: light icon on dark chip.
-    const iconColor = isDark ? '#E8E1D6' : '#201B15';
+    // Light: dark icon on neutral grey chip; dark: light icon on dark chip.
+    const iconColor = isDark ? '#E5E5E7' : '#201B15';
 
     return (
         // Warm screen color (not the white header token) so status bar, top bar
@@ -60,8 +60,8 @@ export function ExploreTopOverlay({
 }
 
 function IconButton({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
-    const { isDark } = useTheme();
-    const backgroundColor = isDark ? '#2C2925' : '#ECE6DE';
+    const colors = useColors();
+    const backgroundColor = colors.chrome.header.iconBackground;
 
     return (
         <View
