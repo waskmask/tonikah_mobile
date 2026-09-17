@@ -17,6 +17,7 @@ import Animated, {
     useAnimatedStyle,
     useSharedValue,
     withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,6 +49,7 @@ import {
     Pencil,
     Plane,
     Puzzle,
+    RefreshCw,
     Ruler,
     ShieldCheck,
     Shirt,
@@ -63,7 +65,7 @@ import { Text } from '@/components/ui/Text';
 import { Divider } from '@/components/ui/Divider';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useLanguage } from '@/hooks/useLanguage';
-import { scale, wp } from '@/hooks/useResponsive';
+import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
@@ -1641,37 +1643,256 @@ function ImageLightbox({
     showReport?: boolean;
 }) {
     const [current, setCurrent] = useState(0);
+    const [imageStatuses, setImageStatuses] = useState<Record<string, 'loading' | 'loaded' | 'error'>>({});
+    const [retryVersions, setRetryVersions] = useState<Record<string, number>>({});
     const palette = useColors();
+    const insets = useSafeAreaInsets();
+    const zoom = useSharedValue(1);
+    const zoomStart = useSharedValue(1);
+    const translateX = useSharedValue(0);
+    const translateY = useSharedValue(0);
+    const pinchStartX = useSharedValue(0);
+    const pinchStartY = useSharedValue(0);
+    const pinchFocalX = useSharedValue(0);
+    const pinchFocalY = useSharedValue(0);
+    const panStartX = useSharedValue(0);
+    const panStartY = useSharedValue(0);
+    const carouselX = useSharedValue(0);
     const dragY = useSharedValue(0);
+    const viewportWidth = useSharedValue(SCREEN_WIDTH);
+    const viewportHeight = useSharedValue(0);
+    const fittedImageWidth = useSharedValue(SCREEN_WIDTH);
+    const fittedImageHeight = useSharedValue(0);
+    const imageSizesRef = useRef<Record<number, { width: number; height: number }>>({});
+    const topbarHeight = insets.top + scale(66);
+
+    const syncImageSize = useCallback((photoIndex: number, width: number, height: number) => {
+        if (width <= 0 || height <= 0) return;
+        imageSizesRef.current[photoIndex] = { width, height };
+        if (photoIndex !== current) return;
+        const frameWidth = viewportWidth.value;
+        const frameHeight = viewportHeight.value + topbarHeight;
+        if (frameWidth <= 0 || frameHeight <= 0) return;
+        const fitScale = Math.min(frameWidth / width, frameHeight / height);
+        fittedImageWidth.value = width * fitScale;
+        fittedImageHeight.value = height * fitScale;
+    }, [current, fittedImageHeight, fittedImageWidth, topbarHeight, viewportHeight, viewportWidth]);
+
+    const resetTransform = useCallback(() => {
+        zoom.value = 1;
+        zoomStart.value = 1;
+        translateX.value = 0;
+        translateY.value = 0;
+        panStartX.value = 0;
+        panStartY.value = 0;
+        dragY.value = 0;
+    }, [dragY, panStartX, panStartY, translateX, translateY, zoom, zoomStart]);
+
     useEffect(() => {
         if (index !== null) {
             setCurrent(index);
-            dragY.value = 0;
+            resetTransform();
+            carouselX.value = -index * viewportWidth.value;
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [index]);
-    const src = index !== null ? photos[current] : '';
+    }, [carouselX, index, resetTransform, viewportWidth]);
     const hasMultiple = photos.length > 1;
-    const goPrevious = () => setCurrent((value) => (value <= 0 ? photos.length - 1 : value - 1));
-    const goNext = () => setCurrent((value) => (value >= photos.length - 1 ? 0 : value + 1));
+    const previousPhoto = photos[current - 1];
+    const nextPhoto = photos[current + 1];
+    const finishNavigation = useCallback((nextIndex: number) => {
+        setCurrent(nextIndex);
+    }, []);
 
-    // Swipe-down anywhere dismisses (standard photo-viewer gesture); taps and
-    // horizontal movement fall through to the buttons.
-    const dismissGesture = Gesture.Pan()
-        .activeOffsetY(16)
-        .failOffsetX([-24, 24])
-        .onUpdate((event) => {
-            dragY.value = Math.max(0, event.translationY);
+    const setImageStatus = useCallback((photo: string, status: 'loading' | 'loaded' | 'error') => {
+        setImageStatuses((previous) => previous[photo] === status
+            ? previous
+            : { ...previous, [photo]: status });
+    }, []);
+
+    const retryImage = useCallback((photo: string) => {
+        setImageStatus(photo, 'loading');
+        setRetryVersions((previous) => ({
+            ...previous,
+            [photo]: (previous[photo] || 0) + 1,
+        }));
+    }, [setImageStatus]);
+
+    useEffect(() => {
+        const size = imageSizesRef.current[current];
+        if (size) {
+            syncImageSize(current, size.width, size.height);
+        } else {
+            fittedImageWidth.value = viewportWidth.value;
+            fittedImageHeight.value = viewportHeight.value + topbarHeight;
+        }
+    }, [current, fittedImageHeight, fittedImageWidth, syncImageSize, topbarHeight, viewportHeight, viewportWidth]);
+
+    useEffect(() => {
+        if (index === null) return;
+        const adjacentPhotos = [previousPhoto, nextPhoto].filter(
+            (photo): photo is string => Boolean(photo),
+        );
+        if (adjacentPhotos.length === 0) return;
+        void Image.prefetch(adjacentPhotos, 'memory-disk').catch(() => undefined);
+    }, [index, nextPhoto, previousPhoto]);
+
+    const pinchGesture = Gesture.Pinch()
+        .onBegin(() => {
+            carouselX.value = -current * viewportWidth.value;
+            dragY.value = 0;
         })
-        .onEnd((event) => {
-            if (event.translationY > 120 || event.velocityY > 900) {
-                runOnJS(onClose)();
+        .onStart((event) => {
+            const frameHeight = viewportHeight.value + topbarHeight;
+            zoomStart.value = zoom.value;
+            pinchStartX.value = translateX.value;
+            pinchStartY.value = translateY.value;
+            pinchFocalX.value = event.focalX - viewportWidth.value / 2;
+            pinchFocalY.value = event.focalY + topbarHeight - frameHeight / 2;
+        })
+        .onUpdate((event) => {
+            const nextZoom = Math.max(1, Math.min(2, zoomStart.value * event.scale));
+            const zoomRatio = nextZoom / zoomStart.value;
+            zoom.value = nextZoom;
+            if (nextZoom > 1.01) {
+                carouselX.value = -current * viewportWidth.value;
+                dragY.value = 0;
+            }
+            const frameHeight = viewportHeight.value + topbarHeight;
+            const maxX = Math.max(0, (fittedImageWidth.value * nextZoom - viewportWidth.value) / 2);
+            const maxY = Math.max(0, (fittedImageHeight.value * nextZoom - frameHeight) / 2);
+            const focalTranslateX = pinchFocalX.value
+                + (pinchStartX.value - pinchFocalX.value) * zoomRatio;
+            const focalTranslateY = pinchFocalY.value
+                + (pinchStartY.value - pinchFocalY.value) * zoomRatio;
+            translateX.value = Math.max(-maxX, Math.min(maxX, focalTranslateX));
+            translateY.value = Math.max(-maxY, Math.min(maxY, focalTranslateY));
+        })
+        .onEnd(() => {
+            if (zoom.value <= 1.05) {
+                zoom.value = 1;
+                zoomStart.value = 1;
+                translateX.value = 0;
+                translateY.value = 0;
+                panStartX.value = 0;
+                panStartY.value = 0;
             } else {
-                dragY.value = withSpring(0, { damping: 18, stiffness: 220 });
+                zoomStart.value = zoom.value;
             }
         });
 
-    const dragStyle = useAnimatedStyle(() => ({
+    const panGesture = Gesture.Pan()
+        .maxPointers(1)
+        .minDistance(5)
+        .onBegin(() => {
+            panStartX.value = translateX.value;
+            panStartY.value = translateY.value;
+        })
+        .onUpdate((event) => {
+            if (zoom.value > 1.01) {
+                const frameHeight = viewportHeight.value + topbarHeight;
+                const maxX = Math.max(0, (fittedImageWidth.value * zoom.value - viewportWidth.value) / 2);
+                const maxY = Math.max(0, (fittedImageHeight.value * zoom.value - frameHeight) / 2);
+                translateX.value = Math.max(-maxX, Math.min(maxX, panStartX.value + event.translationX));
+                translateY.value = Math.max(-maxY, Math.min(maxY, panStartY.value + event.translationY));
+                return;
+            }
+
+            if (Math.abs(event.translationX) > Math.abs(event.translationY)) {
+                dragY.value = 0;
+                if (!hasMultiple) return;
+                const pageWidth = viewportWidth.value;
+                const baseX = -current * pageWidth;
+                const pullingPastStart = current === 0 && event.translationX > 0;
+                const pullingPastEnd = current === photos.length - 1 && event.translationX < 0;
+                const resistance = pullingPastStart || pullingPastEnd ? 0.22 : 1;
+                carouselX.value = baseX + event.translationX * resistance;
+            } else {
+                carouselX.value = -current * viewportWidth.value;
+                dragY.value = Math.max(0, event.translationY);
+            }
+        })
+        .onEnd((event) => {
+            if (zoom.value > 1.01) {
+                panStartX.value = translateX.value;
+                panStartY.value = translateY.value;
+                return;
+            }
+
+            const isHorizontal = Math.abs(event.translationX) > Math.abs(event.translationY);
+            const pageWidth = viewportWidth.value;
+            let targetIndex = current;
+            if (isHorizontal && hasMultiple
+                && (Math.abs(event.translationX) > 70 || Math.abs(event.velocityX) > 650)) {
+                if (event.translationX < 0) targetIndex = Math.min(current + 1, photos.length - 1);
+                else targetIndex = Math.max(current - 1, 0);
+            } else if (!isHorizontal && (event.translationY > 96 || event.velocityY > 700)) {
+                dragY.value = withTiming(
+                    viewportHeight.value + topbarHeight,
+                    { duration: 140 },
+                );
+                runOnJS(onClose)();
+                return;
+            }
+            carouselX.value = withTiming(
+                -targetIndex * pageWidth,
+                { duration: targetIndex === current ? 160 : 220 },
+                (finished) => {
+                    if (finished && targetIndex !== current) {
+                        runOnJS(finishNavigation)(targetIndex);
+                    }
+                },
+            );
+            dragY.value = withSpring(0, { damping: 18, stiffness: 220 });
+        });
+
+    const doubleTapGesture = Gesture.Tap()
+        .numberOfTaps(2)
+        .maxDelay(260)
+        .maxDistance(12)
+        .onEnd((event, success) => {
+            if (!success) return;
+            if (zoom.value > 1.01) {
+                zoom.value = withTiming(1, { duration: 180 });
+                zoomStart.value = 1;
+                translateX.value = withTiming(0, { duration: 180 });
+                translateY.value = withTiming(0, { duration: 180 });
+                panStartX.value = 0;
+                panStartY.value = 0;
+                return;
+            }
+
+            const targetZoom = 2;
+            const frameHeight = viewportHeight.value + topbarHeight;
+            const focalX = event.x - viewportWidth.value / 2;
+            const focalY = event.y + topbarHeight - frameHeight / 2;
+            const maxX = Math.max(0, (fittedImageWidth.value * targetZoom - viewportWidth.value) / 2);
+            const maxY = Math.max(0, (fittedImageHeight.value * targetZoom - frameHeight) / 2);
+            zoom.value = withTiming(targetZoom, { duration: 180 });
+            zoomStart.value = targetZoom;
+            translateX.value = withTiming(
+                Math.max(-maxX, Math.min(maxX, -focalX)),
+                { duration: 180 },
+            );
+            translateY.value = withTiming(
+                Math.max(-maxY, Math.min(maxY, -focalY)),
+                { duration: 180 },
+            );
+        });
+
+    const photoGesture = Gesture.Simultaneous(
+        pinchGesture,
+        Gesture.Race(doubleTapGesture, panGesture),
+    );
+    const photoStyle = useAnimatedStyle(() => ({
+        transform: [
+            { translateX: translateX.value },
+            { translateY: translateY.value },
+            { scale: zoom.value },
+        ],
+    }));
+    const carouselStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: carouselX.value }],
+    }));
+    const dismissStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: dragY.value }],
         opacity: 1 - Math.min(dragY.value / 600, 0.5),
     }));
@@ -1679,38 +1900,139 @@ function ImageLightbox({
     return (
         <Modal visible={index !== null} transparent animationType="fade" onRequestClose={onClose}>
             <GestureHandlerRootView style={{ flex: 1 }}>
-                <GestureDetector gesture={dismissGesture}>
-                    <Animated.View style={[styles.lightbox, dragStyle]}>
-                        <View style={styles.lightboxTopbar}>
-                            <Pressable onPress={onClose} style={styles.lightboxIconButton} hitSlop={10}>
-                                <X size={scale(23)} color={palette.chrome.common.inverseText} />
-                            </Pressable>
-                            {hasMultiple ? (
-                                <Text variant="body-sm" className="font-body-semi" style={{ color: palette.chrome.common.inverseText }}>
-                                    {current + 1}/{photos.length}
-                                </Text>
-                            ) : <View />}
-                            {showReport ? (
-                                <Pressable onPress={() => onReport(current)} style={styles.lightboxIconButton} hitSlop={10}>
-                                    <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
-                                </Pressable>
-                            ) : (
-                                <View style={styles.lightboxActionSpacer} />
-                            )}
+                <View style={styles.lightbox}>
+                    <View style={[styles.lightboxTopbar, { height: topbarHeight, paddingTop: insets.top }]}>
+                        <Pressable
+                            onPress={onClose}
+                            style={styles.lightboxIconButton}
+                            hitSlop={10}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('close', 'Close')}
+                        >
+                            <X size={scale(23)} color={palette.chrome.common.inverseText} />
+                        </Pressable>
+                        <View
+                            style={styles.lightboxDots}
+                            accessible
+                            accessibilityRole="text"
+                            accessibilityLabel={`${t('photo_gallery', 'Photo gallery')}, ${current + 1}/${photos.length}`}
+                        >
+                            {photos.map((_, photoIndex) => (
+                                <View
+                                    key={photoIndex}
+                                    style={[
+                                        styles.lightboxDot,
+                                        photoIndex === current
+                                            ? [styles.lightboxDotActive, { backgroundColor: palette.chrome.primary }]
+                                            : styles.lightboxDotInactive,
+                                    ]}
+                                />
+                            ))}
                         </View>
-                        {src ? <Image source={{ uri: src }} style={styles.lightboxImage} contentFit="contain" /> : null}
-                        {hasMultiple ? (
-                            <>
-                                <Pressable onPress={goPrevious} style={[styles.lightboxNav, styles.lightboxNavLeft]} hitSlop={12}>
-                                    <ChevronLeft size={scale(28)} color={palette.chrome.common.inverseText} />
-                                </Pressable>
-                                <Pressable onPress={goNext} style={[styles.lightboxNav, styles.lightboxNavRight]} hitSlop={12}>
-                                    <ChevronRight size={scale(28)} color={palette.chrome.common.inverseText} />
-                                </Pressable>
-                            </>
-                        ) : null}
-                    </Animated.View>
-                </GestureDetector>
+                        {showReport ? (
+                            <Pressable
+                                onPress={() => onReport(current)}
+                                style={styles.lightboxIconButton}
+                                hitSlop={10}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('report_image', 'Report image')}
+                            >
+                                <Flag size={scale(21)} color={palette.chrome.common.inverseText} />
+                            </Pressable>
+                        ) : (
+                            <View style={styles.lightboxActionSpacer} />
+                        )}
+                    </View>
+                    <View
+                        style={[styles.lightboxViewport, { top: topbarHeight }]}
+                        onLayout={(event) => {
+                            viewportWidth.value = event.nativeEvent.layout.width;
+                            viewportHeight.value = event.nativeEvent.layout.height;
+                            carouselX.value = -current * event.nativeEvent.layout.width;
+                            const size = imageSizesRef.current[current];
+                            if (size) syncImageSize(current, size.width, size.height);
+                        }}
+                    >
+                        <GestureDetector gesture={photoGesture}>
+                            <Animated.View
+                                style={[
+                                    styles.lightboxGestureCanvas,
+                                    dismissStyle,
+                                ]}
+                            >
+                                <Animated.View
+                                    style={[
+                                        styles.lightboxCarousel,
+                                        {
+                                            top: -topbarHeight,
+                                            width: SCREEN_WIDTH * photos.length,
+                                        },
+                                        carouselStyle,
+                                    ]}
+                                >
+                                    {photos.map((photo, photoIndex) => (
+                                        <Animated.View
+                                            key={`${photo}-${photoIndex}`}
+                                            style={[
+                                                styles.lightboxImageFrame,
+                                                { width: SCREEN_WIDTH },
+                                            ]}
+                                        >
+                                            <Animated.View
+                                                style={[
+                                                    styles.lightboxZoomLayer,
+                                                    photoIndex === current ? photoStyle : null,
+                                                ]}
+                                            >
+                                                {(imageStatuses[photo] || 'loading') === 'loading' ? (
+                                                    <View style={styles.lightboxImageState} pointerEvents="none">
+                                                        <ActivityIndicator size="small" color={palette.chrome.primary} />
+                                                    </View>
+                                                ) : null}
+                                                {imageStatuses[photo] === 'error' ? (
+                                                    <View style={styles.lightboxImageState}>
+                                                        <Pressable
+                                                            onPress={() => retryImage(photo)}
+                                                            style={styles.lightboxRetryButton}
+                                                            accessibilityRole="button"
+                                                            accessibilityLabel={t('btn_try_again', 'Try Again')}
+                                                        >
+                                                            <RefreshCw size={scale(19)} color={palette.chrome.common.inverseText} />
+                                                            <Text
+                                                                variant="body-sm"
+                                                                className="font-body-semi"
+                                                                style={{ color: palette.chrome.common.inverseText }}
+                                                            >
+                                                                {t('btn_try_again', 'Try Again')}
+                                                            </Text>
+                                                        </Pressable>
+                                                    </View>
+                                                ) : null}
+                                                <Image
+                                                    key={`${photo}-${retryVersions[photo] || 0}`}
+                                                    source={{ uri: photo }}
+                                                    style={styles.lightboxImage}
+                                                    contentFit="contain"
+                                                    accessibilityLabel={`${t('photo_gallery', 'Photo gallery')}, ${photoIndex + 1}/${photos.length}`}
+                                                    onLoadStart={() => setImageStatus(photo, 'loading')}
+                                                    onLoad={(event) => {
+                                                        setImageStatus(photo, 'loaded');
+                                                        syncImageSize(
+                                                            photoIndex,
+                                                            event.source.width,
+                                                            event.source.height,
+                                                        );
+                                                    }}
+                                                    onError={() => setImageStatus(photo, 'error')}
+                                                />
+                                            </Animated.View>
+                                        </Animated.View>
+                                    ))}
+                                </Animated.View>
+                            </Animated.View>
+                        </GestureDetector>
+                    </View>
+                </View>
             </GestureHandlerRootView>
         </Modal>
     );
@@ -2169,14 +2491,22 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: scale(14),
     },
-    lightbox: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
-    lightboxTopbar: { position: 'absolute', left: 0, right: 0, top: scale(42), zIndex: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(16) },
+    lightbox: { flex: 1, backgroundColor: '#000000' },
+    lightboxTopbar: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(16) },
     lightboxIconButton: { width: scale(42), height: scale(42), borderRadius: scale(21), backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
     lightboxActionSpacer: { width: scale(42), height: scale(42) },
-    lightboxImage: { width: wp(100), height: '82%' },
-    lightboxNav: { position: 'absolute', top: '50%', zIndex: 3, width: scale(44), height: scale(44), marginTop: -scale(22), borderRadius: scale(22), backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-    lightboxNavLeft: { left: scale(14) },
-    lightboxNavRight: { right: scale(14) },
+    lightboxDots: { minWidth: scale(42), height: scale(20), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6) },
+    lightboxDot: { height: scale(6), borderRadius: scale(3) },
+    lightboxDotActive: { width: scale(18) },
+    lightboxDotInactive: { width: scale(6), backgroundColor: 'rgba(255,255,255,0.48)' },
+    lightboxViewport: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+    lightboxGestureCanvas: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+    lightboxCarousel: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
+    lightboxImageFrame: { height: '100%', overflow: 'hidden' },
+    lightboxZoomLayer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    lightboxImage: { width: '100%', height: '100%' },
+    lightboxImageState: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 2, alignItems: 'center', justifyContent: 'center' },
+    lightboxRetryButton: { minHeight: scale(44), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(8), paddingHorizontal: scale(18), borderRadius: scale(22), backgroundColor: 'rgba(255,255,255,0.14)' },
     messageOverlay: {
         flex: 1,
         justifyContent: 'flex-end',

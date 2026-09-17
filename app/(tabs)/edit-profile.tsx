@@ -61,7 +61,12 @@ import { useResponsive } from "@/hooks/useResponsive";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { useUnsavedNavigationGuard } from "@/hooks/useUnsavedNavigationGuard";
-import { type GalleryItem, type GalleryPrivacy, type GalleryResponse } from "@/lib/galleryService";
+import {
+  galleryService,
+  type GalleryItem,
+  type GalleryPrivacy,
+  type GalleryResponse,
+} from "@/lib/galleryService";
 import { isQualifiedGalleryImage } from "@/lib/galleryQualification";
 import {
   buildMissingImpactGroups,
@@ -583,11 +588,25 @@ export default function EditProfileScreen() {
     setRefreshing(true);
     try {
       revalidateMasterdata();
-      await loadProfile(false);
+      const [, galleryResult] = await Promise.allSettled([
+        loadProfile(false),
+        galleryService.fetchMe(),
+      ]);
+
+      if (galleryResult.status === "fulfilled" && galleryResult.value.success) {
+        queryClient.setQueryData(queryKeys.gallery.me, galleryResult.value);
+      } else if (galleryResult.status === "fulfilled") {
+        toast.show(
+          apiMessage(String(galleryResult.value.message || ""), t("gallery_upload_error", "Could not refresh gallery.")),
+          "error",
+        );
+      } else {
+        toast.show(t("gallery_upload_error", "Could not refresh gallery."), "error");
+      }
     } finally {
       setRefreshing(false);
     }
-  }, [loadProfile, refreshBlocked, refreshing, revalidateMasterdata]);
+  }, [loadProfile, refreshBlocked, refreshing, revalidateMasterdata, t, toast]);
 
   const makeTranslatedOptions = useCallback(
     (values: readonly string[], namespace?: string): SelectOption[] =>
