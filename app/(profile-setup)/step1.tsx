@@ -27,7 +27,7 @@ import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
 import { DateWheelSheet } from '@/components/ui/DateWheelSheet';
 import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
-import { VenusAndMars, CalendarDays, Flag, Globe, User } from 'lucide-react-native';
+import { VenusAndMars, CalendarDays, Flag, Footprints, User } from 'lucide-react-native';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
@@ -249,7 +249,7 @@ export default function Step1() {
                         value={grewUpIn ? getDisplayLabel(grewUpIn, countryOptions) : ''}
                         placeholder={t('common:step_1.select_country', { defaultValue: 'Where Did You Grow Up?' })}
                         onPress={() => setShowCountrySheet(true)}
-                        icon={<Globe size={scale(18)} color={iconColor} />}
+                        icon={<Footprints size={scale(18)} color={iconColor} />}
                         hasError={!!errors.grewUpIn}
                     />
                     {errors.grewUpIn && <ErrorText text={errors.grewUpIn} />}

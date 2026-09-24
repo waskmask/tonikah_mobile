@@ -76,7 +76,8 @@ export function UnderReviewInfoIcon({
 
     return (
         <Pressable
-            onPress={() =>
+            onPress={(event) => {
+                event.stopPropagation();
                 toast.show(
                     t(
                         'moderation_text_under_review_hint',
@@ -84,8 +85,8 @@ export function UnderReviewInfoIcon({
                     ),
                     'info',
                     4000,
-                )
-            }
+                );
+            }}
             accessibilityRole="button"
             accessibilityLabel={t('moderation_text_under_review', 'Under review')}
             hitSlop={8}

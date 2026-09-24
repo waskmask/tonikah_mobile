@@ -1,22 +1,23 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Menu } from 'lucide-react-native';
 import { useAppMenu } from '@/components/app/AppMenuProvider';
+import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { Text } from '@/components/ui/Text';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
-import { HeaderTokens, NavigationTypeTokens } from '@/constants/uiTokens';
+import { HeaderTokens } from '@/constants/uiTokens';
 import { scale } from '@/hooks/useResponsive';
 
 type TabTitleBarProps = {
     title: string;
     subtitle?: string;
     showMenu?: boolean;
+    hideBottomBorder?: boolean;
 };
 
 /** Title bar for root tab screens (no back button). */
-export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarProps) {
+export function TabTitleBar({ title, subtitle, showMenu = false, hideBottomBorder = false }: TabTitleBarProps) {
     const { isRTL, t } = useLanguage();
     const chrome = useColors().chrome.header;
     const { openMenu } = useAppMenu();
@@ -30,6 +31,7 @@ export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarPr
                     {
                         backgroundColor: chrome.background,
                         borderBottomColor: chrome.border,
+                        borderBottomWidth: hideBottomBorder ? 0 : StyleSheet.hairlineWidth,
                     },
                 ]}
             >
@@ -42,7 +44,7 @@ export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarPr
                             <Text
                                 variant="body-sm"
                                 numberOfLines={1}
-                                className="font-body-bold"
+                                className="font-body-semi"
                                 style={[styles.title, { color: chrome.title }]}
                             >
                                 {title}
@@ -61,18 +63,10 @@ export function TabTitleBar({ title, subtitle, showMenu = false }: TabTitleBarPr
                         ) : null}
                     </View>
                     {showMenu ? (
-                        <Pressable
-                            accessibilityRole="button"
+                        <AppMenuButton
                             accessibilityLabel={String(t('menu') || 'Menu')}
                             onPress={openMenu}
-                            style={({ pressed }) => [
-                                styles.iconButton,
-                                { borderColor: chrome.border, backgroundColor: chrome.iconBackground },
-                                pressed && styles.iconButtonPressed,
-                            ]}
-                        >
-                            <Menu size={scale(20)} color={chrome.icon} strokeWidth={2.55} />
-                        </Pressable>
+                        />
                     ) : (
                         <View style={styles.iconSpacer} />
                     )}
@@ -96,6 +90,7 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: 0,
         justifyContent: 'center',
+        marginStart: scale(4),
         paddingEnd: scale(10),
     },
     titleRow: {
@@ -103,19 +98,8 @@ const styles = StyleSheet.create({
     },
     title: {
         flexShrink: 1,
-        ...NavigationTypeTokens.topBarTitle,
-    },
-    iconButton: {
-        width: scale(34),
-        height: scale(34),
-        borderRadius: scale(17),
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    iconButtonPressed: {
-        opacity: 0.78,
-        transform: [{ scale: 0.97 }],
+        fontSize: scale(16),
+        lineHeight: scale(20),
     },
     iconSpacer: {
         width: scale(34),

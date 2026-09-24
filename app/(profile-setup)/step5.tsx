@@ -16,7 +16,7 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { GraduationCap, Briefcase, IdCard } from 'lucide-react-native';
+import { GraduationCap, Briefcase, LampDesk } from 'lucide-react-native';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
 
@@ -123,7 +123,7 @@ export default function Step5() {
                     <SelectField required value={occupation ? getLabel(occupation, occupationOpts) : ''} placeholder={t('select_occupation', { defaultValue: 'Select occupation' })} onPress={() => setActiveSheet('occupation')} icon={<Briefcase size={scale(18)} color={iconColor} />} hasError={!!errors.occupation} />
                     {errors.occupation && <ErrorText text={errors.occupation} />}
 
-                    <SelectField value={designation ? getLabel(designation, designationOpts) : ''} placeholder={t('designation', { defaultValue: 'Designation' })} onPress={() => setActiveSheet('designation')} icon={<IdCard size={scale(18)} color={iconColor} />} hasError={!!errors.designation} />
+                    <SelectField value={designation ? getLabel(designation, designationOpts) : ''} placeholder={t('designation', { defaultValue: 'Designation' })} onPress={() => setActiveSheet('designation')} icon={<LampDesk size={scale(18)} color={iconColor} />} hasError={!!errors.designation} />
                     {errors.designation && <ErrorText text={errors.designation} />}
             </KeyboardAwareScrollView>
 

@@ -13,6 +13,31 @@ export const PP_HEIGHT_MAX_CM = 213;
 export const PP_MAX_SELECTIONS = 5;
 export const PP_ABOUT_MAX = 500;
 
+export function hasPartnerPreferenceContent(preference: any) {
+    if (!preference || typeof preference !== 'object') return false;
+
+    const hasValue = (value: unknown) => {
+        if (Array.isArray(value)) return value.some(hasValue);
+        if (value && typeof value === 'object') {
+            const record = value as Record<string, unknown>;
+            return hasValue(record.label ?? record.name ?? record.value ?? record.country);
+        }
+        return String(value ?? '').trim().length > 0;
+    };
+    const ageFrom = preference?.age?.from ?? preference?.age_from;
+    const ageTo = preference?.age?.to ?? preference?.age_to;
+    const heightFrom = preference?.height?.from ?? preference?.height_from;
+    const heightTo = preference?.height?.to ?? preference?.height_to;
+
+    return hasValue(preference.about_partner)
+        || (hasValue(ageFrom) && hasValue(ageTo))
+        || (hasValue(heightFrom) && hasValue(heightTo))
+        || hasValue(preference.marital_status)
+        || hasValue(preference.languages_spoken || preference.languages || preference.mother_tongue)
+        || hasValue(preference.ethnic_group)
+        || hasValue(preference.location || preference.countries);
+}
+
 export const PP_MARITAL_OPTIONS = [
     'never_married',
     'divorced',

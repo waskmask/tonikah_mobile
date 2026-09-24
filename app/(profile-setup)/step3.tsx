@@ -16,8 +16,8 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { Heart, Baby, CalendarHeart, Plane } from 'lucide-react-native';
-import { BabyCarriage } from '@/components/ui/icons/BabyCarriage';
+import { Gem, Baby, CalendarHeart, Plane } from 'lucide-react-native';
+import { Pram } from '@/components/ui/icons/Pram';
 import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step3() {
@@ -70,9 +70,9 @@ export default function Step3() {
     ];
 
     const fields = [
-        { key: 'maritalStatus', label: t('step_3.marital_status'), value: maritalStatus, options: maritalOptions, sheet: 'marital', icon: <Heart size={scale(18)} color={iconColor} /> },
+        { key: 'maritalStatus', label: t('step_3.marital_status'), value: maritalStatus, options: maritalOptions, sheet: 'marital', icon: <Gem size={scale(18)} color={iconColor} /> },
         { key: 'hasChildren', label: t('step_3.has_children_label'), value: hasChildren, options: childrenOptions, sheet: 'children', icon: <Baby size={scale(18)} color={iconColor} /> },
-        { key: 'wantsChildren', label: t('step_3.wants_children_label'), value: wantsChildren, options: wantsChildrenOptions, sheet: 'wantsChildren', icon: <BabyCarriage size={scale(18)} color={iconColor} /> },
+        { key: 'wantsChildren', label: t('step_3.wants_children_label'), value: wantsChildren, options: wantsChildrenOptions, sheet: 'wantsChildren', icon: <Pram size={scale(18)} color={iconColor} /> },
         { key: 'marriagePlan', label: t('step_3.whats_marriage_plan'), value: marriagePlan, options: marriagePlanOptions, sheet: 'marriagePlan', icon: <CalendarHeart size={scale(18)} color={iconColor} /> },
         { key: 'relocationPlan', label: t('step_3.relocation_label'), value: relocationPlan, options: relocationOptions, sheet: 'relocation', icon: <Plane size={scale(18)} color={iconColor} /> },
     ];

@@ -21,8 +21,8 @@ export function ProfileCompletionBar({ percent }: Props) {
             style={[
                 styles.card,
                 {
-                    backgroundColor: palette.brand.bg.surface,
-                    borderColor: palette.brand.bg.border,
+                    backgroundColor: '#F4F4F4',
+                    borderColor: '#201B15',
                 },
             ]}
         >
@@ -50,8 +50,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(12),
+        marginHorizontal: scale(14),
+        marginTop: scale(14),
+        borderWidth: scale(1.5),
+        borderStyle: 'dashed',
+        borderRadius: scale(8),
         paddingHorizontal: scale(18),
-        paddingVertical: scale(14),
+        // Compensate for the new border so the row's outer height is unchanged.
+        paddingVertical: scale(12.5),
     },
     track: {
         flex: 1,

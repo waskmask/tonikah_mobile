@@ -77,6 +77,7 @@ export default function FavouritedScreen() {
         try {
             const res = await usersService.unfavorite(id);
             if (res.success) {
+                queryClient.removeQueries({ queryKey: queryKeys.profile.detail(id), exact: true });
                 setItems((current) => {
                     const nextItems = current.filter((item) => String(item.id || item._id) !== String(id));
                     queryClient.setQueryData(queryKeys.favourites.list, { items: nextItems, nextCursor });

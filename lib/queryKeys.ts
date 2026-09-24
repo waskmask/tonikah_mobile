@@ -5,6 +5,8 @@ export const queryKeys = {
     },
     profile: {
         mySummary: ['profile', 'my-summary'] as const,
+        partnerPreference: ['profile', 'partner-preference'] as const,
+        detail: (userId: string) => ['profile', 'detail', userId] as const,
     },
     gallery: {
         me: ['gallery', 'me'] as const,

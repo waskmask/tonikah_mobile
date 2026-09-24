@@ -77,6 +77,7 @@ export const Colors = {
             common: {
                 card: "#FFFFFF",
                 cardAlt: "#FFFFFF",
+                subtleSurface: "#F4F4F4",
                 skeleton: "#F4F4F4",
                 inverseText: "#FFFFFF",
                 textStrong: "#241E17",
@@ -176,6 +177,7 @@ export const Colors = {
             common: {
                 card: "#1D1D1F",
                 cardAlt: "#18181A",
+                subtleSurface: "#29292C",
                 skeleton: "#303033",
                 inverseText: "#FFFFFF",
                 textStrong: "#E5E5E7",

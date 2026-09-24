@@ -2,8 +2,9 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Menu, User } from 'lucide-react-native';
+import { User } from 'lucide-react-native';
 import { useAppMenu } from '@/components/app/AppMenuProvider';
+import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { Text } from '@/components/ui/Text';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -65,14 +66,10 @@ export function AppTopBar() {
                         >
                             <User size={19} color={chrome.icon} />
                         </Pressable>
-                        <Pressable
-                            accessibilityRole="button"
+                        <AppMenuButton
                             accessibilityLabel={textValue(t('menu'), 'Menu')}
                             onPress={openMenu}
-                            style={[styles.iconButton, { borderColor: chrome.border, backgroundColor: chrome.iconBackground }]}
-                        >
-                            <Menu size={20} color={chrome.icon} />
-                        </Pressable>
+                        />
                     </View>
                 </View>
             </SafeAreaView>

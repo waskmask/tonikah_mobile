@@ -21,9 +21,15 @@ export interface ApiResponse<T = any> {
 export type RefreshResult = {
     accessToken: string | null;
     reason?: 'unauthorized' | 'network_error';
+    message?: string;
+    suspension?: {
+        reason?: string;
+        suspendedAt?: string | null;
+        autoLiftAt?: string | null;
+    };
 };
 
-type UnauthorizedHandler = () => void | Promise<void>;
+type UnauthorizedHandler = (details?: Pick<RefreshResult, 'message' | 'suspension'>) => void | Promise<void>;
 
 type StoredTokens = {
     accessToken: string | null;
@@ -73,11 +79,11 @@ const clearStoredTokens = async () => {
     await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS), SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH)]);
 };
 
-const notifyUnauthorized = async () => {
+const notifyUnauthorized = async (details?: Pick<RefreshResult, 'message' | 'suspension'>) => {
     if (!unauthorizedHandler) return;
     if (!unauthorizedPromise) {
         unauthorizedPromise = Promise.resolve()
-            .then(() => unauthorizedHandler?.())
+            .then(() => unauthorizedHandler?.(details))
             .then(() => undefined)
             .finally(() => {
                 unauthorizedPromise = null;
@@ -86,14 +92,14 @@ const notifyUnauthorized = async () => {
     await unauthorizedPromise;
 };
 
-const handleTerminalUnauthorized = async (): Promise<RefreshResult> => {
+const handleTerminalUnauthorized = async (details?: Pick<RefreshResult, 'message' | 'suspension'>): Promise<RefreshResult> => {
     if (terminalSessionHandled) {
         return { accessToken: null, reason: 'unauthorized' };
     }
     terminalSessionHandled = true;
     await clearStoredTokens();
-    await notifyUnauthorized();
-    return { accessToken: null, reason: 'unauthorized' };
+    await notifyUnauthorized(details);
+    return { accessToken: null, reason: 'unauthorized', ...details };
 };
 
 const getClientHeaders = () => {
@@ -225,7 +231,10 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
                             : 'unauthorized',
                     });
                 }
-                result = await handleTerminalUnauthorized();
+                result = await handleTerminalUnauthorized({
+                    message: typeof refreshData.message === 'string' ? refreshData.message : 'unauthorized',
+                    suspension: refreshData.suspension,
+                });
             }
         }
     } catch {
@@ -260,7 +269,7 @@ const handleResponse = async (response: Response, endpoint: string, options: Fet
         if (refreshResult.reason === 'network_error') {
             return { success: false, message: 'network_error', status: 0 };
         }
-        return { success: false, message: 'unauthorized', status: 401 };
+        return { success: false, message: refreshResult.message || 'unauthorized', suspension: refreshResult.suspension, status: 401 };
     }
 
     try {

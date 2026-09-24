@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Linking,
   Pressable,
   RefreshControl,
@@ -8,34 +9,38 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   Baby,
+  Banknote,
   BookHeart,
+  BookOpen,
   BriefcaseBusiness,
   Building2,
   CalendarHeart,
   ChevronLeft,
   ChevronRight,
   Cigarette,
-  Coins,
+  Compass,
+  Footprints,
+  Gem,
   GraduationCap,
-  Heart,
-  Home,
   Languages,
+  LampDesk,
   Lock,
   MapPin,
   Mic,
   Moon,
   Plane,
+  Palette,
   Puzzle,
   Ruler,
   ShieldCheck,
   Shirt,
-  Sparkles,
+  Signpost,
   UserCog,
-  UserRound,
   Users,
   Wine,
 } from "lucide-react-native";
@@ -43,6 +48,7 @@ import {
 import { AppBackTitleBar } from "@/components/app/AppBackTitleBar";
 import { EditProfileMediaEditor } from "@/components/profile/EditProfileMediaEditor";
 import { ProfileCompletionBar } from "@/components/profile/ProfileCompletionBar";
+import { PartnerPreferencePromptCard } from "@/components/profile/PartnerPreferencePromptCard";
 import { ProfileSummaryEditor, type ProfileSummaryEditorHandle } from "@/components/profile/ProfileSummaryEditor";
 import { CompletionImpactBadge } from "@/components/profile/CompletionImpactBadge";
 import { ConfirmSheet } from "@/components/ui/ConfirmSheet";
@@ -51,6 +57,8 @@ import { MultiSelectOption, MultiSelectSheet } from "@/components/ui/MultiSelect
 import { SelectOption, SingleSelectSheet } from "@/components/ui/SingleSelectSheet";
 import { Text } from "@/components/ui/Text";
 import { TextEditSheet } from "@/components/ui/TextEditSheet";
+import { Mosque } from "@/components/ui/icons/Mosque";
+import { Pram } from "@/components/ui/icons/Pram";
 import { COUNTRY_OPTIONS, LANGUAGE_OPTIONS, NATIONALITY_OPTIONS } from "@/constants/profileOptions";
 import { Typography } from "@/constants/typography";
 import { useEmailVerificationGuard } from "@/hooks/useEmailVerificationGuard";
@@ -83,6 +91,7 @@ import {
   translateCountry,
 } from "@/lib/profileDisplay";
 import { profileService } from "@/lib/profileService";
+import { hasPartnerPreferenceContent } from "@/lib/partnerPreference";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import { localeUsesLatinScript } from "@/lib/textDirection";
@@ -398,8 +407,20 @@ async function withLocationTimeout<T>(promise: Promise<T>, timeoutMs = 12000): P
   }
 }
 
-export default function EditProfileScreen() {
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
+export type EditProfileScreenProps = {
+  embedded?: boolean;
+  active?: boolean;
+};
+
+export default function EditProfileScreen({
+  embedded = false,
+  active = true,
+}: EditProfileScreenProps = {}) {
+  const { returnTo, openEditor, overlay } = useLocalSearchParams<{
+    returnTo?: string | string[];
+    openEditor?: string | string[];
+    overlay?: string | string[];
+  }>();
   const { isDark } = useTheme();
   const palette = useColors();
   const { currentLanguage, isRTL } = useLanguage();
@@ -433,6 +454,31 @@ export default function EditProfileScreen() {
     moderationCandidateForEditing(cachedModerationMeta.company) || cachedProfile?.company || "",
   );
   const [profile, setProfile] = useState<any>(cachedProfile);
+  const profilePartnerPreference = profile?.partner_preference ?? profile?.partnerPreference;
+  const partnerPreferenceQuery = useQuery<any>({
+    queryKey: queryKeys.profile.partnerPreference,
+    queryFn: async () => {
+      const response = await profileService.fetchPartnerPreference();
+      if (response.success === false) {
+        throw new Error(response.message || "partner_preference_unavailable");
+      }
+      return response.partner_preference || {};
+    },
+    enabled: active,
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: false,
+  });
+  const resolvedPartnerPreference = partnerPreferenceQuery.data ?? profilePartnerPreference;
+  const partnerPreferenceKnown = partnerPreferenceQuery.data !== undefined
+    || partnerPreferenceQuery.isSuccess
+    || profilePartnerPreference !== undefined;
+  const partnerPreferencePending = Boolean(
+    pendingModerationCandidate(profile?.contentModeration?.partnerPreferenceAboutPartner),
+  );
+  const showPartnerPreferencePrompt = partnerPreferenceKnown
+    && !partnerPreferencePending
+    && !hasPartnerPreferenceContent(resolvedPartnerPreference);
   const [gallery, setGallery] = useState<GalleryItem[]>(cachedGallery);
   const [privacy, setPrivacy] = useState<GalleryPrivacy>(
     cachedGalleryResponse?.privacy
@@ -467,6 +513,7 @@ export default function EditProfileScreen() {
   const [locationSettingsOpen, setLocationSettingsOpen] = useState(false);
   const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
   const [loading, setLoading] = useState(!cachedProfile);
+  const [profileFetched, setProfileFetched] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingField, setSavingField] = useState<string | null>(null);
@@ -475,16 +522,33 @@ export default function EditProfileScreen() {
   const [summaryDiscarding, setSummaryDiscarding] = useState(false);
   const summaryEditorRef = useRef<ProfileSummaryEditorHandle>(null);
   const initialLoadStartedRef = useRef(false);
+  const companyShortcutHandledRef = useRef(false);
   const masterdataFocusStartedRef = useRef(false);
   const hasCachedProfileRef = useRef(Boolean(cachedProfile));
+  const isProfileOverlay = (Array.isArray(overlay) ? overlay[0] : overlay) === "1";
   const leaveEditProfile = useCallback(() => {
+    if (isProfileOverlay) {
+      router.back();
+      return;
+    }
     router.replace(returnHref as any);
-  }, [returnHref]);
+  }, [isProfileOverlay, returnHref]);
   const summaryNavigation = useUnsavedNavigationGuard({
     dirty: summaryDirty,
     leaveFallback: leaveEditProfile,
-    redirectRemovalToFallback: true,
+    redirectRemovalToFallback: !isProfileOverlay,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (embedded || !active) return undefined;
+      const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+        summaryNavigation.requestClose();
+        return true;
+      });
+      return () => subscription.remove();
+    }, [active, embedded, summaryNavigation.requestClose]),
+  );
 
   const saveSummaryAndLeave = useCallback(async () => {
     if (summaryConfirmSaving) return;
@@ -552,6 +616,7 @@ export default function EditProfileScreen() {
       if (!nextProfile) throw new Error("profile_load_failed");
       const nextGallery = Array.isArray(nextProfile.gallery) ? nextProfile.gallery : [];
       setProfile(nextProfile);
+      patchUserProfile(nextProfile);
       setGallery(nextGallery);
       setPrivacy(nextProfile.gallery_privacy || nextProfile.galleryPrivacy || "public");
       // The owner keeps editing their pending/rejected moderation candidate,
@@ -559,6 +624,7 @@ export default function EditProfileScreen() {
       // prefill lives inside ProfileSummaryEditor.
       const moderationMeta = nextProfile.contentModeration || {};
       setCompany(cleanProfileText(moderationCandidateForEditing(moderationMeta.company) || nextProfile.company || ""));
+      setProfileFetched(true);
       setAnnualIncomeCurrency(nextProfile.annual_income?.currency || "USD");
       setAnnualIncomeAmount(nextProfile.annual_income?.amount ? formatAmount(String(nextProfile.annual_income.amount)) : "");
       await loadCompletion(nextProfile, nextGallery);
@@ -567,10 +633,25 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [loadCompletion]);
+  }, [loadCompletion, patchUserProfile]);
+
+  useEffect(() => {
+    const requestedEditor = Array.isArray(openEditor) ? openEditor[0] : openEditor;
+    if (requestedEditor !== 'company' || !profileFetched || companyShortcutHandledRef.current) return;
+    companyShortcutHandledRef.current = true;
+    setCompanySheetOpen(true);
+  }, [openEditor, profileFetched]);
 
   useFocusEffect(
     useCallback(() => {
+      if (!active) return;
+      if (embedded) {
+        if (!initialLoadStartedRef.current) {
+          initialLoadStartedRef.current = true;
+          void loadCompletion(cachedProfile || {}, cachedGallery);
+        }
+        return;
+      }
       if (masterdataFocusStartedRef.current) {
         revalidateMasterdata();
       } else {
@@ -579,7 +660,7 @@ export default function EditProfileScreen() {
       const showLoader = !initialLoadStartedRef.current && !hasCachedProfileRef.current;
       initialLoadStartedRef.current = true;
       void loadProfile(showLoader);
-    }, [loadProfile, revalidateMasterdata]),
+    }, [active, cachedGallery, cachedProfile, embedded, loadCompletion, loadProfile, revalidateMasterdata]),
   );
 
   const refreshBlocked = saving || Boolean(savingField) || summaryDirty;
@@ -588,9 +669,10 @@ export default function EditProfileScreen() {
     setRefreshing(true);
     try {
       revalidateMasterdata();
-      const [, galleryResult] = await Promise.allSettled([
+      const [, galleryResult, partnerPreferenceResult] = await Promise.allSettled([
         loadProfile(false),
         galleryService.fetchMe(),
+        profileService.fetchPartnerPreference(),
       ]);
 
       if (galleryResult.status === "fulfilled" && galleryResult.value.success) {
@@ -603,10 +685,24 @@ export default function EditProfileScreen() {
       } else {
         toast.show(t("gallery_upload_error", "Could not refresh gallery."), "error");
       }
+
+      if (partnerPreferenceResult.status === "fulfilled" && partnerPreferenceResult.value.success !== false) {
+        const preference = partnerPreferenceResult.value.partner_preference || {};
+        queryClient.setQueryData(queryKeys.profile.partnerPreference, preference);
+        setProfile((current: any) => ({
+          ...(current || {}),
+          partner_preference: preference,
+          partnerPreference: preference,
+        }));
+        patchUserProfile({
+          partner_preference: preference,
+          partnerPreference: preference,
+        });
+      }
     } finally {
       setRefreshing(false);
     }
-  }, [loadProfile, refreshBlocked, refreshing, revalidateMasterdata, t, toast]);
+  }, [loadProfile, patchUserProfile, queryClient, refreshBlocked, refreshing, revalidateMasterdata, t, toast]);
 
   const makeTranslatedOptions = useCallback(
     (values: readonly string[], namespace?: string): SelectOption[] =>
@@ -770,7 +866,7 @@ export default function EditProfileScreen() {
             label: t("profile.grew_up_in", "Grew up in"),
             value: countryValue(profile?.grew_up_in) || fallbackText,
             completionKey: "grew_up_in",
-            icon: Home,
+            icon: Footprints,
             locked: true,
           },
         ],
@@ -827,7 +923,7 @@ export default function EditProfileScreen() {
             label: t("profile.complexion", "Complexion"),
             value: formatSelect(profile?.complexion, fallbackText),
             completionKey: "complexion",
-            icon: UserRound,
+            icon: Palette,
           },
           {
             id: "ethnic_group",
@@ -846,7 +942,7 @@ export default function EditProfileScreen() {
             label: t("profile.marital_status", "Marital status"),
             value: formatSelect(profile?.marital_status, fallbackText),
             completionKey: "marital_status",
-            icon: Users,
+            icon: Gem,
           },
           {
             id: "have_children",
@@ -860,7 +956,7 @@ export default function EditProfileScreen() {
             label: t("profile.wants_children", "Wants children"),
             value: formatSelect(profile?.wants_children, fallbackText),
             completionKey: "wants_children",
-            icon: Baby,
+            icon: Pram,
           },
         ],
       },
@@ -904,7 +1000,7 @@ export default function EditProfileScreen() {
             id: "designation",
             label: t("profile.designation", "Designation"),
             value: formatSelect(profile?.designation, fallbackText),
-            icon: BriefcaseBusiness,
+            icon: LampDesk,
           },
           {
             id: "company",
@@ -919,7 +1015,7 @@ export default function EditProfileScreen() {
             label: t("profile.annual_income", "Annual income"),
             value: annualIncome,
             completionKey: "annual_income",
-            icon: Coins,
+            icon: Banknote,
           },
         ],
       },
@@ -931,20 +1027,20 @@ export default function EditProfileScreen() {
             label: t("profile.sect", "Sect"),
             value: formatSelect(profile?.sect, fallbackText),
             completionKey: "sect",
-            icon: Moon,
+            icon: BookOpen,
           },
           {
             id: "maslak",
             label: t("profile.maslak", "Maslak / School of thought"),
             value: formatSelect(profile?.maslak, fallbackText),
             completionKey: "maslak",
-            icon: Sparkles,
+            icon: Compass,
           },
           {
             id: "following",
             label: t("profile.following", "Following / Movement"),
             value: formatSelect(profile?.following, fallbackText),
-            icon: Heart,
+            icon: Signpost,
           },
           {
             id: "is_practising",
@@ -958,7 +1054,7 @@ export default function EditProfileScreen() {
             label: t("profile.prayers", "Prayer habit"),
             value: formatSelect(profile?.prayers, fallbackText),
             completionKey: "prayers",
-            icon: CalendarHeart,
+            icon: Mosque,
           },
         ],
       },
@@ -1095,7 +1191,6 @@ export default function EditProfileScreen() {
         const nextProfile = {
           ...(profile || {}),
           ...(response.profile || response.user?.profile || {}),
-          company: cleaned,
         };
         setProfile(nextProfile);
         patchUserProfile(nextProfile);
@@ -1523,7 +1618,7 @@ export default function EditProfileScreen() {
             {chips.map((item, index) => (
               <View
                 key={`${config.key}-${item.slug}-${index}`}
-                style={[styles.chip, { backgroundColor: colors.surface }]}
+                style={[styles.chip, { backgroundColor: palette.chrome.common.subtleSurface }]}
               >
                 <Text style={styles.chipEmoji}>{item.emoji}</Text>
                 <Text style={[styles.chipLabel, { color: colors.text }]} numberOfLines={1}>
@@ -1582,11 +1677,13 @@ export default function EditProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppBackTitleBar
-        title={t("edit_profile", "Edit profile")}
-        fallbackHref="/(tabs)/profile"
-        onBack={summaryNavigation.requestClose}
-      />
+      {!embedded ? (
+        <AppBackTitleBar
+          title={t("edit_profile", "Edit profile")}
+          fallbackHref="/(tabs)/profile"
+          onBack={summaryNavigation.requestClose}
+        />
+      ) : null}
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.container}
@@ -1622,9 +1719,22 @@ export default function EditProfileScreen() {
             initialGallery={gallery}
             initialPrivacy={privacy}
             completionImpact={mediaMissing ? missingImpacts.media || 0 : 0}
+            showTopBorder={Math.round(completion.percent) >= 100}
             onGalleryChange={onGalleryChange}
           />
         </View>
+
+        {showPartnerPreferencePrompt ? (
+          <PartnerPreferencePromptCard
+            title={t("add_partner_preference", "Add partner preference")}
+            actionLabel={t("add", "Add")}
+            onPress={() => router.push({
+              pathname: "/(tabs)/partner-preference",
+              params: { returnTo: "/(tabs)/profile" },
+            })}
+            style={{ marginTop: 0, marginBottom: scale(24) }}
+          />
+        ) : null}
 
         {/* Web parity: whatever is missing gets promoted right below the photos */}
         {summaryMissing ? summaryCard : null}
@@ -1772,7 +1882,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   container: {
-    paddingBottom: 112,
+    paddingBottom: 0,
     paddingTop: 0,
   },
   // Full-width profile bands mirror My Profile while controls remain framed.

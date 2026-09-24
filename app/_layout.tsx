@@ -92,9 +92,12 @@ export default function RootLayout() {
     });
 
     useEffect(() => {
-        return api.setUnauthorizedHandler(async () => {
-            await handleUnauthorized();
+        return api.setUnauthorizedHandler(async (details) => {
+            await handleUnauthorized(details);
             queryClient.clear();
+            if (details?.message === 'account_suspended') {
+                router.replace('/account-suspended');
+            }
         });
     }, [handleUnauthorized]);
 
@@ -106,7 +109,7 @@ export default function RootLayout() {
         const rootSegment = segments[0];
         const currentRoute = segments[segments.length - 1];
         const isAuthRoute = rootSegment === '(auth)';
-        const isPublicRoute = !rootSegment || isAuthRoute || rootSegment === '(onboarding)';
+        const isPublicRoute = !rootSegment || isAuthRoute || rootSegment === '(onboarding)' || currentRoute === 'account-suspended';
         const isProfileSetupRoute = rootSegment === '(profile-setup)';
         const isAuthContinuation = currentRoute === 'signup' || currentRoute === 'verify-email';
 
@@ -243,6 +246,14 @@ export default function RootLayout() {
                     <Stack.Screen name="(auth)" options={{ animation: "fade", gestureEnabled: false }} />
                     <Stack.Screen name="(profile-setup)" options={{ animation: "fade", gestureEnabled: false }} />
                     <Stack.Screen name="(tabs)" options={{ animation: "fade", gestureEnabled: false }} />
+                    <Stack.Screen
+                        name="edit-profile"
+                        options={{
+                            animation: isRTL ? "slide_from_left" : "slide_from_right",
+                            gestureEnabled: true,
+                            fullScreenGestureEnabled: true,
+                        }}
+                    />
                 </Stack>
                 <ToastProvider />
                 </BottomSheetModalProvider>

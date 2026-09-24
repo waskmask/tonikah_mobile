@@ -1,4 +1,5 @@
 import i18n from '@/lib/i18n';
+import { decodeHtmlEntities } from '@/lib/profileValidation';
 
 export function t(key: string, fallback?: string, options?: Record<string, any>) {
     const value = i18n.t(key, { defaultValue: fallback || key, ...options });
@@ -80,22 +81,22 @@ export function calculateAge(dob?: string | Date) {
 }
 
 export function cleanProfileText(value?: string | null) {
-    return String(value || '')
+    return decodeHtmlEntities(String(value || ''))
         .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }
 
 export function cleanProfileMultilineText(value?: string | null) {
-    return String(value || '')
+    return decodeHtmlEntities(String(value || ''))
         .replace(/<\s*br\s*\/?\s*>/gi, '\n')
         // The API stores blank-line-separated paragraphs as adjacent <p>
         // elements. Preserve that paragraph boundary before stripping tags.
         .replace(/<\/\s*(p|div)\s*>\s*<\s*(p|div)(?:\s[^>]*)?>/gi, '\n\n')
         .replace(/<\/\s*(p|div|li)\s*>/gi, '\n')
         .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
         .replace(/\r\n?/g, '\n')
         .split('\n')
         .map((line) => line.replace(/[^\S\n]+/g, ' ').trim())

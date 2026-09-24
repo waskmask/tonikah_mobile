@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ImagePlus, Info, Lock, Star, Unlock } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
+import { AmberCard, useAmberCardPalette } from '@/components/ui/AmberCard';
 import { CompletionImpactBadge } from '@/components/profile/CompletionImpactBadge';
 import { SingleSelectSheet } from '@/components/ui/SingleSelectSheet';
 import { GalleryCropModal } from '@/components/app/GalleryCropModal';
@@ -44,6 +45,7 @@ type Props = {
     autoShowGuidelines?: boolean;
     requiredError?: string;
     completionImpact?: number;
+    showTopBorder?: boolean;
     onGalleryChange?: (payload: { gallery: GalleryItem[]; privacy: GalleryPrivacy; avatarUuid?: string | null }) => void;
     onBusyChange?: (busy: boolean) => void;
 };
@@ -70,11 +72,13 @@ export function ProfileMediaEditor({
     autoShowGuidelines = true,
     requiredError,
     completionImpact = 0,
+    showTopBorder = true,
     onGalleryChange,
     onBusyChange,
 }: Props) {
     const { isDark } = useTheme();
     const colors = useColors();
+    const amberCard = useAmberCardPalette();
     const { currentLanguage, isRTL } = useLanguage();
     const usesLatinLabels = localeUsesLatinScript(currentLanguage);
     const { show: showToast } = useToast();
@@ -364,12 +368,14 @@ export function ProfileMediaEditor({
     };
 
     const warningColors = colors.chrome.toast.warning;
+    const privateCardForeground = '#201B15';
 
     return (
         <View
             style={[
                 styles.section,
                 variant === 'onboarding' && styles.onboardingSection,
+                variant === 'edit-profile' && !showTopBorder && styles.sectionWithoutTopBorder,
                 {
                     borderColor: variant === 'onboarding' ? 'transparent' : borderColor,
                     backgroundColor: variant === 'onboarding' ? 'transparent' : colors.brand.bg.surface,
@@ -536,18 +542,11 @@ export function ProfileMediaEditor({
             ) : null}
 
             {canUsePrivateGallery ? (
-                <View
+                <AmberCard
+                    backgroundColor={variant === 'edit-profile' && privacy === 'private' ? '#F4F4F4' : undefined}
                     style={variant === 'edit-profile'
-                        ? [
-                            styles.privacySection,
-                            {
-                                borderColor,
-                                backgroundColor: privacy === 'private'
-                                    ? colors.brand.bg.surface
-                                    : warningColors.bg,
-                            },
-                        ]
-                        : undefined}
+                        ? styles.privacySection
+                        : { backgroundColor: 'transparent' }}
                 >
                     {variant === 'edit-profile' ? (
                         <Text
@@ -558,8 +557,8 @@ export function ProfileMediaEditor({
                                 styles.privacySectionTitle,
                                 {
                                     color: privacy === 'private'
-                                        ? colors.chrome.common.textStrong
-                                        : warningColors.text,
+                                        ? privateCardForeground
+                                        : amberCard.foreground,
                                 },
                             ]}
                         >
@@ -577,8 +576,8 @@ export function ProfileMediaEditor({
                             {
                                 backgroundColor: variant === 'edit-profile'
                                     ? privacy === 'private'
-                                        ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(16,16,17,0.06)')
-                                        : (isDark ? 'rgba(242,184,75,0.16)' : 'rgba(245,158,11,0.14)')
+                                        ? '#FFFFFF'
+                                        : amberCard.iconBackground
                                     : surface,
                             },
                         ]}
@@ -586,12 +585,12 @@ export function ProfileMediaEditor({
                         {privacy === 'private' ? (
                             <Lock
                                 size={scale(18)}
-                                color={colors.brand.text.subtitle}
+                                color={variant === 'edit-profile' ? privateCardForeground : colors.brand.text.subtitle}
                             />
                         ) : (
                             <Unlock
                                 size={scale(18)}
-                                color={variant === 'edit-profile' ? warningColors.icon : colors.brand.text.subtitle}
+                                color={variant === 'edit-profile' ? amberCard.icon : colors.brand.text.subtitle}
                             />
                         )}
                     </View>
@@ -604,8 +603,10 @@ export function ProfileMediaEditor({
                                 styles.privacyFieldLabel,
                                 usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
                                 {
-                                    color: variant === 'edit-profile' && privacy !== 'private'
-                                        ? warningColors.text
+                                    color: variant === 'edit-profile'
+                                        ? privacy === 'private'
+                                            ? privateCardForeground
+                                            : amberCard.foreground
                                         : colors.chrome.common.textMuted,
                                 },
                             ]}
@@ -616,8 +617,10 @@ export function ProfileMediaEditor({
                             style={[
                                 styles.privacyFieldValue,
                                 {
-                                    color: variant === 'edit-profile' && privacy !== 'private'
-                                        ? warningColors.text
+                                    color: variant === 'edit-profile'
+                                        ? privacy === 'private'
+                                            ? privateCardForeground
+                                            : amberCard.foreground
                                         : mutedText,
                                 },
                             ]}
@@ -648,7 +651,7 @@ export function ProfileMediaEditor({
                                         ? '#FFFFFF'
                                         : colors.brand.bg.border,
                                 borderColor: privacy !== 'private' && variant === 'edit-profile'
-                                    ? warningColors.border
+                                    ? amberCard.border
                                     : 'transparent',
                                 borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
                                 opacity: privacy !== 'private' && !hasApprovedGalleryImage ? 0.55 : 1,
@@ -663,7 +666,7 @@ export function ProfileMediaEditor({
                                     privacy === 'private' && styles.switchThumbOn,
                                     {
                                         borderColor: privacy !== 'private' && variant === 'edit-profile'
-                                            ? warningColors.border
+                                            ? amberCard.border
                                             : 'transparent',
                                         borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
                                     },
@@ -684,7 +687,7 @@ export function ProfileMediaEditor({
                                     {
                                         backgroundColor: colors.chrome.common.inverseText,
                                         borderColor: privacy !== 'private' && variant === 'edit-profile'
-                                            ? warningColors.border
+                                            ? amberCard.border
                                             : 'transparent',
                                         borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
                                     },
@@ -693,7 +696,7 @@ export function ProfileMediaEditor({
                         )}
                     </Pressable>
                     </View>
-                </View>
+                </AmberCard>
             ) : null}
 
             <SingleSelectSheet
@@ -785,6 +788,9 @@ const styles = StyleSheet.create({
         borderWidth: 0,
         borderRadius: 0,
         padding: 0,
+    },
+    sectionWithoutTopBorder: {
+        borderTopWidth: 0,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -895,11 +901,11 @@ const styles = StyleSheet.create({
         gap: scale(12),
     },
     privacySection: {
-        borderTopWidth: 1,
-        marginHorizontal: scale(-16),
-        marginBottom: scale(-20),
+        marginHorizontal: scale(-2),
         marginTop: scale(10),
-        paddingTop: scale(22),
+        borderRadius: scale(8),
+        overflow: 'hidden',
+        paddingTop: scale(18),
     },
     privacySectionTitle: {
         paddingHorizontal: scale(16),

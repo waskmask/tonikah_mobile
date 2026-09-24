@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, Lock, MapPin, ShieldCheck, X } from 'lucide-react-native';
+import { Bookmark, Lock, ShieldCheck, X } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -11,6 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { displayText, profileListImage, t, translateCountry, translateNamespace } from '@/lib/profileDisplay';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+import { flagEmoji } from '@/lib/exploreProfile';
 
 type ProfileListCardProps = {
     item: any;
@@ -83,6 +84,12 @@ export function ProfileListCard({
     const location = item.location
         ? [item.location.city, translateCountry(item.location.country)].filter(Boolean).join(' - ')
         : [item.city, translateCountry(item.country)].filter(Boolean).join(' - ');
+    const countryFlag = String(
+        item.countryFlag
+        || item.country_flag
+        || flagEmoji(item.profile ? { ...item, ...item.profile } : item)
+        || '',
+    );
     const name = item.profileName || item.username || t('not_set', 'Not set');
     const imageKey = String(item.id || item._id || image || name);
     const age = item.age || item.profile?.age;
@@ -110,6 +117,7 @@ export function ProfileListCard({
                     recyclingKey={imageKey}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
+                    contentPosition="center"
                 />
                 <LinearGradient
                     colors={['rgba(16, 16, 17,0.04)', 'rgba(16, 16, 17,0.18)', 'rgba(16, 16, 17,0.82)']}
@@ -117,8 +125,8 @@ export function ProfileListCard({
                     style={StyleSheet.absoluteFill}
                 />
                 {badgeLabel ? (
-                    <View style={[styles.badge, { left: isRTL ? undefined : 0, right: isRTL ? 0 : undefined, backgroundColor: colors.chrome.primary }]}>
-                        <Text numberOfLines={1} style={[styles.badgeText, { color: common.inverseText }]}>{badgeLabel}</Text>
+                    <View style={[styles.badge, { left: isRTL ? undefined : 0, right: isRTL ? 0 : undefined, backgroundColor: common.darkOverlayStrong }]}>
+                        <Text className="font-body-semi" numberOfLines={1} style={[styles.badgeText, { color: common.inverseText }]}>{badgeLabel}</Text>
                     </View>
                 ) : null}
                 {item.privacy === 'private' && (
@@ -164,13 +172,13 @@ export function ProfileListCard({
                         no textAlign needed. ‏ (RLM) sets RTL bidi base so the
                         age renders on the visual left of the name. */}
                     <View style={styles.nameRow}>
-                        <Text numberOfLines={1} style={styles.name}>
+                        <Text className="font-body-bold" numberOfLines={1} style={styles.name}>
                             {isRTL ? '‏' : ''}{name}{age ? `, ${age}` : ''}
                         </Text>
                     </View>
                     {location ? (
                         <View style={[styles.metaRow, { flexDirection: 'row' }]}>
-                            <MapPin size={scale(11)} color={colors.brand.bg.border} />
+                            {countryFlag ? <Text style={styles.locationFlag}>{countryFlag}</Text> : null}
                             <Text numberOfLines={1} style={styles.location}>
                                 {isRTL ? '‏' : ''}{location}
                             </Text>
@@ -180,7 +188,7 @@ export function ProfileListCard({
                         <View style={[styles.pillRow, { flexDirection: 'row' }]}>
                             {pills.map((pill, index) => (
                                 <View key={`${String(item.id || item._id || name)}-${pill}-${index}`} style={styles.pill}>
-                                    <Text numberOfLines={1} style={styles.pillText}>{pill}</Text>
+                                    <Text className="font-body-semi" numberOfLines={1} ellipsizeMode="tail" style={styles.pillText}>{pill}</Text>
                                 </View>
                             ))}
                         </View>
@@ -233,7 +241,7 @@ const styles = StyleSheet.create({
         marginBottom: scale(10),
     },
     imageWrap: {
-        aspectRatio: 0.75,
+        aspectRatio: 2 / 3,
         overflow: 'hidden',
         alignItems: 'center',
         justifyContent: 'center',
@@ -242,7 +250,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 0,
         maxWidth: '82%',
-        minHeight: scale(28),
+        minHeight: scale(24),
         borderBottomRightRadius: scale(6),
         paddingHorizontal: scale(10),
         alignItems: 'center',
@@ -252,7 +260,6 @@ const styles = StyleSheet.create({
     badgeText: {
         fontSize: scale(10),
         lineHeight: scale(13),
-        fontWeight: '800',
     },
     lockBadge: {
         position: 'absolute',
@@ -314,9 +321,8 @@ const styles = StyleSheet.create({
     name: {
         flexShrink: 1,
         color: '#FFFFFF',
-        fontSize: scale(18),
-        lineHeight: scale(22),
-        fontWeight: '800',
+        fontSize: scale(16),
+        lineHeight: scale(20),
     },
     metaRow: {
         alignItems: 'center',
@@ -330,6 +336,11 @@ const styles = StyleSheet.create({
         lineHeight: scale(15),
         fontWeight: '600',
     },
+    locationFlag: {
+        fontSize: scale(12),
+        lineHeight: scale(15),
+        includeFontPadding: false,
+    },
     pillRow: {
         flexWrap: 'wrap',
         gap: scale(5),
@@ -337,6 +348,8 @@ const styles = StyleSheet.create({
     },
     pill: {
         maxWidth: '100%',
+        minWidth: 0,
+        flexShrink: 1,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.24)',
         backgroundColor: 'rgba(16, 16, 17,0.34)',
@@ -345,10 +358,10 @@ const styles = StyleSheet.create({
         paddingVertical: scale(3),
     },
     pillText: {
+        flexShrink: 1,
         color: '#FFFFFF',
         fontSize: scale(10),
         lineHeight: scale(13),
-        fontWeight: '700',
     },
     actions: {
         gap: scale(7),

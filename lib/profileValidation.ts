@@ -14,7 +14,7 @@ const BLOCK_END_TAGS =
 const BLOCK_START_TAGS =
     /<\s*(p|div|section|article|blockquote|li|ul|ol|h[1-6])\b[^>]*>/gi;
 
-function decodeHtmlEntities(value: string) {
+export function decodeHtmlEntities(value: string) {
     return value
         .replace(/&nbsp;/gi, ' ')
         .replace(/&amp;/gi, '&')

@@ -1,5 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
+export const PUBLIC_PROFILE_DETAIL_STALE_TIME_MS = 15 * 60_000;
+
 export const queryClient = new QueryClient({
     defaultOptions: {
         queries: {

@@ -27,6 +27,11 @@ export interface AuthResponse extends ApiResponse {
     refreshToken?: string;
     user?: User;
     retryAfter?: number;
+    suspension?: {
+        reason?: string;
+        suspendedAt?: string | null;
+        autoLiftAt?: string | null;
+    };
 }
 
 export interface UserSession {

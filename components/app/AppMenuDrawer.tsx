@@ -40,7 +40,7 @@ const QUICK_ITEMS: MenuItem[] = [
 ];
 
 const ACCOUNT_ITEMS: MenuItem[] = [
-    { href: '/(tabs)/edit-profile', labelKey: 'edit_profile', fallback: 'Edit profile', icon: PencilLine },
+    { href: '/(tabs)/profile', labelKey: 'edit_profile', fallback: 'Edit profile', icon: PencilLine },
     { href: '/(tabs)/memberships', labelKey: 'memberships', fallback: 'Memberships', icon: CreditCard },
     { href: { pathname: '/(tabs)/activities', params: { tab: 'blocked' } }, labelKey: 'blocked_users', fallback: 'Blocked users', icon: Ban },
     { href: '/support', labelKey: 'report_issue', fallback: 'Report an issue', icon: LifeBuoy },
@@ -89,13 +89,6 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
         if (isLoading) return;
         onClose();
         requestAnimationFrame(() => {
-            if (href === '/(tabs)/edit-profile') {
-                router.push({
-                    pathname: '/(tabs)/edit-profile',
-                    params: { returnTo: pathname },
-                });
-                return;
-            }
             if (href === '/(tabs)/hobbies-faith') {
                 router.push({
                     pathname: '/(tabs)/hobbies-faith',

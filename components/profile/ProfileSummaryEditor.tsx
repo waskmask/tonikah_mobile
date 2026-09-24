@@ -58,6 +58,9 @@ type Props = {
     headlineImpact?: number;
     bioImpact?: number;
     onDirtyChange?: (dirty: boolean) => void;
+    initialActiveField?: SummaryField;
+    hideRows?: boolean;
+    onCloseEditor?: () => void;
 };
 
 /** Shared Headline + Bio editor used by Edit Profile and My Profile.
@@ -72,6 +75,9 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
     headlineImpact = 0,
     bioImpact = 0,
     onDirtyChange,
+    initialActiveField,
+    hideRows = false,
+    onCloseEditor,
 }, ref) {
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
@@ -92,7 +98,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
     const [saving, setSaving] = useState(false);
     const [keyboardVisible, setKeyboardVisible] = useState(false);
     const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
-    const [activeField, setActiveField] = useState<SummaryField | null>(null);
+    const [activeField, setActiveField] = useState<SummaryField | null>(initialActiveField || null);
     const [bioExpanded, setBioExpanded] = useState(false);
     const [bioCanExpand, setBioCanExpand] = useState(false);
     const pendingSubmissionRef = useRef<{ field: SummaryField; value: string } | null>(null);
@@ -247,11 +253,9 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
             initialValuesRef.current = nextInitialValues;
             setInitialValues(nextInitialValues);
             const responseProfile = res.profile || res.user?.profile || {};
-            const optimisticPatch = {
-                ...responseProfile,
-                ...(submitHeadline ? { profile_headline: savedValues.headline } : {}),
-                ...(submitBio ? { bio: savedValues.bio } : {}),
-            };
+            // The response retains the previous approved public values while a
+            // candidate is pending. Never replace those fields optimistically.
+            const optimisticPatch = { ...responseProfile };
             patchUserProfile(optimisticPatch);
             onOptimisticSave?.(optimisticPatch);
             const latestModeration =
@@ -344,7 +348,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
 
         return (
             <View>
-                {rows.map((row) => (
+                {!hideRows && rows.map((row) => (
                     <Pressable
                         key={row.field}
                         onPress={() => setActiveField(row.field)}
@@ -387,7 +391,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                                         row.field === 'headline' && row.value && styles.headlineValue,
                                         row.field === 'bio' && styles.editBioValue,
                                         !row.value && styles.editPlaceholder,
-                                        { color: palette.brand.text.body },
+                                        { color: row.value ? palette.brand.text.body : palette.brand.text.muted },
                                     ]}
                                 >
                                     {row.value || row.placeholder}
@@ -443,11 +447,13 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
 
                 {active ? (
                     <TextEditSheet
+                        key={active.field}
                         visible
                         title={active.label}
                         initialValue={active.value}
                         placeholder={active.placeholder}
                         maxNonSpace={active.field === 'bio' ? BIO_MAX : HEADLINE_MAX}
+                        minCount={active.field === 'bio' ? BIO_MIN : undefined}
                         multiline={active.field === 'bio'}
                         minInputHeight={scale(active.field === 'bio' ? 150 : 44)}
                         presentation="drawer"
@@ -463,7 +469,10 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                             }
                         }}
                         onClose={() => {
-                            if (!saving) setActiveField(null);
+                            if (!saving) {
+                                setActiveField(null);
+                                onCloseEditor?.();
+                            }
                         }}
                         onSave={(value) => void saveActiveField(value)}
                     />

@@ -1,7 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text as RNText, TouchableOpacity, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { CircleHelp, Menu, SlidersHorizontal } from 'lucide-react-native';
+import { Platform, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { requireOptionalNativeModule } from 'expo-modules-core';
+import { Info, Settings2 } from 'lucide-react-native';
+import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { useTheme } from '@/hooks/useTheme';
@@ -20,6 +22,10 @@ export function ExploreTopOverlay({
 }) {
     const colors = useColors();
     const { isDark } = useTheme();
+    const hasNativeGlass = Platform.OS === 'ios'
+        && !!requireOptionalNativeModule('ExpoGlassEffect')
+        && isGlassEffectAPIAvailable()
+        && isLiquidGlassAvailable();
     // Light: dark icon on neutral grey chip; dark: light icon on dark chip.
     const iconColor = isDark ? '#E5E5E7' : '#201B15';
 
@@ -27,55 +33,63 @@ export function ExploreTopOverlay({
         // Warm screen color (not the white header token) so status bar, top bar
         // and deck background read as one continuous surface on Explore
         <View style={[styles.root, { backgroundColor: colors.chrome.explore.screen }]}>
-            <TouchableOpacity
-                activeOpacity={0.82}
+            <Pressable
                 onPress={onOpenFilters}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                style={[styles.filterButton, { shadowColor: colors.chrome.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('filters', 'Filters')}
+                accessibilityValue={filterCount > 0 ? { text: String(filterCount) } : undefined}
+                hitSlop={4}
+                style={styles.filterWrap}
             >
-                <LinearGradient
-                    colors={[colors.brand.gradient.start, colors.brand.gradient.end]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
+                <View
+                    pointerEvents="none"
+                    style={[styles.filterShadow, {
+                        backgroundColor: Platform.OS === 'android' && !isDark
+                            ? '#F7F7F7'
+                            : colors.chrome.explore.actionCircle,
+                    }]}
                 />
-                <SlidersHorizontal size={scale(13)} color={colors.chrome.common.inverseText} strokeWidth={2.5} />
-                <RNText style={[styles.filterText, { color: colors.chrome.common.inverseText }]}>{t('filters', 'Filters')}</RNText>
+                {hasNativeGlass ? (
+                    <GlassView
+                        pointerEvents="none"
+                        glassEffectStyle="regular"
+                        colorScheme={isDark ? 'dark' : 'light'}
+                        style={styles.filterGlass}
+                    />
+                ) : null}
+                <View pointerEvents="none" style={styles.filterIconCenter}>
+                    <Settings2
+                        size={scale(Platform.OS === 'android' ? 22 : 18)}
+                        width={scale(Platform.OS === 'android' ? 24 : 18)}
+                        height={scale(Platform.OS === 'android' ? 22 : 18)}
+                        color={iconColor}
+                        strokeWidth={Platform.OS === 'android' ? 2.5 : 2.2}
+                    />
+                </View>
                 {filterCount > 0 ? (
-                    <View style={styles.countBadge}>
+                    <View pointerEvents="none" style={[styles.countBadge, { backgroundColor: colors.chrome.badge.background, borderColor: colors.chrome.explore.screen }]}>
                         <RNText style={[styles.countText, { color: colors.chrome.common.inverseText }]}>{filterCount}</RNText>
                     </View>
                 ) : null}
-            </TouchableOpacity>
+            </Pressable>
             <View style={styles.actions}>
                 <IconButton onPress={onOpenTour}>
-                    <CircleHelp size={scale(15)} color={iconColor} strokeWidth={2.35} />
+                    <Info size={scale(Platform.OS === 'android' ? 20 : 18)} color={iconColor} strokeWidth={2.35} />
                 </IconButton>
-                <IconButton onPress={onOpenMenu}>
-                    <Menu size={scale(15)} color={iconColor} strokeWidth={2.55} />
-                </IconButton>
+                <AppMenuButton onPress={onOpenMenu} />
             </View>
         </View>
     );
 }
 
 function IconButton({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
-    const colors = useColors();
-    const backgroundColor = colors.chrome.header.iconBackground;
-
     return (
-        <View
-            style={[
-                styles.buttonShell,
-                { backgroundColor },
-            ]}
-        >
+        <View style={styles.buttonShell}>
             <Pressable
                 onPress={onPress}
                 hitSlop={6}
                 style={({ pressed }) => [
                     styles.button,
-                    { backgroundColor },
                     pressed && styles.pressed,
                 ]}
             >
@@ -94,34 +108,46 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(14),
+        overflow: 'visible',
+        zIndex: 2,
     },
     actions: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: scale(16),
+        gap: scale(14),
     },
-    filterButton: {
-        minWidth: scale(80),
-        minHeight: scale(34),
-        borderRadius: scale(18),
-        overflow: 'hidden',
-        flexDirection: 'row',
-        justifyContent: 'center',
+    filterWrap: {
+        width: scale(Platform.OS === 'android' ? 38 : 46),
+        height: scale(Platform.OS === 'android' ? 38 : 46),
+        position: 'relative',
+        overflow: 'visible',
+    },
+    filterShadow: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        borderRadius: scale(Platform.OS === 'android' ? 18 : 22),
+    },
+    filterGlass: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        borderRadius: scale(22),
+        borderCurve: 'continuous',
+    },
+    filterIconCenter: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
         alignItems: 'center',
-        gap: scale(7),
-        paddingHorizontal: scale(10),
-        paddingVertical: scale(6),
-        shadowOpacity: 0.24,
-        shadowRadius: scale(12),
-        shadowOffset: { width: 0, height: 5 },
-        elevation: 4,
-        zIndex: 10,
-    },
-    filterText: {
-        fontWeight: '700',
-        fontSize: scale(13),
-        lineHeight: scale(16),
+        justifyContent: 'center',
     },
     buttonShell: {
         width: scale(34),
@@ -145,13 +171,16 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.97 }],
     },
     countBadge: {
-        minWidth: scale(18),
-        height: scale(18),
+        position: 'absolute',
+        top: scale(-5),
+        right: scale(-6),
+        minWidth: scale(17),
+        height: scale(17),
         borderRadius: scale(9),
-        backgroundColor: 'rgba(255,255,255,0.24)',
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: scale(4),
+        paddingHorizontal: scale(3),
     },
     countText: {
         color: '#FFFFFF',

@@ -72,6 +72,11 @@ export default function LoginScreen() {
             return;
         }
 
+        if (result.message === 'account_suspended') {
+            router.replace('/account-suspended');
+            return;
+        }
+
         if (result.message === 'email_not_verified') {
             toast.show(t('verify_email_browse_limit_message'), 'info');
             return;
@@ -101,6 +106,11 @@ export default function LoginScreen() {
         setGoogleLoading(false);
 
         if (result.success) {
+            return;
+        }
+
+        if (result.message === 'account_suspended') {
+            router.replace('/account-suspended');
             return;
         }
 

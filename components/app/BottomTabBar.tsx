@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
+} from 'react-native-reanimated';
 import { Bookmark, Compass, History, Send, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -131,7 +136,25 @@ function AvatarTabIcon({
     );
 }
 
-export function BottomTabBar({ state, descriptors, navigation }: any) {
+type BottomTabBarProps = {
+    state: any;
+    descriptors: any;
+    navigation: any;
+    activeTabName?: string;
+    hidden?: boolean;
+    overlay?: boolean;
+    liveUpdates?: boolean;
+};
+
+export function BottomTabBar({
+    state,
+    descriptors,
+    navigation,
+    activeTabName,
+    hidden = false,
+    overlay = false,
+    liveUpdates = true,
+}: BottomTabBarProps) {
     const colors = useColors();
     const tabChrome = colors.chrome.tabBar;
     const { currentLanguage, t, isRTL } = useLanguage();
@@ -143,7 +166,10 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     const [spinnerRoute, setSpinnerRoute] = useState<string | null>(null);
     const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const profilePreloadRequestedRef = useRef(false);
-    const activeRouteName = state.routes[state.index]?.name;
+    const actualRouteName = state.routes[state.index]?.name;
+    const activeRouteName = activeTabName || actualRouteName;
+    const hiddenProgress = useSharedValue(hidden ? 1 : 0);
+    const hiddenTranslateDistance = scale(74) + insets.bottom;
     const queryClient = useQueryClient();
     const { data: unreadCount = 0 } = useQuery({
         queryKey: queryKeys.chat.unreadCount,
@@ -180,6 +206,15 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
         }
     }, [activeRouteName]);
 
+    useEffect(() => {
+        hiddenProgress.value = withTiming(hidden ? 1 : 0, { duration: hidden ? 180 : 210 });
+    }, [hidden, hiddenProgress]);
+
+    const visibilityStyle = useAnimatedStyle(() => ({
+        opacity: 1 - hiddenProgress.value,
+        transform: [{ translateY: hiddenProgress.value * hiddenTranslateDistance }],
+    }));
+
     useEffect(() => () => {
         if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
     }, []);
@@ -209,7 +244,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     }, [queryClient]);
 
     useChatSocket({
-        enabled: true,
+        enabled: liveUpdates,
         onUnread: handleUnread,
     });
 
@@ -224,20 +259,24 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
     if (!VISIBLE_ROUTE_NAMES.has(activeRouteName)) return null;
 
     return (
-        <View
+        <Animated.View
+            pointerEvents={hidden ? 'none' : 'auto'}
             style={[
                 styles.container,
+                overlay && styles.overlay,
                 {
                     paddingBottom: Math.max(insets.bottom, scale(8)),
                     backgroundColor: tabChrome.background,
                     borderTopColor: tabChrome.border,
                     shadowColor: colors.chrome.common.shadow,
                 },
+                visibilityStyle,
             ]}
         >
             <View style={[styles.inner, { flexDirection: 'row' }]}>
                 {visibleRoutes.map((item) => {
                     const options = descriptors[item.route.key]?.options || {};
+                    const isRouteFocused = actualRouteName === item.name;
                     const isFocused = activeRouteName === item.name;
                     const pending = pendingRoute === item.name;
                     const isActive = isFocused || pending;
@@ -256,7 +295,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                             canPreventDefault: true,
                         });
 
-                        if (isFocused || event.defaultPrevented) return;
+                        if (isRouteFocused || event.defaultPrevented) return;
                         lightImpact();
                         markInteraction(`tab:${item.name}`);
                         setPendingRoute(item.name);
@@ -332,7 +371,7 @@ export function BottomTabBar({ state, descriptors, navigation }: any) {
                     );
                 })}
             </View>
-        </View>
+        </Animated.View>
     );
 }
 
@@ -345,6 +384,13 @@ const styles = StyleSheet.create({
         shadowRadius: scale(16),
         shadowOffset: { width: 0, height: -3 },
         elevation: 10,
+    },
+    overlay: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 50,
     },
     inner: {
         width: '100%',

@@ -17,13 +17,14 @@ interface AuthState {
     isAuthenticated: boolean;
     isLoading: boolean;
     isRestoringSession: boolean;
+    suspension: AuthResponse['suspension'] | null;
 
     login: (email: string, password: string) => Promise<AuthResponse>;
     signup: (data: SignupRequest) => Promise<AuthResponse>;
     googleAuth: (options?: Pick<GoogleAuthRequest, 'agreed' | 'marketing_opt_in' | 'lang'>) => Promise<AuthResponse>;
     logout: () => Promise<void>;
     logoutAllDevices: () => Promise<AuthResponse>;
-    handleUnauthorized: () => Promise<void>;
+    handleUnauthorized: (details?: Pick<AuthResponse, 'message' | 'suspension'>) => Promise<void>;
     restoreSession: () => Promise<void>;
     refreshUser: () => Promise<AuthResponse>;
     setUser: (user: User) => void;
@@ -35,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     isAuthenticated: false,
     isLoading: false,
     isRestoringSession: true,
+    suspension: null,
 
     setUser: (user: User) => set({ user, isAuthenticated: true }),
     patchUserProfile: (patch) => set((state) => ({
@@ -56,8 +58,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
-                set({ user: result.user, isAuthenticated: true });
+                set({ user: result.user, isAuthenticated: true, suspension: null });
                 registerForPushNotifications().catch(() => { });
+            } else if (result.message === 'account_suspended') {
+                set({ suspension: result.suspension || {} });
             }
             return result;
         } finally {
@@ -72,8 +76,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
-                set({ user: result.user, isAuthenticated: true });
+                set({ user: result.user, isAuthenticated: true, suspension: null });
                 registerForPushNotifications().catch(() => { });
+            } else if (result.message === 'account_suspended') {
+                set({ suspension: result.suspension || {} });
             }
             return result;
         } finally {
@@ -155,10 +161,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
-    handleUnauthorized: async () => {
+    handleUnauthorized: async (details) => {
         const userId = get().user?._id;
         await clearPrivateChatData(userId);
-        set({ user: null, isAuthenticated: false, isLoading: false });
+        set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            suspension: details?.message === 'account_suspended' ? details.suspension || {} : null,
+        });
     },
 
     refreshUser: async () => {

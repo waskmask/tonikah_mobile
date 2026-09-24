@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated as NativeAnimated, FlatList, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
-import { Ban, Eye, Users } from 'lucide-react-native';
 import { Text } from '@/components/ui/Text';
 import { ProfileListCard } from '@/components/app/ProfileListCard';
 import { TabTitleBar } from '@/components/app/TabTitleBar';
@@ -21,10 +21,10 @@ type CachedProfileList = {
     nextCursor: string | null;
 };
 
-const MODES: Array<{ value: Mode; labelKey: string; fallback: string; icon: any }> = [
-    { value: 'visitors', labelKey: 'visitors', fallback: 'Visitors', icon: Users },
-    { value: 'visited', labelKey: 'visited', fallback: 'Visited', icon: Eye },
-    { value: 'blocked', labelKey: 'blocked_users', fallback: 'Blocked users', icon: Ban },
+const MODES: Array<{ value: Mode; labelKey: string; fallback: string }> = [
+    { value: 'visitors', labelKey: 'visitors', fallback: 'Visitors' },
+    { value: 'visited', labelKey: 'visited', fallback: 'Visited' },
+    { value: 'blocked', labelKey: 'blocked_users', fallback: 'Blocked users' },
 ];
 
 function normalizeMode(value: unknown): Mode {
@@ -43,6 +43,11 @@ export default function ActivitiesScreen() {
     const toast = useToast();
     const params = useLocalSearchParams<{ tab?: string }>();
     const [mode, setMode] = useState<Mode>(() => normalizeMode(params.tab));
+    const tabLayouts = useRef<Partial<Record<Mode, { x: number; width: number }>>>({});
+    const indicatorReady = useRef(false);
+    const indicatorX = useSharedValue(0);
+    const indicatorWidth = useSharedValue(0);
+    const indicatorOpacity = useSharedValue(0);
     const activeModeRef = useRef(mode);
     activeModeRef.current = mode;
     const initialCache = useRef(queryClient.getQueryData<CachedProfileList>(queryKeys.activities.list(normalizeMode(params.tab))));
@@ -54,6 +59,9 @@ export default function ActivitiesScreen() {
     const [hasMore, setHasMore] = useState(() => Boolean(initialCache.current?.nextCursor));
     const [selectedProfile, setSelectedProfile] = useState<any | null>(null);
     const [unblockingId, setUnblockingId] = useState<string | null>(null);
+    const listScrollY = useRef(0);
+    const refreshingRef = useRef(false);
+    const pullDistance = useRef(new NativeAnimated.Value(0)).current;
 
     const load = useCallback(async (cursor?: string | null, append = false) => {
         const res = mode === 'visitors'
@@ -84,6 +92,27 @@ export default function ActivitiesScreen() {
     }, [params.tab]);
 
     useEffect(() => {
+        const layout = tabLayouts.current[mode];
+        if (!layout) return;
+        if (!indicatorReady.current) {
+            indicatorX.value = layout.x;
+            indicatorWidth.value = layout.width;
+            indicatorOpacity.value = 1;
+            indicatorReady.current = true;
+            return;
+        }
+        const timing = { duration: 240, easing: Easing.out(Easing.cubic) };
+        indicatorX.value = withTiming(layout.x, timing);
+        indicatorWidth.value = withTiming(layout.width, timing);
+    }, [indicatorOpacity, indicatorWidth, indicatorX, mode]);
+
+    const indicatorStyle = useAnimatedStyle(() => ({
+        opacity: indicatorOpacity.value,
+        width: indicatorWidth.value,
+        transform: [{ translateX: indicatorX.value }],
+    }));
+
+    useEffect(() => {
         (async () => {
             const cached = queryClient.getQueryData<CachedProfileList>(queryKeys.activities.list(mode));
             if (cached) {
@@ -102,11 +131,68 @@ export default function ActivitiesScreen() {
         })();
     }, [load]);
 
-    const refresh = async () => {
+    const refresh = useCallback(async () => {
+        if (refreshingRef.current) return;
+        refreshingRef.current = true;
         setRefreshing(true);
-        await load(null, false);
-        setRefreshing(false);
-    };
+        try {
+            await load(null, false);
+        } finally {
+            refreshingRef.current = false;
+            setRefreshing(false);
+        }
+    }, [load]);
+
+    const resetPull = useCallback(() => {
+        NativeAnimated.spring(pullDistance, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.7,
+            useNativeDriver: true,
+        }).start();
+    }, [pullDistance]);
+
+    const pullResponder = useMemo(() => {
+        const threshold = scale(72);
+        const heldDistance = scale(44);
+        const maxVisualDistance = scale(64);
+
+        return PanResponder.create({
+            onMoveShouldSetPanResponderCapture: (_, gesture) => (
+                !refreshingRef.current
+                && listScrollY.current <= 0
+                && gesture.dy > scale(8)
+                && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25
+            ),
+            onPanResponderMove: (_, gesture) => {
+                pullDistance.setValue(Math.min(maxVisualDistance, Math.max(0, gesture.dy * 0.55)));
+            },
+            onPanResponderRelease: (_, gesture) => {
+                if (gesture.dy < threshold || refreshingRef.current) {
+                    resetPull();
+                    return;
+                }
+                NativeAnimated.spring(pullDistance, {
+                    toValue: heldDistance,
+                    damping: 18,
+                    stiffness: 220,
+                    mass: 0.7,
+                    useNativeDriver: true,
+                }).start();
+                void refresh().finally(resetPull);
+            },
+            onPanResponderTerminate: resetPull,
+        });
+    }, [pullDistance, refresh, resetPull]);
+
+    const pullIndicatorStyle = useMemo(() => ({
+        opacity: pullDistance.interpolate({
+            inputRange: [0, scale(16), scale(44)],
+            outputRange: [0, 0.45, 1],
+            extrapolate: 'clamp',
+        }),
+    }), [pullDistance]);
 
     const loadMore = async () => {
         if (loading || refreshing || loadingMore || !hasMore || !nextCursor) return;
@@ -122,6 +208,7 @@ export default function ActivitiesScreen() {
         try {
             const res = await usersService.unblock(id);
             if (res.success) {
+                queryClient.removeQueries({ queryKey: queryKeys.profile.detail(id), exact: true });
                 setItems((current) => {
                     const nextItems = current.filter((entry) => String(entry.id || entry._id) !== String(id));
                     queryClient.setQueryData(queryKeys.activities.list(mode), { items: nextItems, nextCursor });
@@ -139,81 +226,105 @@ export default function ActivitiesScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
-            <TabTitleBar title={t('activities', 'Activities')} showMenu />
-            <View style={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: 0 }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: scale(8), paddingRight: scale(2) }} style={{ marginBottom: scale(12) }}>
-                    {MODES.map(({ value, labelKey, fallback, icon: Icon }) => (
-                        <Pressable
-                            key={value}
-                            onPress={() => setMode(value)}
-                            style={{
-                                minWidth: scale(112),
-                                minHeight: scale(38),
-                                paddingTop: scale(6),
-                                paddingBottom: scale(9),
-                                paddingHorizontal: scale(12),
-                                borderRadius: 0,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexDirection: 'row',
-                                gap: scale(7),
-                                backgroundColor: 'transparent',
-                                borderBottomWidth: mode === value ? scale(2) : 0,
-                                borderBottomColor: colors.brand.text.body,
-                            }}
-                        >
-                            <Icon size={scale(16)} color={mode === value ? colors.brand.text.body : colors.brand.text.muted} strokeWidth={2} />
-                            <Text variant="body-sm" numberOfLines={1} style={{ color: mode === value ? colors.brand.text.body : colors.brand.text.muted, fontWeight: mode === value ? '700' : '500' }}>
-                                {t(labelKey, fallback)}
-                            </Text>
-                        </Pressable>
-                    ))}
+            <TabTitleBar title={t('activities', 'Activities')} showMenu hideBottomBorder />
+            <View style={{ paddingHorizontal: scale(14), paddingTop: scale(2), paddingBottom: 0 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: scale(8) }}>
+                    <View style={{ flexDirection: 'row', gap: scale(8), paddingRight: scale(2) }}>
+                        {MODES.map(({ value, labelKey, fallback }) => (
+                            <Pressable
+                                key={value}
+                                onPress={() => setMode(value)}
+                                onLayout={(event) => {
+                                    const { x, width } = event.nativeEvent.layout;
+                                    tabLayouts.current[value] = { x, width };
+                                    if (mode === value && !indicatorReady.current) {
+                                        indicatorX.value = x;
+                                        indicatorWidth.value = width;
+                                        indicatorOpacity.value = 1;
+                                        indicatorReady.current = true;
+                                    }
+                                }}
+                                style={{
+                                    minWidth: scale(112),
+                                    minHeight: scale(38),
+                                    paddingTop: scale(6),
+                                    paddingBottom: scale(9),
+                                    paddingHorizontal: scale(12),
+                                    borderRadius: 0,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexDirection: 'row',
+                                    backgroundColor: 'transparent',
+                                }}
+                            >
+                                <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ fontSize: 15, color: mode === value ? colors.brand.text.body : colors.brand.text.muted }}>
+                                    {t(labelKey, fallback)}
+                                </Text>
+                            </Pressable>
+                        ))}
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[{ position: 'absolute', bottom: 0, left: 0, height: scale(2), backgroundColor: colors.brand.text.body }, indicatorStyle]}
+                        />
+                    </View>
                 </ScrollView>
             </View>
             {loading ? (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={primary} /></View>
             ) : (
-                <FlatList
-                    data={items}
-                    keyExtractor={(item) => String(item.id || item._id)}
-                    numColumns={2}
-                    columnWrapperStyle={{ gap: scale(10) }}
-                    contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: 0, paddingBottom: scale(110), flexGrow: 1 }}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={primary} />}
-                    onEndReached={loadMore}
-                    onEndReachedThreshold={0.35}
-                    ListFooterComponent={loadingMore ? <View style={{ paddingVertical: scale(18) }}><ActivityIndicator color={primary} /></View> : null}
-                    ListEmptyComponent={
-                        <View style={{ paddingTop: scale(60), paddingHorizontal: scale(24) }}>
-                            <Text variant="h3" align="center">
-                                {mode === 'visitors'
-                                    ? t('no_visitors_yet', 'No visitors yet')
-                                    : mode === 'visited'
-                                        ? t('no_visited_yet', 'No visited profiles yet')
-                                        : t('no_blocked_users', 'No blocked users')}
-                            </Text>
-                            <Text variant="body-sm" align="center" style={{ color: colors.brand.text.subtitle, marginTop: scale(8) }}>
-                                {mode === 'visitors'
-                                    ? t('no_visitors_hint', 'When someone views your profile, they will show up here.')
-                                    : mode === 'visited'
-                                        ? t('no_visited_hint', 'Profiles you view will appear here.')
-                                        : t('no_data_blocked', 'Users you block will appear here.')}
-                            </Text>
-                        </View>
-                    }
-                    renderItem={({ item }) => (
-                        <ProfileListCard
-                            item={item}
-                            onPress={() => setSelectedProfile(item)}
-                            badgeLabel={mode === 'visitors' ? t('visitor_label', 'Visitor') : mode === 'visited' ? t('visited_label', 'Visited') : t('blocked_label', 'Blocked')}
-                            onFavorite={mode === 'blocked' ? () => unblock(item) : undefined}
-                            favoriteLabel={mode === 'blocked' ? t('unblock', 'Unblock') : undefined}
-                            actionTone="danger"
-                            actionPlacement="overlayPill"
-                            actionLoading={unblockingId === String(item.id || item._id)}
+                <View style={styles.pullArea} {...pullResponder.panHandlers}>
+                    <NativeAnimated.View pointerEvents="none" style={[styles.pullIndicator, pullIndicatorStyle]}>
+                        <ActivityIndicator color={primary} />
+                    </NativeAnimated.View>
+                    <NativeAnimated.View style={[styles.listMotion, { transform: [{ translateY: pullDistance }] }]}>
+                        <FlatList
+                            data={items}
+                            keyExtractor={(item) => String(item.id || item._id)}
+                            numColumns={2}
+                            columnWrapperStyle={{ gap: scale(10) }}
+                            contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(6), paddingBottom: scale(110), flexGrow: 1 }}
+                            alwaysBounceVertical={false}
+                            overScrollMode="never"
+                            onScroll={(event) => {
+                                listScrollY.current = Math.max(0, event.nativeEvent.contentOffset.y);
+                            }}
+                            scrollEventThrottle={16}
+                            onEndReached={loadMore}
+                            onEndReachedThreshold={0.35}
+                            ListFooterComponent={loadingMore ? <View style={{ paddingVertical: scale(18) }}><ActivityIndicator color={primary} /></View> : null}
+                            ListEmptyComponent={
+                                <View style={{ paddingTop: scale(60), paddingHorizontal: scale(24) }}>
+                                    <Text variant="h3" align="center">
+                                        {mode === 'visitors'
+                                            ? t('no_visitors_yet', 'No visitors yet')
+                                            : mode === 'visited'
+                                                ? t('no_visited_yet', 'No visited profiles yet')
+                                                : t('no_blocked_users', 'No blocked users')}
+                                    </Text>
+                                    <Text variant="body-sm" align="center" style={{ color: colors.brand.text.subtitle, marginTop: scale(8) }}>
+                                        {mode === 'visitors'
+                                            ? t('no_visitors_hint', 'When someone views your profile, they will show up here.')
+                                            : mode === 'visited'
+                                                ? t('no_visited_hint', 'Profiles you view will appear here.')
+                                                : t('no_data_blocked', 'Users you block will appear here.')}
+                                    </Text>
+                                </View>
+                            }
+                            renderItem={({ item }) => (
+                                <ProfileListCard
+                                    item={item}
+                                    onPress={() => setSelectedProfile(item)}
+                                    badgeLabel={mode === 'visitors' ? t('visitor_label', 'Visitor') : mode === 'visited' ? t('visited_label', 'Visited') : t('blocked_label', 'Blocked')}
+                                    onFavorite={mode === 'blocked' ? () => unblock(item) : undefined}
+                                    favoriteLabel={mode === 'blocked' ? t('unblock', 'Unblock') : undefined}
+                                    actionTone="danger"
+                                    actionPlacement="overlayPill"
+                                    actionLoading={unblockingId === String(item.id || item._id)}
+                                />
+                            )}
                         />
-                    )}
-                />
+                    </NativeAnimated.View>
+                </View>
             )}
             <UserProfileSheet
                 visible={Boolean(selectedProfile)}
@@ -248,3 +359,22 @@ export default function ActivitiesScreen() {
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    pullArea: {
+        flex: 1,
+        overflow: 'hidden',
+    },
+    pullIndicator: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        left: 0,
+        height: scale(44),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    listMotion: {
+        flex: 1,
+    },
+});

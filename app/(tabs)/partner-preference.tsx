@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
@@ -47,6 +47,8 @@ import { useToast } from '@/hooks/useToast';
 import { useUnsavedNavigationGuard } from '@/hooks/useUnsavedNavigationGuard';
 import { localeUsesLatinScript } from '@/lib/textDirection';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import {
     getTextModerationWarning,
     moderationCandidateForEditing,
@@ -66,6 +68,7 @@ export default function PartnerPreferenceScreen() {
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
     const insets = useSafeAreaInsets();
+    const queryClient = useQueryClient();
 
     const [state, setState] = useState<PartnerPrefState>(defaultPartnerPrefState());
     const [loading, setLoading] = useState(true);
@@ -117,6 +120,12 @@ export default function PartnerPreferenceScreen() {
         try {
             await refreshUser().catch(() => undefined);
             const res = await profileService.fetchPartnerPreference();
+            if (res.success !== false) {
+                queryClient.setQueryData(
+                    queryKeys.profile.partnerPreference,
+                    res.partner_preference || {},
+                );
+            }
             const latestProfile = useAuthStore.getState().user?.profile;
             // The owner keeps editing their pending/rejected candidate, not the
             // old approved text other users still see.
@@ -144,7 +153,7 @@ export default function PartnerPreferenceScreen() {
             setLoading(false);
             initialLoadRef.current = false;
         }
-    }, [refreshUser, toast]);
+    }, [queryClient, refreshUser, toast]);
 
     useFocusEffect(
         useCallback(() => {
@@ -159,7 +168,18 @@ export default function PartnerPreferenceScreen() {
     const unsavedNavigation = useUnsavedNavigationGuard({
         dirty,
         leaveFallback: leavePartnerPreference,
+        redirectRemovalToFallback: true,
     });
+
+    useFocusEffect(
+        useCallback(() => {
+            const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+                unsavedNavigation.requestClose();
+                return true;
+            });
+            return () => subscription.remove();
+        }, [unsavedNavigation.requestClose]),
+    );
 
     // Male users cannot prefer "married" women; female users can (co-wife)
     const maritalOptions = useMemo(
@@ -206,6 +226,12 @@ export default function PartnerPreferenceScreen() {
                 // Rebase immediately so Save disables without waiting on refetch
                 baselineRef.current = serializePartnerPrefState(nextState);
                 await refreshUser();
+                const approvedPreference = useAuthStore.getState().user?.profile?.partner_preference
+                    || useAuthStore.getState().user?.profile?.partnerPreference
+                    || res.partner_preference;
+                if (approvedPreference) {
+                    queryClient.setQueryData(queryKeys.profile.partnerPreference, approvedPreference);
+                }
                 const savedForReview = Boolean(
                     pendingModerationCandidate(
                         useAuthStore.getState().user?.profile?.contentModeration
@@ -272,7 +298,6 @@ export default function PartnerPreferenceScreen() {
             const nextPartnerPreference = {
                 ...(currentProfile.partner_preference || currentProfile.partnerPreference || {}),
                 ...(res.partner_preference || {}),
-                about_partner: nextAbout,
             };
             const optimisticModeration = submitAnyway
                 ? {
@@ -300,12 +325,20 @@ export default function PartnerPreferenceScreen() {
             toast.show(
                 submitAnyway || savedForReview
                     ? t('moderation_submit_anyway_success', 'Submitted for review.')
-                    : t('profile.profile_updated', 'Profile updated.'),
+                    : t('partner_preference_updated', 'Partner preference updated successfully.'),
                 'success',
             );
             setAboutSheetOpen(false);
             setTimeout(() => {
-                void refreshUser().catch(() => undefined);
+                void refreshUser()
+                    .then(() => {
+                        const approvedPreference = useAuthStore.getState().user?.profile?.partner_preference
+                            || useAuthStore.getState().user?.profile?.partnerPreference;
+                        if (approvedPreference) {
+                            queryClient.setQueryData(queryKeys.profile.partnerPreference, approvedPreference);
+                        }
+                    })
+                    .catch(() => undefined);
             }, 0);
             return true;
         } catch {
@@ -338,6 +371,7 @@ export default function PartnerPreferenceScreen() {
                 <AppBackTitleBar
                     title={t('partner_preference', 'Partner Preference')}
                     fallbackHref={returnHref as any}
+                    onBack={unsavedNavigation.requestClose}
                 />
                 <ScrollView
                     style={{ flex: 1 }}
@@ -483,7 +517,7 @@ export default function PartnerPreferenceScreen() {
                 />
 
                 <SelectField
-                    label={t('about_partner', 'About partner')}
+                    label={t('looking_for', 'Looking for')}
                     summary={state.about || t('about_partner_placeholder', 'Describe the qualities you are looking for')}
                     hasSelection={Boolean(state.about)}
                     pendingReview={aboutPendingReview}

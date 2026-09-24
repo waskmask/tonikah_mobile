@@ -19,6 +19,7 @@ import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
+import { useUnsavedNavigationGuard } from '@/hooks/useUnsavedNavigationGuard';
 import { firstSearchParam, sanitizeAuthReturnPath } from '@/lib/authReturn';
 import { emojiChipItem } from '@/lib/profileEmoji';
 import { apiMessage, t } from '@/lib/profileDisplay';
@@ -97,12 +98,29 @@ export default function HobbiesFaithScreen() {
     const [saving, setSaving] = useState(false);
     const [returningAfterSave, setReturningAfterSave] = useState(false);
     const [discarding, setDiscarding] = useState(false);
-    const [discardOpen, setDiscardOpen] = useState(false);
     const [faithOffset, setFaithOffset] = useState<number | null>(null);
 
     const hobbiesDirty = !sameIds(hobbies, initialHobbies);
     const faithDirty = !sameIds(faith, initialFaith);
     const dirty = hobbiesDirty || faithDirty;
+    const leaveHobbiesFaith = useCallback(() => {
+        router.replace(returnHref as any);
+    }, [returnHref]);
+    const unsavedNavigation = useUnsavedNavigationGuard({
+        dirty,
+        leaveFallback: leaveHobbiesFaith,
+        redirectRemovalToFallback: true,
+    });
+
+    useFocusEffect(
+        useCallback(() => {
+            const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+                unsavedNavigation.requestClose();
+                return true;
+            });
+            return () => subscription.remove();
+        }, [unsavedNavigation.requestClose]),
+    );
 
     const loadOptions = useCallback(async (kind: SectionKind) => {
         const isHobbies = kind === 'hobbies';
@@ -215,23 +233,14 @@ export default function HobbiesFaithScreen() {
         }
     };
 
-    const leave = useCallback(() => {
-        if (router.canGoBack()) {
-            router.back();
-            return;
-        }
-        router.replace(returnHref as any);
-    }, [returnHref]);
-
     const saveAndReturn = async () => {
         const saved = await save();
         if (!saved) return;
         setReturningAfterSave(true);
         requestAnimationFrame(() => {
-            leave();
+            unsavedNavigation.leave();
             setTimeout(() => {
                 setReturningAfterSave(false);
-                setDiscardOpen(false);
             }, 500);
         });
     };
@@ -242,31 +251,12 @@ export default function HobbiesFaithScreen() {
         requestAnimationFrame(() => {
             setHobbies([...initialHobbies]);
             setFaith([...initialFaith]);
-            leave();
+            unsavedNavigation.leave();
             setTimeout(() => {
                 setDiscarding(false);
-                setDiscardOpen(false);
             }, 500);
         });
-    }, [discarding, initialFaith, initialHobbies, leave]);
-
-    const close = useCallback(() => {
-        if (dirty) {
-            setDiscardOpen(true);
-            return;
-        }
-        leave();
-    }, [dirty, leave]);
-
-    useFocusEffect(
-        useCallback(() => {
-            const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-                close();
-                return true;
-            });
-            return () => subscription.remove();
-        }, [close]),
-    );
+    }, [discarding, initialFaith, initialHobbies, unsavedNavigation]);
 
     const renderSection = (
         kind: SectionKind,
@@ -316,7 +306,7 @@ export default function HobbiesFaithScreen() {
                                     {
                                         backgroundColor: active
                                             ? colors.chrome.common.primaryTint
-                                            : colors.chrome.common.card,
+                                            : colors.chrome.common.subtleSurface,
                                     },
                                 ]}
                             >
@@ -330,7 +320,7 @@ export default function HobbiesFaithScreen() {
                                         pressed
                                             ? {
                                                 backgroundColor: active
-                                                    ? colors.chrome.common.card
+                                                    ? colors.chrome.common.subtleSurface
                                                     : colors.chrome.common.primaryTint,
                                                 opacity: 0.82,
                                                 transform: [{ scale: 0.98 }],
@@ -366,7 +356,7 @@ export default function HobbiesFaithScreen() {
             <AppBackTitleBar
                 title={t('hobbies_and_faith', 'Hobbies & Faith')}
                 fallbackHref={returnHref}
-                onBack={close}
+                onBack={unsavedNavigation.requestClose}
             />
             <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.content}>
                 {renderSection(
@@ -403,9 +393,9 @@ export default function HobbiesFaithScreen() {
                 />
             </SafeAreaView>
             <ConfirmSheet
-                visible={discardOpen}
+                visible={unsavedNavigation.confirmationVisible}
                 onClose={() => {
-                    if (!saving && !returningAfterSave && !discarding) setDiscardOpen(false);
+                    if (!saving && !returningAfterSave && !discarding) unsavedNavigation.stay();
                 }}
                 onCancel={discardAndReturn}
                 onConfirm={() => void saveAndReturn()}
