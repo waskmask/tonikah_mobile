@@ -1,14 +1,16 @@
 import { Stack } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function ProfileSetupLayout() {
     const { isDark } = useTheme();
+    const { isRTL } = useLanguage();
 
     return (
         <Stack
             screenOptions={{
                 headerShown: false,
-                animation: 'slide_from_right',
+                animation: isRTL ? 'slide_from_left' : 'slide_from_right',
                 contentStyle: {
                     backgroundColor: isDark ? '#101011' : '#FFFFFF',
                 },

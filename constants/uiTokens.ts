@@ -54,7 +54,7 @@ export const HeaderTokens = {
 } as const;
 
 export const NavigationTypeTokens = {
-    tabLabel: { fontSize: 10, lineHeight: 13 },
+    tabLabel: { fontSize: 10, selectedFontSize: 11, lineHeight: 13 },
     compactTabLabel: { fontSize: 10, lineHeight: 13 },
     topBarTitle: { fontSize: 17, lineHeight: 22 },
     drawerTitle: { fontSize: 14, lineHeight: 18 },

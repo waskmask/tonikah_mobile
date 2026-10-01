@@ -7,8 +7,7 @@ interface MosqueProps {
     strokeWidth?: number;
 }
 
-/** Mosque — lucide has no such icon, so this is a hand-drawn dome + arch door
-    in the same 24×24 / 2px-stroke style as our lucide set. */
+/** Hand-drawn mosque using the same 24x24 line-icon geometry as the app icon set. */
 export function Mosque({ size = 24, color = 'currentColor', strokeWidth = 2 }: MosqueProps) {
     return (
         <Svg

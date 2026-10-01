@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
     StyleSheet,
     View,
@@ -6,42 +6,20 @@ import {
     type StyleProp,
     type ViewStyle,
 } from 'react-native';
-import Reanimated, { interpolate, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { useKeyboardContext } from 'react-native-keyboard-controller';
+import Reanimated, { interpolate, useAnimatedStyle } from 'react-native-reanimated';
+import { KeyboardAvoidingView, useKeyboardContext } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { scale } from '@/hooks/useResponsive';
 
 /**
- * Wraps the message list + composer. Adds bottom padding equal to the keyboard
- * height so the inner area reflows (list shrinks, composer rides on the keyboard).
- * Pair with Android ADJUST_NOTHING so the OS doesn't also resize the window.
- *
- * A JS visibility gate forces padding back to 0 whenever the keyboard is reported
- * hidden — this prevents the composer getting stuck mid-screen if a native image
- * picker / modal swallows the keyboard-close animation event.
+ * The header stays outside this view; only the message list and composer
+ * resize as the keyboard moves on either platform.
  */
 export function ChatKeyboardAvoider({ children }: { children: React.ReactNode }) {
-    const { reanimated } = useKeyboardContext();
-    const { visible } = useKeyboardHeight();
-    const gate = useSharedValue(0);
-
-    useEffect(() => {
-        gate.value = visible ? 1 : 0;
-    }, [visible, gate]);
-
-    // Slide the whole [list + composer] block up as one piece using a transform
-    // (GPU-composited, no per-frame layout) instead of animating paddingBottom,
-    // which re-laid out the FlatList every frame and caused the keyboard jank.
-    // reanimated.height is negative while the keyboard is open.
-    const liftStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: Math.min(0, reanimated.height.value) * gate.value }],
-    }));
-
     return (
-        <Reanimated.View style={[styles.flex, liftStyle]} collapsable={false}>
+        <KeyboardAvoidingView behavior="height" automaticOffset style={styles.flex}>
             {children}
-        </Reanimated.View>
+        </KeyboardAvoidingView>
     );
 }
 

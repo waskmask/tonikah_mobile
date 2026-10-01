@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetBackdropProps,
+    BottomSheetTextInput,
     BottomSheetView,
     useBottomSheetTimingConfigs,
 } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { X } from 'lucide-react-native';
+import { X } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
 import { GradientButton } from './GradientButton';
@@ -91,6 +92,9 @@ export function IncomeEditSheet({
                     animationConfigs={animationConfigs}
                     enablePanDownToClose={!saving}
                     enableDynamicSizing={false}
+                    keyboardBehavior="interactive"
+                    keyboardBlurBehavior="restore"
+                    android_keyboardInputMode="adjustResize"
                     onClose={onClose}
                     backdropComponent={renderBackdrop}
                     backgroundStyle={{ backgroundColor: palette.chrome.common.card }}
@@ -101,8 +105,15 @@ export function IncomeEditSheet({
                             <Text variant="body-sm" className="font-body-bold" style={styles.title}>
                                 {title}
                             </Text>
-                            <Pressable onPress={onClose} hitSlop={12} disabled={saving}>
-                                <X size={scale(20)} color={palette.brand.text.subtitle} />
+                            <Pressable
+                                onPress={onClose}
+                                hitSlop={12}
+                                disabled={saving}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('close', 'Close')}
+                                accessibilityState={{ disabled: saving }}
+                            >
+                                <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                             </Pressable>
                         </View>
 
@@ -119,7 +130,8 @@ export function IncomeEditSheet({
                                             onPress={() => setCurrency(code)}
                                             disabled={saving}
                                             accessibilityRole="button"
-                                            accessibilityState={{ selected: active }}
+                                            accessibilityLabel={code}
+                                            accessibilityState={{ selected: active, disabled: saving }}
                                             style={[
                                                 styles.chip,
                                                 active
@@ -146,7 +158,8 @@ export function IncomeEditSheet({
                             >
                                 {t('amount', 'Amount')}
                             </Text>
-                            <TextInput
+                            <BottomSheetTextInput
+                                accessibilityLabel={t('amount', 'Amount')}
                                 value={amount}
                                 onChangeText={(value) => setAmount(formatAmount(value))}
                                 placeholder={t('amount', 'Amount')}
@@ -163,7 +176,12 @@ export function IncomeEditSheet({
                                 ]}
                             />
                             {errorText ? (
-                                <Text variant="caption" style={{ color: palette.brand.accent.error, marginTop: scale(4) }}>
+                                <Text
+                                    variant="caption"
+                                    accessibilityRole="alert"
+                                    accessibilityLiveRegion="assertive"
+                                    style={{ color: palette.brand.accent.error, marginTop: scale(4) }}
+                                >
                                     {errorText}
                                 </Text>
                             ) : null}
@@ -176,8 +194,7 @@ export function IncomeEditSheet({
                                 loading={saving}
                                 disabled={!dirty || saving}
                                 widthMode="full"
-                                height={40}
-                                textSize={14}
+                                size="compact"
                             />
                         </View>
                     </BottomSheetView>

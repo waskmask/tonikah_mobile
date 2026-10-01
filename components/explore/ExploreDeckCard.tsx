@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text as RNText, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Crown, MapPin, ShieldCheck } from 'lucide-react-native';
+import { CrownSimple, GraduationCap, IdentificationBadge, MapPin, SealCheck, Users } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { scale } from '@/hooks/useResponsive';
@@ -21,6 +21,8 @@ import {
 import { t } from '@/lib/profileDisplay';
 import { useLanguage } from '@/hooks/useLanguage';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+
+const PREVIEW_TOP_BADGES = __DEV__;
 
 export function ExploreDeckCard({
     profile,
@@ -46,25 +48,40 @@ export function ExploreDeckCard({
     const tags = profileTags(profile);
 
     return (
-        <PressableScale onPress={onPress} activeScale={0.985} containerStyle={{ flex: 1 }} style={styles.card}>
-            <Image source={image ? { uri: image } : PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <PressableScale
+            onPress={onPress}
+            activeScale={0.985}
+            containerStyle={{ flex: 1 }}
+            style={styles.card}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('view_profile', 'View profile')}: ${name}${age ? `, ${age}` : ''}`}
+            accessibilityHint={t('opens_profile', 'Opens this profile')}
+        >
+            <Image
+                source={image ? { uri: image } : PROFILE_PLACEHOLDER_IMAGE}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={120}
+            />
             <LinearGradient
                 colors={['rgba(5,8,15,0.14)', 'rgba(5,8,15,0.0)', 'rgba(5,8,15,0.45)', 'rgba(5,8,15,0.96)']}
                 locations={[0, 0.42, 0.72, 1]}
                 style={StyleSheet.absoluteFill}
             />
-            <View style={styles.badges}>
-                {verified ? (
-                    <View style={styles.topBadge}>
-                        <ShieldCheck size={scale(18)} color="#FFFFFF" fill="#3D63F3" />
+            {membership || PREVIEW_TOP_BADGES ? (
+                <View style={[styles.topBadge, styles.membershipBadge]}>
+                    <CrownSimple size={scale(22)} color="#201B15" weight="fill" />
+                </View>
+            ) : null}
+            {verified || PREVIEW_TOP_BADGES ? (
+                <View style={[styles.topBadge, styles.verifiedBadge]}>
+                    <View style={styles.layeredBadgeIcon}>
+                        <SealCheck size={scale(24)} color="#F34B6F" weight="fill" style={styles.layeredBadgeFill} />
+                        <SealCheck size={scale(26)} color="#FFFFFF" weight="light" style={styles.layeredBadgeOutline} />
                     </View>
-                ) : null}
-                {membership ? (
-                    <View style={styles.topBadge}>
-                        <Crown size={scale(18)} color="#FFFFFF" fill="#F34B6F" />
-                    </View>
-                ) : null}
-            </View>
+                </View>
+            ) : null}
             <View style={[styles.info, { alignItems: 'flex-start' }]}>
                 {profile?.recently_active ? (
                     <View style={[styles.activeChip, { flexDirection: 'row' }]}>
@@ -92,9 +109,12 @@ export function ExploreDeckCard({
                 ) : null}
                 {tags.length > 0 ? (
                     <View style={[styles.tags, { flexDirection: 'row' }]}>
-                        {tags.map((tag, index) => (
-                            <View key={`${index}-${tag}`} style={styles.tag}>
-                                <Text variant="caption" className="font-body-semi" numberOfLines={1} style={styles.tagText}>{tag}</Text>
+                        {tags.map((tag) => (
+                            <View key={tag.id} style={styles.tag}>
+                                {tag.id === 'designation' ? <IdentificationBadge size={scale(14)} color="#FFFFFF" /> : null}
+                                {tag.id === 'education' ? <GraduationCap size={scale(14)} color="#FFFFFF" /> : null}
+                                {tag.id === 'ethnic_group' ? <Users size={scale(14)} color="#FFFFFF" /> : null}
+                                <Text variant="caption" className="font-body-semi" numberOfLines={1} style={styles.tagText}>{tag.label}</Text>
                             </View>
                         ))}
                     </View>
@@ -112,21 +132,36 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         backgroundColor: '#0A0A0A',
     },
-    badges: {
-        position: 'absolute',
-        right: scale(14),
-        top: scale(84),
-        gap: scale(8),
-    },
     topBadge: {
+        position: 'absolute',
+        top: scale(14),
         width: scale(34),
         height: scale(34),
         borderRadius: scale(17),
-        backgroundColor: 'rgba(0,0,0,0.48)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.25)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    membershipBadge: {
+        left: scale(14),
+        backgroundColor: '#F1CA71',
+    },
+    verifiedBadge: {
+        right: scale(14),
+        backgroundColor: 'transparent',
+    },
+    layeredBadgeIcon: {
+        width: scale(26),
+        height: scale(26),
+    },
+    layeredBadgeFill: {
+        position: 'absolute',
+        top: scale(1),
+        left: scale(1),
+    },
+    layeredBadgeOutline: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
     },
     info: {
         position: 'absolute',
@@ -177,6 +212,9 @@ const styles = StyleSheet.create({
     },
     tag: {
         maxWidth: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.18)',
         borderRadius: scale(999),
@@ -188,6 +226,7 @@ const styles = StyleSheet.create({
     // Android bakes extra ascent into the glyph box (includeFontPadding),
     // which reads as the text sitting low inside the pill
     tagText: {
+        flexShrink: 1,
         color: '#FFFFFF',
         includeFontPadding: false,
         lineHeight: scale(14),

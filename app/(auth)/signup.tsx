@@ -10,7 +10,7 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { AuthTopBar } from '@/components/auth/AuthTopBar';
 import { PressableScale } from '@/components/ui/PressableScale';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeSlash } from 'phosphor-react-native';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -327,11 +327,17 @@ export default function SignupScreen() {
                                         <Input
                                             placeholder={t('password')}
                                             rightIcon={
-                                                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
+                                                <Pressable
+                                                    onPress={() => setShowPassword(!showPassword)}
+                                                    hitSlop={10}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={showPassword ? t('hide_password', 'Hide password') : t('show_password', 'Show password')}
+                                                    accessibilityState={{ selected: showPassword }}
+                                                >
                                                     {showPassword ? (
-                                                        <EyeOff size={scale(20)} color={iconMuted} />
+                                                        <EyeSlash size={scale(20)} color={iconMuted} weight="regular" />
                                                     ) : (
-                                                        <Eye size={scale(20)} color={iconMuted} />
+                                                        <Eye size={scale(20)} color={iconMuted} weight="regular" />
                                                     )}
                                                 </Pressable>
                                             }
@@ -339,7 +345,7 @@ export default function SignupScreen() {
                                             autoComplete="password"
                                             textContentType="newPassword"
                                             value={value}
-                                            onChangeText={onChange}
+                                            onChangeText={(text) => onChange(text.replace(/\s+/g, ''))}
                                             onBlur={onBlur}
                                             error={errors.password?.message ? t(errors.password.message as any) : undefined}
                                         />
@@ -356,11 +362,17 @@ export default function SignupScreen() {
                                         <Input
                                             placeholder={t('confirm_password')}
                                             rightIcon={
-                                                <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={10}>
+                                                <Pressable
+                                                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                    hitSlop={10}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={showConfirmPassword ? t('hide_password', 'Hide password') : t('show_password', 'Show password')}
+                                                    accessibilityState={{ selected: showConfirmPassword }}
+                                                >
                                                     {showConfirmPassword ? (
-                                                        <EyeOff size={scale(20)} color={iconMuted} />
+                                                        <EyeSlash size={scale(20)} color={iconMuted} weight="regular" />
                                                     ) : (
-                                                        <Eye size={scale(20)} color={iconMuted} />
+                                                        <Eye size={scale(20)} color={iconMuted} weight="regular" />
                                                     )}
                                                 </Pressable>
                                             }
@@ -368,7 +380,7 @@ export default function SignupScreen() {
                                             autoComplete="password"
                                             textContentType="password"
                                             value={value}
-                                            onChangeText={onChange}
+                                            onChangeText={(text) => onChange(text.replace(/\s+/g, ''))}
                                             onBlur={onBlur}
                                             error={errors.confirmPassword?.message ? t(errors.confirmPassword.message as any) : undefined}
                                         />
@@ -415,8 +427,7 @@ export default function SignupScreen() {
                                     loading={isSubmitting}
                                     disabled={isSubmitting}
                                     widthMode="full"
-                                    height={40}
-                                    textSize={15}
+                                    size="compact"
                                 />
                             </View>
                         </Animated.View>
@@ -472,8 +483,7 @@ export default function SignupScreen() {
                                         onPress={confirmConsent}
                                         disabled={!modalAgreed}
                                         widthMode="full"
-                                        height={40}
-                                        textSize={15}
+                                        size="compact"
                                     />
                                 </View>
 

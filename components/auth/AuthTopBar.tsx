@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text as RNText } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CaretLeft, CaretRight } from 'phosphor-react-native';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { LanguagePicker } from '@/components/ui/LanguagePicker';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -19,7 +19,7 @@ export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
     // Explicit colors, no theme classes — must be visible in both modes
     const linkColor = isDark ? '#F5F5F5' : '#1B1713';
     const linkFont = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.bold;
-    const Arrow = isRTL ? ChevronRight : ChevronLeft;
+    const Arrow = isRTL ? CaretRight : CaretLeft;
 
     return (
         <View style={styles.bar}>
@@ -32,7 +32,7 @@ export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
                     activeScale={0.95}
                     style={styles.leftAction}
                 >
-                    <Arrow size={scale(23)} color={linkColor} />
+                    <Arrow size={scale(23)} color={linkColor} weight="bold" />
                     <RNText
                         style={{
                             color: linkColor,

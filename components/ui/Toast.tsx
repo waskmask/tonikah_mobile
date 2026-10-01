@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from './Text';
-import { AlertCircle, CheckCircle2, AlertTriangle, Info, Lock, Unlock, X } from 'lucide-react-native';
+import { CheckCircle, Info, Lock, LockOpen, Warning, WarningCircle, X } from 'phosphor-react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -29,15 +29,15 @@ export interface ToastProps {
 }
 
 const TOAST_ICONS = {
-    success: CheckCircle2,
-    error: AlertCircle,
-    warning: AlertTriangle,
+    success: CheckCircle,
+    error: WarningCircle,
+    warning: Warning,
     info: Info,
 };
 
 const CUSTOM_TOAST_ICONS = {
     lock: Lock,
-    unlock: Unlock,
+    unlock: LockOpen,
 };
 
 export function Toast({ visible, message, type = 'info', onDismiss, duration = 4000, icon }: ToastProps) {
@@ -99,7 +99,10 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                         {
                             minHeight: scale(60),
                             backgroundColor: toastStyle.bg,
+                            borderLeftWidth: isRTL ? 0 : scale(4),
+                            borderRightWidth: isRTL ? scale(4) : 0,
                             borderLeftColor: toastStyle.border,
+                            borderRightColor: toastStyle.border,
                         },
                     ]}
                 >
@@ -124,7 +127,7 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                         hitSlop={10}
                         style={styles.dismiss}
                     >
-                        <X size={scale(20)} color={toastStyle.icon} />
+                        <X size={scale(20)} color={toastStyle.icon} weight="bold" />
                     </Pressable>
                 </View>
             </Pressable>
@@ -153,7 +156,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: scale(16),
         borderRadius: scale(12),
-        borderLeftWidth: scale(4),
     },
     dismiss: {
         padding: scale(4),

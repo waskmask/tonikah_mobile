@@ -27,7 +27,7 @@ import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
 import { DateWheelSheet } from '@/components/ui/DateWheelSheet';
 import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
-import { VenusAndMars, CalendarDays, Flag, Footprints, User } from 'lucide-react-native';
+import { VenusAndMars, CalendarDays, Flag, Footprints, User } from '@/components/ui/icons/PhosphorCompat';
 import { COUNTRY_OPTIONS, NATIONALITY_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';

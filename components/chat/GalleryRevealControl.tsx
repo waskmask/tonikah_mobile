@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { Camera, Lock, X } from 'lucide-react-native';
+import { Camera, Lock, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';

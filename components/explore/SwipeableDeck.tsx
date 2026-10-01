@@ -1,7 +1,8 @@
-import React, { forwardRef, useImperativeHandle, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+    cancelAnimation,
     Extrapolation,
     interpolate,
     runOnJS,
@@ -10,8 +11,9 @@ import Animated, {
     withSpring,
     withTiming,
 } from 'react-native-reanimated';
-import { ChevronUp, X } from 'lucide-react-native';
+import { ArrowFatUp } from 'phosphor-react-native';
 import { ExploreDeckCard } from './ExploreDeckCard';
+import { ExploreSharpX } from './ExploreActionBar';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -22,6 +24,8 @@ export type SwipeDirection = 'left' | 'right';
 export type SwipeableDeckHandle = {
     /** Fly the top card off screen (same animation as a finger swipe). */
     swipe: (direction: SwipeDirection) => void;
+    /** Place the restored card off screen before React adds it back to the deck. */
+    prepareRestore: (direction: SwipeDirection) => void;
 };
 
 type Props = {
@@ -41,8 +45,25 @@ const FLING_VELOCITY = 900;
 const VERTICAL_OPEN_THRESHOLD = 36;
 const VERTICAL_FLING_VELOCITY = 650;
 const FLY_X = SCREEN_WIDTH * 1.4;
-const FLY_DURATION = 280;
-const SPRING = { damping: 18, stiffness: 220 };
+const RESTORE_X = SCREEN_WIDTH * 1.05;
+const FLY_DURATION = 235;
+const MAX_ROTATION_DEG = 10;
+const RETURN_SPRING = {
+    damping: 30,
+    stiffness: 320,
+    mass: 0.9,
+    overshootClamping: true,
+    restDisplacementThreshold: 0.5,
+    restSpeedThreshold: 5,
+};
+const RESTORE_SPRING = {
+    damping: 30,
+    stiffness: 260,
+    mass: 0.9,
+    overshootClamping: true,
+    restDisplacementThreshold: 0.5,
+    restSpeedThreshold: 5,
+};
 
 // Gesture-left skips and gesture-right opens the profile. Programmatic right
 // remains the Save button's exit animation.
@@ -54,7 +75,12 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
     const reduceMotion = useReducedMotion();
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
+    const deckHeight = useSharedValue(1);
+    const rotationMultiplier = useSharedValue(1);
+    const gestureAxis = useSharedValue<0 | 1 | 2>(0);
     const [animating, setAnimating] = useState(false);
+    const animatingRef = useRef(false);
+    const restoreDirectionRef = useRef<SwipeDirection | null>(null);
 
     const current = profiles[0] || null;
     const next = profiles[1] || null;
@@ -65,67 +91,128 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
         // top card mounts centered.
         translateX.value = 0;
         translateY.value = 0;
+        rotationMultiplier.value = 1;
+        animatingRef.current = false;
         setAnimating(false);
         onSwiped(direction);
     };
 
-    const flyOff = (direction: SwipeDirection) => {
+    const flyOff = (direction: SwipeDirection, velocityX = 0, velocityY = 0) => {
         if (reduceMotion) {
             finishSwipe(direction);
             return;
         }
+        animatingRef.current = true;
         setAnimating(true);
+        const speed = Math.abs(velocityX);
+        const duration = speed > 0
+            ? Math.max(175, Math.min(FLY_DURATION, Math.round((SCREEN_WIDTH / speed) * 1000)))
+            : FLY_DURATION;
+        const projectedY = Math.max(-scale(120), Math.min(scale(120), translateY.value + velocityY * 0.08));
+        translateY.value = withTiming(projectedY, { duration });
         translateX.value = withTiming(
             direction === 'right' ? FLY_X : -FLY_X,
-            { duration: FLY_DURATION },
+            { duration },
             (finished) => {
                 if (finished) runOnJS(finishSwipe)(direction);
             },
         );
     };
 
-    const releaseSwipe = (direction: SwipeDirection) => {
+    const releaseSwipe = (direction: SwipeDirection, velocityX: number, velocityY: number) => {
         if (!canSwipe(direction)) {
-            translateX.value = withSpring(0, SPRING);
-            translateY.value = withSpring(0, SPRING);
+            translateX.value = withSpring(0, RETURN_SPRING);
+            translateY.value = withSpring(0, RETURN_SPRING);
             return;
         }
-        flyOff(direction);
+        flyOff(direction, velocityX, velocityY);
     };
+
+    const finishRestore = () => {
+        animatingRef.current = false;
+        setAnimating(false);
+    };
+
+    useEffect(() => {
+        const direction = restoreDirectionRef.current;
+        if (!direction) return;
+        restoreDirectionRef.current = null;
+        if (reduceMotion) {
+            translateX.value = 0;
+            translateY.value = 0;
+            finishRestore();
+            return;
+        }
+        translateY.value = withSpring(0, RESTORE_SPRING);
+        translateX.value = withSpring(0, RESTORE_SPRING, (finished) => {
+            if (finished) runOnJS(finishRestore)();
+        });
+        // The profile key is the signal that React has mounted the restored card.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentKey]);
 
     useImperativeHandle(ref, () => ({
         swipe: (direction: SwipeDirection) => {
-            if (animating || !current) return;
+            if (animatingRef.current || !current) return;
             flyOff(direction);
+        },
+        prepareRestore: (direction: SwipeDirection) => {
+            if (animatingRef.current) return;
+            restoreDirectionRef.current = direction;
+            animatingRef.current = true;
+            setAnimating(true);
+            rotationMultiplier.value = 1;
+            translateY.value = 0;
+            translateX.value = direction === 'right' ? RESTORE_X : -RESTORE_X;
         },
     }));
 
     const pan = Gesture.Pan()
         .enabled(!animating && Boolean(current))
         .minDistance(8)
+        .onBegin((event) => {
+            cancelAnimation(translateX);
+            cancelAnimation(translateY);
+            gestureAxis.value = 0;
+            rotationMultiplier.value = event.y <= deckHeight.value / 2 ? 1 : -1;
+        })
         .onUpdate((event) => {
-            const horizontal = Math.abs(event.translationX) >= Math.abs(event.translationY);
-            translateX.value = horizontal
-                ? event.translationX
-                : interpolate(
+            const absX = Math.abs(event.translationX);
+            const absY = Math.abs(event.translationY);
+            if (gestureAxis.value === 0 && absX + absY >= 8) {
+                gestureAxis.value = absX >= absY * 1.08 ? 1 : 2;
+            }
+
+            if (gestureAxis.value === 1) {
+                translateX.value = event.translationX;
+                translateY.value = interpolate(
+                    event.translationY,
+                    [-180, 0, 180],
+                    [-14, 0, 14],
+                    Extrapolation.CLAMP,
+                );
+            } else {
+                translateX.value = interpolate(
                     event.translationX,
                     [-80, 0, 80],
                     [-4, 0, 4],
                     Extrapolation.CLAMP,
                 );
-            translateY.value = interpolate(
-                event.translationY,
-                [-160, 0, 160],
-                [-12, 0, 12],
-                Extrapolation.CLAMP,
-            );
+                translateY.value = interpolate(
+                    event.translationY,
+                    [-160, 0, 160],
+                    [-12, 0, 12],
+                    Extrapolation.CLAMP,
+                );
+            }
         })
         .onEnd((event) => {
-            const horizontal = Math.abs(event.translationX) >= Math.abs(event.translationY);
+            const horizontal = gestureAxis.value === 1;
+            gestureAxis.value = 0;
 
             if (!horizontal) {
-                translateX.value = withSpring(0, SPRING);
-                translateY.value = withSpring(0, SPRING);
+                translateX.value = withSpring(0, RETURN_SPRING);
+                translateY.value = withSpring(0, RETURN_SPRING);
                 const openFromScroll =
                     event.translationY < -VERTICAL_OPEN_THRESHOLD
                     || event.velocityY < -VERTICAL_FLING_VELOCITY;
@@ -133,26 +220,35 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
                 return;
             }
 
+            const projectedX = event.translationX + event.velocityX * 0.16;
             const byDistance = Math.abs(event.translationX) > SWIPE_THRESHOLD;
-            const byVelocity = Math.abs(event.velocityX) > FLING_VELOCITY;
+            const byVelocity = Math.abs(event.translationX) > scale(24)
+                && Math.abs(event.velocityX) > FLING_VELOCITY
+                && Math.abs(projectedX) > SWIPE_THRESHOLD;
             if (!byDistance && !byVelocity) {
-                translateX.value = withSpring(0, SPRING);
-                translateY.value = withSpring(0, SPRING);
+                translateX.value = withSpring(0, RETURN_SPRING);
+                translateY.value = withSpring(0, RETURN_SPRING);
                 return;
             }
 
             const direction: SwipeDirection = byDistance
                 ? (event.translationX > 0 ? 'right' : 'left')
-                : (event.velocityX > 0 ? 'right' : 'left');
+                : (projectedX > 0 ? 'right' : 'left');
 
             if (direction === 'right') {
-                translateX.value = withSpring(0, SPRING);
-                translateY.value = withSpring(0, SPRING);
+                translateX.value = withSpring(0, RETURN_SPRING);
+                translateY.value = withSpring(0, RETURN_SPRING);
                 runOnJS(onPressCard)();
                 return;
             }
 
-            runOnJS(releaseSwipe)('left');
+            runOnJS(releaseSwipe)('left', event.velocityX, event.velocityY);
+        })
+        .onFinalize((_event, success) => {
+            if (success) return;
+            gestureAxis.value = 0;
+            translateX.value = withSpring(0, RETURN_SPRING);
+            translateY.value = withSpring(0, RETURN_SPRING);
         });
 
     const topCardStyle = useAnimatedStyle(() => ({
@@ -161,9 +257,9 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
             { translateY: translateY.value },
             {
                 rotate: `${interpolate(
-                    translateX.value,
+                    translateX.value * rotationMultiplier.value,
                     [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-                    [-6, 0, 6],
+                    [-MAX_ROTATION_DEG, 0, MAX_ROTATION_DEG],
                 )}deg`,
             },
         ],
@@ -188,7 +284,12 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
     if (!current) return null;
 
     return (
-        <View style={styles.root}>
+        <View
+            style={styles.root}
+            onLayout={(event) => {
+                deckHeight.value = event.nativeEvent.layout.height;
+            }}
+        >
             {next ? (
                 <Animated.View style={[StyleSheet.absoluteFill, nextCardStyle]} pointerEvents="none">
                     <ExploreDeckCard
@@ -211,13 +312,13 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
                         pointerEvents="none"
                         style={[styles.swipeBadge, styles.viewBadge, { borderColor: colors.chrome.primary }, viewBadgeStyle]}
                     >
-                        <ChevronUp size={scale(36)} color={colors.chrome.primary} strokeWidth={3} />
+                        <ArrowFatUp size={scale(36)} color={colors.chrome.primary} weight="fill" />
                     </Animated.View>
                     <Animated.View
                         pointerEvents="none"
                         style={[styles.swipeBadge, styles.skipBadge, { borderColor: colors.chrome.common.iconNeutral }, skipBadgeStyle]}
                     >
-                        <X size={scale(34)} color={colors.chrome.common.iconNeutral} strokeWidth={3} />
+                        <ExploreSharpX size={34} color={colors.chrome.common.iconNeutral} />
                     </Animated.View>
                 </Animated.View>
             </GestureDetector>

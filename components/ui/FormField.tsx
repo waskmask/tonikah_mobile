@@ -5,6 +5,7 @@ import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
 import { Typography } from '@/constants/typography';
+import { t } from '@/lib/profileDisplay';
 
 /** Field label with optional red asterisk */
 export function FieldLabel({ text, required }: { text: string; required?: boolean }) {
@@ -25,6 +26,8 @@ export function ErrorText({ text }: { text: string }) {
         <View style={{ height: 0, zIndex: 1 }} pointerEvents="none">
             <Text
                 variant="caption"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
                 numberOfLines={1}
                 style={{
                     position: 'absolute',
@@ -69,6 +72,9 @@ export function SelectField({
 
     return (
         <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${placeholder}: ${value || t('not_set', 'Not set')}`}
+            accessibilityHint={t('opens_selection_options', 'Opens selection options')}
             // Blur any focused TextInput and wait for the keyboard to actually
             // hide before opening: otherwise Android sizes the modal window to
             // the keyboard-shrunken screen and the sheet floats mid-air. Also

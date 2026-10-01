@@ -1,7 +1,7 @@
 import { Stack, router, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
-import { AppState, View, LogBox, StatusBar } from "react-native";
+import { AppState, View, LogBox, Platform, StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -23,11 +23,10 @@ configureReanimatedLogger({
 // Suppress expected warnings from dependencies that aren't actionable
 LogBox.ignoreLogs([
     '[GoogleSignIn] Native module',
-    'i18next is maintained with support from Locize',
     'RTL change manual reload required',
     '[RN-IAP] Failed to initialize IAP connection',
 ]);
-import { useFonts } from "expo-font";
+import { getLoadedFonts, useFonts } from "expo-font";
 import {
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -53,7 +52,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useProfileSetupStore } from "@/store/profileSetupStore";
 import { ToastProvider } from "@/hooks/useToast";
 import { useToast } from "@/hooks/useToast";
-import { addPushNotificationListeners } from "@/lib/pushNotifications";
+import { addPushNotificationListeners, registerForPushNotifications } from "@/lib/pushNotifications";
 import { ThemeSync } from "@/components/app/ThemeSync";
 import { AppLoadingScreen } from "@/components/app/AppLoadingScreen";
 import { GalleryEligibilityListener } from "@/components/app/GalleryEligibilityListener";
@@ -63,24 +62,39 @@ import { ConnectivityMonitor } from "@/components/app/ConnectivityMonitor";
 import { LegalConsentGate } from "@/components/app/LegalConsentGate";
 import { EmailVerificationGate } from "@/components/app/EmailVerificationGate";
 import { firstSearchParam, sanitizeAuthReturnPath } from "@/lib/authReturn";
+import { RootAppMenuDrawer } from "@/components/app/RootAppMenuDrawer";
+import { markStartup } from "@/lib/performanceDiagnostics";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 // Cross-fade the native splash into the app instead of a hard cut
-SplashScreen.setOptions({ fade: true, duration: 400 });
+SplashScreen.setOptions({ fade: true, duration: 120 });
+markStartup('root-module-evaluated');
+
+function StartupNavigatorMarker() {
+    useEffect(() => {
+        markStartup('navigator-committed');
+    }, []);
+    return null;
+}
 
 export default function RootLayout() {
     const { isDark, isReady: isThemeReady } = useTheme();
     const colors = useColors();
     const { isRTL, isReady: isLanguageReady } = useLanguage();
-    const { restoreSession, handleUnauthorized, isRestoringSession, isAuthenticated, user } = useAuthStore();
+    const { restoreSession, refreshUser, handleUnauthorized, isRestoringSession, isAuthenticated, user } = useAuthStore();
     const getIncompleteStep = useProfileSetupStore((state) => state.getIncompleteStep);
     const segments = useSegments();
     const pathname = usePathname();
     const authParams = useGlobalSearchParams<{ returnTo?: string | string[] }>();
     const toast = useToast();
+    const [nonVisualServicesReady, setNonVisualServicesReady] = useState(false);
+    const embeddedFontName = Platform.OS === "ios"
+        ? "PlusJakartaSans-Regular"
+        : "PlusJakartaSans_400Regular";
+    const hasEmbeddedNativeFonts = Platform.OS !== "web" && getLoadedFonts().includes(embeddedFontName);
 
-    const [loaded, error] = useFonts({
+    const [loaded, error] = useFonts(Platform.OS === "web" || !hasEmbeddedNativeFonts ? {
         PlusJakartaSans_400Regular,
         PlusJakartaSans_500Medium,
         PlusJakartaSans_600SemiBold,
@@ -89,7 +103,11 @@ export default function RootLayout() {
         NotoSansArabic_400Regular,
         NotoSansArabic_600SemiBold,
         NotoSansArabic_700Bold,
-    });
+    } : {});
+    const startupReady = (loaded || Boolean(error))
+        && !isRestoringSession
+        && isLanguageReady
+        && isThemeReady;
 
     useEffect(() => {
         return api.setUnauthorizedHandler(async (details) => {
@@ -97,6 +115,8 @@ export default function RootLayout() {
             queryClient.clear();
             if (details?.message === 'account_suspended') {
                 router.replace('/account-suspended');
+            } else {
+                router.replace('/(auth)/login');
             }
         });
     }, [handleUnauthorized]);
@@ -140,9 +160,14 @@ export default function RootLayout() {
     }, [authParams.returnTo, getIncompleteStep, isAuthenticated, isLanguageReady, isRestoringSession, pathname, segments, user?.profile]);
 
     useEffect(() => {
+        const previousState = { current: AppState.currentState };
         focusManager.setFocused(AppState.currentState === 'active');
         const subscription = AppState.addEventListener('change', (state) => {
             focusManager.setFocused(state === 'active');
+            if (state === 'active' && previousState.current !== 'active' && useAuthStore.getState().isAuthenticated) {
+                void useAuthStore.getState().refreshUser();
+            }
+            previousState.current = state;
         });
         return () => subscription.remove();
     }, []);
@@ -158,10 +183,32 @@ export default function RootLayout() {
     }, []);
 
     useEffect(() => {
-        if ((loaded || error) && !isRestoringSession && isLanguageReady && isThemeReady) {
-            SplashScreen.hideAsync();
+        if (loaded || error) markStartup('fonts-ready', { fallback: Boolean(error) });
+        if (isThemeReady) markStartup('theme-ready');
+        if (isLanguageReady) markStartup('language-ready', { rtl: isRTL });
+        if (!isRestoringSession) markStartup('auth-ready', { authenticated: isAuthenticated });
+    }, [error, isAuthenticated, isLanguageReady, isRestoringSession, isRTL, isThemeReady, loaded]);
+
+    useEffect(() => {
+        if (!startupReady) return;
+        markStartup('startup-gates-ready');
+        void SplashScreen.hideAsync()
+            .then(() => markStartup('native-splash-hidden'))
+            .catch(() => undefined);
+    }, [startupReady]);
+
+    useEffect(() => {
+        if (!startupReady) {
+            setNonVisualServicesReady(false);
+            return;
         }
-    }, [loaded, error, isLanguageReady, isRestoringSession, isThemeReady]);
+
+        const timeoutId = setTimeout(() => {
+            setNonVisualServicesReady(true);
+            markStartup('deferred-services-started');
+        }, 1000);
+        return () => clearTimeout(timeoutId);
+    }, [startupReady]);
 
     // Language change reloads the app (RTL needs it) and boots at the initial
     // route — restore where the user actually was (e.g. signup, language page).
@@ -192,7 +239,7 @@ export default function RootLayout() {
     }, [loaded, error, isAuthenticated, isLanguageReady, isRestoringSession]);
 
     useEffect(() => {
-        if ((!loaded && !error) || isRestoringSession || !isLanguageReady) return;
+        if (!nonVisualServicesReady) return;
 
         try {
             return addPushNotificationListeners((message) => {
@@ -202,12 +249,21 @@ export default function RootLayout() {
             console.warn('[Layout] Push notification listeners skipped:', error);
             return undefined;
         }
-    }, [toast, loaded, error, isLanguageReady, isRestoringSession]);
+    }, [nonVisualServicesReady, toast]);
+
+    useEffect(() => {
+        if (!nonVisualServicesReady || !isAuthenticated) return;
+        markStartup('background-user-refresh-start');
+        void refreshUser()
+            .catch(() => undefined)
+            .finally(() => markStartup('background-user-refresh-finished'));
+        void registerForPushNotifications().catch(() => undefined);
+    }, [isAuthenticated, nonVisualServicesReady, refreshUser]);
 
     // Hold app rendering until fonts are loaded and secure session is checked.
     // Providers must stay mounted through the loading phase — swapping the whole
     // tree breaks react-native-keyboard-controller's handler registration.
-    const showLoading = (!loaded && !error) || isRestoringSession || !isLanguageReady || !isThemeReady;
+    const showLoading = !startupReady;
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -223,15 +279,16 @@ export default function RootLayout() {
                 backgroundColor={colors.chrome.header.background}
             />
             <QueryClientProvider client={queryClient}>
-                <ConnectivityMonitor />
-                <GalleryEligibilityListener />
+                {nonVisualServicesReady ? <ConnectivityMonitor /> : null}
+                {nonVisualServicesReady ? <GalleryEligibilityListener /> : null}
                 <BottomSheetModalProvider>
                 <LegalConsentGate />
                 <EmailVerificationGate />
+                <RootAppMenuDrawer>
                 <Stack
                     screenOptions={{
                         headerShown: false,
-                        // Pushed detail screens (conversation, user, support) slide and support swipe-back
+                        // Pushed detail screens such as conversations and profiles support swipe-back.
                         animation: isRTL ? "slide_from_left" : "slide_from_right",
                         gestureEnabled: true,
                         fullScreenGestureEnabled: true,
@@ -245,7 +302,7 @@ export default function RootLayout() {
                     <Stack.Screen name="(onboarding)" options={{ animation: "fade", gestureEnabled: false }} />
                     <Stack.Screen name="(auth)" options={{ animation: "fade", gestureEnabled: false }} />
                     <Stack.Screen name="(profile-setup)" options={{ animation: "fade", gestureEnabled: false }} />
-                    <Stack.Screen name="(tabs)" options={{ animation: "fade", gestureEnabled: false }} />
+                    <Stack.Screen name="(tabs)" options={{ animation: "none", gestureEnabled: false }} />
                     <Stack.Screen
                         name="edit-profile"
                         options={{
@@ -255,6 +312,8 @@ export default function RootLayout() {
                         }}
                     />
                 </Stack>
+                <StartupNavigatorMarker />
+                </RootAppMenuDrawer>
                 <ToastProvider />
                 </BottomSheetModalProvider>
             </QueryClientProvider>

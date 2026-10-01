@@ -1,24 +1,22 @@
 const TAB_RETURN_PATHS = new Set([
     'activities',
-    'blocked-users',
-    'edit-profile',
-    'favourited',
-    'language',
-    'memberships',
     'messages',
-    'hobbies-faith',
-    'partner-preference',
     'profile',
     'search',
-    'settings',
 ]);
 
 const ROOT_RETURN_PATHS = new Set([
+    '/blocked-users',
+    '/edit-profile',
+    '/hobbies-faith',
+    '/language',
+    '/memberships',
+    '/partner-preference',
+    '/settings',
     '/settings-account',
     '/settings-notifications',
     '/settings-privacy',
     '/settings-security',
-    '/support',
 ]);
 
 const DYNAMIC_RETURN_PATH = /^\/(conversation|user)\/([a-zA-Z0-9._~-]{1,128})$/;

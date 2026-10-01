@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { AlertCircle, X } from 'lucide-react-native';
+import { AlertCircle, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useColors } from '@/hooks/useColors';

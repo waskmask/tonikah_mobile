@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
-import { WifiOff } from 'lucide-react-native';
+import { WifiOff } from '@/components/ui/icons/PhosphorCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
@@ -11,6 +11,7 @@ import { scale } from '@/hooks/useResponsive';
 import { connectivity } from '@/lib/connectivity';
 import { t } from '@/lib/profileDisplay';
 import { useAuthStore } from '@/store/authStore';
+import { flushOfflineMessageQueue } from '@/lib/offlineMessageQueue';
 
 export function ConnectivityMonitor() {
     const { status, isOffline } = useConnectivity();
@@ -18,6 +19,7 @@ export function ConnectivityMonitor() {
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
     const refreshUser = useAuthStore((state) => state.refreshUser);
+    const userId = useAuthStore((state) => String(state.user?._id || state.user?.id || ''));
     const previousStatusRef = useRef(status);
 
     useEffect(() => {
@@ -37,7 +39,10 @@ export function ConnectivityMonitor() {
             void refreshUser();
             void queryClient.refetchQueries({ type: 'active' });
         }
-    }, [queryClient, refreshUser, status]);
+        if (status === 'online' && previous !== 'online') {
+            void flushOfflineMessageQueue(userId);
+        }
+    }, [queryClient, refreshUser, status, userId]);
 
     useEffect(() => {
         if (!isOffline) return;

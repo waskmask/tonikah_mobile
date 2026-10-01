@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type Vi
 import { Text } from '@/components/ui/Text';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
-import type { LucideIcon } from 'lucide-react-native';
+import type { Icon } from 'phosphor-react-native';
 
 type SmallDarkOutlinedButtonProps = {
     label: string;
@@ -12,7 +12,7 @@ type SmallDarkOutlinedButtonProps = {
     accessibilityLabel?: string;
     disabled?: boolean;
     loading?: boolean;
-    icon?: LucideIcon;
+    icon?: Icon;
     labelWeight?: '500' | '700';
     foregroundColor?: string;
     backgroundColor?: string;
@@ -51,7 +51,7 @@ export function SmallDarkOutlinedButton({
         >
             <View style={[styles.button, { borderColor: borderColor ?? color, backgroundColor }, style]}>
                 <View style={[styles.content, loading && styles.hiddenContent]}>
-                    {Icon ? <Icon size={scale(14)} color={color} strokeWidth={2.2} /> : null}
+                    {Icon ? <Icon size={scale(14)} color={color} weight="bold" /> : null}
                     <Text
                         variant="body-sm"
                         className={labelWeight === '500' ? 'font-body-medium' : 'font-body-bold'}

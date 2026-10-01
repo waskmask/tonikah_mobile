@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import { CreditCard, X } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { CreditCard, X } from '@/components/ui/icons/PhosphorCompat';
+import { router, usePathname } from 'expo-router';
 
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -9,11 +9,13 @@ import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 import type { TrialOffer } from '@/lib/messagingAccess';
+import { sanitizeAuthReturnPath } from '@/lib/authReturn';
 
 type Props = { visible: boolean; trialOffer?: TrialOffer | null; onClose: () => void };
 
 export function MessagingMembershipGate({ visible, trialOffer, onClose }: Props) {
     const colors = useColors();
+    const pathname = usePathname();
     const trialAvailable = trialOffer?.available === true;
     const title = trialAvailable
         ? t('chat:membership_trial_title', 'Start your free trial')
@@ -24,7 +26,8 @@ export function MessagingMembershipGate({ visible, trialOffer, onClose }: Props)
 
     const continueToMembership = () => {
         onClose();
-        router.push({ pathname: '/(tabs)/memberships', params: { returnTo: '/(tabs)/messages', trial: trialOffer?.planSlug || '' } } as any);
+        const returnTo = sanitizeAuthReturnPath(pathname, '/(tabs)/messages');
+        router.push({ pathname: '/memberships', params: { returnTo, trial: trialOffer?.planSlug || '' } } as any);
     };
 
     return (

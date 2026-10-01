@@ -18,7 +18,7 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { LocateFixed, MapPinOff } from 'lucide-react-native';
+import { LocateFixed, MapPinOff } from '@/components/ui/icons/PhosphorCompat';
 
 type LocationRecovery =
     | 'permission_denied'

@@ -1,19 +1,23 @@
-import React, { useCallback } from 'react';
-import { Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import BottomSheet, {
     BottomSheetBackdrop,
     type BottomSheetBackdropProps,
     BottomSheetScrollView,
+    useBottomSheetTimingConfigs,
 } from '@gorhom/bottom-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, ChevronUp, RotateCcw, Settings2, X } from 'lucide-react-native';
+import { ArrowFatUp, ArrowUDownLeft, BookmarkSimple, SlidersHorizontal } from 'phosphor-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Easing } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { scale } from '@/hooks/useResponsive';
+import { useColors } from '@/hooks/useColors';
 import { useTheme } from '@/hooks/useTheme';
 import { t } from '@/lib/profileDisplay';
+import { ExploreSharpX } from '@/components/explore/ExploreActionBar';
 
 export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
     const { isDark } = useTheme();
@@ -21,6 +25,12 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
     const insets = useSafeAreaInsets();
     const surface = isDark ? '#1D1D1F' : '#FFFFFF';
     const border = isDark ? '#303033' : '#EEEEEE';
+    const sheetHeight = Math.min(height * 0.9, scale(520) + insets.bottom);
+    const snapPoints = useMemo(() => [sheetHeight], [sheetHeight]);
+    const animationConfigs = useBottomSheetTimingConfigs({
+        duration: 220,
+        easing: Easing.bezier(0.32, 0.72, 0, 1),
+    });
     const renderBackdrop = useCallback(
         (props: BottomSheetBackdropProps) => (
             <BottomSheetBackdrop
@@ -49,10 +59,11 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
             <GestureHandlerRootView style={styles.fill}>
                 <BottomSheet
                     index={0}
-                    enableDynamicSizing
-                    maxDynamicContentSize={height * 0.95}
+                    snapPoints={snapPoints}
+                    enableDynamicSizing={false}
                     enablePanDownToClose
                     animateOnMount
+                    animationConfigs={animationConfigs}
                     onClose={onClose}
                     backdropComponent={renderBackdrop}
                     backgroundStyle={[styles.sheetBackground, { backgroundColor: surface, borderColor: border }]}
@@ -74,13 +85,13 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
                         </View>
                     </View>
 
-                    <TourRow icon={<Settings2 size={scale(20)} color={isDark ? '#E5E5E7' : '#201B15'} />} title={t('filters', 'Filters')} body={t('show_results', 'Choose age, country, faith and other preferences.')} neutralBackground />
-                    <TourRow icon={<RotateCcw size={scale(20)} color={isDark ? '#F1CA71' : '#141210'} />} title={t('undo', 'Undo')} body={t('tour_undo_text', 'Bring back your last skipped profile.')} />
-                    <TourRow icon={<X size={scale(22)} color="#F34B6F" />} title={t('not_interested', 'Not interested')} body={t('tour_not_interested_text', 'Skip this profile.')} />
-                    <TourRow icon={<ChevronUp size={scale(24)} color="#FFFFFF" />} title={t('view_profile', 'View profile')} body={t('tour_view_profile_text', 'Open full profile details.')} gradient />
-                    <TourRow icon={<Bookmark size={scale(21)} color="#3E9DFF" fill="#3E9DFF" />} title={t('favorite', 'Save')} body={t('tour_favorite_text', 'Save this profile.')} />
+                    <TourRow icon={<SlidersHorizontal size={scale(Platform.OS === 'android' ? 22 : 18)} color={isDark ? '#E5E5E7' : '#201B15'} weight="bold" />} title={t('filters', 'Filters')} body={t('show_results', 'Choose age, country, faith and other preferences.')} />
+                    <TourRow icon={<ArrowUDownLeft size={scale(24)} color={isDark ? '#F4C95D' : '#B7791F'} weight="bold" />} title={t('undo', 'Undo')} body={t('tour_undo_text', 'Bring back your last skipped profile.')} />
+                    <TourRow icon={<ExploreSharpX size={22} color={isDark ? '#FFFFFF' : '#141210'} />} title={t('not_interested', 'Not interested')} body={t('tour_not_interested_text', 'Skip this profile.')} />
+                    <TourRow icon={<ArrowFatUp size={scale(28)} color="#FFFFFF" weight="fill" />} title={t('view_profile', 'View profile')} body={t('tour_view_profile_text', 'Open full profile details.')} gradient />
+                    <TourRow icon={<BookmarkSimple size={scale(22)} color="#3E9DFF" weight="fill" />} title={t('favorite', 'Save')} body={t('tour_favorite_text', 'Save this profile.')} />
 
-                    <GradientButton title={t('tour_done', 'Done')} onPress={onClose} widthMode="full" containerStyle={{ marginTop: scale(12) }} />
+                    <GradientButton title={t('tour_done', 'Done')} onPress={onClose} widthMode="full" size="compact" containerStyle={{ marginTop: scale(12) }} />
                     </BottomSheetScrollView>
                 </BottomSheet>
             </GestureHandlerRootView>
@@ -88,13 +99,15 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
     );
 }
 
-function TourRow({ icon, title, body, gradient = false, neutralBackground = false }: { icon: React.ReactNode; title: string; body: string; gradient?: boolean; neutralBackground?: boolean }) {
+function TourRow({ icon, title, body, gradient = false }: { icon: React.ReactNode; title: string; body: string; gradient?: boolean }) {
     const { isDark } = useTheme();
+    const colors = useColors();
     return (
         <View style={styles.row}>
             {gradient ? (
                 <LinearGradient
-                    colors={['#FF927B', '#F34B6F']}
+                    colors={[colors.brand.gradient.start, colors.brand.gradient.center, colors.brand.gradient.end]}
+                    locations={[0, 0.5, 1]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.iconWrap}
@@ -102,7 +115,7 @@ function TourRow({ icon, title, body, gradient = false, neutralBackground = fals
                     {icon}
                 </LinearGradient>
             ) : (
-                <View style={[styles.iconWrap, { backgroundColor: neutralBackground ? (isDark ? '#29292C' : '#F4F4F4') : (isDark ? '#18181A' : '#FDF0F3') }]}>
+                <View style={[styles.iconWrap, { backgroundColor: isDark ? '#29292C' : '#F4F4F4' }]}>
                     {icon}
                 </View>
             )}

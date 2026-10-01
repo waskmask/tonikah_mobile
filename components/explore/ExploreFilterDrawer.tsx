@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, X } from 'lucide-react-native';
+import { CaretLeft, CaretRight, X } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { MultiSelectSheet, MultiSelectOption } from '@/components/ui/MultiSelectSheet';
@@ -151,7 +151,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={styles.title}>{t('filters', 'Filters')}</Text>
                     </View>
                     <Pressable onPress={onClose} style={styles.closeButton}>
-                        <X size={22} color={colors.chrome.header.icon} />
+                        <X size={22} color={colors.chrome.header.icon} weight="bold" />
                     </Pressable>
                 </View>
 
@@ -218,7 +218,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                 </ScrollView>
 
                 <View style={[styles.footer, { backgroundColor: colors.chrome.header.background, borderTopColor: colors.brand.bg.border }]}>
-                    <GradientButton title={t('apply_filters', 'Apply filters')} onPress={apply} widthMode="full" />
+                    <GradientButton title={t('apply_filters', 'Apply filters')} onPress={apply} widthMode="full" size="compact" />
                 </View>
 
                 {activeSelect ? (
@@ -228,6 +228,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                         onConfirm={(values) => updateSelect(activeSelect, values)}
                         options={activeOptions}
                         selected={draft[activeSelect]}
+                        allowEmptySelection
                         title={t(LABELS[activeSelect], LABELS[activeSelect].replace(/_/g, ' '))}
                         searchEnabled={['country', 'education', 'ethnic_group'].includes(activeSelect)}
                         searchPlaceholder={t('search', 'Search...')}
@@ -316,11 +317,15 @@ function SelectRow({
                         hitSlop={6}
                         style={styles.rowIcon}
                     >
-                        <X size={16} color={primaryColor} />
+                        <X size={16} color={primaryColor} weight="bold" />
                     </Pressable>
                 ) : null}
                 <View style={styles.rowIcon}>
-                    <ChevronLeft size={18} color={mutedColor} style={{ transform: [{ rotate: isRTL ? '0deg' : '180deg' }] }} />
+                    {isRTL ? (
+                        <CaretLeft size={18} color={mutedColor} weight="bold" />
+                    ) : (
+                        <CaretRight size={18} color={mutedColor} weight="bold" />
+                    )}
                 </View>
             </View>
         </Pressable>

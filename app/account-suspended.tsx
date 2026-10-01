@@ -1,6 +1,6 @@
 import { Linking, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { ShieldAlert } from 'lucide-react-native';
+import { ShieldWarning } from 'phosphor-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -32,7 +32,7 @@ export default function AccountSuspendedScreen() {
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.brand.bg.primary }]}>
             <View style={styles.content}>
                 <View style={[styles.iconWrap, { backgroundColor: colors.brand.bg.surface }]}>
-                    <ShieldAlert size={scale(34)} color={colors.brand.gradient.start} strokeWidth={1.8} />
+                    <ShieldWarning size={scale(34)} color={colors.brand.gradient.start} weight="regular" />
                 </View>
                 <Text variant="h2" style={styles.title}>{t('account_suspended_title', 'Account suspended')}</Text>
                 <Text variant="body" style={[styles.description, { color: colors.brand.text.muted }]}>

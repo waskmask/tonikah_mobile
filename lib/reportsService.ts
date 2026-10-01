@@ -1,6 +1,13 @@
 import { api, ApiResponse } from './api';
 
-export type ReportEntityType = 'User' | 'Image';
+export type ReportEntityType = 'User' | 'Image' | 'ChatMessage';
+
+export type ReportScreenshot = {
+    uri: string;
+    name: string;
+    type: 'image/jpeg' | 'image/png' | 'image/webp';
+    size?: number;
+};
 
 export type CreateReportInput = {
     entityType: ReportEntityType;
@@ -14,6 +21,7 @@ export type CreateReportInput = {
     description?: string;
     /** Direct URL of the reported image (Image reports only). */
     imageUrl?: string;
+    screenshots?: ReportScreenshot[];
 };
 
 /** POST /api/reports — same multipart shape the Next.js ReportModal sends. */
@@ -30,6 +38,13 @@ export const reportsService = {
         formData.append('reportVersion', String(input.reportVersion || 2));
         if (input.description?.trim()) formData.append('description', input.description.trim());
         if (input.entityType === 'Image' && input.imageUrl) formData.append('imageUrl', input.imageUrl);
+        for (const screenshot of input.screenshots || []) {
+            formData.append('screenshots', {
+                uri: screenshot.uri,
+                name: screenshot.name,
+                type: screenshot.type,
+            } as any);
+        }
         return api.postFormData('/reports', formData);
     },
 };

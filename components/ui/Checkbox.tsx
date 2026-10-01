@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from './Text';
-import { Check } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Check } from 'phosphor-react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -11,6 +10,7 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import { scale } from '@/hooks/useResponsive';
+import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 
 interface CheckboxProps {
@@ -22,6 +22,7 @@ interface CheckboxProps {
 }
 
 export function Checkbox({ checked, onChange, label, error, disabled }: CheckboxProps) {
+    const colors = useColors();
     const { isRTL } = useLanguage();
     const scaleAnim = useSharedValue(checked ? 1 : 0);
     const borderColorAnim = useSharedValue(error ? 1 : 0);
@@ -40,13 +41,13 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
 
     const checkStyle = useAnimatedStyle(() => {
         return {
-            transform: [{ scale: scaleAnim.value }],
+            transform: [{ translateX: 0.5 }, { scale: scaleAnim.value }],
             opacity: scaleAnim.value,
         };
     });
 
     const boxStyle = useAnimatedStyle(() => {
-        const defaultColor = checked ? 'transparent' : '#D1D5DB'; // gray-300
+        const defaultColor = checked ? colors.chrome.primary : colors.brand.text.muted;
         const errorColor = '#EF4444'; // red-500
 
         return {
@@ -62,37 +63,39 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
         <View className="w-full">
             <Pressable
                 onPress={() => !disabled && onChange(!checked)}
+                accessibilityRole="checkbox"
+                accessibilityLabel={typeof label === 'string' ? label : undefined}
+                accessibilityState={{ checked, disabled }}
                 className={`flex-row items-start ${disabled ? 'opacity-50' : ''}`}
-                style={{ gap: scale(12) }}
+                style={{ gap: scale(12), flexDirection: isRTL ? 'row-reverse' : 'row' }}
             >
-                {/* Checkbox Box */}
                 <Animated.View
-                    className="w-6 h-6 rounded-md border-2 items-center justify-center overflow-hidden bg-white dark:bg-brand-bg-surface"
-                    style={[boxStyle, { marginTop: scale(2) }]}
+                    style={[
+                        styles.checkbox,
+                        boxStyle,
+                        {
+                            marginTop: scale(2),
+                            backgroundColor: checked ? colors.chrome.primary : 'transparent',
+                        },
+                    ]}
                 >
-                    {checked && (
-                        <Animated.View style={[StyleSheet.absoluteFill, checkStyle]}>
-                            <LinearGradient
-                                colors={['#F34B6F', '#E8447A']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={StyleSheet.absoluteFill}
-                            />
-                        </Animated.View>
-                    )}
                     <Animated.View style={checkStyle}>
-                        <Check size={scale(14)} color="#FFFFFF" strokeWidth={3} />
+                        <Check size={scale(12)} color={colors.chrome.common.inverseText} weight="bold" />
                     </Animated.View>
                 </Animated.View>
 
                 {/* Label */}
                 <View className="flex-1">
                     {typeof label === 'string' ? (
-                        <Text variant="body-sm" className="leading-5 text-brand-text-subtitle flex-wrap text-left">
+                        <Text
+                            variant="body-sm"
+                            className="leading-5 text-brand-text-subtitle flex-wrap"
+                            style={{ textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}
+                        >
                             {label}
                         </Text>
                     ) : (
-                        <View className="flex-row flex-wrap items-start justify-start">
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                             {label}
                         </View>
                     )}
@@ -103,8 +106,10 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
             {error && (
                 <Text
                     variant="caption"
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
                     className="text-red-500 mt-1"
-                    style={{ paddingInlineStart: scale(36) }}
+                    style={{ paddingStart: scale(36), textAlign: isRTL ? 'right' : 'left' }}
                 >
                     {error}
                 </Text>
@@ -112,3 +117,16 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    checkbox: {
+        width: scale(20),
+        height: scale(20),
+        flexShrink: 0,
+        borderRadius: scale(6),
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+});

@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Text } from '@/components/ui/Text';
 import { Config } from '@/constants/config';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 
 function getGoogleConsentParts(consentStatement: string) {
@@ -28,7 +29,8 @@ function getGoogleConsentParts(consentStatement: string) {
 }
 
 export function GoogleConsentNotice() {
-    const { t, isRTL } = useLanguage();
+    const { t } = useLanguage();
+    const colors = useColors();
     const parts = getGoogleConsentParts(String(t('consent_statement_google')));
 
     const openTerms = () => WebBrowser.openBrowserAsync(Config.TERMS_URL);
@@ -41,7 +43,7 @@ export function GoogleConsentNotice() {
             </Text>
             {parts.termsLabel ? (
                 <Pressable onPress={openTerms} hitSlop={6}>
-                    <Text variant="caption" align="center" className="text-[#4B68C4] font-body-semi underline" style={styles.link}>
+                    <Text variant="caption" align="center" className="font-body-semi underline" style={[styles.link, { color: colors.brand.accent.link }]}>
                         {parts.termsLabel}
                     </Text>
                 </Pressable>
@@ -53,7 +55,7 @@ export function GoogleConsentNotice() {
             ) : null}
             {parts.privacyLabel ? (
                 <Pressable onPress={openPrivacy} hitSlop={6}>
-                    <Text variant="caption" align="center" className="text-[#4B68C4] font-body-semi underline" style={styles.link}>
+                    <Text variant="caption" align="center" className="font-body-semi underline" style={[styles.link, { color: colors.brand.accent.link }]}>
                         {parts.privacyLabel}
                     </Text>
                 </Pressable>

@@ -29,7 +29,7 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
-import { X } from 'lucide-react-native';
+import { X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography } from '@/constants/typography';
@@ -320,7 +320,7 @@ export function DateWheelSheet({
                                 {title}
                             </Text>
                             <Pressable onPress={onClose} hitSlop={12}>
-                                <X size={scale(20)} color={palette.brand.text.subtitle} />
+                                <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                             </Pressable>
                         </View>
 
@@ -377,8 +377,7 @@ export function DateWheelSheet({
                                 title={t('confirm', 'Confirm')}
                                 onPress={handleConfirm}
                                 widthMode="full"
-                                height={40}
-                                textSize={15}
+                                size="compact"
                             />
                         </View>
                     </BottomSheetView>

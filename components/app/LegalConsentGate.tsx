@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { ShieldCheck } from 'lucide-react-native';
+import { ShieldCheck } from '@/components/ui/icons/PhosphorCompat';
+import { Check } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { accountService, PrivacyConsent } from '@/lib/accountService';
 import { apiMessage, t } from '@/lib/profileDisplay';
@@ -76,14 +77,23 @@ export function LegalConsentGate() {
                         <VersionPill label={t('privacy_version', 'Privacy version')} value={consent?.currentPrivacyVersion || t('not_set', 'Not set')} />
                     </View>
 
-                    <Pressable onPress={() => setAgreed((value) => !value)} style={[styles.checkboxRow, { borderColor: colors.brand.bg.border }]}>
+                    <Pressable
+                        onPress={() => setAgreed((value) => !value)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: agreed }}
+                        style={[styles.checkboxRow, { borderColor: colors.brand.bg.border }]}
+                    >
                         <View
                             style={[
                                 styles.checkbox,
-                                { borderColor: agreed ? colors.chrome.primary : colors.brand.bg.border },
+                                { borderColor: agreed ? colors.chrome.primary : colors.brand.text.muted },
                                 agreed && { backgroundColor: colors.chrome.primary },
                             ]}
-                        />
+                        >
+                            {agreed ? (
+                                <Check size={scale(12)} color={colors.chrome.common.inverseText} weight="bold" style={styles.checkboxCheck} />
+                            ) : null}
+                        </View>
                         <Text variant="caption" style={{ flex: 1, color: colors.brand.text.subtitle }}>
                             {t('legal_consent_checkbox', 'I have read and agree to the latest Terms of Use and Privacy Policy.')}
                         </Text>
@@ -137,7 +147,8 @@ const styles = StyleSheet.create({
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: scale(12) },
     icon: { width: scale(44), height: scale(44), borderRadius: scale(14), alignItems: 'center', justifyContent: 'center' },
     checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: scale(10), marginTop: scale(14), borderWidth: StyleSheet.hairlineWidth, borderRadius: scale(12), padding: scale(12) },
-    checkbox: { width: scale(20), height: scale(20), borderRadius: scale(6), borderWidth: 2 },
+    checkbox: { width: scale(20), height: scale(20), borderRadius: scale(6), borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    checkboxCheck: { transform: [{ translateX: 0.5 }] },
     linksRow: { flexDirection: 'row', gap: scale(16), marginTop: scale(12) },
     acceptButton: { marginTop: scale(16), minHeight: scale(48), borderRadius: scale(24), alignItems: 'center', justifyContent: 'center' },
     pill: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: scale(10), paddingHorizontal: scale(10), paddingVertical: scale(8) },

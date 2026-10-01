@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User } from 'lucide-react-native';
+import { User } from '@/components/ui/icons/PhosphorCompat';
 import { useAppMenu } from '@/components/app/AppMenuProvider';
 import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { Text } from '@/components/ui/Text';

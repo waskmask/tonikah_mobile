@@ -1594,6 +1594,8 @@
   "create_password_failed": "Échec de la création du mot de passe",
   "change_email": "Changer l'adresse e-mail",
   "change_email_short": "Changer l’e-mail",
+  "new_email_address": "Nouvelle adresse e-mail",
+  "change_email_verification_hint": "Nous enverrons un lien de vérification à la nouvelle adresse avant de modifier l’e-mail de votre compte.",
   "resend_email": "Renvoyer l’e-mail",
   "update_email": "Mettre à jour l'adresse e-mail",
   "email_same_as_current": "Cette adresse e-mail est déjà associée à votre compte.",

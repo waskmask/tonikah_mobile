@@ -17,7 +17,7 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { Ruler, Palette, Users2 } from 'lucide-react-native';
+import { Ruler, Palette, Users2 } from '@/components/ui/icons/PhosphorCompat';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';
 

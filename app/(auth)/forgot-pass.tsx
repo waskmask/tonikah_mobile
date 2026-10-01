@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MailCheck } from 'lucide-react-native';
+import { EnvelopeOpen } from 'phosphor-react-native';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -125,7 +125,7 @@ export default function ForgotPassScreen() {
                             className="items-center justify-center p-6 rounded-full mb-6"
                             style={{ backgroundColor: colors.chrome.common.primaryTint }}
                         >
-                            <MailCheck size={scale(64)} color={colors.chrome.primary} strokeWidth={1.5} />
+                            <EnvelopeOpen size={scale(64)} color={colors.chrome.primary} weight="regular" />
                         </View>
 
                         <Text variant="h3" className="text-center mt-2">

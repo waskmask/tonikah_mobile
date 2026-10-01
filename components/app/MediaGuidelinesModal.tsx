@@ -11,7 +11,7 @@ import {
     CheckCircle2,
     EyeOff,
     ShieldAlert,
-} from 'lucide-react-native';
+} from '@/components/ui/icons/PhosphorCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';

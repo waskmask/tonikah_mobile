@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
+    AppState,
     Animated,
     FlatList,
     Image as RNImage,
     Modal,
     NativeScrollEvent,
     NativeSyntheticEvent,
-    PanResponder,
     Platform,
     Pressable,
     StyleProp,
@@ -17,22 +16,22 @@ import {
     type TextStyle,
     TextInput,
     View,
+    type ViewToken,
     ViewStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 import {
-    RecordingPresets,
     requestRecordingPermissionsAsync,
-    setAudioModeAsync,
     useAudioPlayer,
     useAudioPlayerStatus,
-    useAudioRecorder,
-    useAudioRecorderState,
 } from 'expo-audio';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Bell, BellOff, Camera, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Send, Square, Trash2, Undo2, X, XCircle } from 'lucide-react-native';
+import { WaveformRecorderView, type WaveformRecorderCompleteEvent, type WaveformRecorderState, type WaveformRecorderViewRef } from 'react-native-waveform-recorder';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Bell, BellOff, Camera, Check, CheckCheck, Copy, Download, Flag, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Trash2, Undo2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
+import { CaretDoubleDown, CaretLeft, CaretRight, PaperPlaneTilt } from 'phosphor-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import {
@@ -52,13 +51,15 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
 import { useHaptics } from '@/hooks/useHaptics';
-import { useChatScrollAnchor, CHAT_NEAR_BOTTOM_THRESHOLD } from '@/hooks/useChatScrollAnchor';
+import { useChatScrollAnchor } from '@/hooks/useChatScrollAnchor';
 import { clearAllCachedMessages, loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
 import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode';
 import { BRAND_PRIMARY } from '@/constants/Colors';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
 import { KeyboardController } from 'react-native-keyboard-controller';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetView } from '@gorhom/bottom-sheet';
 import Reanimated, {
     Easing,
     FadeInDown,
@@ -74,14 +75,19 @@ import Reanimated, {
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
-import { cacheChatMedia, clearChatMediaCache, deleteCachedChatMediaForMessage, getCachedChatMedia } from '@/lib/chatMediaCache';
+import { cacheChatMedia, clearChatMediaCache, deleteCachedChatMediaForMessage, getCachedChatMedia, pinCachedChatMedia, storeLocalChatMedia, unpinCachedChatMedia } from '@/lib/chatMediaCache';
+import { claimChatAudioPlayback, createChatAudioPlaybackOwner, releaseChatAudioPlayback } from '@/lib/chatAudioPlayback';
+import { waveformPeaks } from '@/lib/chatWaveform';
 import { translateChatText } from '@/lib/chatDisplay';
 import { ImageAttachmentComposer } from '@/components/chat/ImageAttachmentComposer';
+import { GalleryCropModal } from '@/components/app/GalleryCropModal';
 import { GalleryRevealControl } from '@/components/chat/GalleryRevealControl';
 import { ChatKeyboardAvoider, ChatComposerBar } from '@/components/chat/ChatKeyboardFooter';
 import { ViewOnceIcon } from '@/components/chat/ViewOnceIcon';
 import { UnreadBadge } from '@/components/ui/UnreadBadge';
+import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
+import { ReportSheet, type ReportTarget } from '@/components/profile/ReportSheet';
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
 import { QualifiedPhotoRequiredNotice } from '@/components/app/QualifiedPhotoRequiredNotice';
@@ -92,13 +98,23 @@ import { MessagingMembershipGate } from '@/components/membership/MessagingMember
 import { canOpenMessaging } from '@/lib/messagingAccess';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
+import { applyAcceptedConversation, applyConversationStateById, loadCachedInbox, markCachedConversationRead, type CachedInbox } from '@/lib/chatInboxCache';
 import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
+import {
+    enqueueOfflineTextMessage,
+    flushOfflineMessageQueue,
+    queuedMessagesForConversation,
+    subscribeOfflineMessageQueue,
+} from '@/lib/offlineMessageQueue';
 
 const PRIMARY = BRAND_PRIMARY;
+const CHAT_ONE_LINE_BUBBLE_SCROLL_THRESHOLD = scale(69);
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const UNSEND_WINDOW_MIN = 15;
-const VOICE_WAVE_BAR_COUNT = 28;
+const VOICE_WAVE_BAR_COUNT = 64;
+const VOICE_MESSAGE_WAVE_BAR_COUNT = 32;
 const MAX_VOICE_RECORDING_SECONDS = 60;
+const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 type ListItem =
     | { kind: 'date'; id: string; label: string }
     | { kind: 'message'; id: string; message: ChatMessage };
@@ -107,7 +123,12 @@ type PendingImageAttachment = {
     uri: string;
     name: string;
     type: string;
+    clientMessageId: string;
 };
+
+function newMediaMessageId() {
+    return `media-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 function messageId(message: ChatMessage) {
     return String(message.id || message._id || message.tempId || '');
@@ -130,14 +151,6 @@ function directionalTextStyle(value: string): Pick<TextStyle, 'textAlign' | 'wri
         }
     }
     return { textAlign: 'left', writingDirection: 'ltr' };
-}
-
-function makeWaveform(count = VOICE_WAVE_BAR_COUNT) {
-    return Array.from({ length: count }, (_, index) => {
-        const wave = Math.abs(Math.sin(index * 0.72)) * 0.68;
-        const pulse = Math.abs(Math.cos(index * 0.31)) * 0.28;
-        return Math.max(0.18, Math.min(1, wave + pulse));
-    });
 }
 
 function formatMessageTime(value?: string | null) {
@@ -176,6 +189,14 @@ function normalizeMessage(raw: any): ChatMessage {
         reactions: raw?.reactions || [],
         createdAt: raw?.createdAt || new Date().toISOString(),
     };
+}
+
+function conversationFromInbox(inbox: CachedInbox | null | undefined, conversationId: string) {
+    if (!inbox || !conversationId || conversationId === 'new') return null;
+    return inbox.conversations.find((item) => item.id === conversationId)
+        || inbox.requests.find((item) => item.id === conversationId)
+        || inbox.sent.find((item) => item.id === conversationId)
+        || null;
 }
 
 function replyPreview(message?: ChatMessage | string | null) {
@@ -272,11 +293,23 @@ export default function ConversationScreen() {
     const { lightImpact } = useHaptics();
     const insets = useSafeAreaInsets();
     useConversationKeyboardMode();
-    const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-    const recorderState = useAudioRecorderState(recorder, 250);
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const listRef = useRef<FlatList<ListItem>>(null);
     const { isNearBottomRef } = useChatScrollAnchor<ListItem>();
+    const initialPositionPendingRef = useRef(true);
+    const initialFreshPositionPendingRef = useRef(true);
+    const pendingAutoScrollRef = useRef(false);
+    const freshMessagesLoadedRef = useRef(false);
+    const readInFlightRef = useRef(false);
+    const incomingGenerationRef = useRef(0);
+    const activeReadIdRef = useRef(id);
+    activeReadIdRef.current = id;
+    const screenFocusedRef = useRef(false);
+    const viewableMessageIdsRef = useRef<Set<string>>(new Set());
+    const latestIncomingIdRef = useRef<string | null>(null);
+    const tryMarkVisibleUnreadRef = useRef<() => void>(() => undefined);
+    const receivedAwayIdsRef = useRef<Set<string>>(new Set());
+    const knownMessageIdsRef = useRef<Set<string>>(new Set());
     // Holds the live socket API so scroll/seen helpers stay referentially stable
     // (the socket object is recreated on render).
     const socketRef = useRef<{
@@ -287,7 +320,12 @@ export default function ConversationScreen() {
     // True when messages arrived from the peer while the user was scrolled up;
     // we defer marking them seen until they're actually brought into view.
     const pendingSeenRef = useRef(false);
-    const [conversation, setConversation] = useState<Conversation | null>(null);
+    const [conversation, setConversation] = useState<Conversation | null>(() => (
+        conversationFromInbox(queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox), id)
+    ));
+    const acceptedConversationRef = useRef<string | null>(null);
+    const acceptedRefConversationId = useRef<string | null>(null);
+    const [metadataUnavailable, setMetadataUnavailable] = useState(false);
     const [items, setItems] = useState<ChatMessage[]>([]);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [content, setContent] = useState('');
@@ -297,27 +335,37 @@ export default function ConversationScreen() {
     const [uploadingMedia, setUploadingMedia] = useState(false);
     const [recordingBusy, setRecordingBusy] = useState(false);
     const [voicePanelOpen, setVoicePanelOpen] = useState(false);
-    const [voicePreview, setVoicePreview] = useState<{ uri: string; duration: number } | null>(null);
+    const [voicePreview, setVoicePreview] = useState<{ uri: string; duration: number; clientMessageId: string } | null>(null);
+    const voiceUploadedMediaRef = useRef<{ id: string; media: MessageMedia } | null>(null);
+    const voiceCopyGenerationRef = useRef(0);
+    const imageUploadedMediaRef = useRef<{ id: string; viewOnce: boolean; media: MessageMedia } | null>(null);
+    const mediaSendLockRef = useRef(false);
     const [voiceWaveform, setVoiceWaveform] = useState<number[]>([]);
+    const [voiceSendFailed, setVoiceSendFailed] = useState(false);
+    const sendAfterFinalizeRef = useRef(false);
     const [voiceSending, setVoiceSending] = useState(false);
     const [requestBusy, setRequestBusy] = useState(false);
     const [viewOnce, setViewOnce] = useState<{ url: string; messageId: string; seconds: number } | null>(null);
     const [viewOnceLoadingId, setViewOnceLoadingId] = useState<string | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [imageAttachment, setImageAttachment] = useState<PendingImageAttachment | null>(null);
+    const originalImageAttachmentRef = useRef<PendingImageAttachment | null>(null);
+    const [cropOpen, setCropOpen] = useState(false);
     const [imageCaption, setImageCaption] = useState('');
     const [imageViewOnce, setImageViewOnce] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuBusy, setMenuBusy] = useState(false);
+    const [conversationConfirmation, setConversationConfirmation] = useState<'end' | 'delete' | null>(null);
     const [messagesReady, setMessagesReady] = useState(false);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const [unseenWhileAway, setUnseenWhileAway] = useState(0);
     const [chatFooterHeight, setChatFooterHeight] = useState(scale(72));
     const [profileSheetOpen, setProfileSheetOpen] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+    const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
     const [messageActionBusy, setMessageActionBusy] = useState(false);
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
-    const prevListLengthRef = useRef(0);
+    const prevNewestMessageIdRef = useRef('');
     const [peerTyping, setPeerTyping] = useState(false);
     const peerTypingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const typingActiveRef = useRef(false);
@@ -337,11 +385,15 @@ export default function ConversationScreen() {
         primaryEnd: palette.chrome.primaryEnd,
         primaryTint: palette.chrome.common.primaryTint,
         bubbleMine: palette.chrome.common.bubbleMine,
+        bubbleMineText: palette.chrome.common.bubbleMineText,
+        bubbleMineMuted: palette.chrome.common.bubbleMineMuted,
+        bubbleMineBorder: palette.chrome.common.bubbleMineBorder,
+        bubbleMineInset: palette.chrome.common.bubbleMineInset,
         primaryRing: palette.chrome.common.primaryRing,
         inverse: palette.chrome.common.inverseText,
         danger: palette.brand.accent.error,
         success: palette.chrome.common.successStrong,
-        waveMuted: palette.brand.bg.border,
+        waveMuted: palette.chrome.common.iconNeutral,
         blueAction: palette.chrome.common.blueAction,
         seenTick: palette.chrome.common.seenTick,
     }), [palette]);
@@ -361,40 +413,52 @@ export default function ConversationScreen() {
         listRef.current?.scrollToOffset({ offset: 0, animated });
     }, []);
 
-    // Flush "seen" once the newest messages are actually in view. Clears the
-    // deferred-unseen state and the scroll-down badge.
-    const markConversationSeen = useCallback(() => {
-        pendingSeenRef.current = false;
-        setUnseenWhileAway(0);
-        if (id && id !== 'new') {
-            void chatService.markRead(id);
-            socketRef.current?.markSeen(id);
+    const markConversationSeen = useCallback(async () => {
+        if (!id || id === 'new' || !pendingSeenRef.current || readInFlightRef.current) return;
+        readInFlightRef.current = true;
+        const incomingGeneration = incomingGenerationRef.current;
+        const unreadBefore = Number(conversation?.unreadCount || 0);
+        const totalBefore = queryClient.getQueryData<number>(queryKeys.chat.unreadCount);
+        try {
+            const response = await chatService.markRead(id);
+            if (!response.success) return;
+            if (activeReadIdRef.current !== id) return;
+            if (incomingGeneration !== incomingGenerationRef.current) return;
+            pendingSeenRef.current = false;
+            receivedAwayIdsRef.current.clear();
+            setUnseenWhileAway(0);
+            setConversation((current) => current ? { ...current, unreadCount: 0 } : current);
+            const clearedCount = markCachedConversationRead(id, unreadBefore, String(user?._id || user?.id || ''));
+            if (typeof totalBefore === 'number' && clearedCount > 0
+                && queryClient.getQueryData(queryKeys.chat.unreadCount) === totalBefore) {
+                queryClient.setQueryData(queryKeys.chat.unreadCount, Math.max(0, totalBefore - clearedCount));
+            }
+        } catch {
+            // Leave the unread state intact; the next visible event can retry.
+        } finally {
+            readInFlightRef.current = false;
+            if (incomingGeneration !== incomingGenerationRef.current) {
+                requestAnimationFrame(() => tryMarkVisibleUnreadRef.current());
+            }
         }
-    }, [id]);
+    }, [conversation?.unreadCount, id, user?._id, user?.id]);
 
-    useEffect(() => {
-        if (!voicePanelOpen || !recorderState.isRecording) return;
-        const timer = setInterval(() => {
-            setVoiceWaveform((current) => {
-                const nextValue = Math.max(0.18, Math.min(1, 0.22 + Math.random() * 0.78));
-                const next = [...current, nextValue];
-                return next.slice(-VOICE_WAVE_BAR_COUNT);
-            });
-        }, 120);
-        return () => clearInterval(timer);
-    }, [recorderState.isRecording, voicePanelOpen]);
+    const tryMarkVisibleUnread = useCallback(() => {
+        const latestIncomingId = latestIncomingIdRef.current;
+        if (!screenFocusedRef.current || AppState.currentState !== 'active'
+            || !freshMessagesLoadedRef.current || !pendingSeenRef.current
+            || !latestIncomingId || !viewableMessageIdsRef.current.has(latestIncomingId)) return;
+        void markConversationSeen();
+    }, [markConversationSeen]);
+    tryMarkVisibleUnreadRef.current = tryMarkVisibleUnread;
 
-    useEffect(() => {
-        if (
-            voicePanelOpen &&
-            recorderState.isRecording &&
-            !recordingBusy &&
-            Math.round((recorderState.durationMillis || 0) / 1000) >= MAX_VOICE_RECORDING_SECONDS
-        ) {
-            void stopRecordingForPreview();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [recorderState.durationMillis, recorderState.isRecording, recordingBusy, voicePanelOpen]);
+    const viewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 60, minimumViewTime: 100 });
+    const onViewableItemsChangedRef = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        viewableMessageIdsRef.current = new Set(viewableItems
+            .filter((token) => token.item?.kind === 'message')
+            .map((token) => token.item.id));
+        tryMarkVisibleUnreadRef.current();
+    });
 
     const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
         if (!id || id === 'new' || emailBlocked || membershipBlocked || membershipAccessUnavailable) return;
@@ -404,22 +468,30 @@ export default function ConversationScreen() {
             chatService.messages(id, { cursor }),
         ]);
         if (metaRes?.success) {
-            setConversation(normalizeConversation(metaRes.data || metaRes));
+            const latest = normalizeConversation(metaRes.data || metaRes);
+            if (mode === 'replace' && latest.unreadCount > 0) pendingSeenRef.current = true;
+            setConversation(acceptedConversationRef.current === latest.id && latest.state === 'request_pending'
+                ? { ...latest, state: 'active', requestRole: null }
+                : latest);
+            setMetadataUnavailable(false);
+        } else if (mode === 'replace') {
+            setMetadataUnavailable(true);
         }
         if (messageRes.success) {
             const nextItems = (messageRes.items || []).map(normalizeMessage);
+            if (mode === 'replace') freshMessagesLoadedRef.current = true;
             setItems((current) => {
                 if (mode === 'append') return [...current, ...nextItems];
-                const failedLocalMessages = current.filter(
-                    (message) => message.failed && message.type === 'text' && message.tempId,
+                const localMessages = current.filter(
+                    (message) => message.type === 'text' && message.tempId && (message.failed || message.queued),
                 );
-                return [...nextItems, ...failedLocalMessages];
+                return [...nextItems, ...localMessages];
             });
             setNextCursor(messageRes.nextCursor || null);
         } else if (messageRes.code === 'MEMBERSHIP_REQUIRED') {
             void eligibility.refetch();
         } else if (messageRes.message !== 'network_error') {
-            Alert.alert(t('error', 'Error'), apiMessage(messageRes.message));
+            toast.show(apiMessage(messageRes.message), 'error', 3500);
         }
     }, [eligibility, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, nextCursor]);
 
@@ -446,24 +518,31 @@ export default function ConversationScreen() {
     }, [id, load]);
 
     const handleSocketMessage = useCallback((message: ChatMessage) => {
+        const next = normalizeMessage(message);
+        if (!next.id || knownMessageIdsRef.current.has(next.id)) return;
+        knownMessageIdsRef.current.add(next.id);
         setItems((current) => {
-            const next = normalizeMessage(message);
-            if (!next.id || current.some((item) => item.id === next.id)) return current;
+            if (current.some((item) => item.id === next.id)) return current;
             // Mark this incoming message to play the enter animation.
             animateIdsRef.current.add(next.id);
             return [...current, next];
         });
         if (!id || id === 'new') return;
         const myId = String(user?._id || user?.id || '');
-        const fromPeer = String(message?.sender || '') !== myId;
+        const fromPeer = String(next.sender || '') !== myId;
+        const wasNearBottom = isNearBottomRef.current;
+        if (wasNearBottom) pendingAutoScrollRef.current = true;
         // Only mark seen if the user is viewing the bottom (message is visible).
         // If they're scrolled up, defer until they scroll back down and surface a
         // count on the scroll-to-bottom button instead.
-        if (isNearBottomRef.current) {
-            void chatService.markRead(id);
-        } else if (fromPeer) {
+        if (fromPeer) {
+            incomingGenerationRef.current += 1;
             pendingSeenRef.current = true;
-            setUnseenWhileAway((current) => current + 1);
+            setConversation((current) => current ? { ...current, unreadCount: current.unreadCount + 1 } : current);
+            if (!wasNearBottom && !receivedAwayIdsRef.current.has(next.id)) {
+                receivedAwayIdsRef.current.add(next.id);
+                setUnseenWhileAway(receivedAwayIdsRef.current.size);
+            }
         }
     }, [id, user?._id, user?.id, isNearBottomRef]);
 
@@ -546,6 +625,19 @@ export default function ConversationScreen() {
         onMessageUnsent: handleSocketUnsent,
         onMessageUpdated: handleSocketMessageUpdated,
         onConversationChanged: refreshCurrentConversation,
+        onRequestAccepted: (payload) => {
+            if (String(payload?.conversationId || '') !== id) return;
+            acceptedConversationRef.current = id;
+            setConversation((current) => current ? { ...current, state: 'active', requestRole: null } : current);
+            setMetadataUnavailable(false);
+        },
+        onConversationState: (payload) => {
+            if (String(payload?.conversationId || '') !== id) return;
+            if (payload.state === 'ended' || payload.state === 'declined' || payload.state === 'blocked') {
+                acceptedConversationRef.current = null;
+                setConversation((current) => current ? { ...current, state: payload.state } : current);
+            }
+        },
         onSeen: handleSocketSeen,
         onDelivered: handleSocketDelivered,
         onViewOnceViewed: handleViewOnceViewed,
@@ -562,10 +654,22 @@ export default function ConversationScreen() {
         // Reset per-conversation state up front so we never flash the previous
         // chat's messages or reuse its pagination cursor when switching chats.
         setItems([]);
+        if (acceptedRefConversationId.current !== id) {
+            acceptedConversationRef.current = null;
+            acceptedRefConversationId.current = id;
+        }
         setNextCursor(null);
         setShowScrollDown(false);
         setUnseenWhileAway(0);
-        pendingSeenRef.current = false;
+        pendingSeenRef.current = Boolean(queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox)?.conversations
+            .find((item) => item.id === id)?.unreadCount);
+        freshMessagesLoadedRef.current = false;
+        initialPositionPendingRef.current = true;
+        initialFreshPositionPendingRef.current = true;
+        pendingAutoScrollRef.current = false;
+        viewableMessageIdsRef.current.clear();
+        receivedAwayIdsRef.current.clear();
+        knownMessageIdsRef.current.clear();
         isNearBottomRef.current = true;
         (async () => {
             if (eligibility.isLoading) return;
@@ -585,9 +689,33 @@ export default function ConversationScreen() {
             // 1) Instant open: render cached messages right away (inverted list lands
             //    on the newest message with no scroll, no spinner). Skipped if the
             //    user isn't hydrated yet — the effect re-runs once they are.
-            const cached = userId ? await loadCachedMessages(userId, id) : null;
-            if (!cancelled && cached && cached.length) {
-                setItems(cached);
+            const [cached, queued, cachedInbox] = userId
+                ? await Promise.all([
+                    loadCachedMessages(userId, id),
+                    queuedMessagesForConversation(userId, id),
+                    loadCachedInbox(userId),
+                ])
+                : [null, [], null];
+            if (!cancelled) {
+                const cachedConversation = conversationFromInbox(cachedInbox, id);
+                if (cachedConversation) setConversation((current) => current || cachedConversation);
+            }
+            if (!cancelled && ((cached && cached.length) || queued.length)) {
+                const queuedMessages: ChatMessage[] = queued.map((item) => ({
+                    id: item.tempId,
+                    tempId: item.tempId,
+                    clientMessageId: item.tempId,
+                    conversationId: item.conversationId,
+                    sender: userId,
+                    type: 'text',
+                    content: item.content,
+                    replyTo: item.replyTo || null,
+                    createdAt: item.createdAt,
+                    reactions: [],
+                    pending: true,
+                    queued: true,
+                }));
+                setItems([...(cached || []), ...queuedMessages]);
                 setMessagesReady(true);
                 setLoading(false);
             }
@@ -596,8 +724,6 @@ export default function ConversationScreen() {
             if (cancelled) return;
             setLoading(false);
             setMessagesReady(true);
-            await chatService.markRead(id);
-            socket.markSeen(id);
         })();
         return () => {
             cancelled = true;
@@ -611,6 +737,49 @@ export default function ConversationScreen() {
         const userId = String(user?._id || user?.id || '');
         void saveCachedMessages(userId, id, items);
     }, [items, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, messagesReady, user?._id, user?.id]);
+
+    // Warm only the newest few received voice notes. This keeps the first tap
+    // immediate without turning conversation opening into an unbounded download.
+    useEffect(() => {
+        if (!messagesReady || isOffline || !id || id === 'new') return;
+        const userId = String(user?._id || user?.id || '');
+        const recentVoiceNotes = items
+            .filter((message) => message.type === 'voice'
+                && !message.unsent
+                && message.media?.url
+                && String(message.sender) !== userId)
+            .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+            .slice(-3);
+        void Promise.all(recentVoiceNotes.map((message) => cacheChatMedia({
+            userId,
+            conversationId: id,
+            messageId: message.id,
+            media: message.media,
+            kind: 'voice',
+        }).catch(() => null)));
+    }, [id, isOffline, items, messagesReady, user?._id, user?.id]);
+
+    useEffect(() => {
+        const userId = String(user?._id || user?.id || '');
+        if (!userId || !id || id === 'new') return;
+        const unsubscribe = subscribeOfflineMessageQueue((event) => {
+            if (event.item.userId !== userId || event.item.conversationId !== id) return;
+            if (event.type === 'sent') {
+                const normalized = normalizeMessage(event.message);
+                setItems((current) => current.map((item) => item.tempId === event.item.tempId ? normalized : item));
+                return;
+            }
+            setItems((current) => current.map((item) => item.tempId === event.item.tempId
+                ? { ...item, pending: false, queued: false, failed: true }
+                : item));
+            const errorMessage = event.error === 'offline_message_expired'
+                ? t('chat:offline_message_expired', 'Queued message expired. Tap to retry.')
+                : apiMessage(event.error || 'message_failed');
+            toast.show(errorMessage, 'error', 3500);
+        });
+        if (!isOffline) void flushOfflineMessageQueue(userId);
+        return unsubscribe;
+    }, [id, isOffline, toast, user?._id, user?.id]);
 
     useEffect(() => {
         if (!viewOnce) return;
@@ -629,6 +798,47 @@ export default function ConversationScreen() {
     // message must come first. buildItems keeps date headers above each group;
     // reversing preserves that ordering once the list is flipped.
     const invertedItems = useMemo(() => [...listItems].reverse(), [listItems]);
+    latestIncomingIdRef.current = [...listItems].reverse().find((item) =>
+        item.kind === 'message' && !item.message.pending && !item.message.unsent
+        && item.message.type !== 'system'
+        && String(item.message.sender) !== String(user?._id || user?.id || '')
+    )?.id || null;
+    const newestMessageId = invertedItems.find((item) => item.kind === 'message')?.id || '';
+    useEffect(() => {
+        for (const message of items) knownMessageIdsRef.current.add(message.id);
+    }, [items]);
+
+    useFocusEffect(useCallback(() => {
+        screenFocusedRef.current = true;
+        const frame = requestAnimationFrame(() => tryMarkVisibleUnreadRef.current());
+        return () => {
+            cancelAnimationFrame(frame);
+            screenFocusedRef.current = false;
+        };
+    }, []));
+
+    useEffect(() => {
+        if (!messagesReady || invertedItems.length === 0) return;
+        const frame = requestAnimationFrame(() => {
+            if (initialPositionPendingRef.current) {
+                initialPositionPendingRef.current = false;
+                scrollToBottom(false);
+            }
+            if (freshMessagesLoadedRef.current && initialFreshPositionPendingRef.current) {
+                initialFreshPositionPendingRef.current = false;
+                scrollToBottom(false);
+            }
+            tryMarkVisibleUnreadRef.current();
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [conversation?.unreadCount, invertedItems, messagesReady, scrollToBottom]);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (state) => {
+            if (state === 'active') requestAnimationFrame(() => tryMarkVisibleUnreadRef.current());
+        });
+        return () => subscription.remove();
+    }, []);
     // Keep a live ref to the current data so stable callbacks (reply-jump) never
     // read a stale list without having to be recreated on every render.
     const invertedItemsRef = useRef(invertedItems);
@@ -647,15 +857,17 @@ export default function ConversationScreen() {
     }, [id]);
 
     useEffect(() => {
+        const previousId = prevNewestMessageIdRef.current;
+        prevNewestMessageIdRef.current = newestMessageId;
         if (!messagesReady || loadingMore) {
-            prevListLengthRef.current = listItems.length;
             return;
         }
-        if (listItems.length > prevListLengthRef.current && isNearBottomRef.current) {
+        if (newestMessageId && newestMessageId !== previousId
+            && (pendingAutoScrollRef.current || isNearBottomRef.current)) {
+            pendingAutoScrollRef.current = false;
             scrollToBottom(true);
         }
-        prevListLengthRef.current = listItems.length;
-    }, [listItems.length, loadingMore, messagesReady, scrollToBottom, isNearBottomRef]);
+    }, [newestMessageId, loadingMore, messagesReady, scrollToBottom, isNearBottomRef]);
 
     const handleReplyJump = useCallback((replyId: string) => {
         const index = invertedItemsRef.current.findIndex((entry) => entry.kind === 'message' && entry.message.id === replyId);
@@ -679,7 +891,7 @@ export default function ConversationScreen() {
                 seconds: res.expiresIn || res.data?.expiresIn || 30,
             });
         } else if (!reconcileMembershipEligibility(res)) {
-            Alert.alert(t('error', 'Error'), apiMessage(res.message || 'photo_expired'));
+            toast.show(apiMessage(res.message || 'photo_expired'), 'error', 3500);
         }
         setViewOnceLoadingId(null);
     }, [viewOnceLoadingId]);
@@ -709,6 +921,7 @@ export default function ConversationScreen() {
             content: body,
             type: 'text',
             replyTo: replyId || undefined,
+            clientMessageId: message.tempId,
         });
 
         if (res.success && res.message) {
@@ -722,13 +935,32 @@ export default function ConversationScreen() {
 
         if (reconcileMembershipEligibility(res)) return;
         reconcilePhotoEligibility(res);
+        if (res.errorMessage === 'network_error' && id !== 'new' && message.tempId) {
+            try {
+                await enqueueOfflineTextMessage({
+                    tempId: message.tempId,
+                    userId: String(user?._id || user?.id || ''),
+                    conversationId: id,
+                    content: body,
+                    replyTo: replyId || undefined,
+                    createdAt: message.createdAt,
+                });
+                setItems((current) => current.map((item) => messageId(item) === messageId(message)
+                    ? { ...item, pending: true, queued: true, failed: false }
+                    : item));
+                toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
+                return;
+            } catch {
+                // Fall through to the manual retry state when the bounded queue is full.
+            }
+        }
         setItems((current) => current.map((item) => messageId(item) === messageId(message)
-            ? { ...item, pending: false, failed: true }
+            ? { ...item, pending: false, queued: false, failed: true }
             : item));
         toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
-    }, [id, isOffline, recipientId, toast]);
+    }, [id, isOffline, recipientId, toast, user?._id, user?.id]);
 
-    const renderMessageItem = useCallback(({ item }: { item: ListItem }) => {
+    const renderMessageItem = useCallback(({ item, index }: { item: ListItem; index: number }) => {
         if (item.kind === 'date') {
             return (
                 <View style={styles.dateWrap}>
@@ -741,10 +973,16 @@ export default function ConversationScreen() {
         const message = item.message;
         const mine = String(message.sender) === String(user?._id || user?.id);
         const animateIn = animateIdsRef.current.has(item.id);
+        const adjacentItem = invertedItems[index + 1];
+        const sameSenderAsAdjacent = message.type !== 'system'
+            && adjacentItem?.kind === 'message'
+            && adjacentItem.message.type !== 'system'
+            && String(adjacentItem.message.sender) === String(message.sender);
         return (
             <MessageBubble
                 message={message}
                 mine={mine}
+                rowGap={sameSenderAsAdjacent ? 3 : 10}
                 uiDirection={isRTL ? 'rtl' : 'ltr'}
                 colors={colors}
                 userId={String(user?._id || user?.id || '')}
@@ -752,13 +990,16 @@ export default function ConversationScreen() {
                 onOpenImage={setImagePreview}
                 onOpenViewOnce={openViewOnce}
                 viewOnceLoading={viewOnceLoadingId === message.id}
-                onOpenMenu={setSelectedMessage}
+                onOpenMenu={(target) => {
+                    void lightImpact();
+                    setSelectedMessage(target);
+                }}
                 onRetry={retryFailedMessage}
                 onSwipeReply={beginReply}
                 onReplyClick={handleReplyJump}
             />
         );
-    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage]);
+    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage, lightImpact, invertedItems]);
     const routeConversation = useMemo(() => {
         if (!id || id === 'new' || !routeState) return null;
         return {
@@ -812,24 +1053,20 @@ export default function ConversationScreen() {
         _id: peerId,
     }), [headerOther, peerId]);
     const peerDeleted = !!headerOther.account_deleted;
-    const isRequest = activeConversation?.state === 'request_pending';
+    const isRequest = activeConversation?.state === 'request_pending' && Boolean(activeConversation.requestRole);
     const isSentRequest = isRequest && activeConversation?.requestRole === 'sent';
     const isEnded = activeConversation?.state === 'ended';
     const canCompose = !peerDeleted && (id === 'new' || activeConversation?.state === 'active');
 
     const handleListScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
         // Inverted list: offset near 0 means we're pinned to the newest message.
-        const { contentOffset, layoutMeasurement } = event.nativeEvent;
+        const { contentOffset } = event.nativeEvent;
         const y = contentOffset.y;
-        const nearBottom = y <= CHAT_NEAR_BOTTOM_THRESHOLD;
+        const nearBottom = y <= CHAT_ONE_LINE_BUBBLE_SCROLL_THRESHOLD;
         isNearBottomRef.current = nearBottom;
-        // Show the jump-to-latest button once scrolled up at least one screen.
-        setShowScrollDown(y > layoutMeasurement.height);
-        // Back at the bottom: surface any messages that arrived while scrolled up.
-        if (nearBottom && pendingSeenRef.current) {
-            markConversationSeen();
-        }
-    }, [isNearBottomRef, markConversationSeen]);
+        setShowScrollDown(!nearBottom);
+        if (nearBottom) tryMarkVisibleUnreadRef.current();
+    }, [isNearBottomRef]);
 
     const loadMore = async () => {
         if (!nextCursor || loadingMore || id === 'new') return;
@@ -883,18 +1120,12 @@ export default function ConversationScreen() {
             toast.show(t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
-        if (isOffline) {
-            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
-            return;
-        }
         const body = content.trim();
         if (!body) {
-            Alert.alert(t('message_empty', 'Please enter a message before sending.'));
+            toast.show(t('message_empty', 'Please enter a message before sending.'), 'info', 2500);
             return;
         }
-        lightImpact();
-        setSending(true);
-        const tempId = `tmp_${Date.now()}`;
+        const tempId = `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
         const reply = replyTo;
         const temp: ChatMessage = {
             id: tempId,
@@ -907,7 +1138,40 @@ export default function ConversationScreen() {
             createdAt: new Date().toISOString(),
             reactions: [],
             pending: true,
+            clientMessageId: tempId,
         };
+
+        if (isOffline && id === 'new') {
+            toast.show(t('chat:offline_new_conversation', 'Connect to the internet to start a new conversation.'), 'info', 3500);
+            return;
+        }
+
+        if (isOffline) {
+            try {
+                await enqueueOfflineTextMessage({
+                    tempId,
+                    userId: String(user?._id || user?.id || ''),
+                    conversationId: id,
+                    content: body,
+                    replyTo: reply?.id,
+                    createdAt: temp.createdAt,
+                });
+            } catch {
+                toast.show(t('chat:offline_queue_full', 'Offline queue is full. Reconnect before sending more messages.'), 'error', 3500);
+                return;
+            }
+            lightImpact();
+            animateIdsRef.current.add(tempId);
+            setItems((current) => [...current, { ...temp, queued: true }]);
+            setContent('');
+            emitStopTyping();
+            setReplyTo(null);
+            scrollToBottom(true);
+            toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
+            return;
+        }
+        lightImpact();
+        setSending(true);
         animateIdsRef.current.add(tempId);
         setItems((current) => [...current, temp]);
         setContent('');
@@ -921,6 +1185,7 @@ export default function ConversationScreen() {
             content: body,
             type: 'text',
             replyTo: reply?.id || undefined,
+            clientMessageId: tempId,
         });
 
         if (res.success && res.message) {
@@ -936,20 +1201,39 @@ export default function ConversationScreen() {
                 return;
             }
             reconcilePhotoEligibility(res);
-            setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
-            if (res.errorMessage === 'network_error') {
-                toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
+            if (res.errorMessage === 'network_error' && id !== 'new') {
+                try {
+                    await enqueueOfflineTextMessage({
+                        tempId,
+                        userId: String(user?._id || user?.id || ''),
+                        conversationId: id,
+                        content: body,
+                        replyTo: reply?.id,
+                        createdAt: temp.createdAt,
+                    });
+                    setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, queued: true } : item));
+                    toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
+                } catch {
+                    setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
+                    toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
+                }
             } else {
-                Alert.alert(t('error', 'Error'), apiMessage(res.errorMessage || 'message_failed'));
+                setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
+                toast.show(apiMessage(res.errorMessage || 'message_failed'), 'error', 3500);
             }
         }
         setSending(false);
     };
 
-    const sendMediaMessage = async (type: 'image' | 'voice', media: MessageMedia, mediaContent = '') => {
+    const sendMediaMessage = async (
+        type: 'image' | 'voice',
+        media: MessageMedia,
+        mediaContent = '',
+        clientMessageId?: string,
+        localMediaUri?: string,
+    ): Promise<ChatMessage | null> => {
         const reply = replyTo;
         const trimmedContent = mediaContent.trim();
-        setReplyTo(null);
         const res = await chatService.send({
             conversationId: id !== 'new' ? id : undefined,
             recipientId: id === 'new' ? recipientId : undefined,
@@ -957,27 +1241,53 @@ export default function ConversationScreen() {
             content: trimmedContent || undefined,
             media,
             replyTo: reply?.id || undefined,
+            clientMessageId,
         });
 
         if (res.success && res.message) {
-            const normalized = normalizeMessage(res.message);
+            setReplyTo((current) => current?.id === reply?.id ? null : current);
+            let normalized = normalizeMessage(res.message);
+            if (type === 'voice') {
+                normalized = {
+                    ...normalized,
+                    media: { ...media, ...(normalized.media || {}) },
+                };
+            }
+            if (type === 'voice' && localMediaUri && normalized.id) {
+                const cached = await storeLocalChatMedia({
+                    sourceUri: localMediaUri,
+                    userId: String(user?._id || user?.id || ''),
+                    conversationId: normalized.conversationId || id,
+                    messageId: normalized.id,
+                    media: normalized.media,
+                    kind: 'voice',
+                }).catch(() => null);
+                if (cached?.uri) {
+                    normalized = {
+                        ...normalized,
+                        media: { ...(normalized.media || media), localUri: cached.uri },
+                    };
+                }
+            }
             if (normalized.id) animateIdsRef.current.add(normalized.id);
             setItems((current) => current.some((item) => item.id === normalized.id) ? current : [...current, normalized]);
             if (id === 'new' && res.conversationId) {
                 router.replace(`/conversation/${res.conversationId}` as any);
             }
             scrollToBottom(true);
-            return true;
+            return normalized;
         }
 
-        if (reconcileMembershipEligibility(res)) return false;
+        if (reconcileMembershipEligibility(res)) return null;
         reconcilePhotoEligibility(res);
         toast.show(apiMessage(res.errorMessage || 'message_failed'), 'error');
-        return false;
+        return null;
     };
 
     const closeImageAttachment = () => {
         if (uploadingMedia) return;
+        imageUploadedMediaRef.current = null;
+        originalImageAttachmentRef.current = null;
         setImageAttachment(null);
         setImageCaption('');
         setImageViewOnce(false);
@@ -1003,11 +1313,19 @@ export default function ConversationScreen() {
     };
 
     const stageImageAsset = (asset: ImagePicker.ImagePickerAsset) => {
-        setImageAttachment({
+        if (asset.fileSize && asset.fileSize > MAX_CHAT_IMAGE_BYTES) {
+            toast.show(t('chat:image_too_large', 'Choose an image smaller than 10 MB.'), 'error');
+            return;
+        }
+        imageUploadedMediaRef.current = null;
+        const attachment = {
             uri: asset.uri,
             name: asset.fileName || `chat-photo-${Date.now()}.jpg`,
             type: asset.mimeType || 'image/jpeg',
-        });
+            clientMessageId: newMediaMessageId(),
+        };
+        originalImageAttachmentRef.current = attachment;
+        setImageAttachment(attachment);
         setImageCaption('');
         setImageViewOnce(false);
     };
@@ -1019,20 +1337,18 @@ export default function ConversationScreen() {
         // the composer returns to rest and the new image isn't hidden behind it.
         KeyboardController.dismiss();
 
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-            toast.show(t('photo_permission_required', 'Photo library permission is required.'), 'error');
-            return;
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                quality: 0.9,
+                allowsEditing: false,
+                exif: false,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            stageImageAsset(result.assets[0]);
+        } catch {
+            toast.show(t('chat:attachment_failed', 'Could not open photos. Please try again.'), 'error');
         }
-
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            quality: 0.9,
-            allowsEditing: false,
-            exif: false,
-        });
-        if (result.canceled || !result.assets[0]) return;
-        stageImageAsset(result.assets[0]);
     };
 
     const captureAndAttachPhoto = async () => {
@@ -1040,24 +1356,28 @@ export default function ConversationScreen() {
 
         KeyboardController.dismiss();
 
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-            toast.show(t('camera_permission_required', 'Camera permission is required.'), 'error');
-            return;
-        }
+        try {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+                toast.show(t('camera_permission_required', 'Camera permission is required.'), 'error');
+                return;
+            }
 
-        const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            quality: 0.9,
-            allowsEditing: false,
-            exif: false,
-        });
-        if (result.canceled || !result.assets[0]) return;
-        stageImageAsset(result.assets[0]);
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 0.9,
+                allowsEditing: false,
+                exif: false,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            stageImageAsset(result.assets[0]);
+        } catch {
+            toast.show(t('chat:camera_failed', 'Could not open camera. Please try again.'), 'error');
+        }
     };
 
     const sendImageAttachment = async () => {
-        if (!imageAttachment || uploadingMedia || id === 'new') return;
+        if (!imageAttachment || uploadingMedia || mediaSendLockRef.current || id === 'new') return;
         if (isOffline) {
             toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
             return;
@@ -1068,42 +1388,49 @@ export default function ConversationScreen() {
                 : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
+        mediaSendLockRef.current = true;
         setUploadingMedia(true);
-        const formData = new FormData();
-        formData.append('file', {
-            uri: imageAttachment.uri,
-            name: imageAttachment.name,
-            type: imageAttachment.type,
-        } as any);
-        formData.append('conversationId', id);
-        formData.append('type', 'image');
-        formData.append('viewOnce', imageViewOnce ? 'true' : 'false');
-
-        const uploadRes = await chatService.uploadMedia(formData);
-        if (uploadRes.success && uploadRes.media) {
-            const sent = await sendMediaMessage('image', uploadRes.media, imageCaption);
-            if (sent) {
+        try {
+            let media = imageUploadedMediaRef.current?.id === imageAttachment.clientMessageId
+                && imageUploadedMediaRef.current.viewOnce === imageViewOnce
+                ? imageUploadedMediaRef.current.media : null;
+            if (!media) {
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: imageAttachment.uri,
+                    name: imageAttachment.name,
+                    type: imageAttachment.type,
+                } as any);
+                formData.append('conversationId', id);
+                formData.append('type', 'image');
+                formData.append('viewOnce', imageViewOnce ? 'true' : 'false');
+                const uploadRes = await chatService.uploadMedia(formData);
+                if (!uploadRes.success || !uploadRes.media) {
+                    if (reconcileMembershipEligibility(uploadRes)) return;
+                    reconcilePhotoEligibility(uploadRes);
+                    toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
+                    return;
+                }
+                media = uploadRes.media;
+                imageUploadedMediaRef.current = { id: imageAttachment.clientMessageId, viewOnce: imageViewOnce, media };
+            }
+            if (await sendMediaMessage('image', media, imageCaption, imageAttachment.clientMessageId)) {
+                imageUploadedMediaRef.current = null;
+                originalImageAttachmentRef.current = null;
                 setImageAttachment(null);
                 setImageCaption('');
                 setImageViewOnce(false);
             }
-        } else {
-            if (reconcileMembershipEligibility(uploadRes)) {
-                setUploadingMedia(false);
-                return;
-            }
-            reconcilePhotoEligibility(uploadRes);
-            toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
+        } catch {
+            toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error');
+        } finally {
+            setUploadingMedia(false);
+            mediaSendLockRef.current = false;
         }
-        setUploadingMedia(false);
     };
 
     const startRecording = async () => {
         if (!requireVerified('chat')) return;
-        if (isOffline) {
-            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
-            return;
-        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
@@ -1114,78 +1441,76 @@ export default function ConversationScreen() {
             toast.show(t('send_text_first', 'Send a text message first, then attach media.'), 'info');
             return;
         }
-        if (recordingBusy || recorderState.isRecording) return;
-
+        if (voicePanelOpen || recordingBusy) return;
+        voiceCopyGenerationRef.current += 1;
         setRecordingBusy(true);
+        voiceUploadedMediaRef.current = null;
         setVoicePreview(null);
         setVoiceWaveform([]);
-        setVoicePanelOpen(true);
-        const permission = await requestRecordingPermissionsAsync();
-        if (!permission.granted) {
-            toast.show(t('microphone_permission_required', 'Microphone permission is required.'), 'error');
-            setVoicePanelOpen(false);
-            setRecordingBusy(false);
-            return;
-        }
-
+        setVoiceSendFailed(false);
         try {
-            await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-            await recorder.prepareToRecordAsync();
-            recorder.record({ forDuration: MAX_VOICE_RECORDING_SECONDS });
-        } catch {
-            toast.show(t('recording_failed', 'Could not start recording.'), 'error');
-            setVoicePanelOpen(false);
-        } finally {
-            setRecordingBusy(false);
-        }
-    };
-
-    const stopRecordingForPreview = async () => {
-        if (!recorderState.isRecording || recordingBusy || id === 'new') return;
-        setRecordingBusy(true);
-        try {
-            await recorder.stop();
-            await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-            const recorderStatus = recorder.getStatus();
-            const uri = recorder.uri || recorderStatus.url;
-            const durationMillis = recorderState.durationMillis || (recorderStatus as any).durationMillis || 0;
-            const duration = Math.min(MAX_VOICE_RECORDING_SECONDS, Math.round(durationMillis / 1000));
-            if (!uri || duration < 1) {
-                toast.show(t('recording_too_short', 'Recording is too short.'), 'warning');
-                setVoicePanelOpen(false);
-                setVoicePreview(null);
+            const permission = await requestRecordingPermissionsAsync();
+            if (!permission.granted) {
+                toast.show(t('microphone_permission_required', 'Microphone permission is required.'), 'error');
                 return;
             }
-
-            setVoicePreview({ uri, duration });
-            setVoiceWaveform((current) => current.length ? current : makeWaveform(VOICE_WAVE_BAR_COUNT));
+            setVoicePanelOpen(true);
         } catch {
-            toast.show(t('recording_failed', 'Could not save recording.'), 'error');
+            toast.show(t('recording_failed', 'Could not start recording.'), 'error');
         } finally {
             setRecordingBusy(false);
         }
     };
 
-    const discardVoiceRecording = async () => {
-        if (voiceSending) return;
-        setRecordingBusy(true);
-        try {
-            if (recorderState.isRecording) {
-                await recorder.stop();
-            }
-            await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-        } catch {
-            // Discard should always close the recorder even if native audio cleanup fails.
-        } finally {
-            setVoicePanelOpen(false);
-            setVoicePreview(null);
-            setVoiceWaveform([]);
+    const finishVoiceRecording = async (result: WaveformRecorderCompleteEvent) => {
+        if (!result.uri || result.durationMs < 1000) {
+            sendAfterFinalizeRef.current = false;
             setRecordingBusy(false);
+            toast.show(t('recording_too_short', 'Recording is too short.'), 'warning');
+            setVoicePanelOpen(false);
+            return;
         }
+        const generation = voiceCopyGenerationRef.current;
+        const clientMessageId = newMediaMessageId();
+        const copiedUri = `${FileSystem.cacheDirectory || FileSystem.documentDirectory || ''}${clientMessageId}.m4a`;
+        try {
+            if (!FileSystem.cacheDirectory && !FileSystem.documentDirectory) throw new Error('file_system_unavailable');
+            await FileSystem.copyAsync({ from: result.uri, to: copiedUri });
+            const copiedFile = await FileSystem.getInfoAsync(copiedUri);
+            if (!copiedFile.exists || !copiedFile.size) throw new Error('empty_recording');
+            if (generation !== voiceCopyGenerationRef.current) {
+                void FileSystem.deleteAsync(copiedUri, { idempotent: true }).catch(() => undefined);
+                return;
+            }
+            setVoicePreview({ uri: copiedUri, duration: Math.min(MAX_VOICE_RECORDING_SECONDS, Math.round(result.durationMs / 1000)), clientMessageId });
+            setVoiceWaveform(result.samples.slice(0, VOICE_WAVE_BAR_COUNT));
+        } catch (error) {
+            console.warn('[chat] voice-copy-failed', error);
+            void FileSystem.deleteAsync(copiedUri, { idempotent: true }).catch(() => undefined);
+            sendAfterFinalizeRef.current = false;
+            setVoicePanelOpen(false);
+            toast.show(t('recording_failed', 'Could not save recording.'), 'error');
+        } finally {
+            if (generation === voiceCopyGenerationRef.current) setRecordingBusy(false);
+        }
+    };
+
+    const discardVoiceRecording = () => {
+        if (voiceSending) return;
+        voiceCopyGenerationRef.current += 1;
+        sendAfterFinalizeRef.current = false;
+        voiceUploadedMediaRef.current = null;
+        if (voicePreview?.uri) void FileSystem.deleteAsync(voicePreview.uri, { idempotent: true }).catch(() => undefined);
+        setVoicePanelOpen(false);
+        setVoicePreview(null);
+        setVoiceWaveform([]);
+        setVoiceSendFailed(false);
+        setRecordingBusy(false);
     };
 
     const sendVoicePreview = async () => {
-        if (!voicePreview || voiceSending || id === 'new') return;
+        if (voiceSending || mediaSendLockRef.current || id === 'new') return;
+        if (!voicePreview) return;
         if (isOffline) {
             toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
             return;
@@ -1196,35 +1521,64 @@ export default function ConversationScreen() {
                 : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
+        mediaSendLockRef.current = true;
         setVoiceSending(true);
+        setVoiceSendFailed(false);
         try {
-            const formData = new FormData();
-            formData.append('file', {
-                uri: voicePreview.uri,
-                name: `voice-${Date.now()}.m4a`,
-                type: Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4',
-            } as any);
-            formData.append('conversationId', id);
-            formData.append('type', 'voice');
-            formData.append('duration', String(Math.min(MAX_VOICE_RECORDING_SECONDS, voicePreview.duration)));
-
-            const uploadRes = await chatService.uploadMedia(formData);
-            if (uploadRes.success && uploadRes.media) {
-                await sendMediaMessage('voice', uploadRes.media);
+            let media = voiceUploadedMediaRef.current?.id === voicePreview.clientMessageId
+                ? voiceUploadedMediaRef.current.media : null;
+            if (!media) {
+                const formData = new FormData();
+                formData.append('file', {
+                    uri: voicePreview.uri,
+                    name: `voice-${Date.now()}.m4a`,
+                    type: Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4',
+                } as any);
+                formData.append('conversationId', id);
+                formData.append('type', 'voice');
+                formData.append('duration', String(Math.min(MAX_VOICE_RECORDING_SECONDS, voicePreview.duration)));
+                const uploadRes = await chatService.uploadMedia(formData);
+                if (!uploadRes.success || !uploadRes.media) {
+                    console.warn('[chat] voice-upload-failed', { status: uploadRes.status, error: uploadRes.error, message: uploadRes.message });
+                    if (reconcileMembershipEligibility(uploadRes)) return;
+                    reconcilePhotoEligibility(uploadRes);
+                    toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
+                    setVoiceSendFailed(true);
+                    return;
+                }
+                media = {
+                    ...uploadRes.media,
+                    waveform: waveformPeaks(voiceWaveform, VOICE_WAVE_BAR_COUNT),
+                };
+                voiceUploadedMediaRef.current = { id: voicePreview.clientMessageId, media };
+            }
+            const sentMessage = await sendMediaMessage('voice', media, '', voicePreview.clientMessageId, voicePreview.uri);
+            if (sentMessage) {
+                voiceUploadedMediaRef.current = null;
+                if (sentMessage.media?.localUri && sentMessage.media.localUri !== voicePreview.uri) {
+                    void FileSystem.deleteAsync(voicePreview.uri, { idempotent: true }).catch(() => undefined);
+                }
                 setVoicePanelOpen(false);
                 setVoicePreview(null);
                 setVoiceWaveform([]);
             } else {
-                if (reconcileMembershipEligibility(uploadRes)) return;
-                reconcilePhotoEligibility(uploadRes);
-                toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
+                setVoiceSendFailed(true);
             }
         } catch {
             toast.show(t('recording_failed', 'Could not save recording.'), 'error');
+            setVoiceSendFailed(true);
         } finally {
             setVoiceSending(false);
+            mediaSendLockRef.current = false;
         }
     };
+
+    useEffect(() => {
+        if (!voicePreview || !sendAfterFinalizeRef.current) return;
+        sendAfterFinalizeRef.current = false;
+        void sendVoicePreview();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [voicePreview]);
 
     const requestAction = async (action: 'accept' | 'decline' | 'withdraw') => {
         const target = activeConversation;
@@ -1238,18 +1592,23 @@ export default function ConversationScreen() {
         setRequestBusy(false);
         if (reconcileMembershipEligibility(res)) return;
         if (!res.success) {
-            Alert.alert(t('error', 'Error'), apiMessage(res.message));
+            toast.show(apiMessage(res.message), 'error', 3500);
             return;
         }
         if (action === 'accept') {
+            acceptedConversationRef.current = target.id;
+            applyAcceptedConversation(target);
             setConversation((current) => current ? { ...current, state: 'active', requestRole: null } : {
                 ...target,
                 state: 'active',
                 requestRole: null,
             });
-            await load('replace');
+            void load('replace');
         }
-        else goBackToMessages();
+        else {
+            applyConversationStateById(target.id, 'declined');
+            goBackToMessages();
+        }
     };
 
     const toggleMute = async () => {
@@ -1259,7 +1618,7 @@ export default function ConversationScreen() {
         const res = await chatService.mute(conversation.id, nextMuted);
         setMenuBusy(false);
         if (!res.success) {
-            Alert.alert(t('error', 'Error'), apiMessage(res.message));
+            toast.show(apiMessage(res.message), 'error', 3500);
             return;
         }
         setConversation((current) => current ? { ...current, muted: nextMuted } : current);
@@ -1274,66 +1633,46 @@ export default function ConversationScreen() {
 
     const endConversation = () => {
         if (!conversation || menuBusy) return;
-        Alert.alert(
-            translateChatText('end_conversation', 'End conversation'),
-            translateChatText('end_conversation_confirm', 'End this conversation?'),
-            [
-                { text: t('cancel', 'Cancel'), style: 'cancel' },
-                {
-                    text: translateChatText('end_conversation', 'End conversation'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        if (!conversation) return;
-                        setMenuBusy(true);
-                        const res = await chatService.end(conversation.id);
-                        setMenuBusy(false);
-                        if (!res.success) {
-                            Alert.alert(t('error', 'Error'), apiMessage(res.message));
-                            return;
-                        }
-                        setMenuOpen(false);
-                        await load('replace');
-                    },
-                },
-            ],
-        );
+        setConversationConfirmation('end');
     };
 
     const deleteConversation = () => {
         if (!conversation || menuBusy) return;
-        Alert.alert(
-            translateChatText('delete_chat', 'Delete chat'),
-            translateChatText('delete_chat_confirm', 'Delete this chat for me?'),
-            [
-                { text: t('cancel', 'Cancel'), style: 'cancel' },
-                {
-                    text: translateChatText('delete_chat', 'Delete chat'),
-                    style: 'destructive',
-                    onPress: async () => {
-                        if (!conversation) return;
-                        setMenuBusy(true);
-                        const res = await chatService.deleteConversation(conversation.id);
-                        setMenuBusy(false);
-                        if (!res.success) {
-                            Alert.alert(t('error', 'Error'), apiMessage(res.message));
-                            return;
-                        }
-                        setMenuOpen(false);
-                        toast.show(translateChatText('chat_hidden', 'Chat hidden'), 'success');
-                        goBackToMessages();
-                    },
-                },
-            ],
-        );
+        setConversationConfirmation('delete');
+    };
+
+    const confirmConversationAction = async () => {
+        if (!conversation || !conversationConfirmation || menuBusy) return;
+        const action = conversationConfirmation;
+        setMenuBusy(true);
+        const res = action === 'end'
+            ? await chatService.end(conversation.id)
+            : await chatService.deleteConversation(conversation.id);
+        setMenuBusy(false);
+        if (!res.success) {
+            toast.show(apiMessage(res.message), 'error', 3500);
+            return;
+        }
+
+        setConversationConfirmation(null);
+        setMenuOpen(false);
+        if (action === 'end') {
+            await load('replace');
+            return;
+        }
+        toast.show(translateChatText('chat_hidden', 'Chat hidden'), 'success');
+        goBackToMessages();
     };
 
     const markViewOnceLoaded = async () => {
         if (!viewOnce?.messageId) return;
         const messageId = viewOnce.messageId;
-        await chatService.markViewOnceViewed(messageId);
+        const result = await chatService.markViewOnceViewed(messageId);
+        if (!result.success) return;
+        const viewedAt = result.viewedAt || result.data?.viewedAt || new Date().toISOString();
         setItems((current) => current.map((message) => message.id === messageId ? {
             ...message,
-            media: { ...(message.media || {}), viewedAt: new Date().toISOString() },
+            media: { ...(message.media || {}), viewedAt },
         } : message));
     };
 
@@ -1342,6 +1681,16 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
+    const renderMessageMenuBackdrop = useCallback((props: BottomSheetBackdropProps) => (
+        <BottomSheetBackdrop
+            {...props}
+            appearsOnIndex={0}
+            disappearsOnIndex={-1}
+            opacity={0.38}
+            pressBehavior={messageActionBusy ? 'none' : 'close'}
+        />
+    ), [messageActionBusy]);
+
     const copySelectedMessage = async () => {
         if (!selectedMessage || messageActionBusy) return;
         const text = messageText(selectedMessage).trim();
@@ -1349,6 +1698,31 @@ export default function ConversationScreen() {
         await Clipboard.setStringAsync(text);
         toast.show(translateChatText('copied', 'Copied'), 'success');
         setSelectedMessage(null);
+    };
+
+    const reportSelectedMessage = () => {
+        if (!selectedMessage || messageActionBusy || !requireVerified('report')) return;
+        const currentUserId = String(user?._id || user?.id || '');
+        if (!selectedMessage.id || selectedMessage.sender === currentUserId || selectedMessage.type === 'system' || selectedMessage.unsent) return;
+
+        const message = selectedMessage;
+        setSelectedMessage(null);
+        setReportTarget({
+            type: 'ChatMessage',
+            userId: String(message.sender),
+            messageId: message.id,
+            messageType: message.type,
+            messagePreview: message.type === 'text'
+                ? messageText(message).trim()
+                : message.type === 'image'
+                    ? translateChatText(message.media?.viewOnce ? 'view_once_photo' : 'photo', 'Photo')
+                    : message.type === 'voice'
+                        ? translateChatText('voice_message', 'Voice message')
+                        : message.content || translateChatText('message', 'Message'),
+            messageMediaUrl: message.type === 'image'
+                ? message.media?.thumbnail || message.media?.url
+                : undefined,
+        });
     };
 
     const reactToSelectedMessage = async (emoji: string) => {
@@ -1406,7 +1780,7 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
-    if (eligibility.isLoading || loading) {
+    if (eligibility.isLoading) {
         return (
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={styles.center}>
@@ -1421,7 +1795,7 @@ export default function ConversationScreen() {
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
-                        {isRTL ? <ChevronRight size={24} color={colors.text} /> : <ChevronLeft size={24} color={colors.text} />}
+                        {isRTL ? <CaretRight size={24} color={colors.text} weight="bold" /> : <CaretLeft size={24} color={colors.text} weight="bold" />}
                     </Pressable>
                 </View>
                 <View style={styles.gateContent}>
@@ -1440,7 +1814,7 @@ export default function ConversationScreen() {
             <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
                 <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
-                        {isRTL ? <ChevronRight size={24} color={colors.text} /> : <ChevronLeft size={24} color={colors.text} />}
+                        {isRTL ? <CaretRight size={24} color={colors.text} weight="bold" /> : <CaretLeft size={24} color={colors.text} weight="bold" />}
                     </Pressable>
                 </View>
                 <View style={styles.center}>
@@ -1465,7 +1839,7 @@ export default function ConversationScreen() {
     }
 
     return (
-        <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+        <SafeAreaView style={[styles.screen, { backgroundColor: colors.body }]} edges={['top']}>
             <View style={styles.screen}>
                 <View style={[
                     styles.header,
@@ -1476,7 +1850,7 @@ export default function ConversationScreen() {
                     },
                 ]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
-                        {(isRTL ? <ChevronRight size={scale(23)} color={colors.text} /> : <ChevronLeft size={scale(23)} color={colors.text} />)}
+                        {(isRTL ? <CaretRight size={scale(23)} color={colors.text} weight="bold" /> : <CaretLeft size={scale(23)} color={colors.text} weight="bold" />)}
                     </Pressable>
                     <Pressable
                         disabled={headerOther.account_deleted}
@@ -1534,12 +1908,13 @@ export default function ConversationScreen() {
                 </View>
 
                 <ChatKeyboardAvoider>
-                <View style={[styles.messageListWrap, { backgroundColor: colors.body }]}>
-                    <ChatDoodleBackground
-                        color={palette.chrome.common.iconNeutral}
-                        opacity={isDark ? 0.11 : 0.09}
-                    />
+                <ChatDoodleBackground
+                    color={palette.chrome.common.iconNeutral}
+                    opacity={isDark ? 0.11 : 0.09}
+                />
+                <View style={styles.messageListWrap}>
                     <FlatList
+                        key={id}
                         ref={listRef}
                         style={{ flex: 1 }}
                         inverted={invertedItems.length > 0}
@@ -1547,6 +1922,12 @@ export default function ConversationScreen() {
                         keyboardDismissMode="interactive"
                         scrollEventThrottle={16}
                         onScroll={handleListScroll}
+                        onScrollBeginDrag={() => {
+                            initialFreshPositionPendingRef.current = false;
+                            pendingAutoScrollRef.current = false;
+                        }}
+                        onViewableItemsChanged={onViewableItemsChangedRef.current}
+                        viewabilityConfig={viewabilityConfigRef.current}
                         data={invertedItems}
                         keyExtractor={(item) => item.id}
                         contentContainerStyle={{
@@ -1576,9 +1957,13 @@ export default function ConversationScreen() {
                         ListHeaderComponent={peerTyping ? <TypingIndicatorBubble colors={colors} /> : null}
                         ListEmptyComponent={
                             <View style={styles.empty}>
-                                <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
-                                    {t('no_messages_yet', 'No messages yet')}
-                                </Text>
+                                {loading || !messagesReady ? (
+                                    <ActivityIndicator color={colors.primary} />
+                                ) : (
+                                    <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
+                                        {t('no_messages_yet', 'No messages yet')}
+                                    </Text>
+                                )}
                             </View>
                         }
                         renderItem={renderMessageItem}
@@ -1590,15 +1975,12 @@ export default function ConversationScreen() {
                         label={t('chat:scroll_to_latest', 'Scroll to latest')}
                         onPress={() => {
                             scrollToBottom(true);
-                            setShowScrollDown(false);
-                            markConversationSeen();
                         }}
                     />
                 </View>
 
                 <ChatComposerBar
-                    backgroundColor={colors.card}
-                    borderTopColor={colors.border}
+                    backgroundColor="transparent"
                     onLayout={(event) => {
                         const nextHeight = event.nativeEvent.layout.height;
                         if (nextHeight > 0 && Math.abs(nextHeight - chatFooterHeight) > 1) {
@@ -1633,6 +2015,40 @@ export default function ConversationScreen() {
                         )}
                         </View>
                     </View>
+                )}
+
+                {id !== 'new' && !activeConversation && !peerDeleted && !emailBlocked && !membershipBlocked && !membershipAccessUnavailable && (
+                    metadataUnavailable ? (
+                        <View style={[styles.endedBar, { backgroundColor: colors.card }]}>
+                            <Pressable accessibilityRole="button" onPress={() => void load('replace')}>
+                                <Text variant="body-sm" align="center" style={{ color: colors.primary }}>
+                                    {t('btn_try_again', 'Try again')}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    ) : (
+                        <View style={styles.composer} pointerEvents="none">
+                            <View style={[styles.composerRow, { opacity: 0.62 }]}>
+                                <View style={[styles.inputPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <View style={styles.pillIcon}>
+                                        <Camera size={scale(21)} color={colors.muted} strokeWidth={2.2} />
+                                    </View>
+                                    <TextInput
+                                        editable={false}
+                                        placeholder={t('chat:message_placeholder', 'Type a message...')}
+                                        placeholderTextColor={colors.subtle}
+                                        style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                    />
+                                    <View style={styles.pillIcon}>
+                                        <ImageIcon size={scale(21)} color={colors.muted} strokeWidth={2.2} />
+                                    </View>
+                                </View>
+                                <View style={[styles.send, { backgroundColor: colors.primary }]}>
+                                    <Mic size={scale(21)} color={colors.inverse} strokeWidth={2.2} />
+                                </View>
+                            </View>
+                        </View>
+                    )
                 )}
 
                 {peerDeleted && (
@@ -1675,15 +2091,22 @@ export default function ConversationScreen() {
                         {voicePanelOpen ? (
                             <VoiceRecorderPanel
                                 colors={colors}
-                                duration={voicePreview?.duration || Math.min(MAX_VOICE_RECORDING_SECONDS, Math.round((recorderState.durationMillis || 0) / 1000))}
-                                isRecording={recorderState.isRecording}
+                                duration={voicePreview?.duration || 0}
                                 previewUri={voicePreview?.uri || null}
                                 recordingBusy={recordingBusy}
                                 sending={voiceSending}
+                                sendFailed={voiceSendFailed}
                                 waveform={voiceWaveform}
+                                onComplete={finishVoiceRecording}
+                                onError={() => {
+                                    sendAfterFinalizeRef.current = false;
+                                    setRecordingBusy(false);
+                                    setVoicePanelOpen(false);
+                                    toast.show(t('recording_failed', 'Could not save recording.'), 'error');
+                                }}
                                 onDiscard={discardVoiceRecording}
-                                onSend={sendVoicePreview}
-                                onStop={stopRecordingForPreview}
+                                onSendPreview={sendVoicePreview}
+                                onFinalizeForSend={() => { sendAfterFinalizeRef.current = true; setRecordingBusy(true); }}
                             />
                         ) : (
                             <View style={styles.composerRow}>
@@ -1709,16 +2132,8 @@ export default function ConversationScreen() {
                                         style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                         multiline
                                     />
-                                    {!content.trim() && (
-                                        <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)} style={styles.pillIconCluster}>
-                                            <PressableScale
-                                                onPress={startRecording}
-                                                disabled={isOffline || recordingBusy || voiceSending}
-                                                accessibilityLabel={translateChatText('voice_message', 'Voice message')}
-                                                style={styles.pillIcon}
-                                            >
-                                                {recordingBusy ? <ActivityIndicator color={colors.primary} size="small" /> : <Mic size={scale(21)} color={colors.muted} strokeWidth={2.2} />}
-                                            </PressableScale>
+                                    {!content.length && (
+                                        <View style={styles.pillIconCluster}>
                                             <PressableScale
                                                 onPress={pickAndUploadImage}
                                                 disabled={isOffline || uploadingMedia || recordingBusy || voiceSending}
@@ -1727,21 +2142,28 @@ export default function ConversationScreen() {
                                             >
                                                 {uploadingMedia ? <ActivityIndicator color={colors.primary} size="small" /> : <ImageIcon size={scale(21)} color={colors.muted} strokeWidth={2.2} />}
                                             </PressableScale>
-                                        </Reanimated.View>
+                                        </View>
                                     )}
                                 </View>
-                                {!!content.trim() && (
-                                    <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)}>
-                                        <PressableScale
-                                            onPress={send}
-                                            disabled={sending}
-                                            accessibilityLabel={translateChatText('send', 'Send')}
-                                            style={[styles.send, { backgroundColor: colors.primary }]}
-                                        >
-                                            {sending ? <ActivityIndicator color={colors.inverse} /> : <Send size={scale(18)} color={colors.inverse} />}
-                                        </PressableScale>
-                                    </Reanimated.View>
-                                )}
+                                <PressableScale
+                                    onPress={content.length ? send : startRecording}
+                                    disabled={content.length
+                                        ? !content.trim() || sending
+                                        : isOffline || recordingBusy || voiceSending}
+                                    accessibilityLabel={content.length
+                                        ? translateChatText('send', 'Send')
+                                        : translateChatText('voice_message', 'Voice message')}
+                                    accessibilityState={{ disabled: content.length ? !content.trim() || sending : isOffline || recordingBusy || voiceSending }}
+                                    style={[styles.send, { backgroundColor: colors.primary }]}
+                                >
+                                    {content.length
+                                        ? sending
+                                            ? <ActivityIndicator color={colors.inverse} />
+                                            : <PaperPlaneTilt size={scale(22)} color={content.trim() ? colors.inverse : colors.muted} weight="fill" />
+                                        : recordingBusy
+                                            ? <ActivityIndicator color={colors.inverse} />
+                                            : <Mic size={scale(21)} color={colors.inverse} strokeWidth={2.2} />}
+                                </PressableScale>
                             </View>
                         )}
                     </View>
@@ -1751,7 +2173,7 @@ export default function ConversationScreen() {
             </View>
 
             <ImageAttachmentComposer
-                visible={!!imageAttachment}
+                visible={!!imageAttachment && !cropOpen}
                 uri={imageAttachment?.uri ?? null}
                 caption={imageCaption}
                 viewOnce={imageViewOnce}
@@ -1768,9 +2190,51 @@ export default function ConversationScreen() {
                         : translateChatText('send', 'Send'),
                 }}
                 onChangeCaption={setImageCaption}
-                onToggleViewOnce={() => !uploadingMedia && setImageViewOnce((value) => !value)}
+                onToggleViewOnce={() => {
+                    if (uploadingMedia) return;
+                    void lightImpact();
+                    setImageViewOnce((value) => !value);
+                }}
                 onClose={closeImageAttachment}
                 onSend={sendImageAttachment}
+                onCrop={() => { KeyboardController.dismiss(); setCropOpen(true); }}
+                onReset={originalImageAttachmentRef.current && imageAttachment?.uri !== originalImageAttachmentRef.current.uri
+                    ? () => {
+                        imageUploadedMediaRef.current = null;
+                        setImageAttachment({ ...originalImageAttachmentRef.current!, clientMessageId: newMediaMessageId() });
+                    }
+                    : undefined}
+                cropLabel={t('chat:crop', 'Crop')}
+                resetLabel={t('chat:reset_image', 'Reset')}
+            />
+            <GalleryCropModal
+                visible={cropOpen}
+                imageUri={originalImageAttachmentRef.current?.uri || ''}
+                isDark={isDark}
+                uploading={false}
+                labels={{
+                    title: t('chat:crop', 'Crop'),
+                    subtitle: t('chat:crop_hint', 'Move and zoom the image to frame it.'),
+                    preparing: t('chat:crop_preparing', 'Preparing image...'),
+                    upload: t('chat:crop_done', 'Done'),
+                    rotate: t('chat:rotate_image', 'Rotate'),
+                }}
+                ratioOptions={[
+                    { label: t('chat:original_ratio', 'Original'), value: 'original' },
+                    { label: '1:1', value: 1 },
+                    { label: '4:3', value: 4 / 3 },
+                    { label: '3:4', value: 3 / 4 },
+                    { label: '16:9', value: 16 / 9 },
+                    { label: '9:16', value: 9 / 16 },
+                ]}
+                resetLabel={t('chat:reset_image', 'Reset')}
+                onClose={() => setCropOpen(false)}
+                onUpload={async (uri) => {
+                    imageUploadedMediaRef.current = null;
+                    setImageAttachment((current) => current ? { ...current, uri, name: `chat-crop-${Date.now()}.jpg`, type: 'image/jpeg', clientMessageId: newMediaMessageId() } : null);
+                    setCropOpen(false);
+                }}
+                onError={() => toast.show(t('chat:crop_failed', 'Could not crop this image.'), 'error')}
             />
 
             <Modal visible={!!imagePreview} transparent animationType="fade" onRequestClose={() => setImagePreview(null)}>
@@ -1859,11 +2323,34 @@ export default function ConversationScreen() {
                 </View>
             </Modal>
 
-            <Modal visible={!!selectedMessage} transparent animationType="fade" onRequestClose={closeMessageMenu}>
-                <View style={styles.messageMenuLayer}>
-                    <Pressable style={styles.messageMenuBackdrop} onPress={closeMessageMenu} />
-                    {!!selectedMessage && (
-                        <View style={[styles.messageMenuSheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom + scale(50), scale(50)) }]}>
+            <Modal
+                visible={!!selectedMessage}
+                transparent
+                animationType="none"
+                statusBarTranslucent
+                navigationBarTranslucent
+                hardwareAccelerated
+                onRequestClose={closeMessageMenu}
+            >
+                <GestureHandlerRootView style={styles.messageMenuLayer}>
+                    {!!selectedMessage && (() => {
+                        const actionCount = 2
+                            + (messageText(selectedMessage).trim() ? 1 : 0)
+                            + (String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent ? 1 : 0)
+                            + (canUnsendMessage(selectedMessage, String(user?._id || user?.id || '')) ? 1 : 0);
+                        const sheetHeight = scale(86 + actionCount * 52) + insets.bottom;
+                        return (
+                        <BottomSheet
+                            index={0}
+                            snapPoints={[sheetHeight]}
+                            enableDynamicSizing={false}
+                            enablePanDownToClose={!messageActionBusy}
+                            onClose={closeMessageMenu}
+                            backdropComponent={renderMessageMenuBackdrop}
+                            backgroundStyle={{ backgroundColor: colors.card }}
+                            handleIndicatorStyle={{ backgroundColor: colors.muted }}
+                        >
+                        <BottomSheetView style={[styles.messageMenuSheet, { paddingBottom: insets.bottom + scale(10) }]}>
                             <View style={styles.quickReactionRow}>
                                 {QUICK_REACTIONS.map((emoji) => (
                                     <Pressable
@@ -1892,6 +2379,16 @@ export default function ConversationScreen() {
                                     onPress={copySelectedMessage}
                                 />
                             )}
+                            {String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent ? (
+                                <MessageActionItem
+                                    icon={Flag}
+                                    label={translateChatText('report_message', 'Report message')}
+                                    color={colors.danger}
+                                    danger
+                                    disabled={messageActionBusy}
+                                    onPress={reportSelectedMessage}
+                                />
+                            ) : null}
                             <MessageActionItem
                                 icon={Trash2}
                                 label={translateChatText('delete_for_me', 'Delete for me')}
@@ -1910,15 +2407,41 @@ export default function ConversationScreen() {
                                     onPress={unsendSelectedMessage}
                                 />
                             )}
-                        </View>
-                    )}
-                </View>
+                        </BottomSheetView>
+                        </BottomSheet>
+                        );
+                    })()}
+                </GestureHandlerRootView>
             </Modal>
             <UserProfileSheet
                 visible={profileSheetOpen && Boolean(peerId)}
                 userId={peerId}
                 initialProfile={profileSheetProfile}
                 onClose={() => setProfileSheetOpen(false)}
+            />
+            <ReportSheet
+                target={reportTarget}
+                onClose={() => setReportTarget(null)}
+                onBlocked={() => {
+                    setReportTarget(null);
+                    goBackToMessages();
+                }}
+            />
+            <ConfirmSheet
+                visible={conversationConfirmation !== null}
+                onClose={() => setConversationConfirmation(null)}
+                onConfirm={() => void confirmConversationAction()}
+                title={conversationConfirmation === 'delete'
+                    ? translateChatText('delete_chat', 'Delete chat')
+                    : translateChatText('end_conversation', 'End conversation')}
+                message={conversationConfirmation === 'delete'
+                    ? translateChatText('delete_chat_confirm', 'Delete this chat for me?')
+                    : translateChatText('end_conversation_confirm', 'End this conversation?')}
+                confirmLabel={conversationConfirmation === 'delete'
+                    ? translateChatText('delete_chat', 'Delete chat')
+                    : translateChatText('end_conversation', 'End conversation')}
+                cancelLabel={t('cancel', 'Cancel')}
+                confirmLoading={menuBusy}
             />
         </SafeAreaView>
     );
@@ -1987,85 +2510,226 @@ function MessageActionItem({
 function VoiceRecorderPanel({
     colors,
     duration,
-    isRecording,
     previewUri,
     recordingBusy,
     sending,
+    sendFailed,
     waveform,
+    onComplete,
+    onError,
     onDiscard,
-    onSend,
-    onStop,
+    onSendPreview,
+    onFinalizeForSend,
 }: {
     colors: Record<string, string>;
     duration: number;
-    isRecording: boolean;
     previewUri: string | null;
     recordingBusy: boolean;
     sending: boolean;
+    sendFailed: boolean;
     waveform: number[];
+    onComplete: (result: WaveformRecorderCompleteEvent) => void;
+    onError: () => void;
     onDiscard: () => void;
-    onSend: () => void;
-    onStop: () => void;
+    onSendPreview: () => void;
+    onFinalizeForSend: () => void;
 }) {
-    const bars = waveform.length ? waveform : makeWaveform(VOICE_WAVE_BAR_COUNT);
+    const playbackOwnerRef = useRef(createChatAudioPlaybackOwner('native-recorder-preview'));
+    const previewPlayingRef = useRef(false);
+    const recorderRef = useRef<WaveformRecorderViewRef>(null);
+    const startedRef = useRef(false);
+    const discardedRef = useRef(false);
+    const finalizingRef = useRef(false);
+    const previewRequestedRef = useRef(false);
+    const stateRef = useRef<WaveformRecorderState>('idle');
+    const [nativeState, setNativeState] = useState<WaveformRecorderState>('idle');
+    const [elapsedMs, setElapsedMs] = useState(0);
+    const [previewPlaying, setPreviewPlaying] = useState(false);
+    const [waveWidth, setWaveWidth] = useState(0);
+    const [playbackFraction, setPlaybackFraction] = useState(0);
+    const recordedMsRef = useRef(0);
+    const recordingStartedAtRef = useRef<number | null>(null);
     const disabled = recordingBusy || sending;
+    const isPreviewing = nativeState === 'preview';
+    const isPaused = nativeState === 'paused';
+
+    const pauseNativePreview = useCallback(() => {
+        if (!previewPlayingRef.current) return;
+        previewPlayingRef.current = false;
+        recorderRef.current?.togglePreviewPlayback();
+        setPreviewPlaying(false);
+    }, []);
+
+    useEffect(() => () => {
+        releaseChatAudioPlayback(playbackOwnerRef.current);
+        pauseNativePreview();
+    }, [pauseNativePreview]);
+
+    useEffect(() => {
+        if (nativeState !== 'recording') return;
+        const timer = setInterval(() => {
+            setElapsedMs(Math.min(MAX_VOICE_RECORDING_SECONDS * 1000, recordedMsRef.current + Date.now() - (recordingStartedAtRef.current || Date.now())));
+        }, 100);
+        return () => clearInterval(timer);
+    }, [nativeState]);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (next) => {
+            if (next !== 'active' && stateRef.current === 'recording') {
+                previewRequestedRef.current = false;
+                recorderRef.current?.pause();
+            } else if (next === 'active' && stateRef.current === 'paused') {
+                previewRequestedRef.current = true;
+                recorderRef.current?.enterPreview();
+            }
+        });
+        return () => subscription.remove();
+    }, []);
+
+    const handleStateChange = (event: { state: WaveformRecorderState; durationMs: number }) => {
+        stateRef.current = event.state;
+        setNativeState(event.state);
+        recordedMsRef.current = event.durationMs;
+        recordingStartedAtRef.current = event.state === 'recording' ? Date.now() : null;
+        setElapsedMs(event.durationMs);
+        if (event.state !== 'preview') {
+            releaseChatAudioPlayback(playbackOwnerRef.current);
+            previewPlayingRef.current = false;
+            setPreviewPlaying(false);
+            setPlaybackFraction(0);
+        }
+        if (event.state === 'paused' && previewRequestedRef.current) {
+            previewRequestedRef.current = false;
+            requestAnimationFrame(() => {
+                if (!finalizingRef.current && stateRef.current === 'paused') recorderRef.current?.enterPreview();
+            });
+        }
+    };
+
+    const handlePauseResume = () => {
+        if (disabled || previewUri) return;
+        if (nativeState === 'recording') {
+            previewRequestedRef.current = true;
+            recorderRef.current?.pause();
+        } else if (nativeState === 'preview' || nativeState === 'paused') {
+            previewRequestedRef.current = false;
+            recorderRef.current?.resume();
+        }
+    };
+
+    const handleDiscard = () => {
+        if (disabled) return;
+        discardedRef.current = true;
+        finalizingRef.current = true;
+        if (previewUri) {
+            onDiscard();
+            return;
+        }
+        recorderRef.current?.cancel();
+        requestAnimationFrame(onDiscard);
+    };
+
+    const handleSend = () => {
+        if (disabled) return;
+        if (previewUri) {
+            onSendPreview();
+            return;
+        }
+        if (nativeState !== 'recording' && nativeState !== 'paused' && nativeState !== 'preview') return;
+        finalizingRef.current = true;
+        onFinalizeForSend();
+        recorderRef.current?.stop();
+    };
 
     return (
-        <View style={styles.voiceRecorderPanel}>
+        <View style={[styles.voiceRecorderPanel, { backgroundColor: colors.card }]}>
             <View style={styles.voiceRecorderHeader}>
-                <View style={styles.voiceRecorderTimer}>
-                    {isRecording && <View style={styles.recordDot} />}
-                    <Mic size={scale(15)} color={colors.primary} />
-                    <Text variant="caption" className="font-body-bold" style={{ color: colors.text }}>
-                        {formatDuration(duration)}
-                    </Text>
-                </View>
-                <Pressable onPress={onDiscard} disabled={disabled} style={styles.voiceRecorderClose}>
-                    <X size={scale(17)} color={colors.muted} strokeWidth={2.5} />
-                </Pressable>
+                {previewUri ? (
+                    <VoicePreviewPlayer uri={previewUri} duration={duration} colors={colors} waveform={waveform} />
+                ) : (
+                    <>
+                        {isPreviewing ? (
+                            <Pressable accessibilityRole="button" accessibilityLabel={previewPlaying ? t('chat:voice_pause', 'Pause') : t('chat:voice_play', 'Play')} onPress={() => {
+                                if (previewPlayingRef.current) {
+                                    releaseChatAudioPlayback(playbackOwnerRef.current);
+                                } else {
+                                    claimChatAudioPlayback(playbackOwnerRef.current, pauseNativePreview);
+                                }
+                                recorderRef.current?.togglePreviewPlayback();
+                                previewPlayingRef.current = !previewPlayingRef.current;
+                                setPreviewPlaying(previewPlayingRef.current);
+                            }} style={styles.voiceRecorderPreviewPlay}>
+                                {previewPlaying ? <Pause size={scale(20)} color={colors.text} /> : <Play size={scale(20)} color={colors.text} />}
+                            </Pressable>
+                        ) : isPaused ? <View style={styles.voiceRecorderPreviewPlay}><ActivityIndicator color={colors.muted} size="small" /></View>
+                            : <Text style={[styles.voiceRecorderTimeText, { color: colors.text }]}>{formatDuration(Math.floor(elapsedMs / 1000))}</Text>}
+                        <View style={styles.voiceRecorderWaveSlot}>
+                            <View style={styles.voiceRecorderNativeWaveHost} onLayout={(event) => setWaveWidth(event.nativeEvent.layout.width)}>
+                            <WaveformRecorderView
+                                ref={recorderRef}
+                                style={styles.voiceRecorderNativeWave}
+                                output={{ format: 'm4a', channels: 1, bitrate: 128000 }}
+                                maxDurationMs={MAX_VOICE_RECORDING_SECONDS * 1000}
+                                playedBarColor={colors.muted}
+                                unplayedBarColor={colors.waveMuted}
+                                barWidth={scale(3)}
+                                barGap={scale(2)}
+                                barRadius={scale(2)}
+                                showBackground={false}
+                                showTime={false}
+                                showPlayButton={false}
+                                enablePreview
+                                enableContinueRecording
+                                onLayout={() => {
+                                    if (startedRef.current) return;
+                                    startedRef.current = true;
+                                    recorderRef.current?.start();
+                                }}
+                                onStateChange={handleStateChange}
+                                onPlaybackTimeUpdate={({ positionMs, durationMs }) => {
+                                    if (durationMs > 0) setPlaybackFraction(Math.max(0, Math.min(1, positionMs / durationMs)));
+                                    if (durationMs > 0 && positionMs >= durationMs - 100) {
+                                        previewPlayingRef.current = false;
+                                        setPreviewPlaying(false);
+                                        releaseChatAudioPlayback(playbackOwnerRef.current);
+                                    }
+                                }}
+                                onSeek={({ positionMs }) => {
+                                    if (elapsedMs > 0) setPlaybackFraction(Math.max(0, Math.min(1, positionMs / elapsedMs)));
+                                }}
+                                onComplete={(result) => { if (!discardedRef.current) onComplete(result); }}
+                                onError={() => { if (!discardedRef.current) onError(); }}
+                                onPermissionDenied={onError}
+                            />
+                            {isPreviewing ? <View pointerEvents="none" style={[styles.voiceRecorderScrubDot, { backgroundColor: colors.primary, left: Math.max(0, Math.min(waveWidth - scale(10), playbackFraction * waveWidth - scale(5))) }]} /> : null}
+                            </View>
+                        </View>
+                        {isPreviewing || isPaused ? <Text style={[styles.voiceRecorderTimeText, { color: colors.text }]}>{formatDuration(Math.floor(elapsedMs / 1000))}</Text> : null}
+                    </>
+                )}
             </View>
 
-            {previewUri ? (
-                <VoicePreviewPlayer uri={previewUri} duration={duration} colors={colors} waveform={bars} />
-            ) : (
-                <View style={[styles.voiceRecorderWaveSurface, { backgroundColor: colors.surface }]}>
-                    {bars.map((value, index) => (
-                        <View
-                            key={`recording-wave-${index}`}
-                            style={[
-                                styles.voiceRecorderWaveBar,
-                                {
-                                    height: scale(7 + value * 30),
-                                    backgroundColor: colors.primary,
-                                },
-                            ]}
-                        />
-                    ))}
-                </View>
-            )}
-
             <View style={styles.voiceRecorderActions}>
-                <Pressable onPress={onDiscard} disabled={disabled} style={[styles.voiceRecorderSecondary, { backgroundColor: colors.surface }]}>
-                    <Trash2 size={scale(16)} color={colors.text} />
-                    <Text variant="caption" className="font-body-bold" style={{ color: colors.text }}>
-                        {t('chat:voice_discard', 'Discard')}
-                    </Text>
+                <Pressable accessibilityRole="button" accessibilityLabel={t('chat:voice_discard', 'Discard')} onPress={handleDiscard} disabled={disabled} style={[styles.voiceRecorderIconAction, { backgroundColor: colors.surface }]}>
+                    <Trash2 size={scale(20)} color={colors.danger} />
                 </Pressable>
                 {previewUri ? (
-                    <Pressable onPress={onSend} disabled={disabled} style={[styles.voiceRecorderPrimary, disabled && styles.disabledButton]}>
-                        {sending ? <ActivityIndicator color={colors.inverse} size="small" /> : <Send size={scale(16)} color={colors.inverse} />}
-                        <Text variant="caption" className="font-body-bold" style={styles.voiceRecorderPrimaryText}>
-                            {sending ? t('chat:sending', 'Sending') : t('chat:send', 'Send')}
+                    <View style={[styles.voiceRecorderCentral, { backgroundColor: colors.surface }]}>
+                        <Text variant="caption" style={{ color: sendFailed ? colors.danger : colors.muted }}>
+                            {sendFailed ? t('chat:voice_retry', 'Ready to retry') : t('chat:voice_ready', 'Ready to send')}
                         </Text>
-                    </Pressable>
+                    </View>
                 ) : (
-                    <Pressable onPress={onStop} disabled={disabled || !isRecording} style={[styles.voiceRecorderPrimary, (disabled || !isRecording) && styles.disabledButton]}>
-                        {recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <Square size={scale(15)} color={colors.inverse} fill={colors.inverse} />}
-                        <Text variant="caption" className="font-body-bold" style={styles.voiceRecorderPrimaryText}>
-                            {t('chat:voice_stop', 'Stop')}
+                    <Pressable accessibilityRole="button" accessibilityLabel={isPreviewing || isPaused ? t('chat:voice_resume', 'Resume') : t('chat:voice_pause', 'Pause')} onPress={handlePauseResume} disabled={disabled || nativeState === 'idle' || isPaused} style={[styles.voiceRecorderCentral, { backgroundColor: colors.surface }]}>
+                        {isPreviewing || isPaused ? <Mic size={scale(19)} color={colors.text} /> : <Pause size={scale(18)} color={colors.text} />}
+                        <Text variant="body-sm" className="font-body-bold" style={{ color: colors.text }}>
+                            {isPreviewing || isPaused ? t('chat:voice_resume', 'Resume') : t('chat:voice_pause', 'Pause')}
                         </Text>
                     </Pressable>
                 )}
+                <Pressable accessibilityRole="button" accessibilityLabel={sendFailed ? t('chat:voice_retry', 'Retry') : t('chat:send', 'Send')} onPress={handleSend} disabled={disabled || (!previewUri && nativeState === 'idle')} style={[styles.voiceRecorderIconAction, { backgroundColor: colors.primary }]}>
+                    {sending || recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <PaperPlaneTilt size={scale(20)} color={colors.inverse} weight="fill" />}
+                </Pressable>
             </View>
         </View>
     );
@@ -2083,20 +2747,43 @@ function VoicePreviewPlayer({
     waveform: number[];
 }) {
     const toast = useToast();
+    const playbackOwnerRef = useRef(createChatAudioPlaybackOwner('voice-preview'));
     const player = useAudioPlayer(uri, { updateInterval: 250 });
     const status = useAudioPlayerStatus(player);
     const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
-    const displaySeconds = Math.max(0, Math.round(status.playing ? status.currentTime : status.duration || duration || 0));
+    const [trackWidth, setTrackWidth] = useState(0);
+    const [scrubProgress, setScrubProgress] = useState<number | null>(null);
+    const shownProgress = scrubProgress ?? progress;
+    const samples = waveform.length ? waveform : Array.from({ length: 32 }, () => 0.08);
+    const fractionAt = (x: number) => trackWidth > 0 ? Math.max(0, Math.min(1, x / trackWidth)) : 0;
+    const pauseThisPlayer = useCallback(() => {
+        try {
+            player.pause();
+        } catch {
+            // Native player may already be releasing during navigation.
+        }
+    }, [player]);
+
+    useEffect(() => {
+        if (status.didJustFinish) releaseChatAudioPlayback(playbackOwnerRef.current);
+    }, [status.didJustFinish]);
+
+    useEffect(() => () => {
+        releaseChatAudioPlayback(playbackOwnerRef.current);
+        pauseThisPlayer();
+    }, [pauseThisPlayer]);
 
     const toggle = async () => {
         try {
             if (status.playing) {
                 await player.pause();
+                releaseChatAudioPlayback(playbackOwnerRef.current);
                 return;
             }
             if (status.didJustFinish) {
                 await player.seekTo(0).catch(() => undefined);
             }
+            claimChatAudioPlayback(playbackOwnerRef.current, pauseThisPlayer);
             await player.play();
         } catch {
             toast.show(translateChatText('media_playback_failed', 'Could not play this voice note. Please try again.'), 'error');
@@ -2104,32 +2791,61 @@ function VoicePreviewPlayer({
     };
 
     return (
-        <Pressable onPress={toggle} style={[styles.voiceRecorderPreview, { backgroundColor: colors.surface }]}>
-            <View style={styles.voiceRecorderPreviewPlay}>
+        <View style={styles.voiceRecorderPreview}>
+            <Pressable accessibilityRole="button" accessibilityLabel={status.playing ? t('chat:voice_pause', 'Pause') : t('chat:voice_play', 'Play')} onPress={toggle} style={styles.voiceRecorderPreviewPlay}>
                 {status.playing
-                    ? <Pause size={scale(14)} color={colors.inverse} fill={colors.inverse} />
-                    : <Play size={scale(14)} color={colors.inverse} fill={colors.inverse} />}
-            </View>
-            <View style={styles.voiceRecorderPreviewTrack}>
-                <View style={styles.wave}>
-                    {waveform.map((value, index) => (
+                    ? <Pause size={scale(20)} color={colors.text} fill={colors.text} />
+                    : <Play size={scale(20)} color={colors.text} fill={colors.text} />}
+            </Pressable>
+            <View
+                style={styles.voiceRecorderPreviewTrack}
+                onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(event) => setScrubProgress(fractionAt(event.nativeEvent.locationX))}
+                onResponderMove={(event) => setScrubProgress(fractionAt(event.nativeEvent.locationX))}
+                onResponderRelease={(event) => {
+                    const fraction = fractionAt(event.nativeEvent.locationX);
+                    const seekDuration = status.duration || duration;
+                    if (seekDuration > 0) {
+                        void player.seekTo(fraction * seekDuration)
+                            .catch(() => toast.show(translateChatText('media_playback_failed', 'Could not play this voice note. Please try again.'), 'error'))
+                            .finally(() => setScrubProgress(null));
+                    } else {
+                        setScrubProgress(null);
+                    }
+                }}
+                onResponderTerminate={() => setScrubProgress(null)}
+                accessibilityRole="adjustable"
+                accessibilityLabel={t('chat:voice_seek', 'Voice playback position')}
+                accessibilityValue={{ min: 0, max: 100, now: Math.round(shownProgress * 100) }}
+                accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+                onAccessibilityAction={(event) => {
+                    const step = event.nativeEvent.actionName === 'increment' ? 0.1 : -0.1;
+                    const seekDuration = status.duration || duration;
+                    if (seekDuration > 0) void player.seekTo(Math.max(0, Math.min(1, progress + step)) * seekDuration).catch(() => undefined);
+                }}
+            >
+                <View pointerEvents="none" style={styles.voiceRecorderPreviewWave}>
+                    {samples.map((value, index) => (
                         <View
                             key={`preview-wave-${index}`}
                             style={[
                                 styles.waveBar,
                                 {
-                                    height: scale(7 + value * 21),
-                                    backgroundColor: progress * waveform.length >= index ? colors.primary : colors.waveMuted,
+                                    height: scale(5 + value * 31),
+                                    backgroundColor: index < shownProgress * samples.length ? colors.muted : colors.waveMuted,
                                 },
                             ]}
                         />
                     ))}
                 </View>
+                <View pointerEvents="none" style={[styles.voiceRecorderScrubDot, { backgroundColor: colors.primary, left: Math.max(0, shownProgress * trackWidth - scale(5)) }]} />
             </View>
-            <Text variant="caption" className="font-body-semi" numberOfLines={1} style={[styles.voiceDuration, { color: colors.muted }]}>
-                {formatDuration(displaySeconds)}
+            <Text style={[styles.voiceRecorderTimeText, { color: colors.text }]}>
+                {formatDuration(Math.max(0, Math.round(status.duration || duration)))}
             </Text>
-        </Pressable>
+        </View>
     );
 }
 
@@ -2138,12 +2854,13 @@ function VoicePreviewPlayer({
 // Three pulsing dots shown at the visual bottom of the (inverted) list while
 // the peer is typing.
 function TypingDot({ progress, index, color }: { progress: SharedValue<number>; index: number; color: string }) {
+    const liftDistance = scale(3);
     const animated = useAnimatedStyle(() => {
         const phase = (progress.value + index / 3) % 1;
         const lift = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
         return {
             opacity: 0.35 + lift * 0.65,
-            transform: [{ translateY: -lift * scale(3) }],
+            transform: [{ translateY: -lift * liftDistance }],
         };
     });
     return <Reanimated.View style={[styles.typingDot, { backgroundColor: color }, animated]} />;
@@ -2200,7 +2917,7 @@ function ChatScrollDownButton({
                 onPress={onPress}
                 style={styles.scrollDownPress}
             >
-                <ChevronDown size={scale(22)} color={colors.text} strokeWidth={2.4} />
+                <CaretDoubleDown size={scale(22)} color={colors.muted} weight="bold" />
                 {unreadCount > 0 && (
                     <UnreadBadge
                         count={unreadCount}
@@ -2214,9 +2931,98 @@ function ChatScrollDownButton({
     );
 }
 
+function MessageTimeMeta({
+    message,
+    mine,
+    colors,
+    style,
+}: {
+    message: ChatMessage;
+    mine: boolean;
+    colors: Record<string, string>;
+    style?: StyleProp<ViewStyle>;
+}) {
+    const metaColor = mine ? colors.bubbleMineMuted : colors.muted;
+    return (
+        <View style={style}>
+            <Text variant="caption" style={{ color: metaColor, fontSize: scale(10), lineHeight: scale(12) }}>
+                {formatMessageTime(message.createdAt)}
+            </Text>
+            {mine && !message.pending && (
+                message.seenAt
+                    ? <CheckCheck size={scale(12)} color={colors.seenTick} />
+                    : message.deliveredAt
+                        ? <CheckCheck size={scale(12)} color={metaColor} />
+                        : <Check size={scale(12)} color={metaColor} />
+            )}
+            {mine && message.pending && (
+                <Text variant="caption" style={{ color: metaColor, fontSize: scale(9), lineHeight: scale(11) }}>
+                    {message.queued ? t('chat:queued', 'Queued') : t('chat:sending', 'Sending...')}
+                </Text>
+            )}
+            {message.failed && (
+                <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>
+                    {translateChatText('tap_to_retry', 'Tap to retry')}
+                </Text>
+            )}
+        </View>
+    );
+}
+
+function TextMessageWithInlineMeta({
+    content,
+    message,
+    mine,
+    colors,
+    textColor,
+}: {
+    content: string;
+    message: ChatMessage;
+    mine: boolean;
+    colors: Record<string, string>;
+    textColor: string;
+}) {
+    const [layoutMode, setLayoutMode] = useState<'reserved' | 'natural' | 'stacked'>('reserved');
+    const [contentWidth, setContentWidth] = useState(0);
+    // Figure spaces reserve the metadata width without relying on nested text
+    // transparency, which Android does not consistently honor.
+    const reserve = `\u00A0${'\u2007'.repeat(mine ? 11 : 9)}`;
+    const metadataWidth = scale(mine ? 72 : 56);
+    return (
+        <View
+            style={[styles.textMessageWithMeta, layoutMode === 'stacked' && styles.textMessageMetaStacked]}
+            onLayout={(event) => {
+                const width = event.nativeEvent.layout.width;
+                setContentWidth((current) => Math.abs(current - width) < 0.5 ? current : width);
+            }}
+        >
+            <Text
+                variant="body"
+                style={[styles.messageText, { color: textColor }, directionalTextStyle(content)]}
+                onTextLayout={(event) => {
+                    const lines = event.nativeEvent.lines;
+                    if (layoutMode === 'reserved' && lines.length > 1) {
+                        setLayoutMode('natural');
+                        return;
+                    }
+                    if (layoutMode === 'natural' && contentWidth > 0 && lines.length > 0) {
+                        const lastLine = lines[lines.length - 1];
+                        if (lastLine.width + metadataWidth > contentWidth) setLayoutMode('stacked');
+                    }
+                }}
+            >
+                {content}
+                {layoutMode === 'reserved' && <RNText style={styles.inlineMetaReserve}>{reserve}</RNText>}
+            </Text>
+            <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.inlineTimeRow} />
+        </View>
+    );
+}
+
 function MessageBubbleComponent({
     message,
     mine,
+    rowGap,
     uiDirection,
     colors,
     userId,
@@ -2231,6 +3037,7 @@ function MessageBubbleComponent({
 }: {
     message: ChatMessage;
     mine: boolean;
+    rowGap: number;
     uiDirection: 'ltr' | 'rtl';
     colors: Record<string, string>;
     userId: string;
@@ -2284,7 +3091,7 @@ function MessageBubbleComponent({
     if (message.unsent) {
         const unsentLabel = translateChatText('message_unsent', 'Message unsent');
         return (
-            <View style={[styles.bubbleRow, mine ? styles.bubbleRight : styles.bubbleLeft]}>
+            <View style={[styles.bubbleRow, { marginBottom: rowGap }, mine ? styles.bubbleRight : styles.bubbleLeft]}>
                 <View style={[styles.unsentBubble, { borderColor: colors.border, direction: uiDirection }]}>
                     <Text variant="body-sm" style={[{ color: colors.muted, fontStyle: 'italic' }, directionalTextStyle(unsentLabel)]}>
                         {unsentLabel}
@@ -2301,8 +3108,10 @@ function MessageBubbleComponent({
     const replyTo = typeof message.replyTo === 'object' && message.replyTo ? message.replyTo : null;
     const quotedText = replyPreview(replyTo);
     const reactions = message.reactions || [];
+    const messageTextColor = mine ? colors.bubbleMineText : colors.text;
+    const messageMetaColor = mine ? colors.bubbleMineMuted : colors.muted;
+    const useInlineTextMeta = message.type === 'text' && !!content && !message.pending && !message.failed;
     const swipeX = useRef(new Animated.Value(0)).current;
-    const swipeTriggered = useRef(false);
     const resetSwipe = useCallback(() => {
         Animated.spring(swipeX, {
             toValue: 0,
@@ -2311,28 +3120,27 @@ function MessageBubbleComponent({
             friction: 14,
         }).start();
     }, [swipeX]);
-    const panResponder = useMemo(() => PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) => (
-            gesture.dx > scale(12)
-            && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4
-        ),
-        onPanResponderMove: (_, gesture) => {
-            const nextX = Math.max(0, Math.min(scale(72), gesture.dx));
+    const bubbleGesture = useMemo(() => {
+        const swipe = Gesture.Pan()
+            .activeOffsetX(scale(12))
+            .failOffsetY([-scale(12), scale(12)])
+            .runOnJS(true)
+            .onUpdate((event) => {
+            const nextX = Math.max(0, Math.min(scale(72), event.translationX));
             swipeX.setValue(nextX);
-            swipeTriggered.current = nextX >= scale(56);
-        },
-        onPanResponderRelease: () => {
-            if (swipeTriggered.current) {
-                onSwipeReply(message);
-            }
-            swipeTriggered.current = false;
-            resetSwipe();
-        },
-        onPanResponderTerminate: () => {
-            swipeTriggered.current = false;
-            resetSwipe();
-        },
-    }), [message, onSwipeReply, resetSwipe, swipeX]);
+            })
+            .onEnd((event) => {
+                if (event.translationX >= scale(56)) onSwipeReply(message);
+            })
+            .onFinalize(resetSwipe);
+        const longPress = Gesture.LongPress()
+            .enabled(!message.failed)
+            .minDuration(360)
+            .maxDistance(scale(18))
+            .runOnJS(true)
+            .onStart(() => onOpenMenu(message));
+        return Gesture.Race(swipe, longPress);
+    }, [message, onOpenMenu, onSwipeReply, resetSwipe, swipeX]);
     const replyHintOpacity = swipeX.interpolate({
         inputRange: [0, scale(14), scale(56)],
         outputRange: [0, 0.35, 1],
@@ -2346,7 +3154,11 @@ function MessageBubbleComponent({
 
     return (
         <Reanimated.View
-            style={[styles.bubbleRow, mine ? styles.bubbleRight : styles.bubbleLeft]}
+            style={[
+                styles.bubbleRow,
+                { marginBottom: rowGap + (reactions.length > 0 ? 4 : 0) },
+                mine ? styles.bubbleRight : styles.bubbleLeft,
+            ]}
             entering={animateIn ? FadeInDown.duration(240) : undefined}
         >
             <View style={[styles.swipeReplyWrap, { direction: uiDirection }]}>
@@ -2362,14 +3174,10 @@ function MessageBubbleComponent({
                 >
                     <Reply size={scale(17)} color={colors.primary} strokeWidth={2.6} />
                 </Animated.View>
-                <Animated.View
-                    {...panResponder.panHandlers}
-                    style={[styles.swipeReplyBubble, { transform: [{ translateX: swipeX }] }]}
-                >
+                <GestureDetector gesture={bubbleGesture}>
+                <Animated.View style={[styles.swipeReplyBubble, { transform: [{ translateX: swipeX }] }]}>
                     <Pressable
                         onPress={message.failed ? () => onRetry(message) : undefined}
-                        onLongPress={message.failed ? undefined : () => onOpenMenu(message)}
-                        delayLongPress={420}
                         accessibilityRole={message.failed ? 'button' : undefined}
                         accessibilityLabel={message.failed ? translateChatText('tap_to_retry', 'Tap to retry') : undefined}
                     >
@@ -2378,23 +3186,23 @@ function MessageBubbleComponent({
                             mine ? styles.mineBubble : styles.theirBubble,
                             {
                                 backgroundColor: mine ? colors.bubbleMine : colors.surface,
-                                borderColor: mine ? colors.primaryRing : colors.border,
+                                borderColor: mine ? colors.bubbleMineBorder : colors.border,
                                 shadowColor: '#1A130D',
                                 shadowOpacity: mine ? 0.04 : 0.08,
                                 shadowRadius: scale(3),
-                                shadowOffset: { width: 0, height: 1 },
+                                shadowOffset: { width: 0, height: 0 },
                                 elevation: mine ? 0 : 1,
                             },
                         ]}>
                             {replyTo && (
                                 <Pressable
                                     onPress={() => onReplyClick(replyTo.id)}
-                                    style={[styles.replyQuote, { backgroundColor: mine ? colors.primaryTint : colors.surface, borderLeftColor: colors.primary }]}
+                                    style={[styles.replyQuote, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface, borderLeftColor: colors.primary }]}
                                 >
                                     <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
                                         {t('chat:reply', 'Reply')}
                                     </Text>
-                                    <Text variant="caption" numberOfLines={2} style={[{ color: colors.muted }, directionalTextStyle(quotedText)]}>
+                                    <Text variant="caption" numberOfLines={2} style={[{ color: messageMetaColor }, directionalTextStyle(quotedText)]}>
                                         {quotedText}
                                     </Text>
                                 </Pressable>
@@ -2413,7 +3221,7 @@ function MessageBubbleComponent({
                         <Pressable
                             onPress={() => !mine && !media?.viewedAt && onOpenViewOnce(message)}
                             disabled={mine || !!media?.viewedAt || viewOnceLoading}
-                            style={[styles.viewOnceButton, { backgroundColor: mine ? colors.primaryTint : colors.surface }]}
+                            style={[styles.viewOnceButton, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface }]}
                         >
                             <View style={styles.viewOnceIconBadge}>
                                 {viewOnceLoading
@@ -2421,10 +3229,10 @@ function MessageBubbleComponent({
                                     : <ViewOnceIcon size={scale(28)} color={colors.primary} active={true} />}
                             </View>
                             <View style={styles.viewOnceTextWrap}>
-                                <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={{ color: colors.text }}>
+                                <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={{ color: messageTextColor }}>
                                     {translateChatText('view_once_photo', 'View once photo')}
                                 </Text>
-                                <Text variant="caption" numberOfLines={1} style={{ color: colors.muted }}>
+                                <Text variant="caption" numberOfLines={1} style={{ color: messageMetaColor }}>
                                     {mine
                                         ? translateChatText('sent', 'Sent')
                                         : media?.viewedAt
@@ -2436,40 +3244,39 @@ function MessageBubbleComponent({
                     )}
 
                     {hasVoice && (
-                        <VoiceMessage message={message} media={media} mine={mine} colors={colors} userId={userId} />
+                        <VoiceMessage
+                            message={message}
+                            media={media}
+                            mine={mine}
+                            colors={colors}
+                            userId={userId}
+                            onLongPress={() => onOpenMenu(message)}
+                        />
                     )}
 
                     {!!content && (
-                        <Text variant="body" style={[styles.messageText, { color: colors.text }, directionalTextStyle(content)]}>
-                            {content}
-                        </Text>
+                        useInlineTextMeta ? (
+                            <TextMessageWithInlineMeta
+                                content={content}
+                                message={message}
+                                mine={mine}
+                                colors={colors}
+                                textColor={messageTextColor}
+                            />
+                        ) : (
+                            <Text variant="body" style={[styles.messageText, { color: messageTextColor }, directionalTextStyle(content)]}>
+                                {content}
+                            </Text>
+                        )
                     )}
 
-                            <View style={styles.timeRow}>
-                                <Text variant="caption" style={{ color: colors.muted, fontSize: scale(10), lineHeight: scale(12) }}>
-                                    {formatMessageTime(message.createdAt)}
-                                </Text>
-                                {mine && !message.pending && (
-                                    message.seenAt
-                                        ? <CheckCheck size={scale(12)} color={colors.seenTick} />
-                                        : message.deliveredAt
-                                            ? <CheckCheck size={scale(12)} color={colors.muted} />
-                                            : <Check size={scale(12)} color={colors.muted} />
-                                )}
-                                {mine && message.pending && (
-                                    <Text variant="caption" style={{ color: colors.muted, fontSize: scale(9), lineHeight: scale(11) }}>
-                                        {t('chat:sending', 'Sending...')}
-                                    </Text>
-                                )}
-                                {message.failed && (
-                                    <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>
-                                        {translateChatText('tap_to_retry', 'Tap to retry')}
-                                    </Text>
-                                )}
-                            </View>
+                            {!useInlineTextMeta && (
+                                <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.timeRow} />
+                            )}
                         </View>
                     </Pressable>
                 </Animated.View>
+                </GestureDetector>
                 {reactions.length > 0 && (
                     <View style={styles.reactionWrap}>
                         {reactions.map((reaction, index) => {
@@ -2576,25 +3383,68 @@ function VoiceMessageComponent({
     mine,
     colors,
     userId,
+    onLongPress,
 }: {
     message: ChatMessage;
     media?: MessageMedia | null;
     mine: boolean;
     colors: Record<string, string>;
     userId: string;
+    onLongPress: () => void;
 }) {
     const toast = useToast();
-    const [audioUri, setAudioUri] = useState<string | null>(null);
+    const playbackOwnerRef = useRef(createChatAudioPlaybackOwner(`voice-message:${message.id}`));
     const [downloading, setDownloading] = useState(false);
-    const [playAfterLoad, setPlayAfterLoad] = useState(false);
-    const player = useAudioPlayer(audioUri, { updateInterval: 250 });
+    const sourceUriRef = useRef<string | null>(null);
+    const pendingPlayRef = useRef(false);
+    const pendingSeekRef = useRef<number | null>(null);
+    const recoveryAttemptedRef = useRef(false);
+    const suppressNextPressRef = useRef(false);
+    const [trackWidth, setTrackWidth] = useState(0);
+    const [scrubProgress, setScrubProgress] = useState<number | null>(null);
+    const player = useAudioPlayer(null, { updateInterval: 100 });
     const status = useAudioPlayerStatus(player);
     const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
-    const displaySeconds = Math.max(0, Math.round(status.playing ? status.currentTime : status.duration || media?.duration || status.currentTime || 0));
+    const shownProgress = scrubProgress ?? progress;
+    const effectiveDuration = status.duration || media?.duration || 0;
+    const displaySeconds = Math.max(0, Math.round(scrubProgress !== null
+        ? scrubProgress * effectiveDuration
+        : status.playing ? status.currentTime : effectiveDuration || status.currentTime || 0));
+    const waveform = useMemo(() => {
+        const real = waveformPeaks(media?.waveform || [], VOICE_MESSAGE_WAVE_BAR_COUNT);
+        return real.length ? real : Array.from({ length: VOICE_MESSAGE_WAVE_BAR_COUNT }, () => 0.22);
+    }, [media?.waveform]);
+
+    const pauseThisPlayer = useCallback(() => {
+        try {
+            player.pause();
+        } catch {
+            // The hook owns native player disposal during fast navigation.
+        }
+    }, [player]);
+
+    const replaceSource = useCallback((uri: string, playWhenReady: boolean) => {
+        if (sourceUriRef.current === uri) {
+            pendingPlayRef.current = pendingPlayRef.current || playWhenReady;
+            return;
+        }
+        unpinCachedChatMedia(sourceUriRef.current);
+        sourceUriRef.current = uri;
+        pinCachedChatMedia(uri);
+        pendingPlayRef.current = playWhenReady;
+        player.replace(uri);
+    }, [player]);
 
     useEffect(() => {
         let disposed = false;
         (async () => {
+            if (media?.localUri) {
+                const local = await FileSystem.getInfoAsync(media.localUri).catch(() => null);
+                if (!disposed && !pendingPlayRef.current && !sourceUriRef.current && local?.exists) {
+                    replaceSource(media.localUri, false);
+                    return;
+                }
+            }
             const cached = await getCachedChatMedia({
                 userId,
                 conversationId: message.conversationId,
@@ -2602,28 +3452,89 @@ function VoiceMessageComponent({
                 media,
                 kind: 'voice',
             }).catch(() => null);
-            if (!disposed && cached?.cached) setAudioUri(cached.uri);
+            if (!disposed && !pendingPlayRef.current && !sourceUriRef.current && cached?.cached) replaceSource(cached.uri, false);
         })();
         return () => {
             disposed = true;
         };
-    }, [media, message.conversationId, message.id, userId]);
+    }, [media?.key, media?.localUri, media?.mime, media?.url, message.conversationId, message.id, replaceSource, userId]);
 
     useEffect(() => {
-        if (playAfterLoad && audioUri && status.isLoaded) {
+        if (!sourceUriRef.current || !status.isLoaded) return;
+        const seekFraction = pendingSeekRef.current;
+        const shouldPlay = pendingPlayRef.current;
+        if (seekFraction === null && !shouldPlay) return;
+        pendingSeekRef.current = null;
+        pendingPlayRef.current = false;
+        void (async () => {
             try {
-                player.play();
+                const duration = status.duration || media?.duration || 0;
+                if (seekFraction !== null && duration > 0) await player.seekTo(seekFraction * duration);
+                if (shouldPlay) {
+                    claimChatAudioPlayback(playbackOwnerRef.current, pauseThisPlayer);
+                    player.play();
+                }
             } catch {
-                // The native audio object can be released during fast navigation.
+                releaseChatAudioPlayback(playbackOwnerRef.current);
+                toast.show(translateChatText('media_playback_failed', 'Could not play this voice note. Please try again.'), 'error');
             }
-            setPlayAfterLoad(false);
+        })();
+    }, [media?.duration, message.id, pauseThisPlayer, player, status.duration, status.isLoaded, toast]);
+
+    useEffect(() => {
+        if (status.didJustFinish) releaseChatAudioPlayback(playbackOwnerRef.current);
+    }, [status.didJustFinish]);
+
+    useEffect(() => {
+        if (!status.error || !sourceUriRef.current) return;
+        if (recoveryAttemptedRef.current) {
+            pendingPlayRef.current = false;
+            releaseChatAudioPlayback(playbackOwnerRef.current);
+            toast.show(translateChatText('media_playback_failed', 'Could not play this voice note. Please try again.'), 'error');
+            return;
         }
-    }, [audioUri, playAfterLoad, player, status.isLoaded]);
+
+        recoveryAttemptedRef.current = true;
+        pendingPlayRef.current = true;
+        setDownloading(true);
+        void (async () => {
+            await deleteCachedChatMediaForMessage({
+                userId,
+                conversationId: message.conversationId,
+                messageId: message.id,
+            });
+            const cached = await cacheChatMedia({
+                userId,
+                conversationId: message.conversationId,
+                messageId: message.id,
+                media: { ...media, localUri: undefined },
+                kind: 'voice',
+            });
+            replaceSource(cached.uri, true);
+        })().catch(() => {
+            pendingPlayRef.current = false;
+            toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
+        }).finally(() => setDownloading(false));
+    }, [media, message.conversationId, message.id, replaceSource, status.error, toast, userId]);
+
+    useEffect(() => () => {
+        pendingPlayRef.current = false;
+        pendingSeekRef.current = null;
+        releaseChatAudioPlayback(playbackOwnerRef.current);
+        pauseThisPlayer();
+        unpinCachedChatMedia(sourceUriRef.current);
+    }, [pauseThisPlayer]);
 
     const toggle = async () => {
+        if (suppressNextPressRef.current) {
+            suppressNextPressRef.current = false;
+            return;
+        }
+        if (downloading) return;
         try {
             if (status.playing) {
-                await player.pause();
+                player.pause();
+                releaseChatAudioPlayback(playbackOwnerRef.current);
                 return;
             }
 
@@ -2631,8 +3542,9 @@ function VoiceMessageComponent({
                 await player.seekTo(0).catch(() => undefined);
             }
 
-            if (audioUri && status.isLoaded) {
-                await player.play();
+            if (sourceUriRef.current && status.isLoaded) {
+                claimChatAudioPlayback(playbackOwnerRef.current, pauseThisPlayer);
+                player.play();
                 return;
             }
         } catch {
@@ -2649,8 +3561,8 @@ function VoiceMessageComponent({
                 media,
                 kind: 'voice',
             });
-            setAudioUri(cached.uri);
-            setPlayAfterLoad(true);
+            recoveryAttemptedRef.current = false;
+            replaceSource(cached.uri, true);
         } catch {
             toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
         } finally {
@@ -2658,37 +3570,111 @@ function VoiceMessageComponent({
         }
     };
 
+    const fractionAt = (x: number) => trackWidth > 0 ? Math.max(0, Math.min(1, x / trackWidth)) : 0;
+    const seekToFraction = async (fraction: number) => {
+        if (downloading) return;
+        const duration = status.duration || media?.duration || 0;
+        if (sourceUriRef.current && status.isLoaded && duration > 0) {
+            await player.seekTo(fraction * duration);
+            return;
+        }
+        pendingSeekRef.current = fraction;
+        setDownloading(true);
+        try {
+            const cached = await cacheChatMedia({
+                userId,
+                conversationId: message.conversationId,
+                messageId: message.id,
+                media,
+                kind: 'voice',
+            });
+            recoveryAttemptedRef.current = false;
+            replaceSource(cached.uri, false);
+        } catch {
+            pendingSeekRef.current = null;
+            toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
+        } finally {
+            setDownloading(false);
+        }
+    };
+
     return (
-        <Pressable onPress={toggle} style={styles.voiceWrap}>
-            <View style={styles.voicePlayButton}>
-                {downloading || status.isBuffering
-                    ? <ActivityIndicator color={colors.inverse} size="small" />
-                    : status.playing
-                        ? <Pause size={scale(14)} color={colors.inverse} fill={colors.inverse} />
-                        : <Play size={scale(14)} color={colors.inverse} fill={colors.inverse} />}
-            </View>
-            <View style={styles.voiceProgressTrack}>
-                <View style={styles.wave}>
-                    {Array.from({ length: VOICE_WAVE_BAR_COUNT }).map((_, index) => (
-                        <View
-                            key={`voice-${message.id}-${index}`}
-                            style={[
-                                styles.waveBar,
-                                {
-                                    height: scale(7 + ((index * 5) % 18)),
-                                    backgroundColor: progress * VOICE_WAVE_BAR_COUNT >= index ? colors.primary : colors.waveMuted,
-                                },
-                            ]}
-                        />
-                    ))}
+        <View style={styles.voiceWrap}>
+            <View style={styles.voicePlaybackControl}>
+                <Pressable
+                    onPress={toggle}
+                    onLongPress={() => {
+                        suppressNextPressRef.current = true;
+                        onLongPress();
+                    }}
+                    delayLongPress={360}
+                    disabled={downloading}
+                    accessibilityRole="button"
+                    accessibilityLabel={status.playing
+                        ? translateChatText('voice_pause', 'Pause')
+                        : translateChatText('voice_play', 'Play')}
+                    style={styles.voicePlayButton}
+                >
+                    {downloading || status.isBuffering
+                        ? <ActivityIndicator color={colors.inverse} size="small" />
+                        : status.playing
+                            ? <Pause size={scale(14)} color={colors.inverse} fill={colors.inverse} />
+                            : <Play size={scale(14)} color={colors.inverse} fill={colors.inverse} />}
+                </Pressable>
+                <View
+                    style={styles.voiceProgressTrack}
+                    onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
+                    onStartShouldSetResponder={() => true}
+                    onMoveShouldSetResponder={() => true}
+                    onResponderGrant={(event) => setScrubProgress(fractionAt(event.nativeEvent.locationX))}
+                    onResponderMove={(event) => setScrubProgress(fractionAt(event.nativeEvent.locationX))}
+                    onResponderRelease={(event) => {
+                        const fraction = fractionAt(event.nativeEvent.locationX);
+                        void seekToFraction(fraction)
+                            .catch(() => toast.show(translateChatText('media_playback_failed', 'Could not play this voice note. Please try again.'), 'error'))
+                            .finally(() => setScrubProgress(null));
+                    }}
+                    onResponderTerminate={() => setScrubProgress(null)}
+                    accessibilityRole="adjustable"
+                    accessibilityLabel={translateChatText('voice_seek', 'Voice playback position')}
+                    accessibilityValue={{ min: 0, max: 100, now: Math.round(shownProgress * 100) }}
+                    accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+                    onAccessibilityAction={(event) => {
+                        const step = event.nativeEvent.actionName === 'increment' ? 0.1 : -0.1;
+                        void seekToFraction(Math.max(0, Math.min(1, progress + step))).catch(() => undefined);
+                    }}
+                >
+                    <View pointerEvents="none" style={styles.wave}>
+                        {waveform.map((amplitude, index) => (
+                            <View
+                                key={`voice-${message.id}-${index}`}
+                                style={[
+                                    styles.waveBar,
+                                    {
+                                        height: scale(7 + amplitude * 21),
+                                        backgroundColor: index < shownProgress * waveform.length
+                                            ? colors.primary
+                                            : mine ? colors.bubbleMineMuted : colors.waveMuted,
+                                    },
+                                ]}
+                            />
+                        ))}
+                    </View>
+                    <View
+                        pointerEvents="none"
+                        style={[
+                            styles.voiceMessageScrubDot,
+                            { backgroundColor: colors.primary, left: Math.max(0, shownProgress * trackWidth - scale(4)) },
+                        ]}
+                    />
                 </View>
             </View>
             <View style={styles.voiceDurationRow}>
-                <Text variant="caption" className="font-body-semi" numberOfLines={1} style={[styles.voiceDuration, { color: colors.muted }]}>
+                <Text variant="caption" className="font-body-semi" numberOfLines={1} style={[styles.voiceDuration, { color: mine ? colors.bubbleMineMuted : colors.muted }]}>
                     {formatDuration(displaySeconds)}
                 </Text>
             </View>
-        </Pressable>
+        </View>
     );
 }
 
@@ -2708,17 +3694,17 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: scale(14),
         bottom: scale(14),
-        width: scale(42),
-        height: scale(42),
-        borderRadius: scale(21),
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
         borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000000',
-        shadowOpacity: 0.18,
-        shadowRadius: scale(6),
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 4,
+        shadowOpacity: 0.08,
+        shadowRadius: scale(3),
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 2,
     },
     scrollDownPress: {
         width: '100%',
@@ -2782,7 +3768,7 @@ const styles = StyleSheet.create({
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: scale(80) },
     dateWrap: { alignItems: 'center', marginVertical: scale(8) },
     dateLabel: { paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden', textTransform: 'uppercase' },
-    bubbleRow: { width: '100%', marginBottom: scale(14), direction: 'ltr' },
+    bubbleRow: { width: '100%', direction: 'ltr' },
     bubbleLeft: { alignItems: 'flex-start' },
     bubbleRight: { alignItems: 'flex-end' },
     swipeReplyWrap: { position: 'relative', maxWidth: '78%' },
@@ -2813,6 +3799,10 @@ const styles = StyleSheet.create({
     mineBubble: { borderBottomRightRadius: scale(6) },
     theirBubble: { borderBottomLeftRadius: scale(6) },
     messageText: { fontSize: scale(15), lineHeight: scale(20) },
+    textMessageWithMeta: { position: 'relative' },
+    textMessageMetaStacked: { paddingBottom: scale(17) },
+    inlineMetaReserve: { fontSize: scale(10), lineHeight: scale(12) },
+    inlineTimeRow: { position: 'absolute', right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: scale(4), minHeight: scale(14) },
     timeRow: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: scale(4), marginTop: scale(6), minHeight: scale(14) },
     systemWrap: { alignItems: 'center', marginVertical: scale(7) },
     systemText: { paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden' },
@@ -2854,6 +3844,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     voiceWrap: { width: '100%', minWidth: scale(230), borderRadius: scale(12), paddingVertical: scale(2), flexDirection: 'row', alignItems: 'center', gap: scale(8), marginBottom: scale(2) },
+    voicePlaybackControl: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: scale(8) },
     voicePlayButton: {
         width: scale(32),
         height: scale(32),
@@ -2863,8 +3854,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     voiceProgressTrack: { flex: 1, minWidth: scale(90), height: scale(32), justifyContent: 'center', position: 'relative' },
-    wave: { flex: 1, height: scale(30), flexDirection: 'row', alignItems: 'center', gap: scale(2) },
+    wave: { flex: 1, height: scale(30), flexDirection: 'row', alignItems: 'center', gap: scale(1.5) },
     waveBar: { flex: 1, maxWidth: scale(4), borderRadius: scale(2) },
+    voiceMessageScrubDot: {
+        position: 'absolute',
+        top: '50%',
+        width: scale(8),
+        height: scale(8),
+        marginTop: -scale(4),
+        borderRadius: scale(4),
+    },
     voiceDurationRow: { minWidth: scale(36), flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
     voiceDuration: { minWidth: scale(28), textAlign: 'right', fontSize: scale(11), lineHeight: scale(14) },
     requestBar: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(14), paddingTop: scale(10) },
@@ -2949,62 +3948,31 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    voiceRecorderPanel: { gap: scale(9), paddingTop: scale(2) },
-    voiceRecorderHeader: { minHeight: scale(32), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    voiceRecorderTimer: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
-    recordDot: { width: scale(8), height: scale(8), borderRadius: scale(4), backgroundColor: PRIMARY },
-    voiceRecorderClose: { width: scale(32), height: scale(32), borderRadius: scale(16), alignItems: 'center', justifyContent: 'center' },
-    voiceRecorderWaveSurface: {
-        height: scale(46),
-        borderRadius: scale(23),
-        paddingHorizontal: scale(12),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: scale(3),
-        overflow: 'hidden',
-    },
-    voiceRecorderWaveBar: { width: scale(3), borderRadius: scale(2) },
+    voiceRecorderPanel: { gap: scale(13), paddingHorizontal: scale(14), paddingTop: scale(13), paddingBottom: scale(10), borderTopLeftRadius: scale(18), borderTopRightRadius: scale(18) },
+    voiceRecorderHeader: { height: scale(44), flexDirection: 'row', alignItems: 'center', gap: scale(11) },
+    voiceRecorderTimeText: { minWidth: scale(42), fontSize: scale(16), lineHeight: scale(22), fontVariant: ['tabular-nums'] },
+    voiceRecorderWaveSlot: { flex: 1, minWidth: 0, justifyContent: 'center' },
+    voiceRecorderIconAction: { width: scale(44), height: scale(44), borderRadius: scale(22), alignItems: 'center', justifyContent: 'center' },
+    voiceRecorderCentral: { flex: 1, height: scale(44), borderRadius: scale(22), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(8) },
+    voiceRecorderNativeWaveHost: { height: scale(40), width: '100%', justifyContent: 'center' },
+    voiceRecorderNativeWave: { height: scale(40), width: '100%' },
     voiceRecorderPreview: {
-        height: scale(50),
-        borderRadius: scale(25),
-        paddingLeft: scale(8),
-        paddingRight: scale(12),
+        flex: 1,
+        height: scale(44),
         flexDirection: 'row',
         alignItems: 'center',
-        gap: scale(9),
+        gap: scale(11),
     },
     voiceRecorderPreviewPlay: {
-        width: scale(34),
-        height: scale(34),
-        borderRadius: scale(17),
-        backgroundColor: PRIMARY,
+        width: scale(32),
+        height: scale(44),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    voiceRecorderPreviewTrack: { flex: 1, height: scale(32), justifyContent: 'center' },
-    voiceRecorderActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: scale(10) },
-    voiceRecorderSecondary: {
-        height: scale(40),
-        borderRadius: scale(20),
-        paddingHorizontal: scale(14),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: scale(6),
-    },
-    voiceRecorderPrimary: {
-        minWidth: scale(104),
-        height: scale(40),
-        borderRadius: scale(20),
-        paddingHorizontal: scale(16),
-        backgroundColor: PRIMARY,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: scale(7),
-    },
-    voiceRecorderPrimaryText: { color: '#FFFFFF' },
+    voiceRecorderPreviewTrack: { flex: 1, minWidth: 0, height: scale(44), justifyContent: 'center' },
+    voiceRecorderPreviewWave: { height: scale(40), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: scale(1) },
+    voiceRecorderScrubDot: { position: 'absolute', width: scale(10), height: scale(10), borderRadius: scale(5), top: scale(17) },
+    voiceRecorderActions: { height: scale(44), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: scale(10) },
     previewModal: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', alignItems: 'center', justifyContent: 'center' },
     modalClose: { position: 'absolute', right: scale(16), zIndex: 5, width: scale(42), height: scale(42), borderRadius: scale(21), backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
     countdown: { position: 'absolute', left: scale(16), zIndex: 5, paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), backgroundColor: 'rgba(255,255,255,0.12)' },
@@ -3093,25 +4061,10 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'flex-end',
     },
-    messageMenuBackdrop: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'rgba(16, 16, 17,0.35)',
-    },
     messageMenuSheet: {
-        borderTopLeftRadius: scale(18),
-        borderTopRightRadius: scale(18),
+        flex: 1,
         paddingHorizontal: scale(12),
-        paddingTop: scale(10),
-        gap: scale(14),
-        shadowColor: '#000000',
-        shadowOpacity: 0.18,
-        shadowRadius: scale(20),
-        shadowOffset: { width: 0, height: -scale(8) },
-        elevation: 18,
+        gap: scale(2),
     },
     quickReactionRow: {
         flexDirection: 'row',
@@ -3163,7 +4116,7 @@ const styles = StyleSheet.create({
     reactionWrap: {
         position: 'absolute',
         left: scale(10),
-        bottom: -scale(10),
+        bottom: -scale(12),
         alignSelf: 'flex-start',
         flexDirection: 'row',
         flexWrap: 'wrap',

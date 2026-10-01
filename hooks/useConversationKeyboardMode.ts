@@ -7,8 +7,7 @@ import {
 } from 'react-native-keyboard-controller';
 
 /**
- * Chat footer is positioned via keyboard-controller Reanimated values.
- * Disable Android window resize on this screen so only our footer animates.
+ * Keep the conversation in resize mode while it is focused.
  */
 export function useConversationKeyboardMode() {
     useFocusEffect(
@@ -16,7 +15,7 @@ export function useConversationKeyboardMode() {
             if (Platform.OS !== 'android') return undefined;
 
             const apply = () => {
-                KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_NOTHING);
+                KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE);
             };
 
             apply();

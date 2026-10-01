@@ -38,6 +38,14 @@ export const Input: React.FC<InputProps> = ({
     // field is empty — so swap the whole font: regular (light) when empty,
     // semibold (600 — Jakarta's 500 reads too close to 400) once typed.
     const hasValue = Boolean(props.value && String(props.value).length > 0);
+    const textContentType = String(props.textContentType || '').toLowerCase();
+    const autoComplete = String(props.autoComplete || '').toLowerCase();
+    const forceLTR = props.keyboardType === 'email-address'
+        || Boolean(props.secureTextEntry)
+        || textContentType.includes('email')
+        || textContentType.includes('password')
+        || autoComplete.includes('email')
+        || autoComplete.includes('password');
     const inputFontFamily = currentLanguage === "ar"
         ? (hasValue ? Typography.font.arabic.semi : Typography.font.arabic.regular)
         : hasValue ? Typography.font.body.semi : Typography.font.body.regular;
@@ -76,6 +84,7 @@ export const Input: React.FC<InputProps> = ({
 
                 <TextInput
                     ref={inputRef}
+                    accessibilityLabel={props.accessibilityLabel || label || placeholder}
                     // Darker placeholder for readability; weight stays light via the
                     // regular input font (RN can't style placeholder weight separately)
                     placeholder={required && placeholder ? `${placeholder} *` : placeholder}
@@ -100,8 +109,8 @@ export const Input: React.FC<InputProps> = ({
                         paddingVertical: 0,
                         fontFamily: inputFontFamily,
                         color: isDark ? '#E5E5E7' : '#201B15',
-                        textAlign: isRTL ? 'right' : 'left',
-                        writingDirection: isRTL ? 'rtl' : 'ltr',
+                        textAlign: forceLTR ? 'left' : isRTL ? 'right' : 'left',
+                        writingDirection: forceLTR ? 'ltr' : isRTL ? 'rtl' : 'ltr',
                     }}
                     {...props}
                 />
@@ -118,6 +127,8 @@ export const Input: React.FC<InputProps> = ({
                 <View style={{ height: 0, zIndex: 1 }} pointerEvents="none">
                     <Text
                         variant="caption"
+                        accessibilityRole="alert"
+                        accessibilityLiveRegion="assertive"
                         numberOfLines={1}
                         style={{
                             position: 'absolute',

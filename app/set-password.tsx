@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeSlash } from 'phosphor-react-native';
 
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -85,16 +85,22 @@ export default function SetPasswordScreen() {
     };
 
     const eye = (
-        <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
+        <Pressable
+            onPress={() => setShowPassword((v) => !v)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? t('hide_password', 'Hide password') : t('show_password', 'Show password')}
+            accessibilityState={{ selected: showPassword }}
+        >
             {showPassword
-                ? <EyeOff size={scale(18)} color={colors.brand.text.muted} />
-                : <Eye size={scale(18)} color={colors.brand.text.muted} />}
+                ? <EyeSlash size={scale(18)} color={colors.brand.text.muted} weight="regular" />
+                : <Eye size={scale(18)} color={colors.brand.text.muted} weight="regular" />}
         </Pressable>
     );
 
     return (
         <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
-            <AppBackTitleBar title={t('set_password', 'Set Login Password')} fallbackHref="/settings-security" />
+            <AppBackTitleBar title={t('set_password', 'Set Login Password')} fallbackHref="/settings-security" showMenu />
             <KeyboardAwareScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.content}
@@ -122,6 +128,8 @@ export default function SetPasswordScreen() {
                         >
                             <Text
                                 variant="body-sm"
+                                accessibilityRole={status.type === 'error' ? 'alert' : undefined}
+                                accessibilityLiveRegion={status.type === 'error' ? 'assertive' : 'polite'}
                                 className="font-body-semi"
                                 style={{
                                     color: status.type === 'success'

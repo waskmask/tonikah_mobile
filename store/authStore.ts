@@ -3,10 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, AuthResponse, GoogleAuthRequest, SignupRequest, User } from '@/lib/authService';
 import { api } from '@/lib/api';
 import { signInWithGoogle } from '@/lib/googleSignIn';
-import { registerForPushNotifications, removeRegisteredPushToken } from '@/lib/pushNotifications';
+import { removeRegisteredPushToken } from '@/lib/pushNotifications';
 import { queryClient } from '@/lib/queryClient';
 import { canUseCachedUserAfterRefreshFailure, isAccessTokenUsable } from '@/lib/authToken';
 import { clearPrivateChatData } from '@/lib/chatDataCleanup';
+import { markStartup } from '@/lib/performanceDiagnostics';
+import { clearExploreDeckCache } from '@/lib/exploreDeckCache';
+import { clearExploreStartup, primeExploreStartup } from '@/lib/exploreStartup';
 
 // Last known user, persisted so a returning user starts instantly and the
 // fresh /me fetch happens in the background instead of blocking the splash.
@@ -23,6 +26,7 @@ interface AuthState {
     signup: (data: SignupRequest) => Promise<AuthResponse>;
     googleAuth: (options?: Pick<GoogleAuthRequest, 'agreed' | 'marketing_opt_in' | 'lang'>) => Promise<AuthResponse>;
     logout: () => Promise<void>;
+    logoutOtherDevices: () => Promise<AuthResponse>;
     logoutAllDevices: () => Promise<AuthResponse>;
     handleUnauthorized: (details?: Pick<AuthResponse, 'message' | 'suspension'>) => Promise<void>;
     restoreSession: () => Promise<void>;
@@ -59,7 +63,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
                 set({ user: result.user, isAuthenticated: true, suspension: null });
-                registerForPushNotifications().catch(() => { });
             } else if (result.message === 'account_suspended') {
                 set({ suspension: result.suspension || {} });
             }
@@ -77,7 +80,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
                 set({ user: result.user, isAuthenticated: true, suspension: null });
-                registerForPushNotifications().catch(() => { });
             } else if (result.message === 'account_suspended') {
                 set({ suspension: result.suspension || {} });
             }
@@ -112,7 +114,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             if (result.success && result.accessToken && result.user) {
                 await api.setTokens(result.accessToken, result.refreshToken || '');
                 set({ user: result.user, isAuthenticated: true });
-                registerForPushNotifications().catch(() => { });
             }
             return result;
         } finally {
@@ -134,7 +135,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             await Promise.all([
                 api.clearTokens(),
                 clearPrivateChatData(userId),
+                clearExploreDeckCache(userId),
             ]);
+            clearExploreStartup(userId);
             set({ user: null, isAuthenticated: false, isLoading: false });
         }
     },
@@ -149,7 +152,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 await Promise.all([
                     api.clearTokens(),
                     clearPrivateChatData(userId),
+                    clearExploreDeckCache(userId),
                 ]);
+                clearExploreStartup(userId);
                 set({ user: null, isAuthenticated: false, isLoading: false });
                 return result;
             }
@@ -161,9 +166,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
+    logoutOtherDevices: async () => {
+        const result = await authService.revokeOtherSessions();
+        if (result.success && result.accessToken && result.refreshToken) {
+            await api.setTokens(result.accessToken, result.refreshToken);
+            return result;
+        }
+
+        // A successful rotation without replacement credentials would leave
+        // this phone in a contradictory half-authenticated state.
+        if (result.success) {
+            await api.handleUnauthorized();
+            return { success: false, message: 'session_rotation_failed' };
+        }
+        return result;
+    },
+
     handleUnauthorized: async (details) => {
         const userId = get().user?._id;
-        await clearPrivateChatData(userId);
+        await Promise.all([
+            clearPrivateChatData(userId),
+            clearExploreDeckCache(userId),
+        ]);
+        clearExploreStartup(userId);
         set({
             user: null,
             isAuthenticated: false,
@@ -181,9 +206,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     restoreSession: async () => {
+        markStartup('auth-restore-start');
         set({ isRestoringSession: true });
         try {
-            const { accessToken } = await api.getTokens();
+            const [tokens, cached] = await Promise.all([
+                api.getTokens(),
+                AsyncStorage.getItem(USER_CACHE_KEY).catch(() => null),
+            ]);
+            const { accessToken } = tokens;
+            markStartup('secure-tokens-read', { accessToken: Boolean(accessToken) });
+            markStartup('cached-user-read', { hit: Boolean(cached) });
 
             if (!accessToken) {
                 await AsyncStorage.removeItem(USER_CACHE_KEY).catch(() => undefined);
@@ -191,7 +223,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 return;
             }
 
-            const cached = await AsyncStorage.getItem(USER_CACHE_KEY).catch(() => null);
             let cachedUser: User | null = null;
             if (cached) {
                 try {
@@ -201,21 +232,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
             }
 
-            // Only a locally unexpired token may take the instant cached path.
-            // The background /me remains authoritative and can still reject it.
-            if (cachedUser && isAccessTokenUsable(accessToken)) {
+            // Cached identity may render the shell immediately. Every API call
+            // remains server-authorized; the deferred /me refresh will rotate an
+            // expired token or clear this state through the unauthorized handler.
+            if (cachedUser) {
                 set({ user: cachedUser, isAuthenticated: true });
-                registerForPushNotifications().catch(() => { });
-                void authService.me().then((result) => {
-                    if (result.success && result.user) {
-                        set({ user: result.user, isAuthenticated: true });
-                    }
+                markStartup('cached-session-ready', {
+                    tokenUsable: isAccessTokenUsable(accessToken),
                 });
+                const cachedUserId = String(cachedUser._id || cachedUser.id || '');
+                const cachedLocation = cachedUser.profile?.current_location;
+                void primeExploreStartup(
+                    cachedUserId,
+                    Boolean(cachedLocation?.place_id && cachedLocation?.city && cachedLocation?.country),
+                );
                 return;
             }
 
             if (!isAccessTokenUsable(accessToken)) {
+                markStartup('token-refresh-start');
                 const refreshResult = await api.refreshSession();
+                markStartup('token-refresh-finished', { refreshed: Boolean(refreshResult.accessToken) });
                 if (!refreshResult.accessToken) {
                     if (cachedUser && canUseCachedUserAfterRefreshFailure(refreshResult.reason)) {
                         set({ user: cachedUser, isAuthenticated: true });
@@ -227,10 +264,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
 
             const result = await authService.me();
+            markStartup('foreground-user-refresh-finished', { success: Boolean(result.success && result.user) });
 
             if (result.success && result.user) {
                 set({ user: result.user, isAuthenticated: true });
-                registerForPushNotifications().catch(() => { });
             } else if (result.message === 'network_error' && cachedUser) {
                 set({ user: cachedUser, isAuthenticated: true });
             }
@@ -239,6 +276,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             // or foreground refresh can restore the session without a login.
         } finally {
             set({ isRestoringSession: false });
+            markStartup('auth-restore-finished');
         }
     },
 }));

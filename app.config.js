@@ -33,10 +33,25 @@ module.exports = ({ config }) => {
         plugins: [
             ...(config.plugins || []),
             '@react-native-community/datetimepicker',
-            'expo-font',
+            [
+                'expo-font',
+                {
+                    fonts: [
+                        './node_modules/@expo-google-fonts/plus-jakarta-sans/400Regular/PlusJakartaSans_400Regular.ttf',
+                        './node_modules/@expo-google-fonts/plus-jakarta-sans/500Medium/PlusJakartaSans_500Medium.ttf',
+                        './node_modules/@expo-google-fonts/plus-jakarta-sans/600SemiBold/PlusJakartaSans_600SemiBold.ttf',
+                        './node_modules/@expo-google-fonts/plus-jakarta-sans/700Bold/PlusJakartaSans_700Bold.ttf',
+                        './node_modules/@expo-google-fonts/plus-jakarta-sans/800ExtraBold/PlusJakartaSans_800ExtraBold.ttf',
+                        './node_modules/@expo-google-fonts/noto-sans-arabic/400Regular/NotoSansArabic_400Regular.ttf',
+                        './node_modules/@expo-google-fonts/noto-sans-arabic/600SemiBold/NotoSansArabic_600SemiBold.ttf',
+                        './node_modules/@expo-google-fonts/noto-sans-arabic/700Bold/NotoSansArabic_700Bold.ttf',
+                    ],
+                },
+            ],
             'expo-asset',
             'expo-image',
             'expo-audio',
+            ['react-native-waveform-recorder', { microphonePermission: false, backgroundRecording: false }],
             'expo-notifications',
             'expo-status-bar',
             'expo-web-browser',

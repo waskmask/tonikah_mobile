@@ -16,7 +16,7 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { Cigarette, Wine } from 'lucide-react-native';
+import { Cigarette, Wine } from '@/components/ui/icons/PhosphorCompat';
 import { apiMessage } from '@/lib/profileDisplay';
 
 export default function Step7() {

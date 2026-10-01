@@ -26,7 +26,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
-import { Search, X, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CaretLeft, CaretRight, Check, MagnifyingGlass, X } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Typography } from '@/constants/typography';
@@ -253,13 +253,13 @@ export function MultiSelectSheet({
                                 {title}
                             </Text>
                             <Pressable onPress={handleClose} hitSlop={12}>
-                                <X size={scale(20)} color={palette.brand.text.subtitle} />
+                                <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                             </Pressable>
                         </View>
 
                         {searchEnabled && (
                             <View style={[styles.searchContainer, { borderBottomColor: palette.brand.bg.border }]}>
-                                <Search size={scale(16)} color={palette.brand.text.muted} />
+                                <MagnifyingGlass size={scale(16)} color={palette.brand.text.muted} weight="regular" />
                                 <BottomSheetTextInput
                                     value={search}
                                     onChangeText={setSearch}
@@ -276,7 +276,7 @@ export function MultiSelectSheet({
                                 />
                                 {search.length > 0 && (
                                     <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                                        <X size={scale(14)} color={palette.brand.text.muted} />
+                                        <X size={scale(14)} color={palette.brand.text.muted} weight="bold" />
                                     </Pressable>
                                 )}
                             </View>
@@ -314,7 +314,7 @@ export function MultiSelectSheet({
                                             ]}
                                         >
                                             {isChecked && (
-                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} strokeWidth={3} />
+                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} weight="bold" style={styles.checkboxCheck} />
                                             )}
                                         </View>
                                         <Text
@@ -343,8 +343,7 @@ export function MultiSelectSheet({
                                 onPress={handleDone}
                                 disabled={loading || error || (!allowEmptySelection && localSelected.length === 0)}
                                 widthMode="full"
-                                height={40}
-                                textSize={15}
+                                size="compact"
                             />
                         </View>
                     </BottomSheet>
@@ -408,9 +407,9 @@ export function MultiSelectSheet({
                             {isDrawer && (
                                 <Pressable onPress={handleClose} hitSlop={12} style={styles.backButton}>
                                     {isRTL ? (
-                                        <ChevronRight size={22} color={palette.brand.text.body} />
+                                        <CaretRight size={22} color={palette.brand.text.body} weight="bold" />
                                     ) : (
-                                        <ChevronLeft size={22} color={palette.brand.text.body} />
+                                        <CaretLeft size={22} color={palette.brand.text.body} weight="bold" />
                                     )}
                                 </Pressable>
                             )}
@@ -425,7 +424,7 @@ export function MultiSelectSheet({
                                 <View style={styles.headerSpacer} />
                             ) : (
                                 <Pressable onPress={handleClose} hitSlop={12}>
-                                    <X size={scale(20)} color={palette.brand.text.subtitle} />
+                                    <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                                 </Pressable>
                             )}
                         </View>
@@ -438,7 +437,7 @@ export function MultiSelectSheet({
                                     { borderBottomColor: palette.brand.bg.border },
                                 ]}
                             >
-                                <Search size={scale(16)} color={palette.brand.text.muted} />
+                                <MagnifyingGlass size={scale(16)} color={palette.brand.text.muted} weight="regular" />
                                 <TextInput
                                     value={search}
                                     onChangeText={setSearch}
@@ -455,7 +454,7 @@ export function MultiSelectSheet({
                                 />
                                 {search.length > 0 && (
                                     <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                                        <X size={scale(14)} color={palette.brand.text.muted} />
+                                        <X size={scale(14)} color={palette.brand.text.muted} weight="bold" />
                                     </Pressable>
                                 )}
                             </View>
@@ -504,7 +503,7 @@ export function MultiSelectSheet({
                                             ]}
                                         >
                                             {isChecked && (
-                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} strokeWidth={3} />
+                                                <Check size={scale(12)} color={palette.chrome.common.inverseText} weight="bold" style={styles.checkboxCheck} />
                                             )}
                                         </View>
                                         <Text
@@ -570,8 +569,7 @@ export function MultiSelectSheet({
                                 onPress={handleDone}
                                 disabled={loading || error || (!allowEmptySelection && localSelected.length === 0)}
                                 widthMode="full"
-                                height={40}
-                                textSize={15}
+                                size="compact"
                             />
                         </View>
                     </Animated.View>
@@ -726,6 +724,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    checkboxCheck: {
+        transform: [{ translateX: 0.5 }],
     },
     footer: {
         paddingHorizontal: scale(20),

@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, Lock, ShieldCheck, X } from 'lucide-react-native';
+import { Bookmark, Lock, ShieldCheck, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -125,8 +125,8 @@ export function ProfileListCard({
                     style={StyleSheet.absoluteFill}
                 />
                 {badgeLabel ? (
-                    <View style={[styles.badge, { left: isRTL ? undefined : 0, right: isRTL ? 0 : undefined, backgroundColor: common.darkOverlayStrong }]}>
-                        <Text className="font-body-semi" numberOfLines={1} style={[styles.badgeText, { color: common.inverseText }]}>{badgeLabel}</Text>
+                    <View style={[styles.badge, { left: isRTL ? undefined : 0, right: isRTL ? 0 : undefined, backgroundColor: colors.chrome.profileListBadge.background }]}>
+                        <Text className="font-body-semi" numberOfLines={1} style={[styles.badgeText, { color: colors.chrome.profileListBadge.text }]}>{badgeLabel}</Text>
                     </View>
                 ) : null}
                 {item.privacy === 'private' && (

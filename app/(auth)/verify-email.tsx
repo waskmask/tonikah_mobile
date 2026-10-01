@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { AuthTopBar } from '@/components/auth/AuthTopBar';
-import { Mail, RefreshCw } from 'lucide-react-native';
+import { ArrowClockwise, Envelope } from 'phosphor-react-native';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
@@ -67,7 +67,7 @@ export default function VerifyEmailScreen() {
             <View className="flex-1 justify-center items-center px-6">
 
             <View className="items-center justify-center p-6 rounded-full mb-6" style={{ backgroundColor: colors.chrome.common.primaryTint }}>
-                <Mail size={scale(64)} color={colors.chrome.primary} strokeWidth={1.5} />
+                <Envelope size={scale(64)} color={colors.chrome.primary} weight="regular" />
             </View>
 
             <Text variant="h3" className="text-center mt-2">
@@ -100,7 +100,7 @@ export default function VerifyEmailScreen() {
                     className="flex-row justify-center items-center mt-5 pt-2 pb-2"
                     style={{ gap: scale(8) }}
                 >
-                    <RefreshCw size={scale(16)} color={isRefreshing ? colors.brand.text.muted : link} />
+                    <ArrowClockwise size={scale(16)} color={isRefreshing ? colors.brand.text.muted : link} weight="bold" />
                     <Text variant="body" className="text-center font-body-semi" style={{ color: isRefreshing ? colors.brand.text.muted : link }}>
                         {isRefreshing ? t('please_wait') : t('verify_email')}
                     </Text>

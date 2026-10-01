@@ -1,10 +1,11 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { DevSettings, I18nManager } from "react-native";
+import { DevSettings, I18nManager, Image } from "react-native";
 import i18n from "i18next";
 import { i18nReady } from "@/lib/i18n";
 import * as Updates from "expo-updates";
+import { markStartup } from "@/lib/performanceDiagnostics";
 
 interface LanguageState {
     currentLanguage: string;
@@ -18,15 +19,35 @@ export const POST_LANGUAGE_ROUTE_KEY = "tonikah-post-language-route";
 
 const RTL_SYNC_ATTEMPT_KEY = "tonikah-rtl-sync-attempt";
 const RTL_SWAP_PREF_APPLIED_KEY = "tonikah-rtl-swap-pref-applied";
+const RELOAD_HEART = Image.resolveAssetSource(require("../assets/icon/heart-white.png"));
+const RELOAD_SCREEN_OPTIONS = {
+    backgroundColor: "#F34B6F",
+    image: {
+        url: RELOAD_HEART.uri,
+        width: 96,
+        height: 96,
+        scale: 1,
+    },
+    imageResizeMode: "contain" as const,
+    fade: true,
+    spinner: { enabled: false },
+};
 
 function reloadApp() {
-    setTimeout(() => {
+    setTimeout(async () => {
         if (__DEV__) {
+            // This native overlay survives the React surface restart, avoiding
+            // the blank frame between DevSettings.reload and the new bundle.
+            await Updates.showReloadScreen({
+                reloadScreenOptions: RELOAD_SCREEN_OPTIONS,
+            }).catch(() => { });
             DevSettings.reload();
             return;
         }
 
-        Updates.reloadAsync().catch(() => {
+        Updates.reloadAsync({
+            reloadScreenOptions: RELOAD_SCREEN_OPTIONS,
+        }).catch(() => {
             DevSettings.reload();
         });
     }, 120);
@@ -88,18 +109,21 @@ export const useLanguageStore = create<LanguageState>()(
 
                 await i18n.changeLanguage(lng);
                 await AsyncStorage.setItem("user-language", lng);
+                const isRTL = lng === "ar";
+                const directionChanged = (previousLanguage === "ar") !== isRTL;
+
+                // Bundled translations can switch in place. A native reload is
+                // only needed when entering or leaving RTL layout direction.
+                if (!directionChanged) {
+                    set({ currentLanguage: lng, isRTL, isReady: true });
+                    return;
+                }
+
                 if (currentPath) {
                     await AsyncStorage.setItem(POST_LANGUAGE_ROUTE_KEY, currentPath).catch(() => { });
                 }
-
-                const isRTL = lng === "ar";
-
-                if (isRTL !== I18nManager.isRTL) {
-                    I18nManager.allowRTL(isRTL);
-                    I18nManager.forceRTL(isRTL);
-
-                }
-
+                I18nManager.allowRTL(isRTL);
+                I18nManager.forceRTL(isRTL);
                 set({ currentLanguage: lng, isRTL, isReady: false });
                 reloadApp();
             },
@@ -112,8 +136,8 @@ export const useLanguageStore = create<LanguageState>()(
                 void (async () => {
                     try {
                         await i18nReady;
-                        const savedLanguage = await AsyncStorage.getItem('user-language').catch(() => null);
-                        const currentLanguage = savedLanguage || i18n.language || state?.currentLanguage || 'en';
+                        // i18n already reads the legacy key; Zustand supplies the persisted preference.
+                        const currentLanguage = i18n.language || state?.currentLanguage || 'en';
                         await i18n.changeLanguage(currentLanguage);
                         const canRender = await syncNativeRTL(currentLanguage);
                         if (!canRender) return;
@@ -122,6 +146,7 @@ export const useLanguageStore = create<LanguageState>()(
                             isRTL: currentLanguage === 'ar',
                             isReady: true,
                         });
+                        markStartup('language-hydrated', { rtl: currentLanguage === 'ar' });
                     } catch (error) {
                         if (__DEV__) console.warn('[Language] Startup synchronization failed:', error);
                         const fallbackLanguage = state?.currentLanguage || 'en';
@@ -130,6 +155,7 @@ export const useLanguageStore = create<LanguageState>()(
                             isRTL: fallbackLanguage === 'ar',
                             isReady: true,
                         });
+                        markStartup('language-hydrated-fallback', { rtl: fallbackLanguage === 'ar' });
                     }
                 })();
             },

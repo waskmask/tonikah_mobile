@@ -17,7 +17,7 @@ type ChatDoodleBackgroundProps = {
 export const ChatDoodleBackground = memo(function ChatDoodleBackground({
     color,
     opacity = 0.14,
-    tileScale = 0.55,
+    tileScale = 0.42,
 }: ChatDoodleBackgroundProps) {
     return (
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">

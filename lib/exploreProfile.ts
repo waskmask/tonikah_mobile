@@ -1,7 +1,9 @@
 import { calculateAge, cleanProfileMultilineText, cleanProfileText, displayText, listText, profileImage, translateCountry, translateNamespace } from '@/lib/profileDisplay';
+import { nationalityFlag } from '@/lib/nationalityFlag';
 
 export type GalleryLike = {
     uuid?: string;
+    access?: 'full' | 'blurred';
     isPrimary?: boolean;
     sort_index?: number;
     urls?: { avatar?: string; original?: string; small?: string; thumb?: string; blur?: string };
@@ -163,14 +165,27 @@ export function formatProfileLocation(profile: any, includeState = false) {
 
 export function profileTags(profile: any) {
     const nationality = Array.isArray(profile?.nationality)
-        ? profile.nationality.slice(0, 2).map((item: any) => translateCountry(scalar(item))).filter(Boolean).join(' · ')
+        ? profile.nationality
+            .slice(0, 2)
+            .map((item: any) => {
+                const label = translateCountry(scalar(item));
+                const flag = nationalityFlag(item);
+                return [flag, label].filter(Boolean).join('\u00A0');
+            })
+            .filter(Boolean)
+            .join(' · ')
         : '';
     const designation = translateNamespace('designations', scalar(profile?.designation?.label || profile?.designation));
     const education = displayText(scalar(profile?.education?.label || profile?.education));
     const ethnic = Array.isArray(profile?.ethnic_group)
         ? profile.ethnic_group.map((item: any) => translateNamespace('ethnic_group', scalar(item))).filter(Boolean).join(', ')
         : translateNamespace('ethnic_group', scalar(profile?.ethnic_group));
-    return [nationality, designation, education, ethnic].filter(Boolean).slice(0, 3);
+    return [
+        { id: 'nationality', label: nationality },
+        { id: 'designation', label: designation },
+        { id: 'education', label: education },
+        { id: 'ethnic_group', label: ethnic },
+    ].filter((tag) => Boolean(tag.label)).slice(0, 3);
 }
 
 export function profileSummaryLine(profile: any) {

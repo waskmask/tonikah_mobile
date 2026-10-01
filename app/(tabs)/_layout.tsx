@@ -1,77 +1,48 @@
-import { useEffect } from "react";
-import { router, Tabs } from "expo-router";
-import { BottomTabBar } from "@/components/app/BottomTabBar";
-import { usePeriodicLocationRefresh } from "@/hooks/usePeriodicLocationRefresh";
-import { AppMenuProvider } from "@/components/app/AppMenuProvider";
-import { MembershipAccessListener } from "@/components/app/MembershipAccessListener";
-import { scheduleIdleWork } from "@/lib/idleWork";
+import { useWindowDimensions } from 'react-native';
+import { Drawer } from 'expo-router/drawer';
+import { AppMenuDrawerContent } from '@/components/app/AppMenuDrawer';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useTheme } from '@/hooks/useTheme';
+import { completeInteraction } from '@/lib/performanceDiagnostics';
 
-export default function TabsLayout() {
-    usePeriodicLocationRefresh();
-
-    useEffect(() => {
-        return scheduleIdleWork(() => {
-            router.prefetch('/(tabs)/hobbies-faith');
-        });
-    }, []);
+export default function TabsDrawerLayout() {
+    const { width } = useWindowDimensions();
+    const { isRTL, t } = useLanguage();
+    const { isDark } = useTheme();
+    const drawerWidth = Math.min(width * 0.86, 360);
 
     return (
-        <AppMenuProvider>
-        <MembershipAccessListener />
-        <Tabs
+        <Drawer
+            backBehavior="history"
+            drawerContent={({ navigation }) => (
+                <AppMenuDrawerContent onClose={() => navigation.closeDrawer()} />
+            )}
+            screenListeners={{
+                transitionEnd: (event) => {
+                    if (!event.data.closing) completeInteraction('drawer', 'visible');
+                },
+            }}
             screenOptions={{
                 headerShown: false,
-                sceneStyle: { flex: 1 },
-                // Navigation chrome should react immediately. Screen-level
-                // transitions made tab presses feel delayed on Android.
-                animation: "none",
+                drawerPosition: isRTL ? 'left' : 'right',
+                drawerType: 'front',
+                drawerStyle: {
+                    width: drawerWidth,
+                    backgroundColor: 'transparent',
+                },
+                overlayColor: isDark ? 'rgba(0,0,0,0.58)' : 'rgba(16,16,17,0.45)',
+                swipeEnabled: true,
+                swipeEdgeWidth: 28,
+                swipeMinDistance: 24,
             }}
-            tabBar={(props) => <BottomTabBar {...props} />}
         >
-            <Tabs.Screen
-                name="search"
+            <Drawer.Screen
+                name="(main)"
                 options={{
-                    title: "Explore",
-                    headerShown: false,
+                    title: String(t('menu') || 'Menu'),
+                    drawerItemStyle: { display: 'none' },
                 }}
             />
-            <Tabs.Screen
-                name="messages"
-                options={{
-                    title: "Messages",
-                    headerShown: false,
-                }}
-            />
-            <Tabs.Screen
-                name="favourited"
-                options={{
-                    title: "Saved",
-                    headerShown: false,
-                }}
-            />
-            <Tabs.Screen
-                name="activities"
-                options={{
-                    title: "Activities",
-                    headerShown: false,
-                }}
-            />
-            <Tabs.Screen
-                name="profile"
-                options={{
-                    title: "Profile",
-                    headerShown: false,
-                    freezeOnBlur: true,
-                }}
-            />
-            <Tabs.Screen name="edit-profile" options={{ href: null }} />
-            <Tabs.Screen name="memberships" options={{ href: null }} />
-            <Tabs.Screen name="blocked-users" options={{ href: null }} />
-            <Tabs.Screen name="settings" options={{ href: null }} />
-            <Tabs.Screen name="language" options={{ href: null, headerShown: false }} />
-            <Tabs.Screen name="hobbies-faith" options={{ href: null }} />
-            <Tabs.Screen name="partner-preference" options={{ href: null }} />
-        </Tabs>
-        </AppMenuProvider>
+        </Drawer>
     );
 }

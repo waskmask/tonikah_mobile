@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import { Info, X } from 'lucide-react-native';
+import { Info, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { t } from '@/lib/profileDisplay';
 import { useColors } from '@/hooks/useColors';

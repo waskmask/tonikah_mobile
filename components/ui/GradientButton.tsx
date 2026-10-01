@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useColors } from "@/hooks/useColors";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useHaptics } from "@/hooks/useHaptics";
-import { ChevronRight, ChevronLeft } from "lucide-react-native";
+import { CaretLeft, CaretRight } from "phosphor-react-native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 
 interface GradientButtonProps {
@@ -17,15 +17,16 @@ interface GradientButtonProps {
     disabled?: boolean;
     loading?: boolean;
     showChevron?: boolean;
-    rightIcon?: React.ReactNode;
+    rightIcon?: React.ReactNode | ((color: string) => React.ReactNode);
     className?: string;
+    size?: "default" | "compact";
 
     // ✅ new
     widthMode?: "auto" | "full";
     containerStyle?: ViewStyle;
-    /** Button height in design pt (scaled per screen). Defaults to 50 (48 outline). */
+    /** Overrides the selected size's button height in design pt. */
     height?: number;
-    /** Title font size in design pt (scaled per screen). Defaults to the text variant size. */
+    /** Overrides the selected size's title font size in design pt. */
     textSize?: number;
     /** Expands the touch target without changing the visible button size. */
     hitSlop?: number;
@@ -40,6 +41,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
     showChevron = false,
     rightIcon,
     className = "",
+    size = "default",
     widthMode = "auto",
     containerStyle,
     height,
@@ -51,6 +53,14 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
     const reduceMotion = useReducedMotion();
     const { lightImpact } = useHaptics();
     const scaleValue = useSharedValue(1);
+    const resolvedHeight = height ?? (size === "compact" ? 40 : variant === "outline" ? 48 : 50);
+    const resolvedTextSize = textSize ?? (size === "compact" ? 14 : undefined);
+    const resolvedHitSlop = hitSlop ?? (size === "compact" ? scale(4) : undefined);
+    const foregroundColor = variant === 'outline'
+        ? palette.chrome.primary
+        : variant === 'primary'
+            ? palette.chrome.common.inverseText
+            : palette.brand.text.heading;
 
     const gradientColors =
         variant === "outline"
@@ -82,14 +92,12 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                 containerStyle,
             ]}
         >
-            <View
-                style={[
-                    styles.shadowWrapper,
-                    hitSlop ? { paddingVertical: hitSlop } : undefined,
-                ]}
-            >
+            <View style={styles.shadowWrapper}>
                 <TouchableOpacity
-                    hitSlop={hitSlop}
+                    accessibilityRole="button"
+                    accessibilityLabel={title}
+                    accessibilityState={{ disabled: disabled || loading, busy: loading }}
+                    hitSlop={resolvedHitSlop}
                     onPress={() => {
                         if (!disabled && !loading) lightImpact();
                         onPress();
@@ -101,7 +109,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                     className={`overflow-hidden ${variant === 'outline' ? 'rounded-xl' : 'rounded-full'} ${disabled ? "opacity-50" : ""} ${className}`}
                     style={[
                         {
-                            height: scale(height ?? (variant === 'outline' ? 48 : 50)),
+                            height: scale(resolvedHeight),
                             width: "100%",
                         },
                         variant === 'outline' && {
@@ -123,7 +131,7 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                         }}
                     >
                         {loading ? (
-                            <ActivityIndicator color={variant === 'outline' ? palette.chrome.primary : '#FFFFFF'} />
+                            <ActivityIndicator color={foregroundColor} />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: variant === 'outline' ? 'space-between' : 'center', width: '100%', paddingHorizontal: variant === 'outline' ? 4 : 0 }}>
                                 <Text
@@ -132,7 +140,8 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                                     numberOfLines={1}
                                     style={[
                                         variant === 'outline' ? { flex: 1 } : undefined,
-                                        textSize ? { fontSize: scale(textSize) } : undefined,
+                                        resolvedTextSize !== undefined ? { fontSize: scale(resolvedTextSize) } : undefined,
+                                        { color: foregroundColor },
                                         // Android adds asymmetric font padding that pushes the
                                         // label up inside compact buttons
                                         { includeFontPadding: false, textAlignVertical: 'center' },
@@ -141,14 +150,14 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
                                     {title}
                                 </Text>
 
-                                {rightIcon}
+                                {typeof rightIcon === 'function' ? rightIcon(foregroundColor) : rightIcon}
 
                                 {showChevron && (
                                     <View style={styles.chevron}>
                                         {isRTL ? (
-                                            <ChevronLeft size={scale(20)} color="#FFFFFF" />
+                                            <CaretLeft size={scale(20)} color={foregroundColor} weight="bold" />
                                         ) : (
-                                            <ChevronRight size={scale(20)} color="#FFFFFF" />
+                                            <CaretRight size={scale(20)} color={foregroundColor} weight="bold" />
                                         )}
                                     </View>
                                 )}
@@ -172,8 +181,10 @@ const styles = StyleSheet.create({
     },
     chevron: {
         position: "absolute",
-        right: 18,
-        top: "50%",
-        transform: [{ translateY: -10 }],
+        right: 16,
+        top: 0,
+        bottom: 0,
+        alignItems: "center",
+        justifyContent: "center",
     },
 });

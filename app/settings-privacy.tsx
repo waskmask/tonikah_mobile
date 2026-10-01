@@ -1,47 +1,53 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Linking, ScrollView, Share, View } from 'react-native';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
-import { SectionCard } from '@/components/ui/SectionCard';
-import { SettingsActionRow, SettingsToggleRow, SettingsValueRow, formatSessionDate } from '@/components/settings/SettingsRows';
-import { Text } from '@/components/ui/Text';
+import { SettingsFieldSection } from '@/components/settings/SettingsFieldSection';
+import { SettingsInfoRow, SettingsNavRow, SettingsToggleRow, formatSessionDate } from '@/components/settings/SettingsRows';
+import { CalendarBlank, DownloadSimple, EnvelopeSimple, Eye, Scroll, ShieldCheck } from 'phosphor-react-native';
 import { useColors } from '@/hooks/useColors';
 import { t } from '@/lib/profileDisplay';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
-import { accountService, PrivacyConsent } from '@/lib/accountService';
+import { accountService } from '@/lib/accountService';
 import { apiMessage } from '@/lib/profileDisplay';
 import { Config } from '@/constants/config';
 import { useAuthStore } from '@/store/authStore';
+import { useLanguage } from '@/hooks/useLanguage';
+import { useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
+import { fetchPrivacyConsent, SETTINGS_DATA_STALE_TIME_MS } from '@/lib/settingsQueries';
 
 export default function SettingsPrivacyScreen() {
     const colors = useColors();
+    const fieldIconColor = colors.chrome.common.textStrong;
     const toast = useToast();
     const user = useAuthStore((state) => state.user);
-    const [privacyConsent, setPrivacyConsent] = useState<PrivacyConsent | null>(null);
+    const { currentLanguage } = useLanguage();
     const [marketingBusy, setMarketingBusy] = useState(false);
     const [exportingData, setExportingData] = useState(false);
     const isVisible = user?.visible !== false;
-
-    const refreshPrivacyConsent = useCallback(async () => {
-        const result = await accountService.getPrivacyConsent();
-        if (result.success && result.consent) {
-            setPrivacyConsent(result.consent);
-        }
-    }, []);
-
-    useEffect(() => {
-        refreshPrivacyConsent();
-    }, [refreshPrivacyConsent]);
+    const privacyQuery = useQuery({
+        queryKey: queryKeys.settings.privacyConsent,
+        queryFn: fetchPrivacyConsent,
+        staleTime: SETTINGS_DATA_STALE_TIME_MS,
+    });
+    const privacyConsent = privacyQuery.data || null;
 
     const toggleMarketingOptIn = async (nextValue: boolean) => {
         if (!privacyConsent || marketingBusy) return;
         const previous = privacyConsent;
         setMarketingBusy(true);
-        setPrivacyConsent({ ...privacyConsent, marketingOptIn: nextValue });
+        queryClient.setQueryData(queryKeys.settings.privacyConsent, {
+            ...privacyConsent,
+            marketingOptIn: nextValue,
+        });
         const result = await accountService.updateMarketingOptIn(nextValue);
         setMarketingBusy(false);
         if (result.success) {
-            if (result.consent) setPrivacyConsent(result.consent);
+            if (result.consent) {
+                queryClient.setQueryData(queryKeys.settings.privacyConsent, result.consent);
+            }
             toast.show(
                 nextValue
                     ? t('marketing_opt_in_enabled', 'Marketing emails enabled.')
@@ -50,7 +56,7 @@ export default function SettingsPrivacyScreen() {
                 2500,
             );
         } else {
-            setPrivacyConsent(previous);
+            queryClient.setQueryData(queryKeys.settings.privacyConsent, previous);
             toast.show(apiMessage(result.message || 'privacy_consent_update_failed'), 'error', 3500);
         }
     };
@@ -79,52 +85,80 @@ export default function SettingsPrivacyScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
-            <AppBackTitleBar title={t('data_privacy', 'Data & privacy')} fallbackHref="/(tabs)/settings" />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(60) }}>
-                <SectionCard title={t('account_visibility', 'Account visibility')}>
-                    <SettingsValueRow
+            <AppBackTitleBar title={t('data_privacy', 'Data & privacy')} fallbackHref="/settings" showMenu />
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: scale(60) }}>
+                <SettingsFieldSection title={t('account_visibility', 'Account visibility')}>
+                    <SettingsInfoRow
+                        icon={<Eye size={scale(19)} color={fieldIconColor} weight="regular" />}
                         label={t('account_visibility', 'Account visibility')}
                         value={isVisible
                             ? t('publicly_visible', 'Publicly visible')
                             : t('account_is_hidden', 'Account is hidden')}
                     />
-                </SectionCard>
+                </SettingsFieldSection>
 
-                <SectionCard title={t('marketing_emails', 'Marketing emails')}>
+                <SettingsFieldSection title={t('marketing_emails', 'Marketing emails')}>
                     <SettingsToggleRow
+                        icon={<EnvelopeSimple size={scale(19)} color={fieldIconColor} weight="regular" />}
                         label={t('marketing_emails', 'Marketing emails')}
                         description={t('marketing_emails_desc', 'Receive tips, feature updates and offers by email.')}
                         value={Boolean(privacyConsent?.marketingOptIn)}
                         disabled={marketingBusy || !privacyConsent}
                         onValueChange={toggleMarketingOptIn}
                     />
-                </SectionCard>
+                </SettingsFieldSection>
 
-                <SectionCard title={t('data_privacy', 'Data & privacy')}>
-                    {privacyConsent ? (
-                        <View style={{ gap: scale(3) }}>
-                            <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
-                                {t('terms_version', 'Terms version')}: {privacyConsent.termsVersion || t('not_set', 'Not set')}
-                            </Text>
-                            <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
-                                {t('privacy_version', 'Privacy version')}: {privacyConsent.privacyVersion || t('not_set', 'Not set')}
-                            </Text>
-                            <Text variant="caption" style={{ color: colors.brand.text.subtitle }}>
-                                {t('consent_date', 'Consent date')}: {privacyConsent.consentAt ? formatSessionDate(privacyConsent.consentAt) : t('not_set', 'Not set')}
-                            </Text>
-                        </View>
-                    ) : null}
-                    <SettingsActionRow
+                <SettingsFieldSection title={t('data_privacy', 'Data & privacy')}>
+                    <SettingsInfoRow
+                        icon={<Scroll size={scale(19)} color={fieldIconColor} weight="regular" />}
+                        label={t('terms_version', 'Terms version')}
+                        value={privacyConsent?.termsVersion || t('not_set', 'Not set')}
+                    />
+                    <SettingsInfoRow
+                        icon={<ShieldCheck size={scale(19)} color={fieldIconColor} weight="regular" />}
+                        label={t('privacy_version', 'Privacy version')}
+                        value={privacyConsent?.privacyVersion || t('not_set', 'Not set')}
+                        divider
+                    />
+                    <SettingsInfoRow
+                        icon={<CalendarBlank size={scale(19)} color={fieldIconColor} weight="regular" />}
+                        label={t('consent_date', 'Consent date')}
+                        value={privacyConsent?.consentAt
+                            ? formatSessionDate(privacyConsent.consentAt, currentLanguage)
+                            : t('not_set', 'Not set')}
+                        divider
+                    />
+                    <SettingsNavRow
+                        icon={<DownloadSimple size={scale(19)} color={fieldIconColor} weight="regular" />}
                         label={exportingData ? t('please_wait', 'Please wait') : t('download_my_data', 'Download my data')}
                         disabled={exportingData}
+                        loading={exportingData}
                         onPress={downloadMyData}
+                        divider
                     />
-                </SectionCard>
+                </SettingsFieldSection>
 
-                <SectionCard title={t('settings_legal_title', 'Legal')}>
-                    <SettingsActionRow label={t('terms_of_use', 'Terms of use')} onPress={() => Linking.openURL(Config.TERMS_URL)} />
-                    <SettingsActionRow label={t('privacy_policy', 'Privacy Policy')} onPress={() => Linking.openURL(Config.PRIVACY_URL)} />
-                </SectionCard>
+                <SettingsFieldSection title={t('settings_legal_title', 'Legal')}>
+                    <SettingsNavRow
+                        icon={<Scroll size={scale(19)} color={fieldIconColor} weight="regular" />}
+                        label={t('terms_of_use', 'Terms of use')}
+                        description={t(
+                            'meta_description.terms',
+                            'Review the account rules, acceptable conduct, and service conditions.',
+                        )}
+                        onPress={() => void Linking.openURL(Config.TERMS_URL)}
+                    />
+                    <SettingsNavRow
+                        icon={<ShieldCheck size={scale(19)} color={fieldIconColor} weight="regular" />}
+                        label={t('privacy_policy', 'Privacy Policy')}
+                        description={t(
+                            'meta_description.privacy_policy',
+                            'Learn how we collect, use, and protect your personal data.',
+                        )}
+                        onPress={() => void Linking.openURL(Config.PRIVACY_URL)}
+                        divider
+                    />
+                </SettingsFieldSection>
             </ScrollView>
         </View>
     );

@@ -16,7 +16,7 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { BookOpen, Compass, Signpost, MoonStar } from 'lucide-react-native';
+import { BookOpen, Compass, Signpost, MoonStar } from '@/components/ui/icons/PhosphorCompat';
 import { Mosque } from '@/components/ui/icons/Mosque';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';

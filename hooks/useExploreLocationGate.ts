@@ -3,6 +3,11 @@ import { AppState, type AppStateStatus } from 'react-native';
 import * as Location from 'expo-location';
 import { profileService } from '@/lib/profileService';
 import { useAuthStore } from '@/store/authStore';
+import { markStartup } from '@/lib/performanceDiagnostics';
+import {
+    hasRecentExploreLocationVerification,
+    rememberExploreLocationVerification,
+} from '@/lib/exploreLocationVerification';
 
 export type ExploreLocationState =
     | 'checking'
@@ -13,6 +18,13 @@ export type ExploreLocationState =
     | 'network_error';
 
 const LOCATION_TIMEOUT_MS = 12000;
+function hasCompletedProfileLocation(profile: Record<string, any> | undefined) {
+    return Boolean(
+        profile?.current_location?.place_id
+        && profile.current_location?.city
+        && profile.current_location?.country,
+    );
+}
 
 async function withTimeout<T>(promise: Promise<T>): Promise<T> {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -111,6 +123,8 @@ async function resolvePosition({ forceFresh }: { forceFresh: boolean }) {
  */
 export function useExploreLocationGate() {
     const refreshUser = useAuthStore((state) => state.refreshUser);
+    const userId = String(useAuthStore((state) => state.user?._id || ''));
+    const hasProfileLocation = useAuthStore((state) => hasCompletedProfileLocation(state.user?.profile));
     const [state, setState] = useState<ExploreLocationState>('checking');
     const [retrying, setRetrying] = useState(false);
     const stateRef = useRef<ExploreLocationState>('checking');
@@ -132,8 +146,18 @@ export function useExploreLocationGate() {
         }
 
         let position: Awaited<ReturnType<typeof resolvePosition>>;
+        let usingCachedVerification = false;
         try {
+            if (!forceFresh && userId && hasProfileLocation) {
+                if (await hasRecentExploreLocationVerification(userId)) {
+                    usingCachedVerification = true;
+                    updateState('ready');
+                    markStartup('explore-location-cache-hit');
+                }
+            }
+
             const servicesEnabled = await Location.hasServicesEnabledAsync();
+            markStartup('explore-location-services-checked', { enabled: servicesEnabled });
             if (!servicesEnabled) {
                 updateState('services_disabled');
                 inFlightRef.current = false;
@@ -151,16 +175,18 @@ export function useExploreLocationGate() {
                 if (mountedRef.current) setRetrying(false);
                 return;
             }
+            markStartup('explore-location-permission-checked', { granted: true });
 
             position = await resolvePosition({ forceFresh });
+            markStartup('explore-device-position-resolved', { available: Boolean(position) });
             if (!position) {
-                updateState('location_unavailable');
+                if (!usingCachedVerification) updateState('location_unavailable');
                 inFlightRef.current = false;
                 if (mountedRef.current) setRetrying(false);
                 return;
             }
         } catch {
-            updateState('location_unavailable');
+            if (!usingCachedVerification) updateState('location_unavailable');
             inFlightRef.current = false;
             if (mountedRef.current) setRetrying(false);
             return;
@@ -172,6 +198,7 @@ export function useExploreLocationGate() {
                 position.coords.longitude,
                 'en',
             );
+            markStartup('explore-location-reverse-finished', { success: Boolean(reverse.success) });
             const place = reverse.data as Record<string, any> | undefined;
             const lat = Number(place?.lat);
             const lng = Number(place?.lng);
@@ -183,7 +210,7 @@ export function useExploreLocationGate() {
                 !Number.isFinite(lat) ||
                 !Number.isFinite(lng)
             ) {
-                updateState('network_error');
+                if (!usingCachedVerification) updateState('network_error');
                 return;
             }
 
@@ -199,21 +226,24 @@ export function useExploreLocationGate() {
                     },
                 });
                 if (!update.success) {
-                    updateState('network_error');
+                    if (!usingCachedVerification) updateState('network_error');
                     return;
                 }
 
                 await refreshUser();
             }
 
+            if (userId) {
+                await rememberExploreLocationVerification(userId);
+            }
             updateState('ready');
         } catch {
-            updateState('network_error');
+            if (!usingCachedVerification) updateState('network_error');
         } finally {
             inFlightRef.current = false;
             if (mountedRef.current) setRetrying(false);
         }
-    }, [refreshUser, updateState]);
+    }, [hasProfileLocation, refreshUser, updateState, userId]);
 
     const retry = useCallback(
         () => checkLocation({ forceFresh: true }),

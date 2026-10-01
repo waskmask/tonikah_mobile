@@ -3,6 +3,7 @@ import { clearAllCachedMessages, clearEveryCachedMessage } from '@/lib/chatCache
 import { clearCachedInbox } from '@/lib/chatInboxCache';
 import { clearChatMediaCache, clearChatMediaCacheForUser } from '@/lib/chatMediaCache';
 import { queryClient } from '@/lib/queryClient';
+import { clearOfflineMessageQueue } from '@/lib/offlineMessageQueue';
 
 async function clearEveryCachedInbox(): Promise<void> {
     const keys = await AsyncStorage.getAllKeys();
@@ -19,6 +20,7 @@ export async function clearPrivateChatData(userId?: string | null): Promise<void
             clearAllCachedMessages(userId),
             clearCachedInbox(userId),
             clearChatMediaCacheForUser(userId),
+            clearOfflineMessageQueue(userId),
         ]);
         return;
     }
@@ -29,5 +31,6 @@ export async function clearPrivateChatData(userId?: string | null): Promise<void
         clearEveryCachedMessage(),
         clearEveryCachedInbox(),
         clearChatMediaCache(),
+        clearOfflineMessageQueue(),
     ]);
 }

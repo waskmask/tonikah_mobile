@@ -3,10 +3,12 @@ import { StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
+import { SettingsFieldSection } from '@/components/settings/SettingsFieldSection';
+import { SettingsInfoRow } from '@/components/settings/SettingsRows';
 import { EmailSuggestionInput } from '@/components/ui/EmailSuggestionInput';
 import { GradientButton } from '@/components/ui/GradientButton';
-import { SectionCard } from '@/components/ui/SectionCard';
 import { Text } from '@/components/ui/Text';
+import { EnvelopeSimple } from 'phosphor-react-native';
 import { useAuthStore } from '@/store/authStore';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -38,6 +40,7 @@ export default function ChangeEmailScreen() {
         if (normalizedEmail === normalizedCurrent) return 'email_same_as_current';
         return '';
     }, [normalizedCurrent, normalizedEmail]);
+    const fieldError = touched && errorKey ? t(errorKey, errorKey) : undefined;
 
     const submit = async () => {
         setTouched(true);
@@ -68,14 +71,28 @@ export default function ChangeEmailScreen() {
 
     return (
         <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
-            <AppBackTitleBar title={t('change_email', 'Change Email Address')} fallbackHref="/settings-account" />
+            <AppBackTitleBar title={t('change_email_short', 'Change Email')} fallbackHref="/settings-account" showMenu />
             <KeyboardAwareScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.content}
                 keyboardShouldPersistTaps="handled"
                 bottomOffset={scale(24)}
             >
-                <SectionCard title={t('change_email', 'Change Email Address')}>
+                <SettingsFieldSection>
+                    <SettingsInfoRow
+                        icon={(
+                            <EnvelopeSimple
+                                size={scale(19)}
+                                color={colors.chrome.common.textStrong}
+                                weight="regular"
+                            />
+                        )}
+                        label={t('account_email', 'Account email')}
+                        value={user?.email || ''}
+                    />
+                </SettingsFieldSection>
+
+                <SettingsFieldSection contentInset>
                     {status ? (
                         <View
                             style={[
@@ -105,37 +122,34 @@ export default function ChangeEmailScreen() {
                         </View>
                     ) : null}
 
-                    <View style={[styles.currentEmail, { backgroundColor: colors.brand.bg.surface, borderColor: colors.brand.bg.border }]}>
-                        <Text variant="caption" className="font-body-semi" style={{ color: colors.brand.text.subtitle }}>
-                            {t('account_email', 'Account email')}
-                        </Text>
-                        <Text
-                            variant="body-sm"
-                            className="font-body-semi"
-                            selectable
-                            style={styles.emailText}
-                        >
-                            {user?.email || ''}
-                        </Text>
+                    <View style={[styles.inputBlock, fieldError ? styles.inputBlockWithError : null]}>
+                        <EmailSuggestionInput
+                            label={t('new_email_address', 'New email address')}
+                            placeholder={t('email_address', 'Email address')}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            autoComplete="email"
+                            textContentType="emailAddress"
+                            value={email}
+                            onChangeText={(value) => {
+                                setEmail(value);
+                                setStatus(null);
+                            }}
+                            onBlur={() => setTouched(true)}
+                            error={fieldError}
+                        />
                     </View>
 
-                    <EmailSuggestionInput
-                        label={t('change_email', 'Change Email Address')}
-                        placeholder={t('email_address', 'Email address')}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        autoComplete="email"
-                        textContentType="emailAddress"
-                        value={email}
-                        onChangeText={(value) => {
-                            setEmail(value);
-                            setStatus(null);
-                        }}
-                        onBlur={() => setTouched(true)}
-                        error={touched && errorKey ? t(errorKey, errorKey) : undefined}
-                        containerStyle="mb-6"
-                    />
+                    <Text
+                        variant="caption"
+                        style={[styles.hint, { color: colors.brand.text.subtitle, textAlign: isRTL ? 'right' : 'left' }]}
+                    >
+                        {t(
+                            'change_email_verification_hint',
+                            'We will send a verification link to the new address before changing your account email.',
+                        )}
+                    </Text>
 
                     <GradientButton
                         title={saving ? t('please_wait', 'Please wait...') : t('update_email', 'Update Email Address')}
@@ -143,10 +157,9 @@ export default function ChangeEmailScreen() {
                         loading={saving}
                         disabled={saving || !normalizedEmail}
                         widthMode="full"
-                        height={44}
-                        textSize={14}
+                        size="compact"
                     />
-                </SectionCard>
+                </SettingsFieldSection>
             </KeyboardAwareScrollView>
         </View>
     );
@@ -161,26 +174,24 @@ const styles = StyleSheet.create({
     },
     content: {
         paddingBottom: scale(60),
-        paddingHorizontal: scale(14),
-        paddingTop: scale(18),
+        paddingTop: 0,
     },
     status: {
         borderRadius: scale(8),
         borderWidth: 1,
+        marginTop: scale(16),
         marginBottom: scale(14),
         paddingHorizontal: scale(12),
         paddingVertical: scale(10),
     },
-    currentEmail: {
-        borderRadius: scale(8),
-        borderWidth: 1,
-        marginBottom: scale(18),
-        paddingHorizontal: scale(12),
-        paddingVertical: scale(11),
+    hint: {
+        marginBottom: scale(22),
+        lineHeight: scale(18),
     },
-    emailText: {
-        marginTop: scale(4),
-        textAlign: 'left',
-        writingDirection: 'ltr',
+    inputBlock: {
+        marginBottom: scale(6),
+    },
+    inputBlockWithError: {
+        marginBottom: scale(20),
     },
 });

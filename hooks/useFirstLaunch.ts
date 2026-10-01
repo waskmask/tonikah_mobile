@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { markStartup } from "@/lib/performanceDiagnostics";
 
 interface FirstLaunchState {
   hasSeenOnboarding: boolean;
@@ -22,6 +23,7 @@ export const useFirstLaunchStore = create<FirstLaunchState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ hasSeenOnboarding: state.hasSeenOnboarding }),
       onRehydrateStorage: () => () => {
+        markStartup('onboarding-state-hydrated');
         useFirstLaunchStore.setState({ isHydrated: true });
       },
     },

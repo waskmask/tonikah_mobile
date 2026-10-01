@@ -13,6 +13,7 @@ type PressableScaleProps = {
     /** Layout style for the outer Pressable (needed when `style` uses flex to fill the parent). */
     containerStyle?: StyleProp<ViewStyle>;
     accessibilityLabel?: string;
+    accessibilityHint?: string;
     accessibilityRole?: 'button' | 'image';
     accessibilityState?: AccessibilityState;
     activeScale?: number;
@@ -28,6 +29,7 @@ export function PressableScale({
     style,
     containerStyle,
     accessibilityLabel,
+    accessibilityHint,
     accessibilityRole,
     accessibilityState,
     activeScale = 0.9,
@@ -48,6 +50,7 @@ export function PressableScale({
             hitSlop={hitSlop}
             style={containerStyle}
             accessibilityLabel={accessibilityLabel}
+            accessibilityHint={accessibilityHint}
             accessibilityRole={accessibilityRole}
             accessibilityState={accessibilityState}
             onPressIn={() => { scaleValue.value = withSpring(activeScale, PRESS_SPRING); }}

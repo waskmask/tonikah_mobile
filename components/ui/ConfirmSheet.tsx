@@ -12,7 +12,7 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
-import { X } from 'lucide-react-native';
+import { X } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface ConfirmSheetProps {
@@ -99,7 +99,7 @@ export function ConfirmSheet({
                                 hitSlop={8}
                                 style={styles.closeButton}
                             >
-                                <X size={scale(20)} color={palette.brand.text.subtitle} />
+                                <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                             </Pressable>
                         </View>
 

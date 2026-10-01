@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Appearance, ColorSchemeName } from "react-native";
+import { markStartup } from "@/lib/performanceDiagnostics";
 
 type ThemeMode = "light" | "dark" | "system";
 
@@ -36,6 +37,7 @@ export const useThemeStore = create<ThemeState>()(
             storage: createJSONStorage(() => AsyncStorage),
             partialize: (state) => ({ mode: state.mode }),
             onRehydrateStorage: () => () => {
+                markStartup('theme-hydrated');
                 useThemeStore.setState({ isHydrated: true });
             },
         }

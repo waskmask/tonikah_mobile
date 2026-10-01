@@ -26,7 +26,7 @@ module.exports = {
             border: "var(--brand-bg-border)",
           },
           accent: {
-            link: "#4B68C4",
+            link: "rgb(var(--brand-accent-link) / <alpha-value>)",
             success: "#10B981",
             warning: "#F59E0B",
             error: "#EF4444",

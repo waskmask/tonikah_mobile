@@ -9,7 +9,7 @@ import BottomSheet, {
 } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Pressable } from 'react-native';
-import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react-native';
+import { CaretLeft, CaretRight, Trash, X } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, Extrapolation, interpolate, SlideInLeft, SlideInRight, useAnimatedStyle } from 'react-native-reanimated';
 import {
@@ -257,9 +257,9 @@ export function TextEditSheet({
                                     style={styles.drawerHeaderAction}
                                 >
                                     {isRTL ? (
-                                        <ChevronRight size={22} color={palette.brand.text.body} />
+                                        <CaretRight size={22} color={palette.brand.text.body} weight="bold" />
                                     ) : (
-                                        <ChevronLeft size={22} color={palette.brand.text.body} />
+                                        <CaretLeft size={22} color={palette.brand.text.body} weight="bold" />
                                     )}
                                 </Pressable>
                             </View>
@@ -278,7 +278,7 @@ export function TextEditSheet({
                                         accessibilityLabel={t('clear', 'Clear')}
                                         style={styles.drawerHeaderAction}
                                     >
-                                        <Trash2 size={scale(19)} color={palette.brand.text.body} />
+                                        <Trash size={scale(19)} color={palette.brand.text.body} weight="bold" />
                                     </Pressable>
                                 ) : null}
                             </View>
@@ -405,7 +405,7 @@ export function TextEditSheet({
                                         accessibilityLabel={t('clear', 'Clear')}
                                         style={styles.iconButton}
                                     >
-                                        <Trash2 size={scale(19)} color={palette.brand.accent.error} />
+                                        <Trash size={scale(19)} color={palette.brand.accent.error} weight="bold" />
                                     </Pressable>
                                 ) : null}
                                 <Pressable
@@ -416,7 +416,7 @@ export function TextEditSheet({
                                     accessibilityLabel={t('close', 'Close')}
                                     style={styles.iconButton}
                                 >
-                                    <X size={scale(20)} color={palette.brand.text.subtitle} />
+                                    <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                                 </Pressable>
                             </View>
                         </View>
@@ -455,7 +455,12 @@ export function TextEditSheet({
                                 {countValue(draft)}/{maxNonSpace}
                             </Text>
                             {errorText ? (
-                                <Text variant="caption" style={[styles.error, { color: palette.brand.accent.error }]}>
+                                <Text
+                                    variant="caption"
+                                    accessibilityRole="alert"
+                                    accessibilityLiveRegion="assertive"
+                                    style={[styles.error, { color: palette.brand.accent.error }]}
+                                >
                                     {errorText}
                                 </Text>
                             ) : null}

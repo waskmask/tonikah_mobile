@@ -2,25 +2,29 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CaretLeft, CaretRight } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { HeaderTokens } from '@/constants/uiTokens';
 import { scale } from '@/hooks/useResponsive';
 import { useTranslation } from 'react-i18next';
+import { AppMenuButton } from '@/components/app/AppMenuButton';
+import { useRootAppMenu } from '@/components/app/RootAppMenuDrawer';
 
 type AppBackTitleBarProps = {
     title: string;
-    fallbackHref?: string;
+    fallbackHref: string;
     onBack?: () => void;
+    showMenu?: boolean;
 };
 
-export function AppBackTitleBar({ title, fallbackHref = '/(tabs)/search', onBack }: AppBackTitleBarProps) {
+export function AppBackTitleBar({ title, fallbackHref, onBack, showMenu = false }: AppBackTitleBarProps) {
     const { t } = useTranslation('common');
     const { isRTL } = useLanguage();
     const chrome = useColors().chrome.header;
-    const BackIcon = isRTL ? ChevronRight : ChevronLeft;
+    const BackIcon = isRTL ? CaretRight : CaretLeft;
+    const rootMenu = useRootAppMenu();
 
     const goBack = () => {
         if (onBack) {
@@ -53,7 +57,7 @@ export function AppBackTitleBar({ title, fallbackHref = '/(tabs)/search', onBack
                     style={styles.backButton}
                     hitSlop={8}
                 >
-                    <BackIcon size={scale(23)} color={chrome.icon} />
+                    <BackIcon size={scale(23)} color={chrome.icon} weight="bold" />
                 </Pressable>
                 {/* Content-sized title in a flex row hugs the chevron in both
                     directions — no textAlign (Android flips literal values in RTL) */}
@@ -67,7 +71,14 @@ export function AppBackTitleBar({ title, fallbackHref = '/(tabs)/search', onBack
                         {title}
                     </Text>
                 </View>
-                <View style={styles.rightSpacer} />
+                {showMenu && rootMenu ? (
+                    <AppMenuButton
+                        onPress={rootMenu.openMenu}
+                        accessibilityLabel={t('menu', 'Menu')}
+                    />
+                ) : (
+                    <View style={styles.rightSpacer} />
+                )}
             </View>
         </SafeAreaView>
     );

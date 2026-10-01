@@ -20,4 +20,9 @@ export const queryKeys = {
     masterdata: {
         editProfile: (language: string) => ['masterdata', 'edit-profile', language] as const,
     },
+    settings: {
+        activeSessions: ['settings', 'active-sessions'] as const,
+        privacyConsent: ['settings', 'privacy-consent'] as const,
+        notificationStatus: ['settings', 'notification-status'] as const,
+    },
 };

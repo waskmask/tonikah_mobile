@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { EmailSuggestionInput } from '@/components/ui/EmailSuggestionInput';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { AuthTopBar } from '@/components/auth/AuthTopBar';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeSlash } from 'phosphor-react-native';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -42,7 +42,7 @@ export default function LoginScreen() {
     const compactButtonHitSlop = Math.max(2, (44 - scale(40)) / 2);
     const reduceMotion = useReducedMotion();
     const iconMuted = colors.brand.text.muted;
-    const { login, googleAuth } = useAuthStore();
+    const { login, googleAuth, restoreSession } = useAuthStore();
     const toast = useToast();
 
     const [showPassword, setShowPassword] = useState(false);
@@ -70,6 +70,14 @@ export default function LoginScreen() {
 
         if (result.success) {
             return;
+        }
+
+        if (result.message === 'already_logged_in') {
+            await restoreSession();
+            if (useAuthStore.getState().isAuthenticated) {
+                router.replace('/');
+                return;
+            }
         }
 
         if (result.message === 'account_suspended') {
@@ -184,11 +192,17 @@ export default function LoginScreen() {
                                         <Input
                                             placeholder={t('password')}
                                             rightIcon={
-                                                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
+                                                <Pressable
+                                                    onPress={() => setShowPassword(!showPassword)}
+                                                    hitSlop={10}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={showPassword ? t('hide_password', 'Hide password') : t('show_password', 'Show password')}
+                                                    accessibilityState={{ selected: showPassword }}
+                                                >
                                                     {showPassword ? (
-                                                        <EyeOff size={scale(20)} color={iconMuted} />
+                                                        <EyeSlash size={scale(20)} color={iconMuted} weight="regular" />
                                                     ) : (
-                                                        <Eye size={scale(20)} color={iconMuted} />
+                                                        <Eye size={scale(20)} color={iconMuted} weight="regular" />
                                                     )}
                                                 </Pressable>
                                             }
@@ -196,7 +210,7 @@ export default function LoginScreen() {
                                             autoComplete="password"
                                             textContentType="password"
                                             value={value}
-                                            onChangeText={onChange}
+                                            onChangeText={(text) => onChange(text.replace(/\s+/g, ''))}
                                             onBlur={onBlur}
                                             error={errors.password?.message ? t(errors.password.message as any) : undefined}
                                         />
@@ -230,9 +244,7 @@ export default function LoginScreen() {
                                     loading={isSubmitting}
                                     disabled={isSubmitting}
                                     widthMode="full"
-                                    height={40}
-                                    textSize={15}
-                                    hitSlop={compactButtonHitSlop}
+                                    size="compact"
                                 />
                             </View>
 

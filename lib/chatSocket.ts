@@ -1,11 +1,13 @@
 import { io, Socket } from 'socket.io-client';
+import { AppState, type NativeEventSubscription } from 'react-native';
 import { Config } from '@/constants/config';
 import { api } from '@/lib/api';
-import { ChatMessage } from '@/lib/chatService';
+import { ChatMessage, type ConversationState } from '@/lib/chatService';
 import type { GalleryModerationUpdateEvent } from '@/hooks/useGalleryModeration';
 import { queryClient } from '@/lib/queryClient';
 import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
 import { withMessagingAccessClock } from '@/lib/messagingAccess';
+import { applyAcceptedConversationById, applyConversationStateById } from '@/lib/chatInboxCache';
 
 /**
  * Singleton chat socket. Previously every useChatSocket() call opened its own
@@ -21,6 +23,8 @@ export type ChatSocketHandlers = {
     onMessageUnsent?: (messageId: string, payload: any) => void;
     onMessageUpdated?: (payload: any) => void;
     onConversationChanged?: (payload: any) => void;
+    onRequestAccepted?: (payload: any) => void;
+    onConversationState?: (payload: any) => void;
     onUnread?: (payload: any) => void;
     onSeen?: (payload: any) => void;
     onDelivered?: (payload: any) => void;
@@ -35,6 +39,10 @@ type Subscriber = { handlers: () => ChatSocketHandlers };
 
 function socketBaseUrl() {
     return Config.API_URL.replace(/\/api\/?$/, '');
+}
+
+function isBackgrounded() {
+    return AppState.currentState === 'background';
 }
 
 function normalizeMessage(raw: any): ChatMessage {
@@ -54,6 +62,7 @@ let connecting = false;
 let refreshingAuth = false;
 let connected = false;
 let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let appStateSubscription: NativeEventSubscription | null = null;
 
 const subscribers = new Set<Subscriber>();
 const connectionListeners = new Set<(value: boolean) => void>();
@@ -77,15 +86,17 @@ function broadcast(callback: (handlers: ChatSocketHandlers) => void) {
 }
 
 async function ensureSocket() {
-    if (socket || connecting) return;
+    if (socket || connecting || isBackgrounded()) return;
     connecting = true;
     try {
-        const { accessToken } = await api.getTokens();
-        if (!accessToken || socket || subscribers.size === 0) return;
+        const { accessToken, refreshToken } = await api.getTokens();
+        if (!accessToken || socket || subscribers.size === 0 || isBackgrounded()) return;
 
         const nextSocket = io(socketBaseUrl(), {
             transports: ['websocket', 'polling'],
-            auth: { token: accessToken },
+            // Refresh token identifies this particular native session so the
+            // server can revoke other devices without disconnecting this one.
+            auth: { token: accessToken, refreshToken },
             extraHeaders: {
                 Cookie: `app_at=${accessToken}`,
                 Authorization: `Bearer ${accessToken}`,
@@ -120,7 +131,11 @@ async function ensureSocket() {
                 return;
             }
 
-            nextSocket.auth = { token: refreshed };
+            const refreshedTokens = await api.getTokens();
+            nextSocket.auth = {
+                token: refreshed,
+                refreshToken: refreshedTokens.refreshToken,
+            };
             nextSocket.io.opts.extraHeaders = {
                 ...(nextSocket.io.opts.extraHeaders || {}),
                 Cookie: `app_at=${refreshed}`,
@@ -141,21 +156,21 @@ async function ensureSocket() {
                     return;
                 }
                 handlers.onMessage?.(message, payload);
-                handlers.onConversationChanged?.(payload);
+                if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
             });
         });
 
         nextSocket.on('chat:message:unsent', (payload) => {
             broadcast((handlers) => {
                 handlers.onMessageUnsent?.(String(payload?.messageId || ''), payload);
-                handlers.onConversationChanged?.(payload);
+                if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
             });
         });
 
         const forwardUpdated = (payload: any) => {
             broadcast((handlers) => {
                 handlers.onMessageUpdated?.(payload);
-                handlers.onConversationChanged?.(payload);
+                if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
             });
         };
         nextSocket.on('chat:message:updated', forwardUpdated);
@@ -164,7 +179,7 @@ async function ensureSocket() {
         nextSocket.on('chat:viewonce:viewed', (payload) => {
             broadcast((handlers) => {
                 handlers.onViewOnceViewed?.(payload);
-                handlers.onConversationChanged?.(payload);
+                if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
             });
         });
 
@@ -172,8 +187,21 @@ async function ensureSocket() {
             broadcast((handlers) => handlers.onConversationChanged?.(payload));
         };
         nextSocket.on('chat:request', forwardConversationChanged);
-        nextSocket.on('chat:request:accepted', forwardConversationChanged);
+        nextSocket.on('chat:request:accepted', (payload) => {
+            const updated = applyAcceptedConversationById(String(payload?.conversationId || ''));
+            broadcast((handlers) => {
+                handlers.onRequestAccepted?.(payload);
+                if (!updated) handlers.onConversationChanged?.(payload);
+            });
+        });
         nextSocket.on('chat:conversation:ended', forwardConversationChanged);
+        nextSocket.on('chat:conversation:state', (payload) => {
+            const id = String(payload?.conversationId || '');
+            const state = String(payload?.state || '');
+            if (!id || !['active', 'ended', 'declined', 'expired', 'blocked'].includes(state)) return;
+            applyConversationStateById(id, state as ConversationState);
+            broadcast((handlers) => handlers.onConversationState?.(payload));
+        });
 
         const forwardGalleryAccessChanged = (payload: any) => {
             broadcast((handlers) => {
@@ -233,6 +261,17 @@ export const chatSocket = {
     subscribe(handlers: () => ChatSocketHandlers): () => void {
         const subscriber: Subscriber = { handlers };
         subscribers.add(subscriber);
+        if (!appStateSubscription) {
+            appStateSubscription = AppState.addEventListener('change', (state) => {
+                if (state === 'background') {
+                    socket?.disconnect();
+                    setConnected(false);
+                } else if (state === 'active' && subscribers.size > 0) {
+                    if (socket) socket.connect();
+                    else void ensureSocket();
+                }
+            });
+        }
         if (disconnectTimer) {
             clearTimeout(disconnectTimer);
             disconnectTimer = null;
@@ -244,7 +283,11 @@ export const chatSocket = {
                 // Grace period so quick screen transitions don't cycle the connection.
                 disconnectTimer = setTimeout(() => {
                     disconnectTimer = null;
-                    if (subscribers.size === 0) teardownSocket();
+                    if (subscribers.size === 0) {
+                        teardownSocket();
+                        appStateSubscription?.remove();
+                        appStateSubscription = null;
+                    }
                 }, 4000);
             }
         };

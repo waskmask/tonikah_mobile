@@ -2,6 +2,9 @@ type RequestCounts = Record<string, number>;
 
 const interactionStarts = new Map<string, number>();
 const requestCounts: RequestCounts = {};
+const startupOrigin = now();
+const startupMarks = new Set<string>();
+const startupDiagnosticsEnabled = __DEV__ || process.env.EXPO_PUBLIC_STARTUP_DIAGNOSTICS === '1';
 
 function now() {
     return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -12,6 +15,15 @@ function normalizedEndpoint(endpoint: string) {
         .split('?')[0]
         .replace(/\/[0-9a-f]{24}(?=\/|$)/gi, '/:id')
         .replace(/\/[0-9a-f]{8}-[0-9a-f-]{27,}(?=\/|$)/gi, '/:id');
+}
+
+export function markStartup(name: string, details?: Record<string, string | number | boolean>) {
+    if (!startupDiagnosticsEnabled || startupMarks.has(name)) return;
+    startupMarks.add(name);
+    const detailText = details
+        ? ` ${Object.entries(details).map(([key, value]) => `${key}=${String(value)}`).join(' ')}`
+        : '';
+    console.info(`[startup] ${name} +${Math.round(now() - startupOrigin)}ms${detailText}`);
 }
 
 export function markInteraction(name: string) {

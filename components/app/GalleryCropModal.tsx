@@ -5,13 +5,15 @@ import {
     Modal,
     PanResponder,
     Pressable,
+    ScrollView,
     StatusBar,
     StyleSheet,
     View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { ChevronLeft, ChevronRight, RotateCw } from 'lucide-react-native';
+import { RotateCw } from '@/components/ui/icons/PhosphorCompat';
+import { CaretLeft, CaretRight } from 'phosphor-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -58,6 +60,8 @@ type Props = {
     onClose: () => void;
     onUpload: (uri: string) => Promise<void>;
     onError: (message?: string) => void;
+    ratioOptions?: Array<{ label: string; value: number | 'original' }>;
+    resetLabel?: string;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -137,10 +141,12 @@ export function GalleryCropModal({
     onClose,
     onUpload,
     onError,
+    ratioOptions,
+    resetLabel,
 }: Props) {
     const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
-    const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+    const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0, pinchDistance: 0, pinchZoom: 1 });
     const sliderOriginXRef = useRef(0);
     const pendingZoomRef = useRef<number | null>(null);
     const zoomFrameRef = useRef<number | null>(null);
@@ -151,6 +157,8 @@ export function GalleryCropModal({
     const [rotation, setRotation] = useState(0);
     const [sliderWidth, setSliderWidth] = useState(0);
     const [processing, setProcessing] = useState(false);
+    const [ratioIndex, setRatioIndex] = useState(0);
+    const [cropAreaSize, setCropAreaSize] = useState<Size>({ width: 0, height: 0 });
     const initializedImageRef = useRef<string | null>(null);
     const submittedPreviewRef = useRef<PreviewTransform | null>(null);
     const interactionRef = useRef({ natural, frame, offset, zoom, rotation, sliderWidth });
@@ -191,6 +199,7 @@ export function GalleryCropModal({
         setOffset((current) => sameOffset(current, { x: 0, y: 0 }) ? current : { x: 0, y: 0 });
         setZoom((current) => current === 1 ? current : 1);
         setRotation((current) => current === 0 ? current : 0);
+        setRatioIndex(0);
         setProcessing((current) => current ? false : current);
 
         if (sourceSize?.width && sourceSize?.height) {
@@ -230,15 +239,45 @@ export function GalleryCropModal({
                 onMoveShouldSetPanResponder: () => true,
                 onPanResponderGrant: (event) => {
                     const current = interactionRef.current;
+                    const touches = event.nativeEvent.touches;
+                    const pinchDistance = touches.length >= 2
+                        ? Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY)
+                        : 0;
                     dragStart.current = {
                         x: event.nativeEvent.pageX,
                         y: event.nativeEvent.pageY,
                         offsetX: current.offset.x,
                         offsetY: current.offset.y,
+                        pinchDistance,
+                        pinchZoom: current.zoom,
                     };
                 },
                 onPanResponderMove: (event) => {
                     const current = interactionRef.current;
+                    const touches = event.nativeEvent.touches;
+                    if (touches.length >= 2) {
+                        const distance = Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
+                        if (!dragStart.current.pinchDistance) {
+                            dragStart.current.pinchDistance = distance;
+                            dragStart.current.pinchZoom = current.zoom;
+                        }
+                        const nextZoom = clamp(dragStart.current.pinchZoom * distance / Math.max(1, dragStart.current.pinchDistance), MIN_ZOOM, MAX_ZOOM);
+                        interactionRef.current = { ...current, zoom: nextZoom };
+                        setZoom(nextZoom);
+                        setOffset((value) => clampOffset(value, current.natural, current.frame, nextZoom, current.rotation));
+                        return;
+                    }
+                    if (dragStart.current.pinchDistance) {
+                        dragStart.current = {
+                            x: event.nativeEvent.pageX,
+                            y: event.nativeEvent.pageY,
+                            offsetX: current.offset.x,
+                            offsetY: current.offset.y,
+                            pinchDistance: 0,
+                            pinchZoom: current.zoom,
+                        };
+                        return;
+                    }
                     const next = {
                         x: dragStart.current.offsetX + event.nativeEvent.pageX - dragStart.current.x,
                         y: dragStart.current.offsetY + event.nativeEvent.pageY - dragStart.current.y,
@@ -310,6 +349,21 @@ export function GalleryCropModal({
         setOffset({ x: 0, y: 0 });
     }
 
+    const selectedRatio = ratioOptions?.[ratioIndex]?.value;
+    const frameRatio = selectedRatio === 'original' || !selectedRatio
+        ? (natural.width && natural.height ? natural.width / natural.height : 3 / 4)
+        : selectedRatio;
+    const maxChatFrameWidth = ratioOptions
+        ? Math.min(scale(360), Math.max(0, cropAreaSize.width - scale(44)), Math.max(0, cropAreaSize.height - scale(12)) * frameRatio)
+        : undefined;
+
+    function resetCrop() {
+        setOffset({ x: 0, y: 0 });
+        setZoom(1);
+        setRotation(0);
+        setRatioIndex(0);
+    }
+
     async function cropAndUpload() {
         if (!imageUri || !natural.width || !natural.height || !frame.width || !frame.height || busy) return;
 
@@ -343,7 +397,9 @@ export function GalleryCropModal({
                 [
                     ...(rotation ? [{ rotate: rotation }] : []),
                     { crop },
-                    { resize: { width: EXPORT_WIDTH, height: EXPORT_HEIGHT } },
+                    { resize: ratioOptions
+                        ? { width: Math.min(EXPORT_WIDTH, crop.width), height: Math.round(Math.min(EXPORT_WIDTH, crop.width) / frameRatio) }
+                        : { width: EXPORT_WIDTH, height: EXPORT_HEIGHT } },
                 ],
                 { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
             );
@@ -380,8 +436,8 @@ export function GalleryCropModal({
                             accessibilityLabel={labels.title}
                         >
                             {isRTL
-                                ? <ChevronRight size={scale(23)} color={textStrong} />
-                                : <ChevronLeft size={scale(23)} color={textStrong} />}
+                                ? <CaretRight size={scale(23)} color={textStrong} weight="bold" />
+                                : <CaretLeft size={scale(23)} color={textStrong} weight="bold" />}
                         </Pressable>
                     </View>
                     <View style={styles.headerText}>
@@ -395,9 +451,9 @@ export function GalleryCropModal({
                     <View style={styles.headerSpacer} />
                 </View>
 
-                <View style={styles.cropArea}>
+                <View style={styles.cropArea} onLayout={(event) => setCropAreaSize(event.nativeEvent.layout)}>
                     <View
-                        style={[styles.cropFrame, { backgroundColor: surface }]}
+                        style={[styles.cropFrame, { backgroundColor: surface }, ratioOptions && { width: maxChatFrameWidth, aspectRatio: frameRatio }]}
                         pointerEvents={busy ? 'none' : 'auto'}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
@@ -445,6 +501,22 @@ export function GalleryCropModal({
                     </View>
                 </View>
 
+                {!!ratioOptions?.length && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ratioRow}>
+                        {ratioOptions.map((option, index) => (
+                            <Pressable
+                                key={`${option.label}:${index}`}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: index === ratioIndex }}
+                                onPress={() => { setRatioIndex(index); setZoom(1); setOffset({ x: 0, y: 0 }); }}
+                                style={[styles.ratioOption, { borderColor: index === ratioIndex ? '#F34B6F' : border }]}
+                            >
+                                <Text variant="caption" style={{ color: index === ratioIndex ? '#F34B6F' : textMuted }}>{option.label}</Text>
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                )}
+
                 <View style={styles.controls}>
                     <View
                         style={styles.sliderHitArea}
@@ -477,6 +549,11 @@ export function GalleryCropModal({
                     >
                         <RotateCw size={scale(22)} color={textStrong} />
                     </Pressable>
+                    {!!ratioOptions && (
+                        <Pressable onPress={resetCrop} disabled={busy} style={[styles.rotateButton, { borderColor: border }]} accessibilityLabel={resetLabel || 'Reset'}>
+                            <Text variant="caption" style={{ color: textStrong }}>{resetLabel || 'Reset'}</Text>
+                        </Pressable>
+                    )}
                 </View>
 
                 {errorMessage ? (
@@ -505,6 +582,8 @@ export function GalleryCropModal({
 }
 
 const styles = StyleSheet.create({
+    ratioRow: { gap: scale(8), paddingHorizontal: scale(22), paddingVertical: scale(8) },
+    ratioOption: { minWidth: scale(48), minHeight: scale(38), paddingHorizontal: scale(9), alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: scale(6) },
     screen: {
         flex: 1,
     },

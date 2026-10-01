@@ -1,59 +1,104 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, ChevronUp, RotateCcw, X } from 'lucide-react-native';
+import { ArrowFatUp, ArrowUDownLeft, BookmarkSimple } from 'phosphor-react-native';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useTheme } from '@/hooks/useTheme';
+import { t } from '@/lib/profileDisplay';
 
 type ButtonKey = 'undo' | 'skip' | 'favorite' | 'view';
 
 type Props = {
     canUndo: boolean;
     busy?: boolean;
+    disabled?: boolean;
+    writeDisabled?: boolean;
     onUndo: () => void;
     onSkip: () => void;
     onFavorite: () => void;
     onView: () => void;
 };
 
-export function ExploreActionBar({ canUndo, busy, onUndo, onSkip, onFavorite, onView }: Props) {
+export function ExploreActionBar({ canUndo, busy, disabled, writeDisabled, onUndo, onSkip, onFavorite, onView }: Props) {
     const colors = useColors();
     const { isDark } = useTheme();
     const explore = colors.chrome.explore;
     const { lightImpact } = useHaptics();
     const reduceMotion = useReducedMotion();
     const [activeKey, setActiveKey] = useState<ButtonKey | null>(null);
+    const undoColor = canUndo
+        ? (isDark ? '#F4C95D' : '#B7791F')
+        : (isDark ? '#6D6D72' : '#AAA6A0');
     // Extra breathing room above the buttons on tall screens only — short
     // devices keep the tighter gap so the deck doesn't lose card height
     const { height: windowHeight } = useWindowDimensions();
     const tallDevice = windowHeight >= 820;
 
     const run = (key: ButtonKey, action: () => void) => {
+        action();
         lightImpact();
         if (!reduceMotion) {
             setActiveKey(key);
             setTimeout(() => setActiveKey(null), 260);
         }
-        action();
     };
 
     return (
         <View style={[styles.root, { backgroundColor: explore.actionBar, paddingTop: scale(12) + (tallDevice ? scale(8) : 0) }]}>
-            <Circle buttonKey="undo" activeKey={activeKey} disabled={!canUndo || busy} size="sm" reduceMotion={reduceMotion} onPress={() => run('undo', onUndo)}>
-                <RotateCcw size={scale(24)} color={isDark ? '#F1CA71' : '#D2A33B'} strokeWidth={2.5} />
+            <Circle accessibilityLabel={t('undo', 'Undo')} buttonKey="undo" activeKey={activeKey} disabled={!canUndo || busy || disabled || writeDisabled} dimWhenDisabled={false} size="sm" reduceMotion={reduceMotion} onPress={() => run('undo', onUndo)}>
+                <ArrowUDownLeft size={scale(24)} color={undoColor} weight="bold" />
             </Circle>
-            <Circle buttonKey="skip" activeKey={activeKey} disabled={busy} size="md" tone="skip" reduceMotion={reduceMotion} onPress={() => run('skip', onSkip)}>
-                <X size={scale(26)} color={isDark ? '#FFFFFF' : '#141210'} strokeWidth={2.7} />
+            <Circle accessibilityLabel={t('skip_profile', 'Skip profile')} buttonKey="skip" activeKey={activeKey} disabled={busy || disabled || writeDisabled} size="md" tone="skip" reduceMotion={reduceMotion} onPress={() => run('skip', onSkip)}>
+                <ExploreSharpX color={isDark ? '#FFFFFF' : '#141210'} />
             </Circle>
-            <Circle buttonKey="view" activeKey={activeKey} disabled={busy} size="md" tone="view" reduceMotion={reduceMotion} onPress={() => run('view', onView)}>
-                <ChevronUp size={scale(28)} color="#FFFFFF" strokeWidth={2.8} />
+            <Circle accessibilityLabel={t('view_profile', 'View profile')} buttonKey="view" activeKey={activeKey} disabled={busy || disabled} size="md" tone="view" reduceMotion={reduceMotion} onPress={() => run('view', onView)}>
+                <ArrowFatUp size={scale(28)} color="#FFFFFF" weight="fill" />
             </Circle>
-            <Circle buttonKey="favorite" activeKey={activeKey} disabled={busy} size="sm" tone="primary" reduceMotion={reduceMotion} onPress={() => run('favorite', onFavorite)}>
-                {busy ? <ActivityIndicator color="#3E9DFF" /> : <Bookmark size={scale(22)} color="#3E9DFF" fill="#3E9DFF" strokeWidth={2.4} />}
+            <Circle accessibilityLabel={t('save_profile', 'Save profile')} buttonKey="favorite" activeKey={activeKey} disabled={busy || disabled || writeDisabled} size="sm" tone="primary" reduceMotion={reduceMotion} onPress={() => run('favorite', onFavorite)}>
+                <BookmarkSimple size={scale(22)} color="#3E9DFF" weight="fill" />
             </Circle>
+        </View>
+    );
+}
+
+export function ExploreActionBarSkeleton() {
+    const colors = useColors();
+    const { height: windowHeight } = useWindowDimensions();
+    const tallDevice = windowHeight >= 820;
+
+    return (
+        <View
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+                styles.root,
+                {
+                    backgroundColor: colors.chrome.explore.actionBar,
+                    paddingTop: scale(12) + (tallDevice ? scale(8) : 0),
+                },
+            ]}
+        >
+            <Skeleton width={scale(48)} height={scale(48)} borderRadius={scale(24)} />
+            <Skeleton width={scale(56)} height={scale(56)} borderRadius={scale(28)} />
+            <Skeleton width={scale(56)} height={scale(56)} borderRadius={scale(28)} />
+            <Skeleton width={scale(48)} height={scale(48)} borderRadius={scale(24)} />
+        </View>
+    );
+}
+
+export function ExploreSharpX({ color, size = 28 }: { color: string; size?: number }) {
+    const iconSize = scale(size);
+    const barThickness = scale(size >= 28 ? 4 : 3);
+
+    return (
+        <View pointerEvents="none" style={[styles.sharpX, { width: iconSize, height: iconSize }]}>
+            <View style={[styles.sharpXBar, styles.sharpXForward, { backgroundColor: color, top: (iconSize - barThickness) / 2, width: iconSize - scale(1), height: barThickness }]} />
+            <View style={[styles.sharpXBar, styles.sharpXBackward, { backgroundColor: color, top: (iconSize - barThickness) / 2, width: iconSize - scale(1), height: barThickness }]} />
         </View>
     );
 }
@@ -64,18 +109,22 @@ function Circle({
     activeKey,
     onPress,
     disabled,
+    dimWhenDisabled = true,
     tone = 'neutral',
     size,
     reduceMotion = false,
+    accessibilityLabel,
 }: {
     children: React.ReactNode;
     buttonKey: ButtonKey;
     activeKey: ButtonKey | null;
     onPress: () => void;
     disabled?: boolean;
+    dimWhenDisabled?: boolean;
     tone?: 'neutral' | 'skip' | 'primary' | 'view';
     size: 'sm' | 'md';
     reduceMotion?: boolean;
+    accessibilityLabel: string;
 }) {
     const colors = useColors();
     const { isDark } = useTheme();
@@ -143,7 +192,7 @@ function Circle({
                         styles.primary,
                         { shadowColor: buttonShadow, borderWidth: 0 },
                         size === 'md' ? styles.md : styles.sm,
-                        disabled && styles.disabled,
+                        disabled && dimWhenDisabled && styles.disabled,
                         dimmed && styles.dimmed,
                         active && !disabled && !reduceMotion && styles.pressed,
                     ]}
@@ -151,6 +200,9 @@ function Circle({
                     <Pressable
                         onPress={onPress}
                         disabled={disabled}
+                        accessibilityRole="button"
+                        accessibilityLabel={accessibilityLabel}
+                        accessibilityState={{ disabled: Boolean(disabled) }}
                         style={({ pressed }) => [
                             styles.buttonContent,
                             pressed && !disabled && styles.contentPressed,
@@ -176,7 +228,7 @@ function Circle({
                         size === 'md' ? styles.md : styles.sm,
                         tone === 'skip' && styles.skip,
                         tone === 'primary' && styles.view,
-                        disabled && styles.disabled,
+                        disabled && dimWhenDisabled && styles.disabled,
                         dimmed && styles.dimmed,
                         active && !disabled && !reduceMotion && styles.pressed,
                     ]}
@@ -185,6 +237,9 @@ function Circle({
                         <Pressable
                             onPress={onPress}
                             disabled={disabled}
+                            accessibilityRole="button"
+                            accessibilityLabel={accessibilityLabel}
+                            accessibilityState={{ disabled: Boolean(disabled) }}
                             style={({ pressed }) => [
                                 styles.buttonContent,
                                 pressed && !disabled && styles.contentPressed,
@@ -198,6 +253,9 @@ function Circle({
                 <Pressable
                     onPress={onPress}
                     disabled={disabled}
+                    accessibilityRole="button"
+                    accessibilityLabel={accessibilityLabel}
+                    accessibilityState={{ disabled: Boolean(disabled) }}
                     style={({ pressed }) => [
                         styles.circle,
                         {
@@ -209,7 +267,7 @@ function Circle({
                         size === 'md' ? styles.md : styles.sm,
                         tone === 'skip' && styles.skip,
                         tone === 'primary' && styles.view,
-                        disabled && styles.disabled,
+                        disabled && dimWhenDisabled && styles.disabled,
                         dimmed && styles.dimmed,
                         (pressed || active) && !disabled && !reduceMotion && styles.pressed,
                     ]}
@@ -286,6 +344,20 @@ const styles = StyleSheet.create({
         borderTopColor: 'rgba(255,255,255,0.08)',
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.32)',
+    },
+    sharpX: {
+        position: 'relative',
+    },
+    sharpXBar: {
+        position: 'absolute',
+        left: scale(0.5),
+        borderRadius: 0,
+    },
+    sharpXForward: {
+        transform: [{ rotate: '45deg' }],
+    },
+    sharpXBackward: {
+        transform: [{ rotate: '-45deg' }],
     },
     sm: { width: scale(48), height: scale(48) },
     md: { width: scale(56), height: scale(56) },

@@ -1781,6 +1781,8 @@
   "create_password_failed": "Failed to create password",
   "change_email": "Change Email Address",
   "change_email_short": "Change Email",
+  "new_email_address": "New email address",
+  "change_email_verification_hint": "We will send a verification link to the new address before changing your account email.",
   "resend_email": "Resend Email",
   "update_email": "Update Email Address",
   "email_same_as_current": "This email address is already linked to your account.",

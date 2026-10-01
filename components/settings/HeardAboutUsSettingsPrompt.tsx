@@ -13,7 +13,7 @@ import BottomSheet, {
     BottomSheetScrollView,
 } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { CheckCircle2, Megaphone, X } from 'lucide-react-native';
+import { CheckCircle2, Megaphone, X } from '@/components/ui/icons/PhosphorCompat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsNavRow } from '@/components/settings/SettingsRows';

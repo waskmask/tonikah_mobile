@@ -142,6 +142,7 @@ const initI18n = async () => {
         resources: RESOURCES,
         lng,
         fallbackLng: "en",
+        showSupportNotice: false,
         ns: NAMESPACES as unknown as string[],
         defaultNS: "common",
         interpolation: {

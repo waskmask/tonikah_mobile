@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard as RNKeyboard, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard as RNKeyboard, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetBackdropProps,
@@ -9,8 +9,10 @@ import BottomSheet, {
     BottomSheetScrollViewMethods,
     BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
-import { Check, ChevronLeft, ChevronRight, Keyboard as KeyboardIcon, X } from 'lucide-react-native';
+import { ImagePlus, X } from '@/components/ui/icons/PhosphorCompat';
+import { CaretLeft, CaretRight, Check } from 'phosphor-react-native';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useKeyboardState } from 'react-native-keyboard-controller';
@@ -19,11 +21,11 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useHaptics } from '@/hooks/useHaptics';
-import { toast } from '@/hooks/useToast';
+import { toast, ToastProvider } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
 import { apiMessage, t } from '@/lib/profileDisplay';
-import { reportsService, ReportEntityType } from '@/lib/reportsService';
+import { reportsService, ReportEntityType, ReportScreenshot } from '@/lib/reportsService';
 import {
     REPORT_DETAIL_DESCRIPTION_FALLBACKS,
     REPORT_DETAIL_FALLBACKS,
@@ -41,6 +43,10 @@ export type ReportTarget = {
     userId: string;
     imageUrl?: string;
     imageId?: string;
+    messageId?: string;
+    messageType?: 'text' | 'image' | 'voice' | 'system';
+    messagePreview?: string;
+    messageMediaUrl?: string;
 };
 
 type Props = {
@@ -53,14 +59,22 @@ type Props = {
 
 const DESCRIPTION_MAX = 500;
 const OTHER_MIN_NON_SPACE = 30;
+const MAX_SCREENSHOTS = 3;
+const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
+const SCREENSHOT_MIME_TYPES = new Set<ReportScreenshot['type']>(['image/jpeg', 'image/png', 'image/webp']);
 
 export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = false }: Props) {
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
-    const keyboardVisible = useKeyboardState((state) => state.isVisible);
+    const keyboardState = useKeyboardState((state) => ({
+        duration: state.duration,
+        isVisible: state.isVisible,
+    }));
+    const keyboardVisible = keyboardState.isVisible;
     const { lightImpact } = useHaptics();
     const scrollRef = useRef<BottomSheetScrollViewMethods>(null);
+    const editorYRef = useRef(0);
     const primaryActionRef = useRef<() => void>(() => undefined);
     const didNotifyOpenRef = useRef(false);
     const [step, setStep] = useState<'reason' | 'detail'>('reason');
@@ -68,11 +82,12 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
     const [reasonDetail, setReasonDetail] = useState<ReportReasonDetail | null>(null);
     const [description, setDescription] = useState('');
     const [blockAfterReport, setBlockAfterReport] = useState(false);
+    const [screenshots, setScreenshots] = useState<ReportScreenshot[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const targetKey = target
-        ? `${target.type}:${target.userId}:${target.imageId || ''}:${target.imageUrl || ''}`
+        ? `${target.type}:${target.userId}:${target.imageId || ''}:${target.messageId || ''}:${target.imageUrl || ''}`
         : null;
     const reasons = useMemo(() => target ? reportReasons(target.type) : [], [target]);
     const details = useMemo(() => target ? reportDetails(target.type, reason) : [], [reason, target]);
@@ -88,6 +103,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
         setReasonDetail(null);
         setDescription('');
         setBlockAfterReport(false);
+        setScreenshots([]);
         setSubmitting(false);
     }, [targetKey]);
 
@@ -97,13 +113,20 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
         onOpened?.();
     }, [onOpened]);
 
+    const revealEditor = useCallback(() => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, editorYRef.current - scale(16)), animated: true });
+    }, []);
+
     useEffect(() => {
         if (!keyboardVisible || step !== 'detail') return;
-        const timer = setTimeout(() => {
-            scrollRef.current?.scrollToEnd({ animated: true });
-        }, 300);
-        return () => clearTimeout(timer);
-    }, [keyboardVisible, step]);
+
+        const frame = requestAnimationFrame(revealEditor);
+        const timer = setTimeout(revealEditor, Math.max(0, keyboardState.duration));
+        return () => {
+            cancelAnimationFrame(frame);
+            clearTimeout(timer);
+        };
+    }, [keyboardState.duration, keyboardVisible, revealEditor, step]);
 
     const snapPoints = useMemo(() => ['100%'], []);
     const renderBackdrop = useCallback(
@@ -121,8 +144,15 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
 
     const entityTitle = target?.type === 'Image'
         ? t('report_title_image', 'Report reason')
-        : t('report_title_profile', 'Report profile');
-    const selectedReasonLabel = reason ? t(`report_reason_v2_${reason}`, REPORT_REASON_FALLBACKS[reason]) : '';
+        : target?.type === 'ChatMessage'
+            ? t('chat:report_message_title', 'Report message')
+            : t('report_title_profile', 'Report profile');
+    const translateReportText = (key: string, fallback: string) => target?.type === 'ChatMessage'
+        ? t(`chat:${key}`, t(key, fallback))
+        : t(key, fallback);
+    const selectedReasonLabel = reason
+        ? translateReportText(`report_reason_v2_${reason}`, REPORT_REASON_FALLBACKS[reason])
+        : '';
 
     const selectReason = (value: ReportReason) => {
         lightImpact();
@@ -132,8 +162,76 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
     };
 
     const selectDetail = (value: ReportReasonDetail) => {
+        RNKeyboard.dismiss();
         lightImpact();
         setReasonDetail(value);
+    };
+
+    const closeSheet = useCallback(() => {
+        RNKeyboard.dismiss();
+        onClose();
+    }, [onClose]);
+
+    const pickScreenshots = async () => {
+        const remaining = MAX_SCREENSHOTS - screenshots.length;
+        if (remaining <= 0) {
+            toast.show(t('chat:report_screenshot_max', 'You can attach up to 3 screenshots.'), 'info');
+            return;
+        }
+
+        RNKeyboard.dismiss();
+        let result;
+        try {
+            result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: false,
+                allowsMultipleSelection: true,
+                selectionLimit: remaining,
+                quality: 0.9,
+                exif: false,
+                preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+            });
+        } catch {
+            toast.show(t('chat:attachment_failed', 'Could not open photos. Please try again.'), 'error');
+            return;
+        }
+        if (result.canceled) return;
+
+        let invalidType = false;
+        let tooLarge = false;
+        const selected: ReportScreenshot[] = [];
+        for (const asset of result.assets) {
+            const rawMime = String(asset.mimeType || '').toLowerCase();
+            const extension = String(asset.fileName || asset.uri).split(/[?#]/)[0].split('.').pop()?.toLowerCase();
+            const inferredMime = extension === 'jpg' || extension === 'jpeg'
+                ? 'image/jpeg'
+                : extension === 'png'
+                    ? 'image/png'
+                    : extension === 'webp'
+                        ? 'image/webp'
+                        : '';
+            const mime = rawMime === 'image/jpg' ? 'image/jpeg' : rawMime || inferredMime;
+            if (!SCREENSHOT_MIME_TYPES.has(mime as ReportScreenshot['type'])) {
+                invalidType = true;
+                continue;
+            }
+            if (asset.fileSize && asset.fileSize > MAX_SCREENSHOT_BYTES) {
+                tooLarge = true;
+                continue;
+            }
+            selected.push({
+                uri: asset.uri,
+                name: asset.fileName || `report-screenshot-${Date.now()}-${selected.length + 1}.${mime.split('/')[1]}`,
+                type: mime as ReportScreenshot['type'],
+                size: asset.fileSize,
+            });
+        }
+
+        if (invalidType) toast.show(t('chat:report_screenshot_type', 'Use a JPEG, PNG, or WebP image.'), 'error');
+        if (tooLarge) toast.show(t('chat:report_screenshot_size', 'Each screenshot must be 5 MB or smaller.'), 'error');
+        if (selected.length) {
+            setScreenshots((current) => [...current, ...selected].slice(0, MAX_SCREENSHOTS));
+        }
     };
 
     const handlePrimaryAction = () => {
@@ -142,47 +240,72 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
             setStep('detail');
             return;
         }
+        RNKeyboard.dismiss();
         void submit();
     };
 
     const submit = async () => {
         if (!target || !canSubmit || !reason || submitting) return;
         setSubmitting(true);
-        const res = await reportsService.create({
-            entityType: target.type,
-            entityId: target.type === 'Image' ? target.imageId || target.userId : target.userId,
-            reportedUserId: target.type === 'Image' ? target.userId : undefined,
-            reason,
-            reasonDetail: reason === 'other' ? undefined : reasonDetail || undefined,
-            reportVersion: 2,
-            description: description.trim(),
-            imageUrl: target.imageUrl,
-        });
+        let res;
+        try {
+            res = await reportsService.create({
+                entityType: target.type,
+                entityId: target.type === 'Image'
+                    ? target.imageId || target.userId
+                    : target.type === 'ChatMessage'
+                        ? target.messageId || ''
+                        : target.userId,
+                reportedUserId: target.type === 'Image' ? target.userId : undefined,
+                reason,
+                reasonDetail: reason === 'other' ? undefined : reasonDetail || undefined,
+                reportVersion: 2,
+                description: description.trim(),
+                imageUrl: target.imageUrl,
+                screenshots: target.type === 'ChatMessage' ? screenshots : undefined,
+            });
+        } catch {
+            setSubmitting(false);
+            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'error');
+            return;
+        }
 
         if (!res.success) {
             setSubmitting(false);
-            toast.show(apiMessage(res.message || 'report_missing_fields'), 'error');
+            const errorMessage = res.message === 'report_screenshot_too_large'
+                ? t('chat:report_screenshot_size', 'Each screenshot must be 5 MB or smaller.')
+                : res.message === 'report_screenshot_limit'
+                    ? t('chat:report_screenshot_max', 'You can attach up to 3 screenshots.')
+                    : res.message === 'invalid_evidence_type'
+                        ? t('chat:report_screenshot_type', 'Use a JPEG, PNG, or WebP image.')
+                        : apiMessage(res.message || 'report_missing_fields');
+            toast.show(errorMessage, 'error');
             return;
         }
 
         if (blockAfterReport) {
-            const blockRes = await usersService.block(target.userId);
+            let blocked = false;
+            try {
+                blocked = (await usersService.block(target.userId)).success;
+            } catch {
+                // The report is already saved; still show the partial-success result.
+            }
             setSubmitting(false);
-            if (blockRes.success) {
+            if (blocked) {
                 const successMessage = t('report_success_blocked', 'Your report was submitted and the user was blocked.');
                 onClose();
                 onBlocked?.(target.userId);
-                setTimeout(() => toast.show(successMessage, 'success'), 120);
+                setTimeout(() => toast.show(successMessage, 'success'), 250);
                 return;
             }
-            toast.show(t('report_success_block_failed', 'Report submitted, but we could not block this user.'), 'warning');
             onClose();
+            setTimeout(() => toast.show(t('report_success_block_failed', 'Report submitted, but we could not block this user.'), 'warning'), 250);
             return;
         }
 
         setSubmitting(false);
-        toast.show(t('report_success_message', 'Thank you. Our safety team will review your report.'), 'success');
         onClose();
+        setTimeout(() => toast.show(t('report_success_message', 'Thank you. Our safety team will review your report.'), 'success'), 250);
     };
 
     primaryActionRef.current = handlePrimaryAction;
@@ -194,39 +317,19 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                 style={{ backgroundColor: palette.brand.bg.surface }}
             >
                 <View style={[styles.footer, { backgroundColor: palette.brand.bg.surface }]}>
-                    <View style={styles.footerRow}>
-                        {keyboardVisible ? (
-                            <Pressable
-                                onPress={RNKeyboard.dismiss}
-                                style={[styles.keyboardDismissButton, { borderColor: palette.brand.bg.border }]}
-                                accessibilityRole="button"
-                                accessibilityLabel={t('close_keyboard', 'Close keyboard')}
-                            >
-                                <KeyboardIcon size={scale(20)} color={palette.brand.text.subtitle} />
-                                <ChevronRight
-                                    size={scale(12)}
-                                    color={palette.brand.text.subtitle}
-                                    style={styles.keyboardDismissChevron}
-                                />
-                            </Pressable>
-                        ) : null}
-                        <View style={styles.footerPrimaryAction}>
-                            <GradientButton
-                                title={step === 'reason' ? t('continue', 'Continue') : submitting ? t('report_submitting', 'Submitting report...') : t('report_submit', 'Submit report')}
-                                onPress={() => primaryActionRef.current()}
-                                loading={submitting}
-                                disabled={submitting || (step === 'reason' ? !reason : !canSubmit)}
-                                widthMode="full"
-                                height={44}
-                                textSize={15}
-                                containerStyle={styles.drawerSaveButton}
-                            />
-                        </View>
-                    </View>
+                    <GradientButton
+                        title={step === 'reason' ? t('continue', 'Continue') : submitting ? t('report_submitting', 'Submitting report...') : t('report_submit', 'Submit report')}
+                        onPress={() => primaryActionRef.current()}
+                        loading={submitting}
+                        disabled={submitting || (step === 'reason' ? !reason : !canSubmit)}
+                        widthMode="full"
+                        size="compact"
+                        containerStyle={styles.drawerSaveButton}
+                    />
                 </View>
             </BottomSheetFooter>
         ),
-        [canSubmit, insets.bottom, keyboardVisible, palette.brand.bg.border, palette.brand.bg.surface, palette.brand.text.subtitle, reason, step, submitting],
+        [canSubmit, insets.bottom, palette.brand.bg.surface, reason, step, submitting],
     );
 
     if (!target) return null;
@@ -241,7 +344,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
             enableOverDrag={false}
             animateOnMount
             onChange={handleSheetChange}
-            onClose={onClose}
+            onClose={closeSheet}
             backdropComponent={renderBackdrop}
             footerComponent={renderFooter}
             backgroundStyle={{ backgroundColor: palette.brand.bg.surface }}
@@ -254,16 +357,16 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                 <View style={[styles.header, { borderBottomColor: palette.brand.bg.border }]}>
                     <View style={styles.headerSide}>
                         {step === 'detail' ? (
-                            <Pressable onPress={() => setStep('reason')} hitSlop={12} disabled={submitting} accessibilityRole="button" accessibilityLabel={t('back', 'Back')}>
+                            <Pressable onPress={() => { RNKeyboard.dismiss(); setStep('reason'); }} hitSlop={12} disabled={submitting} accessibilityRole="button" accessibilityLabel={t('back', 'Back')}>
                                 {isRTL
-                                    ? <ChevronRight size={scale(22)} color={palette.chrome.common.textStrong} />
-                                    : <ChevronLeft size={scale(22)} color={palette.chrome.common.textStrong} />}
+                                    ? <CaretRight size={scale(22)} color={palette.chrome.common.textStrong} weight="bold" />
+                                    : <CaretLeft size={scale(22)} color={palette.chrome.common.textStrong} weight="bold" />}
                             </Pressable>
                         ) : null}
                     </View>
                     <Text variant="body" className="font-body-bold" align="center" style={styles.sheetTitle}>{entityTitle}</Text>
                     <View style={[styles.headerSide, styles.headerSideEnd]}>
-                        <Pressable onPress={onClose} hitSlop={12} disabled={submitting} accessibilityRole="button" accessibilityLabel={t('close', 'Close')}>
+                        <Pressable onPress={closeSheet} hitSlop={12} disabled={submitting} accessibilityRole="button" accessibilityLabel={t('close', 'Close')}>
                             <X size={scale(21)} color={palette.brand.text.subtitle} />
                         </Pressable>
                     </View>
@@ -273,10 +376,11 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                     ref={scrollRef}
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
-                    keyboardShouldPersistTaps="always"
-                    keyboardDismissMode="on-drag"
+                    keyboardShouldPersistTaps="never"
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 >
                     <View style={styles.scrollBody}>
+                    <Pressable onPress={RNKeyboard.dismiss} style={StyleSheet.absoluteFill} accessible={false} />
                     {step === 'reason' && target.type === 'Image' && target.imageUrl ? (
                         <View style={styles.previewRow}>
                             <Image source={{ uri: target.imageUrl }} style={styles.previewImage} contentFit="cover" cachePolicy="memory-disk" />
@@ -287,11 +391,27 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                         </View>
                     ) : null}
 
+                    {step === 'reason' && target.type === 'ChatMessage' ? (
+                        <View style={[styles.messagePreview, { backgroundColor: palette.chrome.common.card, borderColor: palette.brand.bg.border }]}>
+                            {target.messageType === 'image' && target.messageMediaUrl ? (
+                                <Image source={{ uri: target.messageMediaUrl }} style={styles.messagePreviewImage} contentFit="cover" cachePolicy="memory-disk" />
+                            ) : null}
+                            <View style={styles.previewText}>
+                                <Text variant="body-sm" className="font-body-semi">{t('chat:reporting_message', 'Reporting this message')}</Text>
+                                <Text variant="caption" numberOfLines={3} style={{ color: palette.brand.text.subtitle }}>
+                                    {target.messagePreview || t('chat:report_message_media_fallback', 'Media message')}
+                                </Text>
+                            </View>
+                        </View>
+                    ) : null}
+
                     {step === 'reason' ? (
                         <>
                             {target.type !== 'Image' ? (
                                 <Text variant="h3" className="font-heading" style={styles.stepTitle}>
-                                    {t('report_profile_reason_prompt', 'Why are you reporting this profile?')}
+                                    {target.type === 'ChatMessage'
+                                        ? t('chat:report_message_reason_prompt', 'Why are you reporting this message?')
+                                        : t('report_profile_reason_prompt', 'Why are you reporting this profile?')}
                                 </Text>
                             ) : null}
                             <View style={styles.optionList}>
@@ -299,7 +419,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                                     <ReportOptionRow
                                         key={value}
                                         active={reason === value}
-                                        title={t(`report_reason_v2_${value}`, REPORT_REASON_FALLBACKS[value])}
+                                        title={translateReportText(`report_reason_v2_${value}`, REPORT_REASON_FALLBACKS[value])}
                                         onPress={() => selectReason(value)}
                                     />
                                 ))}
@@ -313,15 +433,15 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                             ) : (
                                 <>
                                     <Text variant="body-sm" style={[styles.stepHelper, { color: palette.brand.text.subtitle }]}>
-                                        {reason ? t(`report_reason_desc_${reason}`, REPORT_REASON_DESCRIPTION_FALLBACKS[reason]) : ''}
+                                        {reason ? translateReportText(`report_reason_desc_${reason}`, REPORT_REASON_DESCRIPTION_FALLBACKS[reason]) : ''}
                                     </Text>
                                     <View style={styles.optionList}>
                                         {details.map((value) => (
                                             <ReportOptionRow
                                                 key={value}
                                                 active={reasonDetail === value}
-                                                title={t(`report_detail_${value}`, REPORT_DETAIL_FALLBACKS[value])}
-                                                description={t(`report_detail_desc_${value}`, REPORT_DETAIL_DESCRIPTION_FALLBACKS[value])}
+                                                title={translateReportText(`report_detail_${value}`, REPORT_DETAIL_FALLBACKS[value])}
+                                                description={translateReportText(`report_detail_desc_${value}`, REPORT_DETAIL_DESCRIPTION_FALLBACKS[value])}
                                                 onPress={() => selectDetail(value)}
                                             />
                                         ))}
@@ -329,36 +449,75 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                                 </>
                             )}
 
-                            <Text variant="body-sm" className="font-body-semi" style={styles.editorLabel}>
-                                {reason === 'other' ? t('report_description_required', 'Details') : t('report_description', 'Additional details (optional)')}
-                            </Text>
-                            <BottomSheetTextInput
-                                value={description}
-                                onChangeText={(value) => setDescription(value.slice(0, DESCRIPTION_MAX))}
-                                placeholder={t('report_description_ph', 'Add any details that help us review this report.')}
-                                placeholderTextColor={palette.brand.text.muted}
-                                multiline
-                                onFocus={() => {
-                                    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
-                                }}
-                                textAlignVertical="top"
-                                style={[styles.description, { color: palette.brand.text.body, borderBottomColor: palette.chrome.primary, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
-                            />
-                            <View style={styles.countRow}>
-                                {reason === 'other' ? (
-                                    <Text variant="caption" style={{ color: otherValid ? palette.brand.text.muted : palette.brand.accent.error }}>{t('report_other_minimum', 'Minimum 30 non-space characters')}</Text>
-                                ) : <View />}
-                                <Text variant="caption" style={{ color: palette.brand.text.muted }}>{description.length}/{DESCRIPTION_MAX}</Text>
-                            </View>
+                            {(reason === 'other' || reasonDetail) ? (
+                                <View onLayout={(event) => { editorYRef.current = event.nativeEvent.layout.y; }}>
+                                    <Text variant="body-sm" className="font-body-semi" style={styles.editorLabel}>
+                                        {reason === 'other' ? t('report_description_required', 'Details') : t('report_description', 'Additional details (optional)')}
+                                    </Text>
+                                    <BottomSheetTextInput
+                                        value={description}
+                                        onChangeText={(value) => setDescription(value.slice(0, DESCRIPTION_MAX))}
+                                        placeholder={t('report_description_ph', 'Add any details that help us review this report.')}
+                                        placeholderTextColor={palette.brand.text.muted}
+                                        multiline
+                                        onFocus={() => requestAnimationFrame(revealEditor)}
+                                        textAlignVertical="top"
+                                        style={[styles.description, { color: palette.brand.text.body, borderBottomColor: palette.chrome.primary, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                    />
+                                    <View style={styles.countRow}>
+                                        {reason === 'other' ? (
+                                            <Text variant="caption" style={{ color: otherValid ? palette.brand.text.muted : palette.brand.accent.error }}>{t('report_other_minimum', 'Minimum 30 non-space characters')}</Text>
+                                        ) : <View />}
+                                        <Text variant="caption" style={{ color: palette.brand.text.muted }}>{description.length}/{DESCRIPTION_MAX}</Text>
+                                    </View>
+                                </View>
+                            ) : null}
+
+                            {target.type === 'ChatMessage' ? (
+                                <View style={styles.evidenceSection}>
+                                    <Text variant="body-sm" className="font-body-semi">{t('chat:report_screenshots', 'Screenshots (optional)')}</Text>
+                                    <Text variant="caption" style={{ color: palette.brand.text.subtitle }}>
+                                        {t('chat:report_screenshots_hint', 'Add up to 3 relevant screenshots. The reported message is saved automatically.')}
+                                    </Text>
+                                    <View style={styles.screenshotRow}>
+                                        {screenshots.map((screenshot, index) => (
+                                            <View key={`${screenshot.uri}:${index}`} style={styles.screenshotPreviewWrap}>
+                                                <Image source={{ uri: screenshot.uri }} style={styles.screenshotPreview} contentFit="cover" />
+                                                <Pressable
+                                                    onPress={() => setScreenshots((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                                                    style={styles.removeScreenshot}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={t('chat:remove_screenshot', 'Remove screenshot')}
+                                                >
+                                                    <X size={scale(13)} color="#FFFFFF" />
+                                                </Pressable>
+                                            </View>
+                                        ))}
+                                        {screenshots.length < MAX_SCREENSHOTS ? (
+                                            <Pressable
+                                                onPress={() => void pickScreenshots()}
+                                                style={[styles.addScreenshot, { borderColor: palette.brand.bg.border }]}
+                                                accessibilityRole="button"
+                                                accessibilityLabel={t('chat:add_screenshots', 'Add screenshots')}
+                                            >
+                                                <ImagePlus size={scale(20)} color={palette.chrome.primary} />
+                                                <Text variant="caption" className="font-body-semi" align="center" style={{ color: palette.chrome.primary }}>
+                                                    {t('chat:add_screenshots', 'Add screenshots')}
+                                                </Text>
+                                            </Pressable>
+                                        ) : null}
+                                    </View>
+                                </View>
+                            ) : null}
 
                             <Pressable
-                                onPress={() => { lightImpact(); setBlockAfterReport((current) => !current); }}
+                                onPress={() => { RNKeyboard.dismiss(); lightImpact(); setBlockAfterReport((current) => !current); }}
                                 style={styles.blockRow}
                                 accessibilityRole="checkbox"
                                 accessibilityState={{ checked: blockAfterReport }}
                             >
-                                <View style={[styles.checkbox, { borderColor: blockAfterReport ? palette.chrome.primary : palette.brand.bg.border }, blockAfterReport && { backgroundColor: palette.chrome.primary }]}>
-                                    {blockAfterReport ? <Check size={scale(13)} color={palette.chrome.common.inverseText} strokeWidth={3} /> : null}
+                                <View style={[styles.checkbox, { borderColor: blockAfterReport ? palette.chrome.primary : palette.brand.text.muted }, blockAfterReport && { backgroundColor: palette.chrome.primary }]}>
+                                    {blockAfterReport ? <Check size={scale(12)} color={palette.chrome.common.inverseText} weight="bold" style={styles.checkboxCheck} /> : null}
                                 </View>
                                 <View style={styles.blockText}>
                                     <Text variant="body-sm" className="font-body-semi">{t('report_block_after', 'Block this user after reporting')}</Text>
@@ -375,7 +534,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
     );
 
     if (embedded) {
-        return <View style={styles.embeddedHost}>{sheet}</View>;
+        return <View style={styles.embeddedHost}>{sheet}<ToastProvider /></View>;
     }
 
     return (
@@ -386,9 +545,9 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
             statusBarTranslucent
             navigationBarTranslucent
             hardwareAccelerated
-            onRequestClose={submitting ? undefined : onClose}
+            onRequestClose={submitting ? undefined : closeSheet}
         >
-            <GestureHandlerRootView style={styles.container}>{sheet}</GestureHandlerRootView>
+            <GestureHandlerRootView style={styles.container}>{sheet}<ToastProvider /></GestureHandlerRootView>
         </Modal>
     );
 }
@@ -421,6 +580,8 @@ const styles = StyleSheet.create({
     previewRow: { flexDirection: 'row', alignItems: 'center', gap: scale(12), marginBottom: scale(18) },
     previewImage: { width: scale(54), height: scale(72), borderRadius: scale(6) },
     previewText: { flex: 1, gap: scale(3) },
+    messagePreview: { flexDirection: 'row', alignItems: 'center', gap: scale(12), borderWidth: StyleSheet.hairlineWidth, borderRadius: scale(8), padding: scale(12), marginBottom: scale(18) },
+    messagePreviewImage: { width: scale(52), height: scale(52), borderRadius: scale(6) },
     stepTitle: { fontSize: scale(18), lineHeight: scale(24), marginBottom: scale(5) },
     stepHelper: { lineHeight: scale(20), marginBottom: scale(10) },
     optionList: { width: '100%' },
@@ -432,13 +593,16 @@ const styles = StyleSheet.create({
     editorLabel: { marginTop: scale(20), marginBottom: scale(6) },
     description: { minHeight: scale(92), borderBottomWidth: 1, paddingHorizontal: scale(6), paddingVertical: scale(8), fontSize: scale(14), lineHeight: scale(21) },
     countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: scale(6) },
+    evidenceSection: { gap: scale(5), paddingTop: scale(18) },
+    screenshotRow: { flexDirection: 'row', flexWrap: 'wrap', gap: scale(10), paddingTop: scale(6) },
+    screenshotPreviewWrap: { position: 'relative' },
+    screenshotPreview: { width: scale(64), height: scale(64), borderRadius: scale(6) },
+    removeScreenshot: { position: 'absolute', top: scale(3), right: scale(3), width: scale(22), height: scale(22), borderRadius: scale(11), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.72)' },
+    addScreenshot: { width: scale(94), height: scale(64), borderWidth: 1, borderStyle: 'dashed', borderRadius: scale(6), alignItems: 'center', justifyContent: 'center', gap: scale(3), paddingHorizontal: scale(6) },
     blockRow: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(12), paddingVertical: scale(18) },
-    checkbox: { width: scale(22), height: scale(22), borderRadius: scale(4), borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: scale(1) },
+    checkbox: { width: scale(20), height: scale(20), borderRadius: scale(6), borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: scale(1) },
+    checkboxCheck: { transform: [{ translateX: 0.5 }] },
     blockText: { flex: 1, gap: scale(3) },
     footer: { paddingHorizontal: scale(26), paddingTop: scale(12), paddingBottom: scale(12) },
-    footerRow: { flexDirection: 'row', alignItems: 'center', gap: scale(10) },
-    footerPrimaryAction: { flex: 1, minWidth: 0 },
-    keyboardDismissButton: { width: scale(44), height: scale(44), borderRadius: scale(22), borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-    keyboardDismissChevron: { position: 'absolute', right: scale(4), bottom: scale(3), transform: [{ rotate: '90deg' }] },
-    drawerSaveButton: { height: scale(44) },
+    drawerSaveButton: { height: scale(40) },
 });

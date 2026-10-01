@@ -5,7 +5,8 @@ import BottomSheet, {
     type BottomSheetBackdropProps,
     BottomSheetFlatList,
 } from '@gorhom/bottom-sheet';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, X } from 'lucide-react-native';
+import { CalendarDays, Clock3, X } from '@/components/ui/icons/PhosphorCompat';
+import { CaretLeft, CaretRight } from 'phosphor-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -77,7 +78,7 @@ export function MembershipHistorySheet({
     const colors = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
-    const BackIcon = isRTL ? ChevronRight : ChevronLeft;
+    const BackIcon = isRTL ? CaretRight : CaretLeft;
     const snapPoints = useMemo(() => ['92%'], []);
     const renderBackdrop = useCallback(
         (props: BottomSheetBackdropProps) => (
@@ -121,7 +122,7 @@ export function MembershipHistorySheet({
                             accessibilityLabel={t('close', 'Close')}
                             style={[styles.iconButton, { backgroundColor: colors.chrome.header.iconBackground }]}
                         >
-                            <BackIcon size={scale(23)} color={colors.chrome.header.icon} />
+                            <BackIcon size={scale(23)} color={colors.chrome.header.icon} weight="bold" />
                         </Pressable>
                         <Text variant='body' className='font-body-bold' style={styles.title} numberOfLines={1}>
                             {t('membership_history', 'Membership history')}

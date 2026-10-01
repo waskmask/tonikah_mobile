@@ -1594,6 +1594,8 @@
   "create_password_failed": "Gagal membuat kata sandi",
   "change_email": "Ganti Alamat Email",
   "change_email_short": "Ganti Email",
+  "new_email_address": "Alamat email baru",
+  "change_email_verification_hint": "Kami akan mengirim tautan verifikasi ke alamat baru sebelum mengubah email akun Anda.",
   "resend_email": "Kirim Ulang Email",
   "update_email": "Perbarui Alamat Email",
   "email_same_as_current": "Alamat email ini sudah terhubung dengan akun Anda.",

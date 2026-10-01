@@ -1,5 +1,5 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { AppMenuDrawer } from '@/components/app/AppMenuDrawer';
+import React, { createContext, useCallback, useContext, useMemo } from 'react';
+import { useNavigation } from 'expo-router';
 import { markInteraction } from '@/lib/performanceDiagnostics';
 
 type AppMenuContextValue = {
@@ -10,18 +10,20 @@ type AppMenuContextValue = {
 const AppMenuContext = createContext<AppMenuContextValue | null>(null);
 
 export function AppMenuProvider({ children }: { children: React.ReactNode }) {
-    const [visible, setVisible] = useState(false);
+    const drawerNavigation = useNavigation('/(tabs)') as unknown as {
+        openDrawer: () => void;
+        closeDrawer: () => void;
+    };
     const openMenu = useCallback(() => {
         markInteraction('drawer');
-        setVisible(true);
-    }, []);
-    const closeMenu = useCallback(() => setVisible(false), []);
+        drawerNavigation.openDrawer();
+    }, [drawerNavigation]);
+    const closeMenu = useCallback(() => drawerNavigation.closeDrawer(), [drawerNavigation]);
     const value = useMemo(() => ({ openMenu, closeMenu }), [closeMenu, openMenu]);
 
     return (
         <AppMenuContext.Provider value={value}>
             {children}
-            <AppMenuDrawer visible={visible} onClose={closeMenu} />
         </AppMenuContext.Provider>
     );
 }

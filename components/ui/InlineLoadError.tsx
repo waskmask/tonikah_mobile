@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { CloudOff, RefreshCw } from 'lucide-react-native';
+import { ArrowClockwise, CloudSlash } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useColors } from '@/hooks/useColors';
@@ -26,7 +26,7 @@ export function InlineLoadError({
     return (
         <View style={styles.wrap}>
             <View style={[styles.iconTile, { backgroundColor: colors.chrome.common.primaryTint }]}>
-                <CloudOff size={scale(22)} color={colors.chrome.primary} strokeWidth={1.8} />
+                <CloudSlash size={scale(22)} color={colors.chrome.primary} weight="regular" />
             </View>
             <Text variant="body" className="font-body-semi" align="center">
                 {title}
@@ -57,7 +57,7 @@ export function InlineLoadError({
                     <ActivityIndicator size="small" color={colors.chrome.primary} />
                 ) : (
                     <>
-                        <RefreshCw size={scale(16)} color={colors.chrome.primary} />
+                        <ArrowClockwise size={scale(16)} color={colors.chrome.primary} weight="bold" />
                         <Text variant="body-sm" className="font-body-semi" style={{ color: colors.chrome.primary }}>
                             {retryLabel}
                         </Text>

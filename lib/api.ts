@@ -4,6 +4,7 @@ import i18n from '@/lib/i18n';
 import { Platform } from 'react-native';
 import { recordApiRequest } from '@/lib/performanceDiagnostics';
 import { connectivity } from '@/lib/connectivity';
+import { getInstallationId } from '@/lib/deviceIdentity';
 
 const TOKEN_KEYS = {
     ACCESS: 'tn_access_token',
@@ -93,23 +94,28 @@ const notifyUnauthorized = async (details?: Pick<RefreshResult, 'message' | 'sus
 };
 
 const handleTerminalUnauthorized = async (details?: Pick<RefreshResult, 'message' | 'suspension'>): Promise<RefreshResult> => {
-    if (terminalSessionHandled) {
-        return { accessToken: null, reason: 'unauthorized' };
+    if (!terminalSessionHandled) {
+        terminalSessionHandled = true;
+        await clearStoredTokens();
     }
-    terminalSessionHandled = true;
-    await clearStoredTokens();
+    // Token cleanup and auth-state cleanup are separate concerns. A socket
+    // revocation can arrive after another request already cleared the tokens,
+    // and must still tell Zustand to unmount protected screens.
     await notifyUnauthorized(details);
     return { accessToken: null, reason: 'unauthorized', ...details };
 };
 
-const getClientHeaders = () => {
+const getClientHeaders = async () => {
     const clientPlatform = Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'web';
 
     return {
         'X-Client-Type': clientPlatform === 'web' ? 'web' : 'native',
-        'X-Client-Platform': clientPlatform
+        'X-Client-Platform': clientPlatform,
+        ...(clientPlatform === 'web' ? {} : { 'X-Device-ID': await getInstallationId() }),
     };
 };
+
+const waitForSessionRedirect = (): Promise<ApiResponse> => new Promise(() => undefined);
 
 // Extends RequestInit with our custom options
 interface FetchOptions extends RequestInit {
@@ -128,7 +134,7 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
 
     const headers: Record<string, string> = {
         'Accept-Language': i18n.language,
-        ...getClientHeaders(),
+        ...await getClientHeaders(),
         ...(customHeaders as Record<string, string>)
     };
 
@@ -146,6 +152,12 @@ const performFetch = async (endpoint: string, options: FetchOptions = {}): Promi
         recordApiRequest(endpoint);
         const response = await fetch(url, {
             ...restOptions,
+            // Native auth uses bearer/refresh tokens from SecureStore. Keeping
+            // the platform cookie jar out of API requests prevents stale web
+            // cookies from producing a false `already_logged_in` response.
+            credentials: Platform.OS === 'ios' || Platform.OS === 'android'
+                ? 'omit'
+                : restOptions.credentials,
             headers,
             signal: controller.signal
         });
@@ -199,9 +211,10 @@ const refreshAccessTokenResult = async (): Promise<RefreshResult> => {
         recordApiRequest('/app-user/mobile/refresh');
         const refreshRes = await fetch(`${Config.API_URL}/app-user/mobile/refresh`, {
             method: 'POST',
+            credentials: Platform.OS === 'ios' || Platform.OS === 'android' ? 'omit' : undefined,
             headers: {
                 'Content-Type': 'application/json',
-                ...getClientHeaders()
+                ...await getClientHeaders()
             },
             body: JSON.stringify({ refreshToken })
         });
@@ -269,7 +282,7 @@ const handleResponse = async (response: Response, endpoint: string, options: Fet
         if (refreshResult.reason === 'network_error') {
             return { success: false, message: 'network_error', status: 0 };
         }
-        return { success: false, message: refreshResult.message || 'unauthorized', suspension: refreshResult.suspension, status: 401 };
+        return waitForSessionRedirect();
     }
 
     try {
@@ -311,6 +324,7 @@ const parseApiResponseText = (text: string, status: number): ApiResponse => {
 
 const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000): Promise<ApiResponse> => {
     const { accessToken } = await readStoredTokens();
+    const clientHeaders = await getClientHeaders();
     const url = `${Config.API_URL}${endpoint}`;
 
     return new Promise(resolve => {
@@ -320,7 +334,6 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
         xhr.timeout = timeout;
 
         xhr.setRequestHeader('Accept-Language', i18n.language);
-        const clientHeaders = getClientHeaders();
         Object.entries(clientHeaders).forEach(([key, value]) => {
             xhr.setRequestHeader(key, value);
         });
@@ -345,11 +358,8 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
                     });
                     return;
                 }
-                resolve({
-                    success: false,
-                    message: 'unauthorized',
-                    status: 401
-                });
+                // Global auth handling is already redirecting to Login. Keep
+                // the rejected request from reaching screen-level toast code.
                 return;
             }
 

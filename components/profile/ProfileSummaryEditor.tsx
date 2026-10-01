@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { TextModerationWarningModal } from '@/components/app/TextModerationWarningModal';
@@ -638,8 +638,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                                 loading={saving}
                                 disabled={!canSave}
                                 widthMode="full"
-                                height={36}
-                                textSize={13}
+                                size="compact"
                             />
                         </View>
                     </View>
@@ -651,8 +650,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                     loading={saving}
                     disabled={!canSave}
                     widthMode="auto"
-                    height={40}
-                    textSize={14}
+                    size="compact"
                     containerStyle={styles.saveButton}
                 />
             )}

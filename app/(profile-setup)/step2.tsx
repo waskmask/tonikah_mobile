@@ -17,7 +17,7 @@ import { profileService } from '@/lib/profileService';
 import { useProfileSetupStore } from '@/store/profileSetupStore';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/hooks/useToast';
-import { Languages, Mic, ShieldCheck, Shirt } from 'lucide-react-native';
+import { Languages, Mic, ShieldCheck, Shirt } from '@/components/ui/icons/PhosphorCompat';
 import { LANGUAGE_OPTIONS } from '@/constants/profileOptions';
 import { formatProfileOptionLabel } from '@/lib/profileOptionLabels';
 import { apiMessage } from '@/lib/profileDisplay';

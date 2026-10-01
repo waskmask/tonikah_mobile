@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { X } from 'lucide-react-native';
+import { X } from '@/components/ui/icons/PhosphorCompat';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/components/ui/GradientButton';

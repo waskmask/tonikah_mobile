@@ -27,12 +27,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { router } from 'expo-router';
 import { PUBLIC_PROFILE_DETAIL_STALE_TIME_MS, queryClient } from '@/lib/queryClient';
+import { useCachedInbox } from '@/hooks/useCachedInbox';
 import { queryKeys } from '@/lib/queryKeys';
 import {
     Baby,
     AlertCircle,
     Ban,
-    BookHeart,
     BookOpen,
     BriefcaseBusiness,
     Building2,
@@ -43,9 +43,7 @@ import {
     Compass,
     Flag,
     GraduationCap,
-    Gem,
     Languages,
-    LampDesk,
     Lock,
     MapPin,
     Mic,
@@ -53,7 +51,6 @@ import {
     Pencil,
     Plane,
     Palette,
-    Puzzle,
     Quote,
     RefreshCw,
     Ruler,
@@ -66,21 +63,22 @@ import {
     X,
     Banknote,
     Footprints,
-} from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
+} from '@/components/ui/icons/PhosphorCompat';
+import { CaretLeft, CaretRight, IdentificationBadge, SketchLogo } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { SmallDarkOutlinedButton } from '@/components/ui/SmallDarkOutlinedButton';
 import { Divider } from '@/components/ui/Divider';
 import { DashedRoundedBorder } from '@/components/ui/DashedRoundedBorder';
 import { PartnerPreferencePromptCard } from '@/components/profile/PartnerPreferencePromptCard';
 import { Mosque } from '@/components/ui/icons/Mosque';
-import { Pram } from '@/components/ui/icons/Pram';
+import { BabyCarriage as Pram } from '@/components/ui/icons/BabyCarriage';
 import { ProfileMessage } from '@/components/ui/icons/ProfileMessage';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
+import { useDeliberateRefresh } from '@/hooks/useDeliberateRefresh';
 import { ToastProvider, useToast } from '@/hooks/useToast';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
@@ -88,7 +86,8 @@ import { isGalleryModerationActive } from '@/hooks/useGalleryModeration';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usersService } from '@/lib/usersService';
 import { profileService } from '@/lib/profileService';
-import { chatService, normalizeConversation } from '@/lib/chatService';
+import { chatService } from '@/lib/chatService';
+import { applyOutgoingRequest } from '@/lib/chatInboxCache';
 import {
     apiMessage,
     cleanProfileMultilineText,
@@ -113,6 +112,7 @@ import {
     profileName,
 } from '@/lib/exploreProfile';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+import { countryFlag, nationalityFlag, rawNationality } from '@/lib/nationalityFlag';
 import { Typography } from '@/constants/typography';
 import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { emojiChipItem } from '@/lib/profileEmoji';
@@ -133,7 +133,8 @@ import {
     MISSING_IMPACT_WEIGHTS,
 } from '@/lib/profileCompletionImpact';
 
-type Fact = { id?: string; icon: LucideIcon; label: string; value: string; underReview?: boolean; editTarget?: 'company' };
+type ProfileIcon = React.ElementType<{ size?: number; color?: string; strokeWidth?: number }>;
+type Fact = { id?: string; icon: ProfileIcon; label: string; value: string; underReview?: boolean; editTarget?: 'company' };
 type PendingProfileToast = {
     key: string;
     fallback: string;
@@ -257,10 +258,11 @@ export function UserProfileView({
     const [messageSheetOpen, setMessageSheetOpen] = useState(false);
     const [messageDraft, setMessageDraft] = useState('');
     const [messageChecking, setMessageChecking] = useState(false);
+    const messageCheckLockRef = useRef(false);
     const [messageSending, setMessageSending] = useState(false);
     const [membershipGateOpen, setMembershipGateOpen] = useState(false);
     const messagingEligibility = useMessagingEligibilityStatus();
-    const [locallySentRequestIds, setLocallySentRequestIds] = useState<Set<string>>(() => new Set());
+    const sharedInbox = useCachedInbox();
     const [pendingProfileToast, setPendingProfileToast] = useState<PendingProfileToast | null>(null);
     const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
     const [blockBusy, setBlockBusy] = useState(false);
@@ -272,13 +274,7 @@ export function UserProfileView({
     const scrollOffsetRef = useRef(0);
     const scrollDirectionDistanceRef = useRef(0);
     const bottomBarHiddenRef = useRef(false);
-
-    const openLightbox = useCallback((photoIndex: number) => {
-        if (Platform.OS === 'ios') {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-        }
-        setLightboxIndex(photoIndex);
-    }, []);
+    const refreshGesture = useDeliberateRefresh(onRefresh, Boolean(onRefresh) && !refreshing);
 
     const load = useCallback(async (force = false) => {
         if (!resolvedUserId) return;
@@ -394,14 +390,41 @@ export function UserProfileView({
                 safe: item?.safe,
                 moderationStatus: item?.moderationMeta?.status,
                 qualified: !showOwnerContent || isPublicGalleryItem(item),
+                canOpen: galleryPrivacy !== 'private'
+                    || item?.access === 'full'
+                    || (!item?.access && Boolean(
+                        item?.urls?.original
+                        || item?.urls?.avatar
+                        || item?.urls?.small
+                        || item?.urls?.thumb,
+                    )),
             }))
             .filter((item: { url: string }) => Boolean(item.url));
         if (fromGallery.length > 0) return fromGallery;
         if (publicPreview) return [];
         const avatar = typeof profile?.avatar === 'string' ? profile.avatar.trim() : '';
-        return avatar ? [{ url: avatar, uuid: '', safe: undefined, moderationStatus: undefined, qualified: true }] : [];
+        return avatar ? [{
+            url: avatar,
+            uuid: '',
+            safe: undefined,
+            moderationStatus: undefined,
+            qualified: true,
+            canOpen: galleryPrivacy !== 'private',
+        }] : [];
     })();
     const photos = photoItems.map((item) => item.url);
+    const lightboxPhotoItems = photoItems.filter((item) => item.canOpen);
+    const lightboxPhotos = lightboxPhotoItems.map((item) => item.url);
+    const openPhoto = (photoIndex: number) => {
+        const selected = photoItems[photoIndex];
+        if (!selected?.canOpen) return;
+        const openIndex = lightboxPhotoItems.findIndex((item) => item === selected);
+        if (openIndex < 0) return;
+        if (Platform.OS === 'ios') {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+        }
+        setLightboxIndex(openIndex);
+    };
     const inlinePhotos = photoItems
         .map((item, index) => ({ item, index }))
         .filter(({ item, index }) => index > 0 && item.qualified)
@@ -544,7 +567,8 @@ export function UserProfileView({
 
     const startMessage = async () => {
         if (!id || !requireVerified('chat')) return;
-        if (messageChecking) return;
+        if (messageCheckLockRef.current) return;
+        messageCheckLockRef.current = true;
         setMessageChecking(true);
         try {
             let access = messagingEligibility.messagingAccess;
@@ -556,13 +580,18 @@ export function UserProfileView({
                 setMembershipGateOpen(true);
                 return;
             }
+            const known = [
+                ...(sharedInbox?.conversations || []),
+                ...(sharedInbox?.requests || []),
+                ...(sharedInbox?.sent || []),
+            ].find((item) => String(item.otherUser?.id || item.otherUser?._id || '') === String(id));
+            if (known?.state === 'active') {
+                router.push({ pathname: '/conversation/[id]', params: { id: known.id, recipientId: id, name } } as any);
+                return;
+            }
             const status = await chatService.status(id);
 
             if (!status.success) {
-                if (locallySentRequestIds.has(id)) {
-                    toast.show(t('chat:request_already_sent', 'Message request already sent.'), 'info', 3000);
-                    return;
-                }
                 toast.show(apiMessage(status.message || 'connection_error'), 'error');
                 return;
             }
@@ -573,44 +602,27 @@ export function UserProfileView({
             }
 
             if (status.status === 'pending') {
-                const sent = await chatService.sentRequests();
-                if (sent.success) {
-                    const alreadySent = (sent.items || [])
-                        .map((item) => normalizeConversation(item, 'sent'))
-                        .some((item) => {
-                            const other = (item.otherUser || {}) as { id?: string; _id?: string };
-                            return String(other.id || other._id || '') === String(id);
-                        });
-                    if (alreadySent) {
-                        setLocallySentRequestIds((current) => new Set(current).add(id));
-                        setMessageDraft('');
-                        toast.show(t('chat:request_already_sent', 'Message request already sent.'), 'info', 3000);
-                        return;
-                    }
-                } else if (locallySentRequestIds.has(id)) {
+                const role = status.requestRole || (status.conversationId
+                    ? (await chatService.conversation(status.conversationId)).data?.requestRole
+                    : null);
+                if (role === 'sent') {
                     toast.show(t('chat:request_already_sent', 'Message request already sent.'), 'info', 3000);
                     return;
                 }
-                if (status.conversationId) {
+                if (role === 'incoming' && status.conversationId) {
                     router.push({ pathname: '/conversation/[id]', params: { id: status.conversationId, recipientId: id, name, state: 'request_pending', requestRole: 'incoming' } } as any);
                     return;
                 }
-            }
-
-            if (locallySentRequestIds.has(id)) {
-                toast.show(t('chat:request_already_sent', 'Message request already sent.'), 'info', 3000);
+                toast.show(apiMessage('connection_error'), 'error');
                 return;
             }
 
             setMessageSheetOpen(true);
         } catch {
-            if (locallySentRequestIds.has(id)) {
-                toast.show(t('chat:request_already_sent', 'Message request already sent.'), 'info', 3000);
-            } else {
-                toast.show(apiMessage('connection_error'), 'error');
-            }
+            toast.show(apiMessage('connection_error'), 'error');
         } finally {
             setMessageChecking(false);
+            messageCheckLockRef.current = false;
         }
     };
 
@@ -632,8 +644,8 @@ export function UserProfileView({
                     return;
                 }
                 if (res.errorMessage === 'request_already_pending') {
+                    if (res.conversationId) applyOutgoingRequest(res.conversationId, id, name);
                     setMessageDraft('');
-                    setLocallySentRequestIds((current) => new Set(current).add(id));
                     setPendingProfileToast({
                         key: 'chat:request_already_sent',
                         fallback: 'Message request already sent.',
@@ -651,7 +663,7 @@ export function UserProfileView({
                 return;
             }
             setMessageDraft('');
-            setLocallySentRequestIds((current) => new Set(current).add(id));
+            if (res.conversationId) applyOutgoingRequest(res.conversationId, id, name);
             setPendingProfileToast({
                 key: 'chat:msg_request_sent',
                 fallback: 'Message request sent!',
@@ -831,8 +843,8 @@ export function UserProfileView({
                         hitSlop={11}
                     >
                         {isRTL
-                            ? <ChevronRight size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} strokeWidth={2.2} />
-                            : <ChevronLeft size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} strokeWidth={2.2} />}
+                            ? <CaretRight size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} weight="bold" />
+                            : <CaretLeft size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} weight="bold" />}
                     </Pressable>
                 ) : isOwnProfile ? null : <View style={styles.headerButton} />}
                 {/* Content-sized title in a flex row hugs the chevron both directions;
@@ -858,7 +870,7 @@ export function UserProfileView({
                 {isOwnProfile ? (
                     <View style={styles.ownHeaderActions}>
                         <SmallDarkOutlinedButton
-                            onPress={onEditProfile || (() => router.push('/(tabs)/edit-profile'))}
+                            onPress={onEditProfile || (() => router.push('/edit-profile'))}
                             label={t('edit_profile', 'Edit profile')}
                             loading={editProfileOpening}
                         />
@@ -924,11 +936,18 @@ export function UserProfileView({
                 automaticallyAdjustKeyboardInsets={isOwnProfile}
                 keyboardShouldPersistTaps="handled"
                 scrollEventThrottle={16}
-                onScroll={(event) => handleProfileScroll(event.nativeEvent.contentOffset.y)}
+                onScroll={(event) => {
+                    refreshGesture.onScroll(event);
+                    handleProfileScroll(event.nativeEvent.contentOffset.y);
+                }}
+                onTouchStart={refreshGesture.onTouchStart}
+                onTouchMove={refreshGesture.onTouchMove}
+                onTouchEnd={refreshGesture.onTouchEnd}
+                onTouchCancel={refreshGesture.onTouchCancel}
                 refreshControl={onRefresh ? (
                     <RefreshControl
                         refreshing={refreshing}
-                        onRefresh={onRefresh}
+                        onRefresh={refreshGesture.guardedRefresh}
                         tintColor={colors.chrome.primary}
                         colors={[colors.chrome.primary]}
                         progressBackgroundColor={colors.chrome.header.background}
@@ -943,7 +962,7 @@ export function UserProfileView({
                     photos={photos}
                     photoItems={photoItems}
                     privateGallery={privateGallery}
-                    canOpenPhotos={!privateGallery && !previewOnly}
+                    canOpenPhotos={!previewOnly}
                     name={name}
                     age={age}
                     nameDirection={nameDirection}
@@ -953,7 +972,7 @@ export function UserProfileView({
                     verified={verified}
                     activeMembership={activeMembership}
                     profileManagerLabel={formatProfileManagerBadge(profile?.profile_manager)}
-                    onOpenPhoto={openLightbox}
+                    onOpenPhoto={openPhoto}
                     isDark={isDark}
                 />
                 {/* Per-photo "Under review" pills on the gallery images carry the
@@ -965,8 +984,7 @@ export function UserProfileView({
                         title=""
                         isDark={isDark}
                         hideTitle
-                        topPadding={30}
-                        bottomPadding={!headline && !bio && missingSummaryFields.length === 0 ? 24 : undefined}
+                        topPadding={28}
                     >
                         <AtAGlancePills
                             facts={facts.atAGlance}
@@ -1131,7 +1149,7 @@ export function UserProfileView({
                     isDark={isDark}
                     isRTL={isRTL}
                     onPressCompany={showOwnerContent
-                        ? () => router.push({ pathname: '/(tabs)/edit-profile', params: { openEditor: 'company' } })
+                        ? () => router.push({ pathname: '/edit-profile', params: { openEditor: 'company' } })
                         : undefined}
                 />
                 {secondPhoto ? (
@@ -1139,8 +1157,8 @@ export function UserProfileView({
                         source={secondPhoto.item.url}
                         index={secondPhoto.index}
                         total={photos.length}
-                        disabled={privateGallery}
-                        onPress={() => openLightbox(secondPhoto.index)}
+                        disabled={!secondPhoto.item.canOpen}
+                        onPress={() => openPhoto(secondPhoto.index)}
                     />
                 ) : null}
                 <SectionFacts title={t('appearance', 'Appearance')} facts={facts.appearance} isDark={isDark} isRTL={isRTL} />
@@ -1153,7 +1171,7 @@ export function UserProfileView({
                     action={showOwnerContent ? {
                         label: t('edit', 'Edit'),
                         onPress: () => router.push({
-                            pathname: '/(tabs)/hobbies-faith',
+                            pathname: '/hobbies-faith',
                             params: { section: 'faith', returnTo: '/(tabs)/profile' },
                         }),
                     } : undefined}
@@ -1166,8 +1184,8 @@ export function UserProfileView({
                         source={thirdPhoto.item.url}
                         index={thirdPhoto.index}
                         total={photos.length}
-                        disabled={privateGallery}
-                        onPress={() => openLightbox(thirdPhoto.index)}
+                        disabled={!thirdPhoto.item.canOpen}
+                        onPress={() => openPhoto(thirdPhoto.index)}
                     />
                 ) : null}
                 <ChipSection
@@ -1179,7 +1197,7 @@ export function UserProfileView({
                     action={showOwnerContent ? {
                         label: t('edit', 'Edit'),
                         onPress: () => router.push({
-                            pathname: '/(tabs)/hobbies-faith',
+                            pathname: '/hobbies-faith',
                             params: { section: 'hobbies', returnTo: '/(tabs)/profile' },
                         }),
                     } : undefined}
@@ -1189,7 +1207,7 @@ export function UserProfileView({
                         title={t('add_partner_preference', 'Add partner preference')}
                         actionLabel={t('add', 'Add')}
                         onPress={() => router.push({
-                            pathname: '/(tabs)/partner-preference',
+                            pathname: '/partner-preference',
                             params: { returnTo: '/(tabs)/profile' },
                         })}
                     />
@@ -1203,7 +1221,7 @@ export function UserProfileView({
                         action={showOwnerContent || showPartnerPreferenceEdit ? {
                             label: t('edit', 'Edit'),
                             onPress: () => router.push({
-                                pathname: '/(tabs)/partner-preference',
+                                pathname: '/partner-preference',
                                 params: { returnTo: '/(tabs)/profile' },
                             }),
                         } : undefined}
@@ -1340,7 +1358,7 @@ export function UserProfileView({
 
             {lightboxIndex !== null ? (
                 <ImageLightbox
-                    photos={photos}
+                    photos={lightboxPhotos}
                     index={lightboxIndex}
                     showReport={!isOwnProfile}
                     reportTarget={reportTarget?.type === 'Image' ? reportTarget : null}
@@ -1355,7 +1373,7 @@ export function UserProfileView({
                     }}
                     onReport={(photoIndex) => {
                         if (!id || !requireVerified('report')) return;
-                        const item = photoItems[photoIndex];
+                        const item = lightboxPhotoItems[photoIndex];
                         setReportTarget({
                             type: 'Image',
                             userId: id,
@@ -1628,6 +1646,7 @@ function ProfileGallery({
         safe?: boolean;
         moderationStatus?: string;
         qualified?: boolean;
+        canOpen: boolean;
     }>;
     privateGallery: boolean;
     canOpenPhotos?: boolean;
@@ -1644,6 +1663,7 @@ function ProfileGallery({
     isDark: boolean;
 }) {
     const palette = useColors();
+    const [failedPhotos, setFailedPhotos] = useState<Set<string>>(() => new Set());
     const slots = photos.length > 1
         ? photos.slice(0, 3)
         : [photos[0] || '', '', ''];
@@ -1673,15 +1693,24 @@ function ProfileGallery({
                     return (
                         <Pressable
                             key={item?.uuid || `${src}-${index}`}
-                            disabled={!src || !canOpenPhotos}
+                            disabled={!src || !canOpenPhotos || !item?.canOpen}
                             onPress={() => onOpenPhoto(index)}
                             style={[styles.gallerySlide, { width: slideWidth, backgroundColor: palette.brand.bg.surface }]}
                         >
                             <Image
-                                source={src ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE}
+                                source={src && !failedPhotos.has(src) ? { uri: src } : PROFILE_PLACEHOLDER_IMAGE}
                                 style={StyleSheet.absoluteFill}
                                 contentFit="cover"
                                 cachePolicy="memory-disk"
+                                onError={() => {
+                                    if (!src) return;
+                                    setFailedPhotos((current) => {
+                                        if (current.has(src)) return current;
+                                        const next = new Set(current);
+                                        next.add(src);
+                                        return next;
+                                    });
+                                }}
                             />
                             {checking || underReview ? (
                                 <View
@@ -1810,6 +1839,9 @@ function InlineProfilePhoto({
     onPress: () => void;
 }) {
     const palette = useColors();
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => setFailed(false), [source]);
 
     return (
         <View
@@ -1829,11 +1861,12 @@ function InlineProfilePhoto({
                 ]}
             >
                 <Image
-                    source={{ uri: source }}
+                    source={failed ? PROFILE_PLACEHOLDER_IMAGE : { uri: source }}
                     style={styles.inlineProfilePhotoImage}
                     contentFit="contain"
                     cachePolicy="memory-disk"
                     transition={180}
+                    onError={() => setFailed(true)}
                 />
             </Pressable>
         </View>
@@ -2142,7 +2175,6 @@ function ChipSection({
             title={title}
             isDark={isDark}
             action={action}
-            icon={type === 'hobby' ? Puzzle : BookHeart}
         >
             <View style={[styles.chipWrap, { flexDirection: 'row' }]}>
                 {clean.map((item, index) => (
@@ -2186,7 +2218,7 @@ function Section({
     children: React.ReactNode;
     isDark: boolean;
     action?: SectionAction;
-    icon?: LucideIcon;
+    icon?: ProfileIcon;
     highlight?: boolean;
     card?: boolean;
     extraBottomPadding?: number;
@@ -2778,7 +2810,17 @@ function buildFacts(profile: any, isOwnProfile = false) {
             .find((candidate) => candidate && !/^[a-f\d]{24}$/i.test(candidate));
         return translateNamespace('ethnic_group', raw);
     };
-    const countryList = (values: any[]) => listText((values || []).map(translateCountry));
+    const countryList = (values: any[]) => (values || []).map((value) => {
+        const label = translateCountry(rawNationality(value));
+        const flag = nationalityFlag(value);
+        return [flag, label].filter(Boolean).join('\u00A0');
+    }).filter(Boolean).join(',  ');
+    const grewUpIn = (value: any) => {
+        const raw = rawNationality(value);
+        const label = translateCountry(raw);
+        const flag = countryFlag(raw);
+        return [flag, label].filter(Boolean).join('\u00A0');
+    };
     const annualIncome = typeof profile?.annual_income === 'object'
         ? [profile?.annual_income?.amount, profile?.annual_income?.currency].filter(Boolean).join(' ')
         : String(profile?.annual_income || '');
@@ -2789,9 +2831,9 @@ function buildFacts(profile: any, isOwnProfile = false) {
     return {
         atAGlance: compact([
             { id: 'sect', icon: BookOpen, label: t('sect', 'Sect'), value: common(profile?.sect) },
-            { id: 'marital_status', icon: Gem, label: t('marital_status', 'Marital status'), value: common(profile?.marital_status) },
+            { id: 'marital_status', icon: SketchLogo, label: t('marital_status', 'Marital status'), value: common(profile?.marital_status) },
             { id: 'height', icon: Ruler, label: t('height', 'Height'), value: common(profile?.height) },
-            { id: 'designation', icon: LampDesk, label: t('designation', 'Designation'), value: common(profile?.designation) },
+            { id: 'designation', icon: IdentificationBadge, label: t('designation', 'Designation'), value: common(profile?.designation) },
             { id: 'prayers', icon: Mosque, label: t('prayers', 'Prayers'), value: common(profile?.prayers) },
             { id: 'have_children', icon: Baby, label: t('have_children', 'Has children'), value: common(profile?.have_children) },
         ]),
@@ -2820,7 +2862,7 @@ function buildFacts(profile: any, isOwnProfile = false) {
         ]),
         background: compact([
             { icon: ShieldCheck, label: t('nationality', 'Nationality'), value: countryList(profile?.nationality) },
-            { icon: Footprints, label: t('grew_up_in', 'Grew up in'), value: translateCountry(profile?.grew_up_in) },
+            { icon: Footprints, label: t('grew_up_in', 'Grew up in'), value: grewUpIn(profile?.grew_up_in) },
             { icon: Mic, label: t('mother_tongue', 'Mother tongue'), value: common(profile?.mother_tongue) },
             { icon: Languages, label: t('languages_spoken', 'Languages'), value: listText((profile?.languages_spoken || []).map(displayText)) },
         ]),
@@ -2874,7 +2916,7 @@ function buildPartnerFacts(partnerPreference: any) {
     return compact([
         heightFrom && heightTo ? { icon: Ruler, label: t('preferred_height', 'Preferred height'), value: `${heightFrom} - ${heightTo}` } : null,
         ageFrom && ageTo ? { icon: CalendarHeart, label: t('preferred_age', 'Preferred age'), value: `${ageFrom} - ${ageTo} ${t('years', 'years')}` } : null,
-        { icon: Users, label: t('preferred_marital_status', 'Preferred marital status'), value: list(partnerPreference?.marital_status) },
+        { icon: SketchLogo, label: t('preferred_marital_status', 'Preferred marital status'), value: list(partnerPreference?.marital_status) },
         { icon: Languages, label: t('preferred_languages', 'Preferred languages'), value: list(partnerPreference?.languages_spoken || partnerPreference?.languages || partnerPreference?.mother_tongue) },
         { icon: Users, label: t('preferred_ethnicity', 'Preferred ethnicity'), value: ethnicList(partnerPreference?.ethnic_group) },
         { icon: MapPin, label: t('location', 'Location'), value: countryList(partnerPreference?.location || partnerPreference?.countries || []) },
@@ -3043,9 +3085,9 @@ const styles = StyleSheet.create({
         paddingVertical: scale(3),
     },
     sectionActionText: { color: '#F34B6F' },
-    headline: { fontSize: scale(18), lineHeight: scale(25), marginBottom: scale(20) },
+    headline: { fontSize: scale(18), lineHeight: scale(25), marginBottom: scale(14) },
     bioOnlyTitle: {
-        marginTop: scale(4),
+        marginTop: 0,
         marginBottom: scale(10),
     },
     // Inline info icon + text for owner-visible pending moderation text
@@ -3077,7 +3119,7 @@ const styles = StyleSheet.create({
     // Pinned line height — Noto Sans Arabic's natural metrics add ~6dp of air
     factLabel: { color: '#737378', fontSize: scale(13), lineHeight: scale(17), includeFontPadding: false, flexShrink: 1 },
     atAGlanceWrap: { flexWrap: 'wrap', gap: scale(8) },
-    atAGlanceWithContent: { marginBottom: scale(24) },
+    atAGlanceWithContent: { marginBottom: scale(18) },
     atAGlanceChip: {
         maxWidth: '100%',
         minHeight: scale(30),

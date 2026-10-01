@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Plus } from 'lucide-react-native';
+import { Plus } from 'phosphor-react-native';
 import { DashedRoundedBorder } from '@/components/ui/DashedRoundedBorder';
 import { SmallDarkOutlinedButton } from '@/components/ui/SmallDarkOutlinedButton';
 import { Text } from '@/components/ui/Text';

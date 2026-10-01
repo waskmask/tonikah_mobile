@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Trash2, X } from 'lucide-react-native';
+import { Trash2, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -12,6 +12,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 const REASONS = [
     'delete_reason_found_match',
@@ -69,7 +70,7 @@ export default function DeleteAccountScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
-            <AppBackTitleBar title={t('delete_account', 'Delete account')} fallbackHref="/(tabs)/settings" />
+            <AppBackTitleBar title={t('delete_account', 'Delete account')} fallbackHref="/settings-security" showMenu />
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: scale(14), paddingBottom: scale(120) }}>
                 <View style={[styles.reasonsCard, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
                     {REASONS.map((key, index) => {
@@ -78,6 +79,9 @@ export default function DeleteAccountScreen() {
                             <Pressable
                                 key={key}
                                 onPress={() => setReason(key)}
+                                accessibilityRole="radio"
+                                accessibilityLabel={t(key, key)}
+                                accessibilityState={{ selected: active }}
                                 style={[
                                     styles.reasonRow,
                                     index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.brand.bg.border },
@@ -106,6 +110,7 @@ export default function DeleteAccountScreen() {
                 {reason === 'delete_reason_other' ? (
                     <View style={[styles.otherBox, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
                         <TextInput
+                            accessibilityLabel={t('delete_reason_other_placeholder', 'Tell us what happened...')}
                             value={otherText}
                             onChangeText={(value) => setOtherText(value.slice(0, 250))}
                             multiline
@@ -133,12 +138,21 @@ export default function DeleteAccountScreen() {
 
             <Modal visible={confirmOpen} transparent animationType="fade" onRequestClose={() => !deleting && setConfirmOpen(false)}>
                 <View style={styles.modalBackdrop}>
+                    <KeyboardAvoidingView behavior="padding" automaticOffset style={styles.modalKeyboardWrap}>
                     <View style={[styles.modalCard, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
                         <View style={styles.modalHeader}>
                             <View style={[styles.modalIcon, { backgroundColor: colors.chrome.common.dangerTint }]}>
                                 <Trash2 size={scale(20)} color={colors.brand.accent.error} />
                             </View>
-                            <Pressable disabled={deleting} onPress={() => setConfirmOpen(false)} style={styles.modalClose} hitSlop={8}>
+                            <Pressable
+                                disabled={deleting}
+                                onPress={() => setConfirmOpen(false)}
+                                style={styles.modalClose}
+                                hitSlop={8}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('close', 'Close')}
+                                accessibilityState={{ disabled: deleting }}
+                            >
                                 <X size={scale(18)} color={colors.brand.text.subtitle} />
                             </Pressable>
                         </View>
@@ -152,6 +166,7 @@ export default function DeleteAccountScreen() {
                             {t('delete_account_type_label', 'Type to confirm:')} DELETE
                         </Text>
                         <TextInput
+                            accessibilityLabel={t('delete_account_type_placeholder', 'Type DELETE')}
                             value={confirmText}
                             onChangeText={(value) => setConfirmText(value.toUpperCase())}
                             autoCapitalize="characters"
@@ -163,6 +178,9 @@ export default function DeleteAccountScreen() {
                             <Pressable
                                 disabled={deleting}
                                 onPress={() => setConfirmOpen(false)}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('cancel', 'Cancel')}
+                                accessibilityState={{ disabled: deleting }}
                                 style={[styles.modalButton, { backgroundColor: colors.brand.bg.surface }]}
                             >
                                 <Text variant="body-sm" className="font-body-bold">{t('cancel', 'Cancel')}</Text>
@@ -170,6 +188,9 @@ export default function DeleteAccountScreen() {
                             <Pressable
                                 disabled={confirmText !== 'DELETE' || deleting}
                                 onPress={deleteAccount}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('delete_account_confirm_ok', 'Delete forever')}
+                                accessibilityState={{ disabled: confirmText !== 'DELETE' || deleting, busy: deleting }}
                                 style={[
                                     styles.modalButton,
                                     { backgroundColor: colors.brand.accent.error, opacity: confirmText !== 'DELETE' || deleting ? 0.55 : 1 },
@@ -188,6 +209,7 @@ export default function DeleteAccountScreen() {
                             {t('delete_account_confirm_hint', 'You will be logged out on all devices.')}
                         </Text>
                     </View>
+                    </KeyboardAvoidingView>
                 </View>
             </Modal>
         </View>
@@ -202,6 +224,7 @@ const styles = StyleSheet.create({
     otherInput: { minHeight: scale(96), fontSize: scale(14), lineHeight: scale(19), padding: 0 },
     otherMeta: { flexDirection: 'row', alignItems: 'center', gap: scale(10), marginTop: scale(8) },
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: scale(18) },
+    modalKeyboardWrap: { width: '100%', maxWidth: scale(420) },
     modalCard: { width: '100%', maxWidth: scale(420), borderRadius: scale(18), borderWidth: StyleSheet.hairlineWidth, padding: scale(18) },
     modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     modalIcon: { width: scale(42), height: scale(42), borderRadius: scale(13), alignItems: 'center', justifyContent: 'center' },

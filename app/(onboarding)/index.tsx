@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     },
     headline: {
         fontSize: scale(31),
-        lineHeight: scale(34),
+        lineHeight: scale(40),
         letterSpacing: -0.6,
         marginBottom: scale(22),
     },

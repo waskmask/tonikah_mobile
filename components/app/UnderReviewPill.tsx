@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { CircleAlert, Info } from 'lucide-react-native';
+import { CircleAlert, Info } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { useColors } from '@/hooks/useColors';
 import { toast } from '@/hooks/useToast';

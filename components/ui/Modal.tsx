@@ -2,7 +2,7 @@ import React from "react";
 import { Modal as RNModal, View, TouchableOpacity, ScrollView } from "react-native";
 import { Text } from "./Text";
 import { scale } from "@/hooks/useResponsive";
-import { X } from "lucide-react-native";
+import { X } from "phosphor-react-native";
 import { useColors } from "@/hooks/useColors";
 
 interface ModalProps {
@@ -33,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({ visible, onClose, title, children 
                     <View className="flex-row items-center justify-between px-6 py-5 border-b border-brand-bg-border">
                         <Text variant="h3">{title}</Text>
                         <TouchableOpacity onPress={onClose} className="p-1">
-                            <X size={scale(24)} stroke={colors.chrome.common.iconNeutral} />
+                            <X size={scale(24)} color={colors.chrome.common.iconNeutral} weight="bold" />
                         </TouchableOpacity>
                     </View>
 

@@ -5,7 +5,7 @@ import BottomSheet, {
     type BottomSheetBackdropProps,
     BottomSheetView,
 } from '@gorhom/bottom-sheet';
-import { Apple, CreditCard, Play, X } from 'lucide-react-native';
+import { Apple, CreditCard, Play, X } from '@/components/ui/icons/PhosphorCompat';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

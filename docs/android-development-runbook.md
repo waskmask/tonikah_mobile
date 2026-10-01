@@ -65,6 +65,42 @@ Rebuild the development APK when native dependencies, Expo plugins, Android
 configuration, permissions, or native assets change. Normal JavaScript and
 TypeScript changes only require restarting or reloading Metro.
 
+## Build a Standalone Preview APK for Testers
+
+When the app is ready for broader testing, create an internally distributed
+preview APK:
+
+```bash
+npx eas-cli@latest build --profile preview --platform android
+```
+
+The preview APK contains the JavaScript bundle and assets from the build. It
+runs by itself and does not require Metro, a development server, or a computer
+on the same network. It also does not provide Fast Refresh or the normal
+development-client workflow.
+
+When the build finishes:
+
+1. Open the build URL printed by EAS.
+2. Share the EAS installation link or downloaded APK with testers.
+3. Testers allow installation from their browser or file manager when Android
+   asks, then install and open the app normally.
+
+### Cold-Start Performance Check
+
+Run this check after the current feature work is complete. Install the preview
+APK, completely force-close it, and test five cold starts. The preview build
+does not use Metro and is much closer to Play Store production performance.
+
+If the app still takes longer than roughly three seconds to become usable,
+instrument the startup gates to determine whether fonts, secure storage,
+language hydration, theme hydration, or token refresh is responsible.
+
+Create a new preview build when testers need JavaScript, native dependency,
+plugin, permission, configuration, or bundled asset changes. With the current
+configuration, preview builds use the development API unless an EAS environment
+variable selects another app environment.
+
 ## Install Locally Through USB
 
 Android Studio and the Android SDK must be installed. Enable Developer Options

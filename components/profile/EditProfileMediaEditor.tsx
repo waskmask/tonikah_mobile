@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ImagePlus, Info, Lock, Star, Unlock } from 'lucide-react-native';
+import { AlertCircle, ImagePlus, Info, Lock, Star, Unlock } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { AmberCard, useAmberCardPalette } from '@/components/ui/AmberCard';
 import { CompletionImpactBadge } from '@/components/profile/CompletionImpactBadge';
@@ -69,7 +69,7 @@ export function ProfileMediaEditor({
     variant = 'edit-profile',
     gender = canUsePrivateGallery ? 'female' : 'male',
     guidelinesIdentity = 'current-user',
-    autoShowGuidelines = true,
+    autoShowGuidelines = false,
     requiredError,
     completionImpact = 0,
     showTopBorder = true,
@@ -132,7 +132,9 @@ export function ProfileMediaEditor({
     }, [onGalleryChange]);
 
     useEffect(() => {
-        if (!autoShowGuidelines) return;
+        // Automatic guidance belongs only to the onboarding photo step. The
+        // edit-profile instance can stay mounted behind other tabs.
+        if (variant !== 'onboarding' || !autoShowGuidelines) return;
         let active = true;
         void AsyncStorage.getItem(guidelinesStorageKey)
             .then((seen) => {
@@ -144,7 +146,7 @@ export function ProfileMediaEditor({
         return () => {
             active = false;
         };
-    }, [autoShowGuidelines, guidelinesStorageKey]);
+    }, [autoShowGuidelines, guidelinesStorageKey, variant]);
 
     const acknowledgeGuidelines = useCallback(() => {
         setGuidelinesVisible(false);
@@ -648,7 +650,9 @@ export function ProfileMediaEditor({
                                 backgroundColor: privacy === 'private'
                                     ? colors.chrome.primary
                                     : variant === 'edit-profile'
-                                        ? '#FFFFFF'
+                                        ? isDark
+                                            ? 'transparent'
+                                            : '#FFFFFF'
                                         : colors.brand.bg.border,
                                 borderColor: privacy !== 'private' && variant === 'edit-profile'
                                     ? amberCard.border
@@ -669,6 +673,11 @@ export function ProfileMediaEditor({
                                             ? amberCard.border
                                             : 'transparent',
                                         borderWidth: privacy !== 'private' && variant === 'edit-profile' ? 1 : 0,
+                                        backgroundColor: privacy !== 'private'
+                                            && variant === 'edit-profile'
+                                            && isDark
+                                            ? amberCard.foreground
+                                            : '#FFFFFF',
                                     },
                                 ]}
                             >
@@ -685,7 +694,11 @@ export function ProfileMediaEditor({
                                     styles.switchThumb,
                                     privacy === 'private' && styles.switchThumbOn,
                                     {
-                                        backgroundColor: colors.chrome.common.inverseText,
+                                        backgroundColor: privacy !== 'private'
+                                            && variant === 'edit-profile'
+                                            && isDark
+                                            ? amberCard.foreground
+                                            : '#FFFFFF',
                                         borderColor: privacy !== 'private' && variant === 'edit-profile'
                                             ? amberCard.border
                                             : 'transparent',

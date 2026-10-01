@@ -12,6 +12,7 @@ type Props = {
     thin brand-filled track with a bold trailing percent. */
 export function ProfileCompletionBar({ percent }: Props) {
     const palette = useColors();
+    const completionColors = palette.chrome.profileCompletion;
     const clamped = Math.max(0, Math.min(100, Math.round(percent)));
 
     return (
@@ -21,23 +22,23 @@ export function ProfileCompletionBar({ percent }: Props) {
             style={[
                 styles.card,
                 {
-                    backgroundColor: '#F4F4F4',
-                    borderColor: '#201B15',
+                    backgroundColor: completionColors.background,
+                    borderColor: completionColors.border,
                 },
             ]}
         >
-            <View style={[styles.track, { backgroundColor: palette.brand.bg.border }]}>
+            <View style={[styles.track, { backgroundColor: completionColors.track }]}>
                 <View
                     style={[
                         styles.fill,
-                        { backgroundColor: palette.chrome.primary, width: `${clamped}%` },
+                        { backgroundColor: completionColors.fill, width: `${clamped}%` },
                     ]}
                 />
             </View>
             <Text
                 variant="caption"
                 className="font-body-bold"
-                style={[styles.percent, { color: palette.chrome.primary }]}
+                style={[styles.percent, { color: completionColors.text }]}
             >
                 {clamped}%
             </Text>

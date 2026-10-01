@@ -15,7 +15,7 @@ type EmptyStateAction = {
 };
 
 type EmptyStateProps = {
-    /** Lucide icon element; sized/tinted by the caller (recommended: size scale(30), brand primary). */
+    /** Icon element sized and tinted by the caller (recommended: size scale(30), brand primary). */
     icon: React.ReactNode;
     title: string;
     description?: string;

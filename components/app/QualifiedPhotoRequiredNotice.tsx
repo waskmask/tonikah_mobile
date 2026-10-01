@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Camera, TriangleAlert } from 'lucide-react-native';
+import { Camera, TriangleAlert } from '@/components/ui/icons/PhosphorCompat';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
@@ -63,7 +63,7 @@ export function QualifiedPhotoRequiredNotice() {
                     </Text>
                     <Pressable
                         accessibilityRole="button"
-                        onPress={() => router.push('/(tabs)/edit-profile' as any)}
+                        onPress={() => router.push('/edit-profile' as any)}
                         style={({ pressed }) => [
                             styles.button,
                             { backgroundColor: colors.chrome.primary },

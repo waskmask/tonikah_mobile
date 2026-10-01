@@ -11,16 +11,23 @@ type SectionCardProps = {
     onAction?: () => void;
     children: React.ReactNode;
     style?: ViewStyle;
+    variant?: 'card' | 'section';
 };
 
-export function SectionCard({ title, actionLabel, onAction, children, style }: SectionCardProps) {
+export function SectionCard({ title, actionLabel, onAction, children, style, variant = 'card' }: SectionCardProps) {
     const colors = useColors();
-    const surface = colors.brand.bg.primary;
+    const surface = variant === 'section' ? colors.brand.bg.surface : colors.brand.bg.primary;
     const border = colors.brand.bg.border;
     const primary = colors.chrome.primary;
 
     return (
-        <View style={[styles.card, { backgroundColor: surface, borderColor: border }, style]}>
+        <View
+            style={[
+                variant === 'section' ? styles.section : styles.card,
+                { backgroundColor: surface, borderColor: border },
+                style,
+            ]}
+        >
             {title ? (
                 <View style={styles.header}>
                     <Text variant="h3" style={[styles.title, { fontSize: scale(18) }]}>
@@ -46,6 +53,11 @@ const styles = StyleSheet.create({
         borderRadius: radius('lg'),
         padding: space('md'),
         marginBottom: space('md'),
+    },
+    section: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        paddingVertical: space('md'),
+        marginBottom: 0,
     },
     header: {
         flexDirection: 'row',

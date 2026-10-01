@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import { Menu } from 'lucide-react-native';
+import { Menu } from '@/components/ui/icons/PhosphorCompat';
 import Svg, { Line } from 'react-native-svg';
 
 import { scale } from '@/hooks/useResponsive';

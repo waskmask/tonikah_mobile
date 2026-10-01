@@ -1,111 +1,163 @@
-import React, { useEffect } from 'react';
-import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+    useAnimatedStyle,
+    useReducedMotion,
+    useSharedValue,
+    withDelay,
+    withTiming,
+} from 'react-native-reanimated';
 import {
-    Ban,
-    CreditCard,
-    Handshake,
-    Languages,
-    LifeBuoy,
-    LogOut,
     PencilLine,
-    Settings,
-    Sparkles,
-    User,
     X,
-} from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
+} from '@/components/ui/icons/PhosphorCompat';
+import {
+    CreditCard,
+    GearSix,
+    HandHeart,
+    Plant,
+    Prohibit,
+    ShieldWarning,
+    SignOut,
+    Translate,
+    User,
+    type Icon as PhosphorIcon,
+    type IconWeight,
+} from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { useAuthStore } from '@/store/authStore';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
+import { useWebSupport } from '@/hooks/useWebSupport';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
 import { NavigationTypeTokens } from '@/constants/uiTokens';
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
-import { completeInteraction } from '@/lib/performanceDiagnostics';
 
-type MenuItem = {
-    href: Href;
+type MenuItemBase = {
     labelKey: string;
     fallback: string;
-    icon: LucideIcon;
+    icon: PhosphorIcon;
+    iconWeight?: IconWeight;
 };
 
+type MenuItem = MenuItemBase & (
+    | { href: Href; action?: never }
+    | { action: 'support'; href?: never }
+);
+
 const QUICK_ITEMS: MenuItem[] = [
-    { href: '/(tabs)/hobbies-faith', labelKey: 'hobbies_and_faith', fallback: 'Hobbies & Faith', icon: Sparkles },
-    { href: '/(tabs)/partner-preference', labelKey: 'partner_preference', fallback: 'Partner Preference', icon: Handshake },
-    { href: '/(tabs)/language', labelKey: 'language', fallback: 'Language', icon: Languages },
+    { href: '/hobbies-faith', labelKey: 'hobbies_and_faith', fallback: 'Hobbies & Faith', icon: Plant, iconWeight: 'bold' },
+    { href: '/partner-preference', labelKey: 'partner_preference', fallback: 'Partner Preference', icon: HandHeart, iconWeight: 'bold' },
+    { href: '/language', labelKey: 'language', fallback: 'Language', icon: Translate, iconWeight: 'bold' },
 ];
 
 const ACCOUNT_ITEMS: MenuItem[] = [
     { href: '/(tabs)/profile', labelKey: 'edit_profile', fallback: 'Edit profile', icon: PencilLine },
-    { href: '/(tabs)/memberships', labelKey: 'memberships', fallback: 'Memberships', icon: CreditCard },
-    { href: { pathname: '/(tabs)/activities', params: { tab: 'blocked' } }, labelKey: 'blocked_users', fallback: 'Blocked users', icon: Ban },
-    { href: '/support', labelKey: 'report_issue', fallback: 'Report an issue', icon: LifeBuoy },
-    { href: '/(tabs)/settings', labelKey: 'settings', fallback: 'Settings', icon: Settings },
+    { href: '/memberships', labelKey: 'memberships', fallback: 'Memberships', icon: CreditCard, iconWeight: 'bold' },
+    { href: '/blocked-users', labelKey: 'blocked_users', fallback: 'Blocked users', icon: Prohibit, iconWeight: 'bold' },
+    { action: 'support', labelKey: 'report_issue', fallback: 'Report an issue', icon: ShieldWarning, iconWeight: 'bold' },
+    { href: '/settings', labelKey: 'settings', fallback: 'Settings', icon: GearSix, iconWeight: 'bold' },
 ];
-
-const DRAWER_WIDTH = Dimensions.get('window').width;
-const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 
 function textValue(value: unknown, fallback: string) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
 
-export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+const DRAWER_FADE_DELAY_MS = 100;
+const DRAWER_FADE_DURATION_MS = 55;
+const DRAWER_NAVIGATION_DELAY_MS = 115;
+const DRAWER_RESET_DELAY_MS = 300;
+const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
+
+export function AppMenuDrawerContent({
+    onClose,
+    isOpen = true,
+}: {
+    onClose: () => void;
+    isOpen?: boolean;
+}) {
     const { t, isRTL } = useLanguage();
     const { isDark } = useTheme();
     const { logout, isLoading } = useAuthStore();
+    const openSupport = useWebSupport();
     const pathname = usePathname();
     const reduceMotion = useReducedMotion();
-    const progress = useSharedValue(0);
-
-    useEffect(() => {
-        if (!visible) return;
-        progress.value = reduceMotion ? 1 : 0;
-        if (!reduceMotion) {
-            progress.value = withTiming(1, {
-                duration: 180,
-                easing: Easing.out(Easing.cubic),
-            });
-        }
-    }, [progress, reduceMotion, visible]);
-
-    const overlayStyle = useAnimatedStyle(() => ({
-        opacity: progress.value,
-    }));
-    const drawerStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: (1 - progress.value) * DRAWER_WIDTH * (isRTL ? -1 : 1) }],
-    }));
-
+    const opacity = useSharedValue(1);
+    const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [transitioning, setTransitioning] = useState(false);
     const surfaceColor = isDark ? '#1D1D1F' : '#FFFFFF';
     const borderColor = isDark ? '#303033' : '#EEEEEE';
     const headingColor = isDark ? '#E5E5E7' : '#241E17';
-    const overlayColor = isDark ? 'rgba(0, 0, 0, 0.58)' : 'rgba(16, 16, 17, 0.45)';
 
-    const navigate = (href: Href) => {
-        if (isLoading) return;
-        onClose();
-        requestAnimationFrame(() => {
-            if (href === '/(tabs)/hobbies-faith') {
-                router.push({
-                    pathname: '/(tabs)/hobbies-faith',
-                    params: { returnTo: pathname },
-                });
-                return;
-            }
-            if (href === '/(tabs)/partner-preference') {
-                router.push({
-                    pathname: '/(tabs)/partner-preference',
-                    params: { returnTo: pathname },
-                });
-                return;
-            }
-            router.push(href);
-        });
+    useEffect(() => {
+        if (!isOpen) return;
+        if (navigationTimerRef.current) {
+            clearTimeout(navigationTimerRef.current);
+            navigationTimerRef.current = null;
+        }
+        if (resetTimerRef.current) {
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = null;
+        }
+        opacity.value = 1;
+        setTransitioning(false);
+    }, [isOpen, opacity]);
+
+    useEffect(() => () => {
+        if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
+        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    }, []);
+
+    const contentStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+    const openDestination = (href: Href) => {
+        if (href === '/hobbies-faith') {
+            router.push({
+                pathname: '/hobbies-faith',
+                params: { returnTo: pathname },
+            });
+            return;
+        }
+        if (href === '/partner-preference') {
+            router.push({
+                pathname: '/partner-preference',
+                params: { returnTo: pathname },
+            });
+            return;
+        }
+        router.push(href);
     };
+
+    const closeThenRun = (action: () => void) => {
+        if (isLoading || transitioning) return;
+        if (reduceMotion) {
+            onClose();
+            action();
+            return;
+        }
+
+        setTransitioning(true);
+        onClose();
+        opacity.value = withDelay(
+            DRAWER_FADE_DELAY_MS,
+            withTiming(0, { duration: DRAWER_FADE_DURATION_MS }),
+        );
+        navigationTimerRef.current = setTimeout(() => {
+            navigationTimerRef.current = null;
+            action();
+        }, DRAWER_NAVIGATION_DELAY_MS);
+        resetTimerRef.current = setTimeout(() => {
+            resetTimerRef.current = null;
+            opacity.value = 1;
+            setTransitioning(false);
+        }, DRAWER_RESET_DELAY_MS);
+    };
+
+    const navigate = (href: Href) => closeThenRun(() => openDestination(href));
+    const navigateToSupport = () => closeThenRun(() => void openSupport());
 
     const handleLogout = async () => {
         if (isLoading) return;
@@ -113,101 +165,91 @@ export function AppMenuDrawer({ visible, onClose }: { visible: boolean; onClose:
     };
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            onShow={() => completeInteraction('drawer', 'visible')}
-            onRequestClose={() => {
-                if (!isLoading) onClose();
-            }}
+        <AnimatedSafeAreaView
+            edges={['top', 'bottom']}
+            pointerEvents={transitioning ? 'none' : 'auto'}
+            style={[
+                styles.drawer,
+                contentStyle,
+                {
+                    backgroundColor: surfaceColor,
+                    borderColor,
+                    borderLeftWidth: isRTL ? 0 : StyleSheet.hairlineWidth,
+                    borderRightWidth: isRTL ? StyleSheet.hairlineWidth : 0,
+                },
+            ]}
         >
-            <View style={styles.modalRoot}>
-                <Animated.View style={[styles.overlay, { backgroundColor: overlayColor }, overlayStyle]}>
-                    <Pressable style={styles.overlayPressable} onPress={onClose} disabled={isLoading} />
-                </Animated.View>
-                <AnimatedSafeAreaView
-                    edges={['top', 'bottom']}
-                    style={[
-                        styles.drawer,
-                        drawerStyle,
-                        {
-                            width: DRAWER_WIDTH,
-                            backgroundColor: surfaceColor,
-                            borderColor,
-                            left: isRTL ? 0 : undefined,
-                            right: isRTL ? undefined : 0,
-                        },
-                    ]}
+            <View style={[styles.header, { borderBottomColor: borderColor, flexDirection: 'row' }]}>
+                <Text
+                    variant="body-sm"
+                    className="font-body-bold"
+                    style={[styles.headerTitle, { color: headingColor, textAlign: isRTL ? 'right' : 'left' }]}
                 >
-                    <View style={[styles.header, { borderBottomColor: borderColor, flexDirection: 'row' }]}>
-                        <Text
-                            variant="body-sm"
-                            className="font-body-bold"
-                            style={[styles.headerTitle, { color: headingColor, textAlign: isRTL ? 'right' : 'left' }]}
-                        >
-                            {textValue(t('menu'), 'Menu')}
-                        </Text>
-                        <Pressable onPress={onClose} disabled={isLoading} style={styles.closeButton} hitSlop={10}>
-                            <X size={24} color={headingColor} strokeWidth={2.1} />
-                        </Pressable>
-                    </View>
-
-                    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                        <MenuRow
-                            icon={User}
-                            label={textValue(t('my_profile'), 'My profile')}
-                            disabled={isLoading}
-                            onPress={() => navigate('/(tabs)/profile')}
-                        />
-
-                        {QUICK_ITEMS.map((item) => (
-                            <MenuRow
-                                key={item.labelKey}
-                                icon={item.icon}
-                                label={textValue(t(item.labelKey), item.fallback)}
-                                disabled={isLoading}
-                                onPress={() => navigate(item.href)}
-                            />
-                        ))}
-
-                        {ACCOUNT_ITEMS.map((item) => (
-                            <MenuRow
-                                key={item.labelKey}
-                                icon={item.icon}
-                                label={textValue(t(item.labelKey), item.fallback)}
-                                disabled={isLoading}
-                                onPress={() => navigate(item.href)}
-                            />
-                        ))}
-                    </ScrollView>
-
-                    <View style={[styles.footer, { borderTopColor: borderColor }]}>
-                        <MenuRow
-                            icon={LogOut}
-                            label={isLoading ? textValue(t('please_wait'), 'Please wait') : textValue(t('logout'), 'Logout')}
-                            danger
-                            disabled={isLoading}
-                            loading={isLoading}
-                            onPress={handleLogout}
-                        />
-                    </View>
-                </AnimatedSafeAreaView>
+                    {textValue(t('menu'), 'Menu')}
+                </Text>
+                <Pressable onPress={onClose} disabled={isLoading} style={styles.closeButton} hitSlop={10}>
+                    <X size={24} color={headingColor} strokeWidth={2.1} />
+                </Pressable>
             </View>
-        </Modal>
+
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                <MenuRow
+                    icon={User}
+                    iconWeight="bold"
+                    label={textValue(t('my_profile'), 'My profile')}
+                    disabled={isLoading}
+                    onPress={() => navigate('/(tabs)/profile')}
+                />
+
+                {QUICK_ITEMS.map((item) => (
+                    <MenuRow
+                        key={item.labelKey}
+                        icon={item.icon}
+                        iconWeight={item.iconWeight}
+                        label={textValue(t(item.labelKey), item.fallback)}
+                        disabled={isLoading}
+                        onPress={() => item.action === 'support' ? navigateToSupport() : navigate(item.href)}
+                    />
+                ))}
+
+                {ACCOUNT_ITEMS.map((item) => (
+                    <MenuRow
+                        key={item.labelKey}
+                        icon={item.icon}
+                        iconWeight={item.iconWeight}
+                        label={textValue(t(item.labelKey), item.fallback)}
+                        disabled={isLoading}
+                        onPress={() => item.action === 'support' ? navigateToSupport() : navigate(item.href)}
+                    />
+                ))}
+            </ScrollView>
+
+            <View style={[styles.footer, { borderTopColor: borderColor }]}>
+                <MenuRow
+                    icon={SignOut}
+                    iconWeight="bold"
+                    label={isLoading ? textValue(t('please_wait'), 'Please wait') : textValue(t('logout'), 'Logout')}
+                    danger
+                    disabled={isLoading}
+                    loading={isLoading}
+                    onPress={handleLogout}
+                />
+            </View>
+        </AnimatedSafeAreaView>
     );
 }
 
 function MenuRow({
     icon: Icon,
+    iconWeight,
     label,
     onPress,
     danger = false,
     disabled = false,
     loading = false,
 }: {
-    icon: LucideIcon;
+    icon: PhosphorIcon;
+    iconWeight?: IconWeight;
     label: string;
     onPress: () => void;
     danger?: boolean;
@@ -236,7 +278,7 @@ function MenuRow({
                     {loading ? (
                         <ActivityIndicator size="small" color={color} />
                     ) : (
-                        <Icon size={20} color={color} strokeWidth={1.85} />
+                        <Icon size={20} color={color} weight={iconWeight || 'regular'} />
                     )}
                 </View>
                 <Text
@@ -253,24 +295,8 @@ function MenuRow({
 }
 
 const styles = StyleSheet.create({
-    modalRoot: {
-        flex: 1,
-    },
-    overlay: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-    },
-    overlayPressable: {
-        flex: 1,
-    },
     drawer: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
+        flex: 1,
     },
     header: {
         height: scale(50),

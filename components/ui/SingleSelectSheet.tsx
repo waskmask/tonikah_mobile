@@ -26,7 +26,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
-import { Search, X, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CaretLeft, CaretRight, Check, MagnifyingGlass, X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography } from '@/constants/typography';
@@ -208,7 +208,7 @@ export function SingleSelectSheet({
                             end={{ x: 1, y: 1 }}
                             style={StyleSheet.absoluteFill}
                         />
-                        <Check size={scale(12)} color={palette.chrome.common.inverseText} strokeWidth={3} />
+                        <Check size={scale(12)} color={palette.chrome.common.inverseText} weight="bold" />
                     </View>
                 ) : (
                     <View
@@ -330,7 +330,7 @@ export function SingleSelectSheet({
                                 {title}
                             </Text>
                             <Pressable onPress={onClose} hitSlop={12}>
-                                <X size={scale(20)} color={palette.brand.text.subtitle} />
+                                <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
                             </Pressable>
                         </View>
                         {searchEnabled && (
@@ -340,7 +340,7 @@ export function SingleSelectSheet({
                                     { borderBottomColor: palette.brand.bg.border },
                                 ]}
                             >
-                                <Search size={scale(16)} color={palette.brand.text.muted} />
+                                <MagnifyingGlass size={scale(16)} color={palette.brand.text.muted} weight="regular" />
                                 <BottomSheetTextInput
                                     value={search}
                                     onChangeText={setSearch}
@@ -357,7 +357,7 @@ export function SingleSelectSheet({
                                 />
                                 {search.length > 0 && (
                                     <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                                        <X size={scale(14)} color={palette.brand.text.muted} />
+                                        <X size={scale(14)} color={palette.brand.text.muted} weight="bold" />
                                     </Pressable>
                                 )}
                             </View>
@@ -421,9 +421,9 @@ export function SingleSelectSheet({
                         <View style={[styles.header, styles.drawerHeader]}>
                             <Pressable onPress={onClose} hitSlop={12} style={styles.backButton}>
                                 {isRTL ? (
-                                    <ChevronRight size={22} color={palette.brand.text.body} />
+                                    <CaretRight size={22} color={palette.brand.text.body} weight="bold" />
                                 ) : (
-                                    <ChevronLeft size={22} color={palette.brand.text.body} />
+                                    <CaretLeft size={22} color={palette.brand.text.body} weight="bold" />
                                 )}
                             </Pressable>
                             <Text
@@ -444,7 +444,7 @@ export function SingleSelectSheet({
                                     { borderBottomColor: palette.brand.bg.border },
                                 ]}
                             >
-                                <Search size={scale(16)} color={palette.brand.text.muted} />
+                                <MagnifyingGlass size={scale(16)} color={palette.brand.text.muted} weight="regular" />
                                 <TextInput
                                     value={search}
                                     onChangeText={setSearch}
@@ -461,7 +461,7 @@ export function SingleSelectSheet({
                                 />
                                 {search.length > 0 && (
                                     <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                                        <X size={scale(14)} color={palette.brand.text.muted} />
+                                        <X size={scale(14)} color={palette.brand.text.muted} weight="bold" />
                                     </Pressable>
                                 )}
                             </View>

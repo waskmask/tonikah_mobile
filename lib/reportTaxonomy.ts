@@ -17,21 +17,41 @@ export const IMAGE_REPORT_DETAILS = {
     personal_information: ['phone_or_email_visible', 'social_media_handle_visible', 'address_or_document_visible'],
 } as const;
 
-export type ReportReason = keyof typeof PROFILE_REPORT_DETAILS | keyof typeof IMAGE_REPORT_DETAILS | 'other';
+export const CHAT_MESSAGE_REPORT_DETAILS = {
+    harassment_or_threats: ['threats_or_intimidation', 'sexual_harassment', 'repeated_unwanted_contact', 'coercion_or_blackmail'],
+    sexual_or_inappropriate_content: ['sexual_harassment', 'sexual_content', 'offensive_language'],
+    scam_or_money_request: ['asked_for_money', 'investment_or_crypto', 'suspicious_link', 'romance_scam'],
+    spam_or_promotion: ['advertising_or_sales', 'repeated_messages', 'redirecting_off_app'],
+    hate_or_discrimination: ['hate_or_discrimination', 'religious_abuse', 'racist_or_ethnic_abuse'],
+    sharing_private_information: ['shared_phone_or_email', 'shared_address_or_document', 'threatened_to_share_private_content'],
+    underage_concern: ['says_under_18', 'admitted_false_age', 'sexual_content_involving_minor'],
+} as const;
+
+export type ReportReason = keyof typeof PROFILE_REPORT_DETAILS | keyof typeof IMAGE_REPORT_DETAILS | keyof typeof CHAT_MESSAGE_REPORT_DETAILS | 'other';
 export type ReportReasonDetail =
     | (typeof PROFILE_REPORT_DETAILS)[keyof typeof PROFILE_REPORT_DETAILS][number]
-    | (typeof IMAGE_REPORT_DETAILS)[keyof typeof IMAGE_REPORT_DETAILS][number];
+    | (typeof IMAGE_REPORT_DETAILS)[keyof typeof IMAGE_REPORT_DETAILS][number]
+    | (typeof CHAT_MESSAGE_REPORT_DETAILS)[keyof typeof CHAT_MESSAGE_REPORT_DETAILS][number];
 
 export function reportReasons(entityType: ReportEntityType): ReportReason[] {
+    const taxonomy = entityType === 'Image'
+        ? IMAGE_REPORT_DETAILS
+        : entityType === 'ChatMessage'
+            ? CHAT_MESSAGE_REPORT_DETAILS
+            : PROFILE_REPORT_DETAILS;
     return [
-        ...Object.keys(entityType === 'Image' ? IMAGE_REPORT_DETAILS : PROFILE_REPORT_DETAILS),
+        ...Object.keys(taxonomy),
         'other',
     ] as ReportReason[];
 }
 
 export function reportDetails(entityType: ReportEntityType, reason: ReportReason | null): ReportReasonDetail[] {
     if (!reason || reason === 'other') return [];
-    const taxonomy = entityType === 'Image' ? IMAGE_REPORT_DETAILS : PROFILE_REPORT_DETAILS;
+    const taxonomy = entityType === 'Image'
+        ? IMAGE_REPORT_DETAILS
+        : entityType === 'ChatMessage'
+            ? CHAT_MESSAGE_REPORT_DETAILS
+            : PROFILE_REPORT_DETAILS;
     return [...((taxonomy as Record<string, readonly ReportReasonDetail[]>)[reason] || [])];
 }
 
@@ -47,6 +67,11 @@ export const REPORT_REASON_FALLBACKS: Record<ReportReason, string> = {
     hate_or_offensive_content: 'Hateful or offensive content',
     violence_or_disturbing_content: 'Violence or disturbing content',
     personal_information: 'Personal information',
+    harassment_or_threats: 'Harassment or threats',
+    sexual_or_inappropriate_content: 'Sexual or inappropriate content',
+    hate_or_discrimination: 'Hate or discrimination',
+    sharing_private_information: 'Sharing private information',
+    underage_concern: 'Underage concern',
     other: 'Something else',
 };
 
@@ -62,6 +87,11 @@ export const REPORT_REASON_DESCRIPTION_FALLBACKS: Record<ReportReason, string> =
     hate_or_offensive_content: 'Hate symbols, discriminatory content, or obscene gestures.',
     violence_or_disturbing_content: 'Violence, weapons, threats, self-harm, or disturbing imagery.',
     personal_information: 'Phone, email, social media, address, or identity documents.',
+    harassment_or_threats: 'Threats, sexual harassment, coercion, or repeated unwanted contact.',
+    sexual_or_inappropriate_content: 'Unwanted sexual content, explicit images, requests, or offensive language.',
+    hate_or_discrimination: 'Abuse targeting identity, religion, race, or ethnicity.',
+    sharing_private_information: 'Private contact details, documents, addresses, or threats to expose content.',
+    underage_concern: 'The message suggests that someone is under 18 or involves a minor.',
     other: 'A different issue not listed above.',
 };
 
@@ -105,6 +135,13 @@ export const REPORT_DETAIL_FALLBACKS: Record<ReportReasonDetail, string> = {
     phone_or_email_visible: 'Phone number or email',
     social_media_handle_visible: 'Social media username',
     address_or_document_visible: 'Address or identity document',
+    coercion_or_blackmail: 'Coercion or blackmail',
+    religious_abuse: 'Religious abuse',
+    racist_or_ethnic_abuse: 'Racist or ethnic abuse',
+    shared_phone_or_email: 'Shared phone number or email',
+    shared_address_or_document: 'Shared address or identity document',
+    threatened_to_share_private_content: 'Threatened to share private content',
+    sexual_content_involving_minor: 'Sexual content involving a minor',
 };
 
 export const REPORT_DETAIL_DESCRIPTION_FALLBACKS: Record<ReportReasonDetail, string> = {
@@ -147,4 +184,11 @@ export const REPORT_DETAIL_DESCRIPTION_FALLBACKS: Record<ReportReasonDetail, str
     phone_or_email_visible: 'A phone number or email address is visible in the photo.',
     social_media_handle_visible: 'A social media username or account is visible in the photo.',
     address_or_document_visible: 'A home address, identity document, or other sensitive record is visible.',
+    coercion_or_blackmail: 'They pressured, coerced, or threatened someone to make them comply.',
+    religious_abuse: 'They used abusive or hateful language about religion or belief.',
+    racist_or_ethnic_abuse: 'They used racist language or targeted someone based on ethnicity.',
+    shared_phone_or_email: 'They shared a private phone number or email address without permission.',
+    shared_address_or_document: 'They shared a private address or identity document without permission.',
+    threatened_to_share_private_content: 'They threatened to expose private messages, images, or information.',
+    sexual_content_involving_minor: 'The message refers to or contains sexual content involving someone under 18.',
 };

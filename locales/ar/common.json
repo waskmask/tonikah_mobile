@@ -1594,6 +1594,8 @@
   "create_password_failed": "فشل إنشاء كلمة المرور",
   "change_email": "تغيير عنوان البريد الإلكتروني",
   "change_email_short": "تغيير البريد",
+  "new_email_address": "عنوان البريد الإلكتروني الجديد",
+  "change_email_verification_hint": "سنرسل رابط تحقق إلى العنوان الجديد قبل تغيير البريد الإلكتروني لحسابك.",
   "resend_email": "إعادة إرسال البريد",
   "update_email": "تحديث عنوان البريد الإلكتروني",
   "email_same_as_current": "هذا العنوان مرتبط بحسابك بالفعل.",

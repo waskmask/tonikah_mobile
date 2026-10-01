@@ -7,8 +7,7 @@ interface BabyCarriageProps {
     strokeWidth?: number;
 }
 
-/** Baby carriage / stroller — lucide has no such icon, so this is Tabler's
-    `baby-carriage` (MIT), same 24×24 / 2px-stroke style as our lucide set. */
+/** Tabler's MIT-licensed baby carriage, adapted to the app's 24x24 line-icon geometry. */
 export function BabyCarriage({ size = 24, color = 'currentColor', strokeWidth = 2 }: BabyCarriageProps) {
     return (
         <Svg

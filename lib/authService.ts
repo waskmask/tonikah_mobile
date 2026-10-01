@@ -53,6 +53,8 @@ export interface UserSession {
 export interface SessionsResponse extends ApiResponse {
     sessions?: UserSession[];
     revokedCount?: number;
+    accessToken?: string;
+    refreshToken?: string;
 }
 
 export const authService = {

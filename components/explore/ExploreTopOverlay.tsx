@@ -2,7 +2,7 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { Info, Settings2 } from 'lucide-react-native';
+import { Info, SlidersHorizontal } from 'phosphor-react-native';
 import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
@@ -58,12 +58,10 @@ export function ExploreTopOverlay({
                     />
                 ) : null}
                 <View pointerEvents="none" style={styles.filterIconCenter}>
-                    <Settings2
+                    <SlidersHorizontal
                         size={scale(Platform.OS === 'android' ? 22 : 18)}
-                        width={scale(Platform.OS === 'android' ? 24 : 18)}
-                        height={scale(Platform.OS === 'android' ? 22 : 18)}
                         color={iconColor}
-                        strokeWidth={Platform.OS === 'android' ? 2.5 : 2.2}
+                        weight="bold"
                     />
                 </View>
                 {filterCount > 0 ? (
@@ -73,8 +71,8 @@ export function ExploreTopOverlay({
                 ) : null}
             </Pressable>
             <View style={styles.actions}>
-                <IconButton onPress={onOpenTour}>
-                    <Info size={scale(Platform.OS === 'android' ? 20 : 18)} color={iconColor} strokeWidth={2.35} />
+                <IconButton onPress={onOpenTour} accessibilityLabel={t('explore_guide', 'Explore guide')}>
+                    <Info size={scale(Platform.OS === 'android' ? 20 : 18)} color={iconColor} weight="bold" />
                 </IconButton>
                 <AppMenuButton onPress={onOpenMenu} />
             </View>
@@ -82,11 +80,13 @@ export function ExploreTopOverlay({
     );
 }
 
-function IconButton({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+function IconButton({ children, onPress, accessibilityLabel }: { children: React.ReactNode; onPress: () => void; accessibilityLabel: string }) {
     return (
         <View style={styles.buttonShell}>
             <Pressable
                 onPress={onPress}
+                accessibilityRole="button"
+                accessibilityLabel={accessibilityLabel}
                 hitSlop={6}
                 style={({ pressed }) => [
                     styles.button,

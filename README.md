@@ -9,6 +9,7 @@
 ## Development runbooks
 
 - [Android emulator and physical device](docs/android-development-runbook.md)
+- [iOS physical device builds](docs/ios-development-runbook.md)
 
 # Example
 

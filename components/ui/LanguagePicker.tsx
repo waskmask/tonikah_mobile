@@ -13,7 +13,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
-import { ChevronDown, Check, Languages } from 'lucide-react-native';
+import { CaretDown, Check, Translate } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SUPPORTED_APP_LANGUAGES } from '@/lib/languageNames';
 
@@ -57,35 +57,42 @@ export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
                 hitSlop={6}
                 accessibilityRole="button"
                 accessibilityLabel={t('language', 'Language')}
-                style={({ pressed }) => [
-                    isIcon ? styles.iconTrigger : styles.trigger,
-                    isIcon
-                        ? {
-                            backgroundColor: pressed ? colors.chrome.common.primaryTint : iconChipBg,
-                            borderColor: iconChipBorder,
-                        }
-                        : {
-                            backgroundColor: pressed
-                                ? colors.chrome.common.primaryTint
-                                : colors.brand.bg.surface,
-                            borderColor: colors.brand.bg.border,
-                        },
-                ]}
+                style={isIcon ? styles.iconPressTarget : styles.triggerPressTarget}
             >
-                {isIcon ? (
-                    <Languages size={scale(18)} color={iconColor} strokeWidth={1.75} />
+                {({ pressed }) => isIcon ? (
+                    <View
+                        style={[
+                            styles.iconTrigger,
+                            {
+                                backgroundColor: pressed ? colors.chrome.common.primaryTint : iconChipBg,
+                                borderColor: iconChipBorder,
+                            },
+                        ]}
+                    >
+                        <Translate size={scale(18)} color={iconColor} weight="regular" />
+                    </View>
                 ) : (
-                    <>
+                    <View
+                        style={[
+                            styles.trigger,
+                            {
+                                backgroundColor: pressed
+                                    ? colors.chrome.common.primaryTint
+                                    : colors.brand.bg.surface,
+                                borderColor: colors.brand.bg.border,
+                            },
+                        ]}
+                    >
                         <Text style={{ fontSize: scale(18) }}>{current.flag}</Text>
                         <Text
                             variant="body-sm"
-                            className="font-body-medium"
-                            style={{ marginHorizontal: scale(6) }}
+                            numberOfLines={1}
+                            style={styles.triggerLabel}
                         >
-                            {current.code.toUpperCase()}
+                            {t(current.translationKey, current.name)}
                         </Text>
-                        <ChevronDown size={scale(14)} color={colors.brand.text.muted} />
-                    </>
+                        <CaretDown size={scale(14)} color={colors.brand.text.muted} weight="bold" />
+                    </View>
                 )}
             </Pressable>
 
@@ -174,7 +181,7 @@ export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
                                                             <Check
                                                                 size={scale(12)}
                                                                 color="#FFFFFF"
-                                                                strokeWidth={3}
+                                                                weight="bold"
                                                             />
                                                         </View>
                                                     )}
@@ -193,13 +200,24 @@ export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
 }
 
 const styles = StyleSheet.create({
+    triggerPressTarget: {
+        alignSelf: 'flex-start',
+    },
+    iconPressTarget: {
+        width: scale(36),
+        height: scale(36),
+    },
     trigger: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: scale(7),
         paddingHorizontal: scale(12),
         paddingVertical: scale(8),
         borderRadius: scale(12),
         borderWidth: 1,
+    },
+    triggerLabel: {
+        flexShrink: 1,
     },
     iconTrigger: {
         width: scale(36),
