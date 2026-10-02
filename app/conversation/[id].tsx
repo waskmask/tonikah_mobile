@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ActivityIndicator,
     AppState,
-    Animated,
+    BackHandler,
     FlatList,
     Image as RNImage,
+    Keyboard,
+    type LayoutChangeEvent,
     Modal,
     NativeScrollEvent,
     NativeSyntheticEvent,
@@ -20,7 +22,9 @@ import {
     ViewStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -30,8 +34,8 @@ import {
 } from 'expo-audio';
 import { WaveformRecorderView, type WaveformRecorderCompleteEvent, type WaveformRecorderState, type WaveformRecorderViewRef } from 'react-native-waveform-recorder';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Bell, BellOff, Camera, Check, CheckCheck, Copy, Download, Flag, Image as ImageIcon, Mic, MoreVertical, Pause, Play, Reply, Trash2, Undo2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
-import { CaretDoubleDown, CaretLeft, CaretRight, PaperPlaneTilt } from 'phosphor-react-native';
+import { Bell, BellOff, Camera, Check, CheckCheck, Copy, Download, Flag, Mic, MoreVertical, Pause, Play, RefreshCw, Reply, Trash2, Undo2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
+import { CaretDoubleDown, CaretLeft, CaretRight, Paperclip, PaperPlaneTilt } from 'phosphor-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import {
@@ -57,8 +61,9 @@ import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode
 import { BRAND_PRIMARY } from '@/constants/Colors';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
+import { ChatImageLightbox, type ChatImagePreview } from '@/components/chat/ChatImageLightbox';
 import { KeyboardController } from 'react-native-keyboard-controller';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetView } from '@gorhom/bottom-sheet';
 import Reanimated, {
     Easing,
@@ -66,6 +71,7 @@ import Reanimated, {
     type SharedValue,
     ZoomIn,
     ZoomOut,
+    runOnJS,
     useAnimatedStyle,
     useSharedValue,
     withRepeat,
@@ -76,13 +82,14 @@ import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
 import { Typography } from '@/constants/typography';
 import { cacheChatMedia, clearChatMediaCache, deleteCachedChatMediaForMessage, getCachedChatMedia, pinCachedChatMedia, storeLocalChatMedia, unpinCachedChatMedia } from '@/lib/chatMediaCache';
-import { claimChatAudioPlayback, createChatAudioPlaybackOwner, releaseChatAudioPlayback } from '@/lib/chatAudioPlayback';
+import { claimChatAudioPlayback, createChatAudioPlaybackOwner, isChatAudioPlaybackOwner, releaseChatAudioPlayback, stopChatAudioPlaybackForMessage } from '@/lib/chatAudioPlayback';
+import { mergeChatMessageMedia } from '@/lib/chatMessageMedia';
+import { chatImageLayout } from '@/lib/chatImageLayout';
 import { waveformPeaks } from '@/lib/chatWaveform';
 import { translateChatText } from '@/lib/chatDisplay';
 import { ImageAttachmentComposer } from '@/components/chat/ImageAttachmentComposer';
-import { GalleryCropModal } from '@/components/app/GalleryCropModal';
 import { GalleryRevealControl } from '@/components/chat/GalleryRevealControl';
-import { ChatKeyboardAvoider, ChatComposerBar } from '@/components/chat/ChatKeyboardFooter';
+import { ChatKeyboardAvoider, ChatKeyboardViewport, ChatStickyComposer, ChatComposerBar } from '@/components/chat/ChatKeyboardFooter';
 import { ViewOnceIcon } from '@/components/chat/ViewOnceIcon';
 import { UnreadBadge } from '@/components/ui/UnreadBadge';
 import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
@@ -124,7 +131,40 @@ type PendingImageAttachment = {
     name: string;
     type: string;
     clientMessageId: string;
+    width?: number;
+    height?: number;
+    size?: number;
 };
+
+type PendingMediaSend = {
+    clientMessageId: string;
+    reply: ChatMessage | null;
+    uploadedMedia?: MessageMedia;
+} & (
+    | { type: 'image'; attachment: PendingImageAttachment; caption: string; viewOnce: boolean }
+    | { type: 'voice'; uri: string; duration: number; waveform: number[] }
+);
+
+async function prepareChatImageUpload(attachment: PendingImageAttachment) {
+    const sourceInfo = await FileSystem.getInfoAsync(attachment.uri).catch(() => null);
+    const sourceSize = attachment.size || (sourceInfo?.exists ? sourceInfo.size : 0) || 0;
+    if (attachment.type === 'image/webp' && (!attachment.width || attachment.width <= 1200)) {
+        return { uri: attachment.uri, name: attachment.name, type: attachment.type, size: sourceSize, temporaryUri: null };
+    }
+
+    const resized = await ImageManipulator.manipulateAsync(
+        attachment.uri,
+        attachment.width && attachment.width > 1200 ? [{ resize: { width: 1200 } }] : [],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.WEBP },
+    );
+    const outputInfo = await FileSystem.getInfoAsync(resized.uri);
+    const outputSize = outputInfo.exists ? outputInfo.size || 0 : 0;
+    if (!outputSize || outputSize > MAX_CHAT_IMAGE_BYTES) {
+        void FileSystem.deleteAsync(resized.uri, { idempotent: true }).catch(() => undefined);
+        throw new Error('image_too_large');
+    }
+    return { uri: resized.uri, name: 'chat-photo.webp', type: 'image/webp', size: outputSize, temporaryUri: resized.uri };
+}
 
 function newMediaMessageId() {
     return `media-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
@@ -158,6 +198,54 @@ function formatMessageTime(value?: string | null) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function sendFailureText(reason?: string) {
+    switch (reason) {
+        case 'upload_timeout':
+            return t('chat:upload_timeout', 'Upload timed out. Check your connection and retry.');
+        case 'image_too_large':
+            return t('chat:image_too_large', 'Choose an image smaller than 10 MB.');
+        case 'voice_too_long':
+            return t('chat:voice_too_long', 'Voice note is too long. Record a shorter one.');
+        case 'invalid_media':
+        case 'media_required':
+        case 'missing_file':
+            return t('chat:invalid_media_send', 'This media could not be sent. Choose or record it again.');
+        case 'conversation_not_active':
+            return t('chat:conversation_not_active_send', 'This conversation is no longer active.');
+        case 'message_not_allowed':
+            return t('chat:message_not_allowed_send', 'You cannot send messages in this conversation.');
+        case 'active_chat_limit_reached':
+            return t('chat:active_chat_limit_reached', 'Your active chat limit is full.');
+        case 'sender_chat_limit_reached':
+            return t('chat:sender_chat_limit_reached', 'Their active chat limit is full.');
+        case 'pending_requests_limit':
+            return t('chat:pending_requests_limit_send', 'You have reached the pending message request limit.');
+        case 'request_already_pending':
+            return t('chat:request_already_sent', 'Message request already sent.');
+        case 'conversation_already_active':
+            return t('chat:conversation_already_active_send', 'This conversation is already active.');
+        case 'request_expired':
+            return t('chat:request_expired', 'This request has expired.');
+        case 'account_deleted':
+            return t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.');
+        case 'MEMBERSHIP_REQUIRED':
+            return t('chat:membership_required_desc', 'Activate membership to open and use conversations.');
+        case 'QUALIFIED_PHOTO_REQUIRED':
+            return t('qualified_photo_required', 'An approved profile photo is required to send messages.');
+        case 'offline_queue_full':
+            return t('chat:offline_queue_full', 'Offline queue is full. Reconnect before sending more messages.');
+        default:
+            return apiMessage(reason || 'server_error_default');
+    }
+}
+
+function sendFailureReason(response: { code?: string; errorMessage?: string; message?: unknown; error?: string }) {
+    if (response.code === 'MEMBERSHIP_REQUIRED' || response.code === 'QUALIFIED_PHOTO_REQUIRED') return response.code;
+    if (response.error === 'upload_timeout') return 'upload_timeout';
+    return response.errorMessage || (typeof response.message === 'string' ? response.message : undefined)
+        || response.code || 'server_error_default';
 }
 
 function dateLabel(value?: string | null) {
@@ -299,6 +387,7 @@ export default function ConversationScreen() {
     const initialPositionPendingRef = useRef(true);
     const initialFreshPositionPendingRef = useRef(true);
     const pendingAutoScrollRef = useRef(false);
+    const ownSendScrollMessageIdRef = useRef<string | null>(null);
     const freshMessagesLoadedRef = useRef(false);
     const readInFlightRef = useRef(false);
     const incomingGenerationRef = useRef(0);
@@ -310,6 +399,11 @@ export default function ConversationScreen() {
     const tryMarkVisibleUnreadRef = useRef<() => void>(() => undefined);
     const receivedAwayIdsRef = useRef<Set<string>>(new Set());
     const knownMessageIdsRef = useRef<Set<string>>(new Set());
+    const earlyDeliveryReceiptsRef = useRef(new Map<string, string>());
+    const withDeliveryReceipt = useCallback((message: ChatMessage): ChatMessage => {
+        const deliveredAt = earlyDeliveryReceiptsRef.current.get(message.id);
+        return deliveredAt && !message.deliveredAt ? { ...message, deliveredAt } : message;
+    }, []);
     // Holds the live socket API so scroll/seen helpers stay referentially stable
     // (the socket object is recreated on render).
     const socketRef = useRef<{
@@ -332,25 +426,30 @@ export default function ConversationScreen() {
     const [loading, setLoading] = useState(id !== 'new');
     const [loadingMore, setLoadingMore] = useState(false);
     const [sending, setSending] = useState(false);
-    const [uploadingMedia, setUploadingMedia] = useState(false);
     const [recordingBusy, setRecordingBusy] = useState(false);
     const [voicePanelOpen, setVoicePanelOpen] = useState(false);
     const [voicePreview, setVoicePreview] = useState<{ uri: string; duration: number; clientMessageId: string } | null>(null);
-    const voiceUploadedMediaRef = useRef<{ id: string; media: MessageMedia } | null>(null);
     const voiceCopyGenerationRef = useRef(0);
-    const imageUploadedMediaRef = useRef<{ id: string; viewOnce: boolean; media: MessageMedia } | null>(null);
     const mediaSendLockRef = useRef(false);
+    const mediaSendJobsRef = useRef(new Map<string, PendingMediaSend>());
+    const textRetryInFlightRef = useRef(new Set<string>());
+    const retryMediaMessageRef = useRef<(message: ChatMessage) => void>(() => undefined);
     const [voiceWaveform, setVoiceWaveform] = useState<number[]>([]);
     const [voiceSendFailed, setVoiceSendFailed] = useState(false);
     const sendAfterFinalizeRef = useRef(false);
-    const [voiceSending, setVoiceSending] = useState(false);
     const [requestBusy, setRequestBusy] = useState(false);
     const [viewOnce, setViewOnce] = useState<{ url: string; messageId: string; seconds: number } | null>(null);
     const [viewOnceLoadingId, setViewOnceLoadingId] = useState<string | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imagePreview, setImagePreview] = useState<ChatImagePreview | null>(null);
+    const handleImageCached = useCallback((uri: string) => {
+        const messageId = imagePreview?.messageId;
+        if (!messageId) return;
+        setItems((current) => current.map((item) => item.id === messageId && item.media?.localUri !== uri
+            ? { ...item, media: { ...(item.media || {}), localUri: uri } }
+            : item));
+    }, [imagePreview?.messageId]);
     const [imageAttachment, setImageAttachment] = useState<PendingImageAttachment | null>(null);
     const originalImageAttachmentRef = useRef<PendingImageAttachment | null>(null);
-    const [cropOpen, setCropOpen] = useState(false);
     const [imageCaption, setImageCaption] = useState('');
     const [imageViewOnce, setImageViewOnce] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -359,9 +458,13 @@ export default function ConversationScreen() {
     const [messagesReady, setMessagesReady] = useState(false);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const [unseenWhileAway, setUnseenWhileAway] = useState(0);
-    const [chatFooterHeight, setChatFooterHeight] = useState(scale(72));
+    const [messageAreaWidth, setMessageAreaWidth] = useState(0);
+    const [composerHeight, setComposerHeight] = useState(scale(56));
     const [profileSheetOpen, setProfileSheetOpen] = useState(false);
-    const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+    const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+    const selectedMessage = items.find((message) => message.id === selectedMessageId) || null;
+    const messageSheetRef = useRef<BottomSheet>(null);
+    const setSelectedMessage = (message: ChatMessage | null) => setSelectedMessageId(message?.id || null);
     const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
     const [messageActionBusy, setMessageActionBusy] = useState(false);
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -372,12 +475,35 @@ export default function ConversationScreen() {
     const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const previousConnectivityRef = useRef(connectivityStatus);
 
+    useEffect(() => {
+        if (selectedMessageId && selectedMessage) {
+            Keyboard.dismiss();
+            messageSheetRef.current?.snapToIndex(0);
+        } else {
+            messageSheetRef.current?.close();
+        }
+    }, [selectedMessageId]);
+
+    useEffect(() => {
+        if (selectedMessageId && !selectedMessage) setSelectedMessageId(null);
+    }, [selectedMessageId, selectedMessage]);
+
+    useEffect(() => {
+        if (!selectedMessageId) return;
+        const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+            setSelectedMessageId(null);
+            return true;
+        });
+        return () => subscription.remove();
+    }, [selectedMessageId]);
+
     const colors = useMemo(() => ({
         bg: palette.brand.bg.surface,
-        body: palette.brand.bg.primary,
+        body: isDark ? palette.brand.bg.primary : '#F7F7F7',
         card: palette.chrome.common.card,
         surface: palette.chrome.common.cardAlt,
         text: palette.chrome.common.textStrong,
+        composerIcon: palette.chrome.common.textMuted,
         muted: palette.brand.text.subtitle,
         subtle: palette.brand.text.muted,
         border: palette.brand.bg.border,
@@ -394,9 +520,10 @@ export default function ConversationScreen() {
         danger: palette.brand.accent.error,
         success: palette.chrome.common.successStrong,
         waveMuted: palette.chrome.common.iconNeutral,
+        shadow: palette.chrome.common.shadow,
         blueAction: palette.chrome.common.blueAction,
         seenTick: palette.chrome.common.seenTick,
-    }), [palette]);
+    }), [isDark, palette]);
 
     // Preserves the swipe-back/slide animation when we arrived from messages;
     // falls back to replace for deep-link / push-notification entries with no history.
@@ -478,14 +605,23 @@ export default function ConversationScreen() {
             setMetadataUnavailable(true);
         }
         if (messageRes.success) {
-            const nextItems = (messageRes.items || []).map(normalizeMessage);
+            const nextItems = (messageRes.items || []).map((raw) => withDeliveryReceipt(normalizeMessage(raw)));
             if (mode === 'replace') freshMessagesLoadedRef.current = true;
             setItems((current) => {
-                if (mode === 'append') return [...current, ...nextItems];
-                const localMessages = current.filter(
-                    (message) => message.type === 'text' && message.tempId && (message.failed || message.queued),
-                );
-                return [...nextItems, ...localMessages];
+                if (mode === 'append') return [...current, ...nextItems.map(withDeliveryReceipt)];
+                const serverClientIds = new Set(nextItems.map((message) => message.clientMessageId).filter(Boolean));
+                const localMessages = current.filter((message) => message.tempId
+                    && !serverClientIds.has(message.clientMessageId || message.tempId)
+                    && ((message.type === 'text' && (message.pending || message.failed || message.queued))
+                        || ((message.type === 'image' || message.type === 'voice') && (message.pending || message.failed))));
+                const previousById = new Map(current.map((message) => [message.id, message]));
+                return [
+                    ...nextItems.map((message) => {
+                        const previous = previousById.get(message.id);
+                        return withDeliveryReceipt(previous ? mergeChatMessageMedia(previous, message) : message);
+                    }),
+                    ...localMessages,
+                ];
             });
             setNextCursor(messageRes.nextCursor || null);
         } else if (messageRes.code === 'MEMBERSHIP_REQUIRED') {
@@ -493,7 +629,7 @@ export default function ConversationScreen() {
         } else if (messageRes.message !== 'network_error') {
             toast.show(apiMessage(messageRes.message), 'error', 3500);
         }
-    }, [eligibility, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, nextCursor]);
+    }, [eligibility, emailBlocked, id, membershipAccessUnavailable, membershipBlocked, nextCursor, withDeliveryReceipt]);
 
     useEffect(() => {
         if (!membershipBlocked) return;
@@ -523,6 +659,9 @@ export default function ConversationScreen() {
         knownMessageIdsRef.current.add(next.id);
         setItems((current) => {
             if (current.some((item) => item.id === next.id)) return current;
+            if (next.clientMessageId && current.some((item) => item.clientMessageId === next.clientMessageId)) {
+                return [...current.filter((item) => item.clientMessageId !== next.clientMessageId), next];
+            }
             // Mark this incoming message to play the enter animation.
             animateIdsRef.current.add(next.id);
             return [...current, next];
@@ -548,6 +687,7 @@ export default function ConversationScreen() {
 
     const handleSocketUnsent = useCallback((incomingMessageId: string) => {
         if (!incomingMessageId) return;
+        stopChatAudioPlaybackForMessage(incomingMessageId);
         void deleteCachedChatMediaForMessage({
             userId: String(user?._id || user?.id || ''),
             conversationId: id,
@@ -567,11 +707,11 @@ export default function ConversationScreen() {
         setItems((current) => current.map((message) => {
             if (message.id !== incomingMessageId) return message;
             const nextMessage = payload?.message ? normalizeMessage(payload.message) : null;
-            return {
+            return mergeChatMessageMedia(message, {
                 ...message,
                 ...(nextMessage || {}),
                 reactions: payload?.reactions || nextMessage?.reactions || message.reactions || [],
-            };
+            });
         }));
     }, [refreshCurrentConversation]);
 
@@ -586,7 +726,13 @@ export default function ConversationScreen() {
 
     const handleSocketDelivered = useCallback((payload: any) => {
         if (!payload?.messageId || !payload?.deliveredAt) return;
-        setItems((current) => current.map((message) => message.id === String(payload.messageId)
+        const messageId = String(payload.messageId);
+        earlyDeliveryReceiptsRef.current.set(messageId, payload.deliveredAt);
+        if (earlyDeliveryReceiptsRef.current.size > 100) {
+            const oldestId = earlyDeliveryReceiptsRef.current.keys().next().value;
+            if (oldestId) earlyDeliveryReceiptsRef.current.delete(oldestId);
+        }
+        setItems((current) => current.map((message) => message.id === messageId
             ? { ...message, deliveredAt: payload.deliveredAt }
             : message));
     }, []);
@@ -623,6 +769,9 @@ export default function ConversationScreen() {
         ),
         onMessage: handleSocketMessage,
         onMessageUnsent: handleSocketUnsent,
+        onMessageDeleted: (messageId) => {
+            if (messageId) setItems((current) => current.filter((message) => message.id !== messageId));
+        },
         onMessageUpdated: handleSocketMessageUpdated,
         onConversationChanged: refreshCurrentConversation,
         onRequestAccepted: (payload) => {
@@ -649,6 +798,21 @@ export default function ConversationScreen() {
         socketRef.current = socket;
     });
 
+    const wasConnectedRef = useRef(socket.connected);
+    const missedSocketEventsRef = useRef(false);
+    useEffect(() => {
+        if (!socket.connected) {
+            if (wasConnectedRef.current) missedSocketEventsRef.current = true;
+            wasConnectedRef.current = false;
+            return;
+        }
+        wasConnectedRef.current = true;
+        if (missedSocketEventsRef.current && messagesReady && id && id !== 'new') {
+            missedSocketEventsRef.current = false;
+            void load('replace');
+        }
+    }, [socket.connected, messagesReady, id]);
+
     useEffect(() => {
         let cancelled = false;
         // Reset per-conversation state up front so we never flash the previous
@@ -667,9 +831,11 @@ export default function ConversationScreen() {
         initialPositionPendingRef.current = true;
         initialFreshPositionPendingRef.current = true;
         pendingAutoScrollRef.current = false;
+        ownSendScrollMessageIdRef.current = null;
         viewableMessageIdsRef.current.clear();
         receivedAwayIdsRef.current.clear();
         knownMessageIdsRef.current.clear();
+        earlyDeliveryReceiptsRef.current.clear();
         isNearBottomRef.current = true;
         (async () => {
             if (eligibility.isLoading) return;
@@ -765,21 +931,26 @@ export default function ConversationScreen() {
         const unsubscribe = subscribeOfflineMessageQueue((event) => {
             if (event.item.userId !== userId || event.item.conversationId !== id) return;
             if (event.type === 'sent') {
-                const normalized = normalizeMessage(event.message);
-                setItems((current) => current.map((item) => item.tempId === event.item.tempId ? normalized : item));
+                const normalized = withDeliveryReceipt(normalizeMessage(event.message));
+                setItems((current) => current.map((item) => item.tempId === event.item.tempId
+                    ? withDeliveryReceipt(normalized) : item));
                 return;
             }
             setItems((current) => current.map((item) => item.tempId === event.item.tempId
-                ? { ...item, pending: false, queued: false, failed: true }
+                ? { ...item, pending: false, queued: false, failed: true, failureReason: event.error || 'server_error_default' }
                 : item));
             const errorMessage = event.error === 'offline_message_expired'
                 ? t('chat:offline_message_expired', 'Queued message expired. Tap to retry.')
                 : apiMessage(event.error || 'message_failed');
             toast.show(errorMessage, 'error', 3500);
         });
-        if (!isOffline) void flushOfflineMessageQueue(userId);
         return unsubscribe;
-    }, [id, isOffline, toast, user?._id, user?.id]);
+    }, [id, toast, user?._id, user?.id, withDeliveryReceipt]);
+
+    useEffect(() => {
+        const userId = String(user?._id || user?.id || '');
+        if (!isOffline && userId && id && id !== 'new') void flushOfflineMessageQueue(userId);
+    }, [id, isOffline, user?._id, user?.id]);
 
     useEffect(() => {
         if (!viewOnce) return;
@@ -794,6 +965,7 @@ export default function ConversationScreen() {
     }, [viewOnce]);
 
     const listItems = useMemo(() => buildItems(items), [items]);
+    const messagesById = useMemo(() => new Map(items.map((message) => [message.id, message])), [items]);
     // Inverted FlatList renders index 0 at the visual bottom, so the newest
     // message must come first. buildItems keeps date headers above each group;
     // reversing preserves that ordering once the list is flipped.
@@ -804,6 +976,10 @@ export default function ConversationScreen() {
         && String(item.message.sender) !== String(user?._id || user?.id || '')
     )?.id || null;
     const newestMessageId = invertedItems.find((item) => item.kind === 'message')?.id || '';
+    const newestMessage = invertedItems.find((item) => item.kind === 'message');
+    const ownSendIsNewest = Boolean(ownSendScrollMessageIdRef.current && newestMessage?.kind === 'message'
+        && (newestMessage.message.id === ownSendScrollMessageIdRef.current
+            || newestMessage.message.clientMessageId === ownSendScrollMessageIdRef.current));
     useEffect(() => {
         for (const message of items) knownMessageIdsRef.current.add(message.id);
     }, [items]);
@@ -863,15 +1039,16 @@ export default function ConversationScreen() {
             return;
         }
         if (newestMessageId && newestMessageId !== previousId
-            && (pendingAutoScrollRef.current || isNearBottomRef.current)) {
+            && (ownSendIsNewest || pendingAutoScrollRef.current || isNearBottomRef.current)) {
             pendingAutoScrollRef.current = false;
-            scrollToBottom(true);
+            scrollToBottom(!ownSendIsNewest);
         }
-    }, [newestMessageId, loadingMore, messagesReady, scrollToBottom, isNearBottomRef]);
+    }, [newestMessageId, ownSendIsNewest, loadingMore, messagesReady, scrollToBottom, isNearBottomRef]);
 
     const handleReplyJump = useCallback((replyId: string) => {
         const index = invertedItemsRef.current.findIndex((entry) => entry.kind === 'message' && entry.message.id === replyId);
         if (index >= 0) {
+            ownSendScrollMessageIdRef.current = null;
             try {
                 listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
             } catch {
@@ -902,62 +1079,85 @@ export default function ConversationScreen() {
     }, []);
 
     const retryFailedMessage = useCallback(async (message: ChatMessage) => {
-        if (!message.failed || message.pending || message.type !== 'text') return;
+        if (!message.failed || message.pending) return;
         if (isOffline) {
-            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+            toast.show(sendFailureText('network_error'), 'info', 3000);
             return;
         }
+        if (message.type === 'image' || message.type === 'voice') {
+            if (mediaSendLockRef.current) return;
+            if (message.failureReason) toast.show(sendFailureText(message.failureReason), 'info', 2500);
+            retryMediaMessageRef.current(message);
+            return;
+        }
+        if (message.type !== 'text') return;
         const body = messageText(message).trim();
         if (!body) return;
+        const retryId = message.tempId || message.id;
+        if (textRetryInFlightRef.current.has(retryId)) return;
+        textRetryInFlightRef.current.add(retryId);
+        if (message.failureReason) toast.show(sendFailureText(message.failureReason), 'info', 2500);
 
-        setItems((current) => current.map((item) => messageId(item) === messageId(message)
-            ? { ...item, failed: false, pending: true }
-            : item));
+        try {
+            setItems((current) => current.map((item) => messageId(item) === messageId(message)
+                ? { ...item, failed: false, pending: true, failureReason: undefined }
+                : item));
 
-        const replyId = typeof message.replyTo === 'string' ? message.replyTo : message.replyTo?.id;
-        const res = await chatService.send({
-            conversationId: id !== 'new' ? id : undefined,
-            recipientId: id === 'new' ? recipientId : undefined,
-            content: body,
-            type: 'text',
-            replyTo: replyId || undefined,
-            clientMessageId: message.tempId,
-        });
+            const replyId = typeof message.replyTo === 'string' ? message.replyTo : message.replyTo?.id;
+            const res = await chatService.send({
+                conversationId: id !== 'new' ? id : undefined,
+                recipientId: id === 'new' ? recipientId : undefined,
+                content: body,
+                type: 'text',
+                replyTo: replyId || undefined,
+                clientMessageId: message.tempId,
+            }).catch(() => ({ success: false, errorMessage: 'network_error' } as Awaited<ReturnType<typeof chatService.send>>));
 
-        if (res.success && res.message) {
-            const normalized = normalizeMessage(res.message);
-            setItems((current) => current.map((item) => messageId(item) === messageId(message) ? normalized : item));
-            if (id === 'new' && res.conversationId) {
-                router.replace(`/conversation/${res.conversationId}` as any);
-            }
-            return;
-        }
-
-        if (reconcileMembershipEligibility(res)) return;
-        reconcilePhotoEligibility(res);
-        if (res.errorMessage === 'network_error' && id !== 'new' && message.tempId) {
-            try {
-                await enqueueOfflineTextMessage({
-                    tempId: message.tempId,
-                    userId: String(user?._id || user?.id || ''),
-                    conversationId: id,
-                    content: body,
-                    replyTo: replyId || undefined,
-                    createdAt: message.createdAt,
-                });
+            if (res.success && res.message) {
+                const normalized = normalizeMessage(res.message);
                 setItems((current) => current.map((item) => messageId(item) === messageId(message)
-                    ? { ...item, pending: true, queued: true, failed: false }
+                    ? { ...normalized, replyTo: typeof item.replyTo === 'object' && item.replyTo ? item.replyTo : normalized.replyTo }
                     : item));
-                toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
+                if (id === 'new' && res.conversationId) {
+                    router.replace(`/conversation/${res.conversationId}` as any);
+                }
                 return;
-            } catch {
-                // Fall through to the manual retry state when the bounded queue is full.
             }
+
+            reconcileMembershipEligibility(res);
+            reconcilePhotoEligibility(res);
+            if (res.errorMessage === 'network_error' && id !== 'new' && message.tempId) {
+                try {
+                    await enqueueOfflineTextMessage({
+                        tempId: message.tempId,
+                        userId: String(user?._id || user?.id || ''),
+                        conversationId: id,
+                        content: body,
+                        replyTo: replyId || undefined,
+                        createdAt: message.createdAt,
+                    });
+                    setItems((current) => current.map((item) => messageId(item) === messageId(message)
+                        ? { ...item, pending: true, queued: true, failed: false, failureReason: undefined }
+                        : item));
+                    toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
+                    return;
+                } catch {
+                    const failureReason = 'offline_queue_full';
+                    setItems((current) => current.map((item) => messageId(item) === messageId(message)
+                        ? { ...item, pending: false, queued: false, failed: true, failureReason }
+                        : item));
+                    toast.show(sendFailureText(failureReason), 'error', 3500);
+                    return;
+                }
+            }
+            const failureReason = sendFailureReason(res);
+            setItems((current) => current.map((item) => messageId(item) === messageId(message)
+                ? { ...item, pending: false, queued: false, failed: true, failureReason }
+                : item));
+            toast.show(sendFailureText(failureReason), 'error', 3500);
+        } finally {
+            textRetryInFlightRef.current.delete(retryId);
         }
-        setItems((current) => current.map((item) => messageId(item) === messageId(message)
-            ? { ...item, pending: false, queued: false, failed: true }
-            : item));
-        toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
     }, [id, isOffline, recipientId, toast, user?._id, user?.id]);
 
     const renderMessageItem = useCallback(({ item, index }: { item: ListItem; index: number }) => {
@@ -971,9 +1171,25 @@ export default function ConversationScreen() {
             );
         }
         const message = item.message;
+        const replyId = typeof message.replyTo === 'string' ? message.replyTo : message.replyTo?.id;
+        const replyTarget = replyId
+            ? messagesById.get(replyId)
+                || (typeof message.replyTo === 'object' ? message.replyTo : null)
+                || {
+                    id: replyId,
+                    conversationId: message.conversationId,
+                    sender: '',
+                    type: 'text' as const,
+                    content: t('chat:message_placeholder', 'Message...'),
+                    createdAt: message.createdAt,
+                }
+            : null;
         const mine = String(message.sender) === String(user?._id || user?.id);
         const animateIn = animateIdsRef.current.has(item.id);
-        const adjacentItem = invertedItems[index + 1];
+        const adjacentItem = invertedItems[index - 1];
+        const hasAdjacentMessage = message.type !== 'system'
+            && adjacentItem?.kind === 'message'
+            && adjacentItem.message.type !== 'system';
         const sameSenderAsAdjacent = message.type !== 'system'
             && adjacentItem?.kind === 'message'
             && adjacentItem.message.type !== 'system'
@@ -981,8 +1197,11 @@ export default function ConversationScreen() {
         return (
             <MessageBubble
                 message={message}
+                replyTarget={replyTarget}
                 mine={mine}
-                rowGap={sameSenderAsAdjacent ? 3 : 10}
+                rowGap={hasAdjacentMessage ? (sameSenderAsAdjacent ? 3 : 10) : 0}
+                messageAreaWidth={messageAreaWidth}
+                maxTextWidth={Math.max(0, (messageAreaWidth - scale(24)) * 0.78 - scale(24) - 2 * StyleSheet.hairlineWidth)}
                 uiDirection={isRTL ? 'rtl' : 'ltr'}
                 colors={colors}
                 userId={String(user?._id || user?.id || '')}
@@ -999,7 +1218,7 @@ export default function ConversationScreen() {
                 onReplyClick={handleReplyJump}
             />
         );
-    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage, lightImpact, invertedItems]);
+    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage, lightImpact, invertedItems, messageAreaWidth, messagesById]);
     const routeConversation = useMemo(() => {
         if (!id || id === 'new' || !routeState) return null;
         return {
@@ -1062,11 +1281,16 @@ export default function ConversationScreen() {
         // Inverted list: offset near 0 means we're pinned to the newest message.
         const { contentOffset } = event.nativeEvent;
         const y = contentOffset.y;
+        if (ownSendScrollMessageIdRef.current && ownSendIsNewest) {
+            isNearBottomRef.current = true;
+            setShowScrollDown(false);
+            return;
+        }
         const nearBottom = y <= CHAT_ONE_LINE_BUBBLE_SCROLL_THRESHOLD;
         isNearBottomRef.current = nearBottom;
         setShowScrollDown(!nearBottom);
         if (nearBottom) tryMarkVisibleUnreadRef.current();
-    }, [isNearBottomRef]);
+    }, [isNearBottomRef, ownSendIsNewest]);
 
     const loadMore = async () => {
         if (!nextCursor || loadingMore || id === 'new') return;
@@ -1162,22 +1386,24 @@ export default function ConversationScreen() {
             }
             lightImpact();
             animateIdsRef.current.add(tempId);
+            ownSendScrollMessageIdRef.current = tempId;
             setItems((current) => [...current, { ...temp, queued: true }]);
             setContent('');
             emitStopTyping();
             setReplyTo(null);
-            scrollToBottom(true);
             toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
             return;
         }
         lightImpact();
         setSending(true);
+        isNearBottomRef.current = true;
+        setShowScrollDown(false);
         animateIdsRef.current.add(tempId);
+        ownSendScrollMessageIdRef.current = tempId;
         setItems((current) => [...current, temp]);
         setContent('');
         emitStopTyping();
         setReplyTo(null);
-        scrollToBottom(true);
 
         const res = await chatService.send({
             conversationId: id !== 'new' ? id : undefined,
@@ -1186,17 +1412,22 @@ export default function ConversationScreen() {
             type: 'text',
             replyTo: reply?.id || undefined,
             clientMessageId: tempId,
-        });
+        }).catch(() => ({ success: false, errorMessage: 'network_error' } as Awaited<ReturnType<typeof chatService.send>>));
 
         if (res.success && res.message) {
-            const normalized = normalizeMessage(res.message);
-            setItems((current) => current.map((item) => item.tempId === tempId ? normalized : item));
+            const normalized = withDeliveryReceipt(normalizeMessage(res.message));
+            setItems((current) => current.map((item) => item.tempId === tempId
+                ? { ...withDeliveryReceipt(normalized), replyTo: reply || normalized.replyTo }
+                : item));
             if (id === 'new' && res.conversationId) {
                 router.replace(`/conversation/${res.conversationId}` as any);
             }
         } else {
             if (reconcileMembershipEligibility(res)) {
-                setItems((current) => current.filter((item) => item.tempId !== tempId));
+                setItems((current) => current.map((item) => item.tempId === tempId
+                    ? { ...item, pending: false, failed: true, failureReason: 'MEMBERSHIP_REQUIRED' }
+                    : item));
+                toast.show(sendFailureText('MEMBERSHIP_REQUIRED'), 'error', 3500);
                 setSending(false);
                 return;
             }
@@ -1214,12 +1445,15 @@ export default function ConversationScreen() {
                     setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, queued: true } : item));
                     toast.show(t('chat:message_queued', 'Message queued. It will send when you are online.'), 'info', 3000);
                 } catch {
-                    setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
-                    toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error', 3500);
+                    setItems((current) => current.map((item) => item.tempId === tempId
+                        ? { ...item, pending: false, failed: true, failureReason: 'offline_queue_full' } : item));
+                    toast.show(sendFailureText('offline_queue_full'), 'error', 3500);
                 }
             } else {
-                setItems((current) => current.map((item) => item.tempId === tempId ? { ...item, pending: false, failed: true } : item));
-                toast.show(apiMessage(res.errorMessage || 'message_failed'), 'error', 3500);
+                const failureReason = sendFailureReason(res);
+                setItems((current) => current.map((item) => item.tempId === tempId
+                    ? { ...item, pending: false, failed: true, failureReason } : item));
+                toast.show(sendFailureText(failureReason), 'error', 3500);
             }
         }
         setSending(false);
@@ -1231,9 +1465,10 @@ export default function ConversationScreen() {
         mediaContent = '',
         clientMessageId?: string,
         localMediaUri?: string,
+        reply: ChatMessage | null = replyTo,
     ): Promise<ChatMessage | null> => {
-        const reply = replyTo;
         const trimmedContent = mediaContent.trim();
+        const commitStartedAt = Date.now();
         const res = await chatService.send({
             conversationId: id !== 'new' ? id : undefined,
             recipientId: id === 'new' ? recipientId : undefined,
@@ -1242,51 +1477,200 @@ export default function ConversationScreen() {
             media,
             replyTo: reply?.id || undefined,
             clientMessageId,
-        });
+        }).catch(() => ({ success: false, errorMessage: 'network_error' } as Awaited<ReturnType<typeof chatService.send>>));
+        if (__DEV__) console.info('[chat-media] commit', { type, durationMs: Date.now() - commitStartedAt, success: res.success });
 
         if (res.success && res.message) {
             setReplyTo((current) => current?.id === reply?.id ? null : current);
-            let normalized = normalizeMessage(res.message);
-            if (type === 'voice') {
-                normalized = {
-                    ...normalized,
-                    media: { ...media, ...(normalized.media || {}) },
-                };
+            let normalized = withDeliveryReceipt(normalizeMessage(res.message));
+            if (type === 'voice') normalized = mergeChatMessageMedia({ ...normalized, media }, normalized);
+            if (localMediaUri && !media.viewOnce) {
+                normalized = { ...normalized, media: { ...(normalized.media || media), localUri: localMediaUri } };
             }
-            if (type === 'voice' && localMediaUri && normalized.id) {
+            const serverMessage = normalized;
+            setItems((current) => {
+                const existing = current.find((item) => item.id === serverMessage.id);
+                const next = withDeliveryReceipt(existing ? mergeChatMessageMedia(existing, serverMessage) : serverMessage);
+                return [
+                    ...current.filter((item) => item.id !== serverMessage.id
+                        && (!clientMessageId || (item.tempId !== clientMessageId && item.clientMessageId !== clientMessageId))),
+                    next,
+                ];
+            });
+            if (localMediaUri && normalized.id && !media.viewOnce) {
                 const cached = await storeLocalChatMedia({
                     sourceUri: localMediaUri,
                     userId: String(user?._id || user?.id || ''),
                     conversationId: normalized.conversationId || id,
                     messageId: normalized.id,
                     media: normalized.media,
-                    kind: 'voice',
+                    kind: type,
                 }).catch(() => null);
                 if (cached?.uri) {
                     normalized = {
                         ...normalized,
                         media: { ...(normalized.media || media), localUri: cached.uri },
                     };
+                    setItems((current) => current.map((item) => item.id === normalized.id
+                        ? { ...item, media: { ...(item.media || media), localUri: cached.uri } }
+                        : item));
+                } else if (type === 'image') {
+                    normalized = {
+                        ...normalized,
+                        media: { ...(normalized.media || media), localUri: undefined },
+                    };
+                    setItems((current) => current.map((item) => item.id === normalized.id
+                        ? { ...item, media: { ...(item.media || media), localUri: undefined } }
+                        : item));
                 }
             }
-            if (normalized.id) animateIdsRef.current.add(normalized.id);
-            setItems((current) => current.some((item) => item.id === normalized.id) ? current : [...current, normalized]);
             if (id === 'new' && res.conversationId) {
                 router.replace(`/conversation/${res.conversationId}` as any);
             }
-            scrollToBottom(true);
             return normalized;
         }
 
-        if (reconcileMembershipEligibility(res)) return null;
+        reconcileMembershipEligibility(res);
         reconcilePhotoEligibility(res);
-        toast.show(apiMessage(res.errorMessage || 'message_failed'), 'error');
+        const failureReason = sendFailureReason(res);
+        setItems((current) => current.map((item) => item.tempId === clientMessageId
+            ? { ...item, pending: false, failed: true, failureReason }
+            : item));
+        toast.show(sendFailureText(failureReason), 'error', 3500);
         return null;
     };
 
+    const runMediaSend = async (job: PendingMediaSend) => {
+        if (mediaSendLockRef.current) return;
+        mediaSendLockRef.current = true;
+        setItems((current) => current.map((item) => item.tempId === job.clientMessageId
+            ? { ...item, pending: true, failed: false, failureReason: undefined } : item));
+
+        let temporaryUri: string | null = null;
+        let localUri = job.type === 'voice' ? job.uri : job.attachment.uri;
+        try {
+            let media = job.uploadedMedia;
+            if (!media || job.type === 'image') {
+                const formData = new FormData();
+                if (job.type === 'image') {
+                    const prepareStartedAt = Date.now();
+                    const prepared = await prepareChatImageUpload(job.attachment);
+                    temporaryUri = prepared.temporaryUri;
+                    localUri = prepared.uri;
+                    if (!media) {
+                        formData.append('file', { uri: prepared.uri, name: prepared.name, type: prepared.type } as any);
+                        formData.append('viewOnce', job.viewOnce ? 'true' : 'false');
+                    }
+                    if (__DEV__) console.info('[chat-media] prepare', {
+                        type: 'image', bytes: prepared.size, durationMs: Date.now() - prepareStartedAt,
+                    });
+                } else {
+                    formData.append('file', {
+                        uri: job.uri,
+                        name: `voice-${Date.now()}.m4a`,
+                        type: Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4',
+                    } as any);
+                    formData.append('duration', String(Math.min(MAX_VOICE_RECORDING_SECONDS, job.duration)));
+                }
+                if (!media) {
+                    formData.append('conversationId', id);
+                    formData.append('type', job.type);
+                    const uploadStartedAt = Date.now();
+                    const uploadRes = await chatService.uploadMedia(formData)
+                        .catch(() => ({ success: false, message: 'network_error' } as Awaited<ReturnType<typeof chatService.uploadMedia>>));
+                    if (__DEV__) console.info('[chat-media] upload', {
+                        type: job.type, durationMs: Date.now() - uploadStartedAt, success: uploadRes.success,
+                    });
+                    if (!uploadRes.success || !uploadRes.media) {
+                        reconcileMembershipEligibility(uploadRes);
+                        reconcilePhotoEligibility(uploadRes);
+                        const failureReason = sendFailureReason(uploadRes);
+                        setItems((current) => current.map((item) => item.tempId === job.clientMessageId
+                            ? { ...item, pending: false, failed: true, failureReason } : item));
+                        toast.show(sendFailureText(failureReason), 'error', 3500);
+                        return;
+                    }
+                    media = job.type === 'voice'
+                        ? { ...uploadRes.media, waveform: waveformPeaks(job.waveform, VOICE_WAVE_BAR_COUNT) }
+                        : uploadRes.media;
+                    job.uploadedMedia = media;
+                }
+            }
+
+            const sent = await sendMediaMessage(
+                job.type,
+                media,
+                job.type === 'image' ? job.caption : '',
+                job.clientMessageId,
+                localUri,
+                job.reply,
+            );
+            if (sent) {
+                mediaSendJobsRef.current.delete(job.clientMessageId);
+                if (job.type === 'voice' && sent.media?.localUri && sent.media.localUri !== job.uri) {
+                    void FileSystem.deleteAsync(job.uri, { idempotent: true }).catch(() => undefined);
+                }
+            } else {
+                setItems((current) => current.map((item) => item.tempId === job.clientMessageId
+                    ? { ...item, pending: false, failed: true } : item));
+            }
+        } catch (error) {
+            console.warn('[chat-media] send-failed', { type: job.type, error });
+            const rawReason = error instanceof Error ? error.message : String(error || '');
+            const failureReason = rawReason === 'image_too_large' ? rawReason : 'server_error_default';
+            toast.show(sendFailureText(failureReason), 'error', 3500);
+            setItems((current) => current.map((item) => item.tempId === job.clientMessageId
+                ? { ...item, pending: false, failed: true, failureReason } : item));
+        } finally {
+            if (temporaryUri) void FileSystem.deleteAsync(temporaryUri, { idempotent: true }).catch(() => undefined);
+            mediaSendLockRef.current = false;
+        }
+    };
+
+    const beginMediaSend = (job: PendingMediaSend) => {
+        mediaSendJobsRef.current.set(job.clientMessageId, job);
+        ownSendScrollMessageIdRef.current = job.clientMessageId;
+        const localUri = job.type === 'image' ? job.attachment.uri : job.uri;
+        const pending: ChatMessage = {
+            id: job.clientMessageId,
+            tempId: job.clientMessageId,
+            clientMessageId: job.clientMessageId,
+            conversationId: id,
+            sender: String(user?._id || user?.id || ''),
+            type: job.type,
+            content: job.type === 'image' ? job.caption : undefined,
+            media: job.type === 'image'
+                ? { url: localUri, localUri, width: job.attachment.width, height: job.attachment.height, viewOnce: job.viewOnce }
+                : { url: localUri, localUri, duration: job.duration, waveform: job.waveform },
+            replyTo: job.reply,
+            createdAt: new Date().toISOString(),
+            reactions: [],
+            pending: !isOffline,
+            failed: isOffline,
+            failureReason: isOffline ? 'network_error' : undefined,
+        };
+        setItems((current) => [...current, pending]);
+        if (isOffline) {
+            toast.show(sendFailureText('network_error'), 'error', 3500);
+            return;
+        }
+        void runMediaSend(job);
+    };
+
+    retryMediaMessageRef.current = (message) => {
+        const job = mediaSendJobsRef.current.get(message.tempId || message.clientMessageId || message.id);
+        if (!job) {
+            toast.show(sendFailureText('invalid_media'), 'error', 3500);
+            return;
+        }
+        if (mediaSendLockRef.current) {
+            toast.show(t('chat:sending', 'Sending...'), 'info', 2000);
+            return;
+        }
+        void runMediaSend(job);
+    };
+
     const closeImageAttachment = () => {
-        if (uploadingMedia) return;
-        imageUploadedMediaRef.current = null;
         originalImageAttachmentRef.current = null;
         setImageAttachment(null);
         setImageCaption('');
@@ -1295,8 +1679,8 @@ export default function ConversationScreen() {
 
     const canAttachMedia = () => {
         if (!requireVerified('chat')) return false;
-        if (isOffline) {
-            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+        if (mediaSendLockRef.current) {
+            toast.show(t('chat:sending', 'Sending...'), 'info', 2000);
             return false;
         }
         if (!canCompose) {
@@ -1317,12 +1701,14 @@ export default function ConversationScreen() {
             toast.show(t('chat:image_too_large', 'Choose an image smaller than 10 MB.'), 'error');
             return;
         }
-        imageUploadedMediaRef.current = null;
         const attachment = {
             uri: asset.uri,
             name: asset.fileName || `chat-photo-${Date.now()}.jpg`,
             type: asset.mimeType || 'image/jpeg',
             clientMessageId: newMediaMessageId(),
+            width: asset.width,
+            height: asset.height,
+            size: asset.fileSize,
         };
         originalImageAttachmentRef.current = attachment;
         setImageAttachment(attachment);
@@ -1377,9 +1763,9 @@ export default function ConversationScreen() {
     };
 
     const sendImageAttachment = async () => {
-        if (!imageAttachment || uploadingMedia || mediaSendLockRef.current || id === 'new') return;
-        if (isOffline) {
-            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
+        if (!imageAttachment || id === 'new') return;
+        if (mediaSendLockRef.current) {
+            toast.show(t('chat:sending', 'Sending...'), 'info', 2000);
             return;
         }
         if (!canCompose) {
@@ -1388,49 +1774,27 @@ export default function ConversationScreen() {
                 : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
-        mediaSendLockRef.current = true;
-        setUploadingMedia(true);
-        try {
-            let media = imageUploadedMediaRef.current?.id === imageAttachment.clientMessageId
-                && imageUploadedMediaRef.current.viewOnce === imageViewOnce
-                ? imageUploadedMediaRef.current.media : null;
-            if (!media) {
-                const formData = new FormData();
-                formData.append('file', {
-                    uri: imageAttachment.uri,
-                    name: imageAttachment.name,
-                    type: imageAttachment.type,
-                } as any);
-                formData.append('conversationId', id);
-                formData.append('type', 'image');
-                formData.append('viewOnce', imageViewOnce ? 'true' : 'false');
-                const uploadRes = await chatService.uploadMedia(formData);
-                if (!uploadRes.success || !uploadRes.media) {
-                    if (reconcileMembershipEligibility(uploadRes)) return;
-                    reconcilePhotoEligibility(uploadRes);
-                    toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
-                    return;
-                }
-                media = uploadRes.media;
-                imageUploadedMediaRef.current = { id: imageAttachment.clientMessageId, viewOnce: imageViewOnce, media };
-            }
-            if (await sendMediaMessage('image', media, imageCaption, imageAttachment.clientMessageId)) {
-                imageUploadedMediaRef.current = null;
-                originalImageAttachmentRef.current = null;
-                setImageAttachment(null);
-                setImageCaption('');
-                setImageViewOnce(false);
-            }
-        } catch {
-            toast.show(t('chat:message_failed', 'Message failed to send. Tap to retry.'), 'error');
-        } finally {
-            setUploadingMedia(false);
-            mediaSendLockRef.current = false;
-        }
+        const job: PendingMediaSend = {
+            type: 'image',
+            clientMessageId: imageAttachment.clientMessageId,
+            attachment: imageAttachment,
+            caption: imageCaption,
+            viewOnce: imageViewOnce,
+            reply: replyTo,
+        };
+        originalImageAttachmentRef.current = null;
+        setImageAttachment(null);
+        setImageCaption('');
+        setImageViewOnce(false);
+        beginMediaSend(job);
     };
 
     const startRecording = async () => {
         if (!requireVerified('chat')) return;
+        if (mediaSendLockRef.current) {
+            toast.show(t('chat:sending', 'Sending...'), 'info', 2000);
+            return;
+        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
@@ -1444,7 +1808,6 @@ export default function ConversationScreen() {
         if (voicePanelOpen || recordingBusy) return;
         voiceCopyGenerationRef.current += 1;
         setRecordingBusy(true);
-        voiceUploadedMediaRef.current = null;
         setVoicePreview(null);
         setVoiceWaveform([]);
         setVoiceSendFailed(false);
@@ -1496,10 +1859,8 @@ export default function ConversationScreen() {
     };
 
     const discardVoiceRecording = () => {
-        if (voiceSending) return;
         voiceCopyGenerationRef.current += 1;
         sendAfterFinalizeRef.current = false;
-        voiceUploadedMediaRef.current = null;
         if (voicePreview?.uri) void FileSystem.deleteAsync(voicePreview.uri, { idempotent: true }).catch(() => undefined);
         setVoicePanelOpen(false);
         setVoicePreview(null);
@@ -1509,68 +1870,27 @@ export default function ConversationScreen() {
     };
 
     const sendVoicePreview = async () => {
-        if (voiceSending || mediaSendLockRef.current || id === 'new') return;
+        if (mediaSendLockRef.current || id === 'new') return;
         if (!voicePreview) return;
-        if (isOffline) {
-            toast.show(t('network_error', 'No internet connection. Please check and try again.'), 'info', 3000);
-            return;
-        }
         if (!canCompose) {
             toast.show(peerDeleted
                 ? t('chat:account_deleted_message_disabled', 'This account has been deleted. You can no longer send messages.')
                 : t('chat:accept_request_to_reply', 'Accept the request before replying.'), 'info');
             return;
         }
-        mediaSendLockRef.current = true;
-        setVoiceSending(true);
         setVoiceSendFailed(false);
-        try {
-            let media = voiceUploadedMediaRef.current?.id === voicePreview.clientMessageId
-                ? voiceUploadedMediaRef.current.media : null;
-            if (!media) {
-                const formData = new FormData();
-                formData.append('file', {
-                    uri: voicePreview.uri,
-                    name: `voice-${Date.now()}.m4a`,
-                    type: Platform.OS === 'ios' ? 'audio/m4a' : 'audio/mp4',
-                } as any);
-                formData.append('conversationId', id);
-                formData.append('type', 'voice');
-                formData.append('duration', String(Math.min(MAX_VOICE_RECORDING_SECONDS, voicePreview.duration)));
-                const uploadRes = await chatService.uploadMedia(formData);
-                if (!uploadRes.success || !uploadRes.media) {
-                    console.warn('[chat] voice-upload-failed', { status: uploadRes.status, error: uploadRes.error, message: uploadRes.message });
-                    if (reconcileMembershipEligibility(uploadRes)) return;
-                    reconcilePhotoEligibility(uploadRes);
-                    toast.show(apiMessage(uploadRes.message || 'upload_failed'), 'error');
-                    setVoiceSendFailed(true);
-                    return;
-                }
-                media = {
-                    ...uploadRes.media,
-                    waveform: waveformPeaks(voiceWaveform, VOICE_WAVE_BAR_COUNT),
-                };
-                voiceUploadedMediaRef.current = { id: voicePreview.clientMessageId, media };
-            }
-            const sentMessage = await sendMediaMessage('voice', media, '', voicePreview.clientMessageId, voicePreview.uri);
-            if (sentMessage) {
-                voiceUploadedMediaRef.current = null;
-                if (sentMessage.media?.localUri && sentMessage.media.localUri !== voicePreview.uri) {
-                    void FileSystem.deleteAsync(voicePreview.uri, { idempotent: true }).catch(() => undefined);
-                }
-                setVoicePanelOpen(false);
-                setVoicePreview(null);
-                setVoiceWaveform([]);
-            } else {
-                setVoiceSendFailed(true);
-            }
-        } catch {
-            toast.show(t('recording_failed', 'Could not save recording.'), 'error');
-            setVoiceSendFailed(true);
-        } finally {
-            setVoiceSending(false);
-            mediaSendLockRef.current = false;
-        }
+        const job: PendingMediaSend = {
+            type: 'voice',
+            clientMessageId: voicePreview.clientMessageId,
+            uri: voicePreview.uri,
+            duration: voicePreview.duration,
+            waveform: voiceWaveform,
+            reply: replyTo,
+        };
+        setVoicePanelOpen(false);
+        setVoicePreview(null);
+        setVoiceWaveform([]);
+        beginMediaSend(job);
     };
 
     useEffect(() => {
@@ -1681,6 +2001,14 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
+    const messageActionCount = selectedMessage
+        ? 2
+            + (messageText(selectedMessage).trim() ? 1 : 0)
+            + (String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent ? 1 : 0)
+            + (canUnsendMessage(selectedMessage, String(user?._id || user?.id || '')) ? 1 : 0)
+        : 2;
+    const messageSheetHeight = scale(102 + messageActionCount * 48 + Math.max(0, messageActionCount - 1) * 4) + insets.bottom;
+
     const renderMessageMenuBackdrop = useCallback((props: BottomSheetBackdropProps) => (
         <BottomSheetBackdrop
             {...props}
@@ -1750,6 +2078,7 @@ export default function ConversationScreen() {
             toast.show(apiMessage(res.message || 'connection_error'), 'error');
             return;
         }
+        stopChatAudioPlaybackForMessage(message.id);
         await deleteCachedChatMediaForMessage({
             userId: String(user?._id || user?.id || ''),
             conversationId: message.conversationId,
@@ -1769,6 +2098,7 @@ export default function ConversationScreen() {
             toast.show(apiMessage(res.message || 'connection_error'), 'error');
             return;
         }
+        stopChatAudioPlaybackForMessage(message.id);
         await deleteCachedChatMediaForMessage({
             userId: String(user?._id || user?.id || ''),
             conversationId: message.conversationId,
@@ -1839,8 +2169,8 @@ export default function ConversationScreen() {
     }
 
     return (
-        <SafeAreaView style={[styles.screen, { backgroundColor: colors.body }]} edges={['top']}>
-            <View style={styles.screen}>
+        <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+            <View style={[styles.screen, { backgroundColor: colors.body }]}>
                 <View style={[
                     styles.header,
                     {
@@ -1912,7 +2242,14 @@ export default function ConversationScreen() {
                     color={palette.chrome.common.iconNeutral}
                     opacity={isDark ? 0.11 : 0.09}
                 />
-                <View style={styles.messageListWrap}>
+                <ChatKeyboardViewport composerHeight={composerHeight}>
+                <View
+                    style={styles.messageListWrap}
+                    onLayout={(event) => {
+                        const width = event.nativeEvent.layout.width;
+                        setMessageAreaWidth((current) => Math.abs(current - width) < 0.5 ? current : width);
+                    }}
+                >
                     <FlatList
                         key={id}
                         ref={listRef}
@@ -1922,14 +2259,25 @@ export default function ConversationScreen() {
                         keyboardDismissMode="interactive"
                         scrollEventThrottle={16}
                         onScroll={handleListScroll}
+                        onContentSizeChange={() => {
+                            if (!ownSendIsNewest) return;
+                            const targetId = ownSendScrollMessageIdRef.current;
+                            requestAnimationFrame(() => {
+                                if (ownSendScrollMessageIdRef.current !== targetId) return;
+                                scrollToBottom(false);
+                            });
+                        }}
                         onScrollBeginDrag={() => {
+                            ownSendScrollMessageIdRef.current = null;
                             initialFreshPositionPendingRef.current = false;
                             pendingAutoScrollRef.current = false;
                         }}
                         onViewableItemsChanged={onViewableItemsChangedRef.current}
                         viewabilityConfig={viewabilityConfigRef.current}
                         data={invertedItems}
-                        keyExtractor={(item) => item.id}
+                        keyExtractor={(item) => item.kind === 'message' && item.message.clientMessageId
+                            ? `${item.message.sender}:${item.message.clientMessageId}`
+                            : item.id}
                         contentContainerStyle={{
                             paddingHorizontal: scale(12),
                             paddingTop: scale(8),
@@ -1938,7 +2286,7 @@ export default function ConversationScreen() {
                         }}
                         onEndReached={loadMore}
                         onEndReachedThreshold={0.2}
-                        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
                         removeClippedSubviews={Platform.OS === 'android'}
                         initialNumToRender={12}
                         maxToRenderPerBatch={10}
@@ -1978,14 +2326,14 @@ export default function ConversationScreen() {
                         }}
                     />
                 </View>
+                </ChatKeyboardViewport>
 
+                <ChatStickyComposer>
                 <ChatComposerBar
                     backgroundColor="transparent"
-                    onLayout={(event) => {
-                        const nextHeight = event.nativeEvent.layout.height;
-                        if (nextHeight > 0 && Math.abs(nextHeight - chatFooterHeight) > 1) {
-                            setChatFooterHeight(nextHeight);
-                        }
+                    onContentLayout={(event) => {
+                        const height = event.nativeEvent.layout.height;
+                        setComposerHeight((current) => Math.abs(current - height) < 1 ? current : height);
                     }}
                 >
                 {isRequest && activeConversation && !peerDeleted && (
@@ -2031,7 +2379,7 @@ export default function ConversationScreen() {
                             <View style={[styles.composerRow, { opacity: 0.62 }]}>
                                 <View style={[styles.inputPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                     <View style={styles.pillIcon}>
-                                        <Camera size={scale(21)} color={colors.muted} strokeWidth={2.2} />
+                                        <Camera size={scale(21)} color={colors.composerIcon} strokeWidth={2.2} />
                                     </View>
                                     <TextInput
                                         editable={false}
@@ -2040,11 +2388,11 @@ export default function ConversationScreen() {
                                         style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                     />
                                     <View style={styles.pillIcon}>
-                                        <ImageIcon size={scale(21)} color={colors.muted} strokeWidth={2.2} />
+                                        <Paperclip size={scale(21)} color={colors.composerIcon} weight="bold" />
                                     </View>
                                 </View>
-                                <View style={[styles.send, { backgroundColor: colors.primary }]}>
-                                    <Mic size={scale(21)} color={colors.inverse} strokeWidth={2.2} />
+                                <View style={[styles.send, { backgroundColor: colors.bubbleMine }]}>
+                                    <Mic size={scale(21)} color={colors.inverse} weight="fill" />
                                 </View>
                             </View>
                         </View>
@@ -2094,7 +2442,6 @@ export default function ConversationScreen() {
                                 duration={voicePreview?.duration || 0}
                                 previewUri={voicePreview?.uri || null}
                                 recordingBusy={recordingBusy}
-                                sending={voiceSending}
                                 sendFailed={voiceSendFailed}
                                 waveform={voiceWaveform}
                                 onComplete={finishVoiceRecording}
@@ -2110,23 +2457,28 @@ export default function ConversationScreen() {
                             />
                         ) : (
                             <View style={styles.composerRow}>
-                                <View style={[styles.inputPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <View style={[styles.inputPill, {
+                                    backgroundColor: colors.surface,
+                                    borderColor: colors.border,
+                                    boxShadow: [{
+                                        offsetX: 0,
+                                        offsetY: 0,
+                                        blurRadius: scale(3),
+                                        spreadDistance: 0,
+                                        color: isDark ? 'rgba(0,0,0,0.20)' : 'rgba(0,0,0,0.10)',
+                                    }],
+                                }]}>
                                     <PressableScale
                                         onPress={captureAndAttachPhoto}
-                                        disabled={isOffline || uploadingMedia || recordingBusy || voiceSending}
+                                        disabled={recordingBusy}
                                         accessibilityLabel={translateChatText('camera', 'Camera')}
                                         style={styles.pillIcon}
                                     >
-                                        <Camera size={scale(21)} color={colors.muted} strokeWidth={2.2} />
+                                        <Camera size={scale(21)} color={colors.composerIcon} strokeWidth={2.2} />
                                     </PressableScale>
                                     <TextInput
                                         value={content}
                                         onChangeText={handleComposerChange}
-                                        onFocus={() => {
-                                            if (isNearBottomRef.current) {
-                                                scrollToBottom(false);
-                                            }
-                                        }}
                                         placeholder={t('chat:message_placeholder', 'Type a message...')}
                                         placeholderTextColor={colors.subtle}
                                         style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
@@ -2136,11 +2488,11 @@ export default function ConversationScreen() {
                                         <View style={styles.pillIconCluster}>
                                             <PressableScale
                                                 onPress={pickAndUploadImage}
-                                                disabled={isOffline || uploadingMedia || recordingBusy || voiceSending}
+                                                disabled={recordingBusy}
                                                 accessibilityLabel={translateChatText('attach_photo', 'Attach photo')}
                                                 style={styles.pillIcon}
                                             >
-                                                {uploadingMedia ? <ActivityIndicator color={colors.primary} size="small" /> : <ImageIcon size={scale(21)} color={colors.muted} strokeWidth={2.2} />}
+                                                <Paperclip size={scale(21)} color={colors.composerIcon} weight="bold" />
                                             </PressableScale>
                                         </View>
                                     )}
@@ -2149,12 +2501,12 @@ export default function ConversationScreen() {
                                     onPress={content.length ? send : startRecording}
                                     disabled={content.length
                                         ? !content.trim() || sending
-                                        : isOffline || recordingBusy || voiceSending}
+                                        : recordingBusy}
                                     accessibilityLabel={content.length
                                         ? translateChatText('send', 'Send')
                                         : translateChatText('voice_message', 'Voice message')}
-                                    accessibilityState={{ disabled: content.length ? !content.trim() || sending : isOffline || recordingBusy || voiceSending }}
-                                    style={[styles.send, { backgroundColor: colors.primary }]}
+                                    accessibilityState={{ disabled: content.length ? !content.trim() || sending : recordingBusy }}
+                                    style={[styles.send, { backgroundColor: colors.bubbleMine }]}
                                 >
                                     {content.length
                                         ? sending
@@ -2162,22 +2514,26 @@ export default function ConversationScreen() {
                                             : <PaperPlaneTilt size={scale(22)} color={content.trim() ? colors.inverse : colors.muted} weight="fill" />
                                         : recordingBusy
                                             ? <ActivityIndicator color={colors.inverse} />
-                                            : <Mic size={scale(21)} color={colors.inverse} strokeWidth={2.2} />}
+                                            : <Mic size={scale(21)} color={colors.inverse} weight="fill" />}
                                 </PressableScale>
                             </View>
                         )}
                     </View>
                 )}
                 </ChatComposerBar>
+                </ChatStickyComposer>
                 </ChatKeyboardAvoider>
             </View>
 
             <ImageAttachmentComposer
-                visible={!!imageAttachment && !cropOpen}
+                visible={!!imageAttachment}
                 uri={imageAttachment?.uri ?? null}
+                sourceSize={imageAttachment?.width && imageAttachment?.height
+                    ? { width: imageAttachment.width, height: imageAttachment.height }
+                    : undefined}
                 caption={imageCaption}
                 viewOnce={imageViewOnce}
-                uploading={uploadingMedia}
+                uploading={false}
                 colors={colors}
                 inputFontFamily={inputFontFamily}
                 isRTL={isRTL}
@@ -2185,66 +2541,48 @@ export default function ConversationScreen() {
                     captionPlaceholder: translateChatText('caption_placeholder', 'Add a caption (optional)'),
                     closeA11y: translateChatText('close', 'Close'),
                     viewOnceA11y: translateChatText('view_once_toggle', 'View once photo'),
-                    sendA11y: uploadingMedia
-                        ? translateChatText('sending', 'Sending...')
-                        : translateChatText('send', 'Send'),
+                    sendA11y: translateChatText('send', 'Send'),
                 }}
                 onChangeCaption={setImageCaption}
                 onToggleViewOnce={() => {
-                    if (uploadingMedia) return;
                     void lightImpact();
                     setImageViewOnce((value) => !value);
                 }}
                 onClose={closeImageAttachment}
                 onSend={sendImageAttachment}
-                onCrop={() => { KeyboardController.dismiss(); setCropOpen(true); }}
+                onCrop={() => KeyboardController.dismiss()}
+                onApplyCrop={({ uri, width, height }) => {
+                    setImageAttachment((current) => current ? {
+                        ...current,
+                        uri,
+                        name: `chat-crop-${Date.now()}.webp`,
+                        type: 'image/webp',
+                        width,
+                        height,
+                        size: undefined,
+                        clientMessageId: newMediaMessageId(),
+                    } : null);
+                }}
+                onCropError={() => toast.show(t('chat:crop_failed', 'Could not crop this image.'), 'error')}
                 onReset={originalImageAttachmentRef.current && imageAttachment?.uri !== originalImageAttachmentRef.current.uri
                     ? () => {
-                        imageUploadedMediaRef.current = null;
                         setImageAttachment({ ...originalImageAttachmentRef.current!, clientMessageId: newMediaMessageId() });
                     }
                     : undefined}
                 cropLabel={t('chat:crop', 'Crop')}
                 resetLabel={t('chat:reset_image', 'Reset')}
-            />
-            <GalleryCropModal
-                visible={cropOpen}
-                imageUri={originalImageAttachmentRef.current?.uri || ''}
-                isDark={isDark}
-                uploading={false}
-                labels={{
-                    title: t('chat:crop', 'Crop'),
-                    subtitle: t('chat:crop_hint', 'Move and zoom the image to frame it.'),
-                    preparing: t('chat:crop_preparing', 'Preparing image...'),
-                    upload: t('chat:crop_done', 'Done'),
-                    rotate: t('chat:rotate_image', 'Rotate'),
-                }}
-                ratioOptions={[
-                    { label: t('chat:original_ratio', 'Original'), value: 'original' },
-                    { label: '1:1', value: 1 },
-                    { label: '4:3', value: 4 / 3 },
-                    { label: '3:4', value: 3 / 4 },
-                    { label: '16:9', value: 16 / 9 },
-                    { label: '9:16', value: 9 / 16 },
-                ]}
-                resetLabel={t('chat:reset_image', 'Reset')}
-                onClose={() => setCropOpen(false)}
-                onUpload={async (uri) => {
-                    imageUploadedMediaRef.current = null;
-                    setImageAttachment((current) => current ? { ...current, uri, name: `chat-crop-${Date.now()}.jpg`, type: 'image/jpeg', clientMessageId: newMediaMessageId() } : null);
-                    setCropOpen(false);
-                }}
-                onError={() => toast.show(t('chat:crop_failed', 'Could not crop this image.'), 'error')}
+                cancelLabel={t('cancel', 'Cancel')}
+                rotateLabel={t('chat:rotate_image', 'Rotate')}
+                doneLabel={t('chat:crop_done', 'Done')}
             />
 
-            <Modal visible={!!imagePreview} transparent animationType="fade" onRequestClose={() => setImagePreview(null)}>
-                <View style={styles.previewModal}>
-                    <Pressable style={[styles.modalClose, { top: insets.top + scale(14) }]} onPress={() => setImagePreview(null)}>
-                        <X size={scale(22)} color="#FFFFFF" />
-                    </Pressable>
-                    {!!imagePreview && <RNImage source={{ uri: imagePreview }} style={styles.previewImage} resizeMode="contain" />}
-                </View>
-            </Modal>
+            {imagePreview && (
+                <ChatImageLightbox
+                    preview={imagePreview}
+                    onClose={() => setImagePreview(null)}
+                    onCached={handleImageCached}
+                />
+            )}
 
             <Modal visible={!!viewOnce} transparent animationType="fade" onRequestClose={() => setViewOnce(null)}>
                 <View style={styles.previewModal}>
@@ -2323,34 +2661,19 @@ export default function ConversationScreen() {
                 </View>
             </Modal>
 
-            <Modal
-                visible={!!selectedMessage}
-                transparent
-                animationType="none"
-                statusBarTranslucent
-                navigationBarTranslucent
-                hardwareAccelerated
-                onRequestClose={closeMessageMenu}
+            <BottomSheet
+                ref={messageSheetRef}
+                index={-1}
+                snapPoints={[messageSheetHeight]}
+                enableDynamicSizing={false}
+                enablePanDownToClose={!messageActionBusy}
+                onClose={closeMessageMenu}
+                backdropComponent={renderMessageMenuBackdrop}
+                backgroundStyle={{ backgroundColor: colors.card }}
+                handleIndicatorStyle={{ backgroundColor: colors.muted }}
             >
-                <GestureHandlerRootView style={styles.messageMenuLayer}>
-                    {!!selectedMessage && (() => {
-                        const actionCount = 2
-                            + (messageText(selectedMessage).trim() ? 1 : 0)
-                            + (String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent ? 1 : 0)
-                            + (canUnsendMessage(selectedMessage, String(user?._id || user?.id || '')) ? 1 : 0);
-                        const sheetHeight = scale(86 + actionCount * 52) + insets.bottom;
-                        return (
-                        <BottomSheet
-                            index={0}
-                            snapPoints={[sheetHeight]}
-                            enableDynamicSizing={false}
-                            enablePanDownToClose={!messageActionBusy}
-                            onClose={closeMessageMenu}
-                            backdropComponent={renderMessageMenuBackdrop}
-                            backgroundStyle={{ backgroundColor: colors.card }}
-                            handleIndicatorStyle={{ backgroundColor: colors.muted }}
-                        >
-                        <BottomSheetView style={[styles.messageMenuSheet, { paddingBottom: insets.bottom + scale(10) }]}>
+                    {!!selectedMessage && (
+                        <BottomSheetView style={[styles.messageMenuSheet, { paddingBottom: insets.bottom + scale(12) }]}>
                             <View style={styles.quickReactionRow}>
                                 {QUICK_REACTIONS.map((emoji) => (
                                     <Pressable
@@ -2408,11 +2731,8 @@ export default function ConversationScreen() {
                                 />
                             )}
                         </BottomSheetView>
-                        </BottomSheet>
-                        );
-                    })()}
-                </GestureHandlerRootView>
-            </Modal>
+                    )}
+            </BottomSheet>
             <UserProfileSheet
                 visible={profileSheetOpen && Boolean(peerId)}
                 userId={peerId}
@@ -2512,7 +2832,6 @@ function VoiceRecorderPanel({
     duration,
     previewUri,
     recordingBusy,
-    sending,
     sendFailed,
     waveform,
     onComplete,
@@ -2525,7 +2844,6 @@ function VoiceRecorderPanel({
     duration: number;
     previewUri: string | null;
     recordingBusy: boolean;
-    sending: boolean;
     sendFailed: boolean;
     waveform: number[];
     onComplete: (result: WaveformRecorderCompleteEvent) => void;
@@ -2549,7 +2867,7 @@ function VoiceRecorderPanel({
     const [playbackFraction, setPlaybackFraction] = useState(0);
     const recordedMsRef = useRef(0);
     const recordingStartedAtRef = useRef<number | null>(null);
-    const disabled = recordingBusy || sending;
+    const disabled = recordingBusy;
     const isPreviewing = nativeState === 'preview';
     const isPaused = nativeState === 'paused';
 
@@ -2728,7 +3046,7 @@ function VoiceRecorderPanel({
                     </Pressable>
                 )}
                 <Pressable accessibilityRole="button" accessibilityLabel={sendFailed ? t('chat:voice_retry', 'Retry') : t('chat:send', 'Send')} onPress={handleSend} disabled={disabled || (!previewUri && nativeState === 'idle')} style={[styles.voiceRecorderIconAction, { backgroundColor: colors.primary }]}>
-                    {sending || recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <PaperPlaneTilt size={scale(20)} color={colors.inverse} weight="fill" />}
+                    {recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <PaperPlaneTilt size={scale(20)} color={colors.inverse} weight="fill" />}
                 </Pressable>
             </View>
         </View>
@@ -2917,7 +3235,7 @@ function ChatScrollDownButton({
                 onPress={onPress}
                 style={styles.scrollDownPress}
             >
-                <CaretDoubleDown size={scale(22)} color={colors.muted} weight="bold" />
+                <CaretDoubleDown size={scale(16)} color={colors.muted} weight="bold" />
                 {unreadCount > 0 && (
                     <UnreadBadge
                         count={unreadCount}
@@ -2936,24 +3254,29 @@ function MessageTimeMeta({
     mine,
     colors,
     style,
+    onLayout,
 }: {
     message: ChatMessage;
     mine: boolean;
     colors: Record<string, string>;
     style?: StyleProp<ViewStyle>;
+    onLayout?: (event: LayoutChangeEvent) => void;
 }) {
     const metaColor = mine ? colors.bubbleMineMuted : colors.muted;
+    const statusIconSize = scale(14);
     return (
-        <View style={style}>
+        <View style={style} onLayout={onLayout}>
             <Text variant="caption" style={{ color: metaColor, fontSize: scale(10), lineHeight: scale(12) }}>
                 {formatMessageTime(message.createdAt)}
             </Text>
-            {mine && !message.pending && (
-                message.seenAt
-                    ? <CheckCheck size={scale(12)} color={colors.seenTick} />
-                    : message.deliveredAt
-                        ? <CheckCheck size={scale(12)} color={metaColor} />
-                        : <Check size={scale(12)} color={metaColor} />
+            {mine && !message.pending && !message.failed && (
+                <View style={[styles.messageStatusIcon, { width: statusIconSize, height: statusIconSize }]}>
+                    {message.seenAt
+                        ? <CheckCheck size={statusIconSize} color={colors.seenTick} />
+                        : message.deliveredAt
+                            ? <CheckCheck size={statusIconSize} color={metaColor} />
+                            : <Check size={statusIconSize} color={metaColor} />}
+                </View>
             )}
             {mine && message.pending && (
                 <Text variant="caption" style={{ color: metaColor, fontSize: scale(9), lineHeight: scale(11) }}>
@@ -2961,9 +3284,7 @@ function MessageTimeMeta({
                 </Text>
             )}
             {message.failed && (
-                <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>
-                    {translateChatText('tap_to_retry', 'Tap to retry')}
-                </Text>
+                <RefreshCw size={statusIconSize} color={colors.danger} />
             )}
         </View>
     );
@@ -2975,54 +3296,44 @@ function TextMessageWithInlineMeta({
     mine,
     colors,
     textColor,
+    maxTextWidth,
 }: {
     content: string;
     message: ChatMessage;
     mine: boolean;
     colors: Record<string, string>;
     textColor: string;
+    maxTextWidth: number;
 }) {
-    const [layoutMode, setLayoutMode] = useState<'reserved' | 'natural' | 'stacked'>('reserved');
-    const [contentWidth, setContentWidth] = useState(0);
-    // Figure spaces reserve the metadata width without relying on nested text
-    // transparency, which Android does not consistently honor.
-    const reserve = `\u00A0${'\u2007'.repeat(mine ? 11 : 9)}`;
-    const metadataWidth = scale(mine ? 72 : 56);
+    const { currentLanguage } = useLanguage();
+    const direction = directionalTextStyle(content);
+    const textStyle = [
+        {
+            fontFamily: currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular,
+            fontSize: Typography.size.base,
+            lineHeight: Typography.lineHeight.base,
+            letterSpacing: 0,
+        },
+        styles.messageText,
+        { color: textColor },
+        direction,
+    ];
+
     return (
-        <View
-            style={[styles.textMessageWithMeta, layoutMode === 'stacked' && styles.textMessageMetaStacked]}
-            onLayout={(event) => {
-                const width = event.nativeEvent.layout.width;
-                setContentWidth((current) => Math.abs(current - width) < 0.5 ? current : width);
-            }}
-        >
-            <Text
-                variant="body"
-                style={[styles.messageText, { color: textColor }, directionalTextStyle(content)]}
-                onTextLayout={(event) => {
-                    const lines = event.nativeEvent.lines;
-                    if (layoutMode === 'reserved' && lines.length > 1) {
-                        setLayoutMode('natural');
-                        return;
-                    }
-                    if (layoutMode === 'natural' && contentWidth > 0 && lines.length > 0) {
-                        const lastLine = lines[lines.length - 1];
-                        if (lastLine.width + metadataWidth > contentWidth) setLayoutMode('stacked');
-                    }
-                }}
-            >
-                {content}
-                {layoutMode === 'reserved' && <RNText style={styles.inlineMetaReserve}>{reserve}</RNText>}
-            </Text>
-            <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.inlineTimeRow} />
+        <View style={[styles.textMessageWithMeta, { maxWidth: maxTextWidth || undefined }]}>
+            <RNText style={[textStyle, styles.textMessageBody]}>{content}</RNText>
+            <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.textInlineMeta} />
         </View>
     );
 }
 
 function MessageBubbleComponent({
     message,
+    replyTarget,
     mine,
     rowGap,
+    messageAreaWidth,
+    maxTextWidth,
     uiDirection,
     colors,
     userId,
@@ -3036,13 +3347,16 @@ function MessageBubbleComponent({
     onReplyClick,
 }: {
     message: ChatMessage;
+    replyTarget: ChatMessage | null;
     mine: boolean;
     rowGap: number;
+    messageAreaWidth: number;
+    maxTextWidth: number;
     uiDirection: 'ltr' | 'rtl';
     colors: Record<string, string>;
     userId: string;
     animateIn: boolean;
-    onOpenImage: (url: string) => void;
+    onOpenImage: (preview: ChatImagePreview) => void;
     onOpenViewOnce: (message: ChatMessage) => void;
     viewOnceLoading: boolean;
     onOpenMenu: (message: ChatMessage) => void;
@@ -3052,12 +3366,62 @@ function MessageBubbleComponent({
 }) {
     const content = messageText(message);
 
+    const media = message.media as MessageMedia | null | undefined;
+    const [observedImageSize, setObservedImageSize] = useState<{ messageId: string; width: number; height: number } | null>(null);
+    const hasNormalImage = message.type === 'image' && media?.url && !media.viewOnce;
+    const hasViewOnce = message.type === 'image' && media?.viewOnce;
+    const hasVoice = message.type === 'voice';
+    const replyTo = replyTarget;
+    const imageHasDetails = !!(content.trim() || replyTo);
+    const imageSize = observedImageSize?.messageId === message.id ? observedImageSize : null;
+    const imageLayout = chatImageLayout(
+        media?.width || imageSize?.width,
+        media?.height || imageSize?.height,
+        messageAreaWidth > 0 ? Math.max(0, messageAreaWidth - scale(24)) : scale(220),
+    );
+    const quotedText = replyPreview(replyTo);
+    const reactions = message.reactions || [];
+    const messageTextColor = mine ? colors.bubbleMineText : colors.text;
+    const messageMetaColor = mine ? colors.bubbleMineMuted : colors.muted;
+    const useInlineTextMeta = message.type === 'text' && !!content;
+    const swipeX = useSharedValue(0);
+    const swipeLimit = scale(72);
+    const replyThreshold = scale(56);
+    const replyHintTranslateY = -scale(17);
+    const swipeStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: swipeX.value }],
+    }));
+    const replyHintStyle = useAnimatedStyle(() => ({
+        opacity: Math.min(1, Math.max(0, swipeX.value / replyThreshold)),
+        transform: [{ translateY: replyHintTranslateY }, { scale: 0.78 + Math.min(1, swipeX.value / replyThreshold) * 0.22 }],
+    }));
+    const bubbleGesture = useMemo(() => {
+        const swipe = Gesture.Pan()
+            .enabled(!hasVoice)
+            .activeOffsetX(16)
+            .failOffsetY([-10, 10])
+            .onUpdate((event) => {
+                swipeX.value = Math.max(0, Math.min(swipeLimit, event.translationX));
+            })
+            .onEnd((event) => {
+                if (event.translationX >= replyThreshold) runOnJS(onSwipeReply)(message);
+            })
+            .onFinalize(() => {
+                if (swipeX.value > 0) swipeX.value = withSpring(0, { damping: 20, stiffness: 270 });
+            });
+        const longPress = Gesture.LongPress()
+            .enabled(!message.failed && !message.pending)
+            .minDuration(280)
+            .maxDistance(10)
+            .runOnJS(true)
+            .onStart(() => onOpenMenu(message));
+        return Gesture.Race(swipe, longPress);
+    }, [hasVoice, message, onOpenMenu, onSwipeReply, replyThreshold, swipeLimit, swipeX]);
+
     if (message.type === 'system') {
         const systemContent = String(message.content || '').trim().toLowerCase().replace(/\s+/g, '_');
         const isGalleryAccessSystem = systemContent === 'gallery_access_granted' || systemContent === 'gallery_access_revoked';
         if (isGalleryAccessSystem) {
-            // Centered privacy-safe pill with a camera emoji; the "revealed" pill
-            // opens the owner's profile so the viewer can see the photos.
             const canOpenGalleryOwner = systemContent === 'gallery_access_granted'
                 && message.sender
                 && message.sender !== '000000000000000000000000';
@@ -3101,81 +3465,27 @@ function MessageBubbleComponent({
         );
     }
 
-    const media = message.media as MessageMedia | null | undefined;
-    const hasNormalImage = message.type === 'image' && media?.url && !media.viewOnce;
-    const hasViewOnce = message.type === 'image' && media?.viewOnce;
-    const hasVoice = message.type === 'voice';
-    const replyTo = typeof message.replyTo === 'object' && message.replyTo ? message.replyTo : null;
-    const quotedText = replyPreview(replyTo);
-    const reactions = message.reactions || [];
-    const messageTextColor = mine ? colors.bubbleMineText : colors.text;
-    const messageMetaColor = mine ? colors.bubbleMineMuted : colors.muted;
-    const useInlineTextMeta = message.type === 'text' && !!content && !message.pending && !message.failed;
-    const swipeX = useRef(new Animated.Value(0)).current;
-    const resetSwipe = useCallback(() => {
-        Animated.spring(swipeX, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 120,
-            friction: 14,
-        }).start();
-    }, [swipeX]);
-    const bubbleGesture = useMemo(() => {
-        const swipe = Gesture.Pan()
-            .activeOffsetX(scale(12))
-            .failOffsetY([-scale(12), scale(12)])
-            .runOnJS(true)
-            .onUpdate((event) => {
-            const nextX = Math.max(0, Math.min(scale(72), event.translationX));
-            swipeX.setValue(nextX);
-            })
-            .onEnd((event) => {
-                if (event.translationX >= scale(56)) onSwipeReply(message);
-            })
-            .onFinalize(resetSwipe);
-        const longPress = Gesture.LongPress()
-            .enabled(!message.failed)
-            .minDuration(360)
-            .maxDistance(scale(18))
-            .runOnJS(true)
-            .onStart(() => onOpenMenu(message));
-        return Gesture.Race(swipe, longPress);
-    }, [message, onOpenMenu, onSwipeReply, resetSwipe, swipeX]);
-    const replyHintOpacity = swipeX.interpolate({
-        inputRange: [0, scale(14), scale(56)],
-        outputRange: [0, 0.35, 1],
-        extrapolate: 'clamp',
-    });
-    const replyHintScale = swipeX.interpolate({
-        inputRange: [0, scale(56)],
-        outputRange: [0.78, 1],
-        extrapolate: 'clamp',
-    });
-
     return (
         <Reanimated.View
             style={[
                 styles.bubbleRow,
-                { marginBottom: rowGap + (reactions.length > 0 ? 4 : 0) },
+                { marginBottom: rowGap },
                 mine ? styles.bubbleRight : styles.bubbleLeft,
             ]}
             entering={animateIn ? FadeInDown.duration(240) : undefined}
         >
-            <View style={[styles.swipeReplyWrap, { direction: uiDirection }]}>
-                <Animated.View
+            <View style={[styles.swipeReplyWrap, { direction: uiDirection }, hasNormalImage && { width: imageLayout.width }]}>
+                <Reanimated.View
                     style={[
                         styles.swipeReplyHint,
                         mine ? styles.swipeReplyHintMine : styles.swipeReplyHintTheir,
-                        {
-                            opacity: replyHintOpacity,
-                            transform: [{ translateY: -scale(17) }, { scale: replyHintScale }],
-                        },
+                        replyHintStyle,
                     ]}
                 >
                     <Reply size={scale(17)} color={colors.primary} strokeWidth={2.6} />
-                </Animated.View>
+                </Reanimated.View>
                 <GestureDetector gesture={bubbleGesture}>
-                <Animated.View style={[styles.swipeReplyBubble, { transform: [{ translateX: swipeX }] }]}>
+                <Reanimated.View style={[styles.swipeReplyBubble, swipeStyle]}>
                     <Pressable
                         onPress={message.failed ? () => onRetry(message) : undefined}
                         accessibilityRole={message.failed ? 'button' : undefined}
@@ -3184,17 +3494,18 @@ function MessageBubbleComponent({
                         <View style={[
                             styles.bubble,
                             mine ? styles.mineBubble : styles.theirBubble,
+                            hasNormalImage && styles.imageBubble,
                             {
-                                backgroundColor: mine ? colors.bubbleMine : colors.surface,
+                                backgroundColor: hasNormalImage && !imageHasDetails ? 'transparent' : mine ? colors.bubbleMine : colors.surface,
                                 borderColor: mine ? colors.bubbleMineBorder : colors.border,
-                                shadowColor: '#1A130D',
-                                shadowOpacity: mine ? 0.04 : 0.08,
+                                shadowColor: colors.shadow,
+                                shadowOpacity: hasNormalImage && !imageHasDetails ? 0 : mine ? 0.04 : 0.08,
                                 shadowRadius: scale(3),
                                 shadowOffset: { width: 0, height: 0 },
-                                elevation: mine ? 0 : 1,
+                                elevation: hasNormalImage || mine ? 0 : 1,
                             },
                         ]}>
-                            {replyTo && (
+                            {replyTo && !hasNormalImage && (
                                 <Pressable
                                     onPress={() => onReplyClick(replyTo.id)}
                                     style={[styles.replyQuote, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface, borderLeftColor: colors.primary }]}
@@ -3209,18 +3520,76 @@ function MessageBubbleComponent({
                             )}
 
                     {hasNormalImage && (
-                        <CachedImageMessage
-                            message={message}
-                            media={media}
-                            userId={userId}
-                            onOpenImage={onOpenImage}
-                        />
+                        <>
+                        <View pointerEvents={message.pending || message.failed ? 'none' : 'auto'}>
+                            <CachedImageMessage
+                                message={message}
+                                media={media}
+                                userId={userId}
+                                onOpenImage={onOpenImage}
+                                frameWidth={imageLayout.width}
+                                frameHeight={imageLayout.height}
+                                crop={imageLayout.crop}
+                                onImageSize={(width, height) => {
+                                    if (media.width && media.height) return;
+                                    setObservedImageSize((current) => current?.messageId === message.id
+                                        && current.width === width && current.height === height
+                                        ? current
+                                        : { messageId: message.id, width, height });
+                                }}
+                            />
+                        </View>
+                        {imageHasDetails ? (
+                            <View style={styles.imageCaptionBody}>
+                                {replyTo && (
+                                    <Pressable
+                                        onPress={() => onReplyClick(replyTo.id)}
+                                        style={[styles.replyQuote, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface, borderLeftColor: colors.primary }]}
+                                    >
+                                        <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
+                                            {t('chat:reply', 'Reply')}
+                                        </Text>
+                                        <Text variant="caption" numberOfLines={2} style={[{ color: messageMetaColor }, directionalTextStyle(quotedText)]}>
+                                            {quotedText}
+                                        </Text>
+                                    </Pressable>
+                                )}
+                                {!!content ? (
+                                    <TextMessageWithInlineMeta
+                                        content={content}
+                                        message={message}
+                                        mine={mine}
+                                        colors={colors}
+                                        textColor={messageTextColor}
+                                        maxTextWidth={imageLayout.width - scale(24)}
+                                    />
+                                ) : (
+                                    <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.timeRow} />
+                                )}
+                            </View>
+                        ) : (
+                            <View pointerEvents="none" style={styles.imageMetaOverlay}>
+                                <LinearGradient
+                                    pointerEvents="none"
+                                    colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.64)']}
+                                    style={styles.imageTimeShade}
+                                />
+                                <MessageTimeMeta
+                                    message={message}
+                                    mine={mine}
+                                    colors={{ ...colors, bubbleMineMuted: '#FFFFFF', muted: '#FFFFFF' }}
+                                    style={styles.imageTimeRow}
+                                />
+                            </View>
+                        )}
+                        </>
                     )}
 
                     {hasViewOnce && (
                         <Pressable
                             onPress={() => !mine && !media?.viewedAt && onOpenViewOnce(message)}
                             disabled={mine || !!media?.viewedAt || viewOnceLoading}
+                            pointerEvents={message.failed ? 'none' : 'auto'}
                             style={[styles.viewOnceButton, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface }]}
                         >
                             <View style={styles.viewOnceIconBadge}>
@@ -3244,17 +3613,18 @@ function MessageBubbleComponent({
                     )}
 
                     {hasVoice && (
-                        <VoiceMessage
-                            message={message}
-                            media={media}
-                            mine={mine}
-                            colors={colors}
-                            userId={userId}
-                            onLongPress={() => onOpenMenu(message)}
-                        />
+                        <View pointerEvents={message.failed ? 'none' : 'auto'}>
+                            <VoiceMessage
+                                message={message}
+                                media={media}
+                                mine={mine}
+                                colors={colors}
+                                userId={userId}
+                            />
+                        </View>
                     )}
 
-                    {!!content && (
+                    {!hasNormalImage && !!content && (
                         useInlineTextMeta ? (
                             <TextMessageWithInlineMeta
                                 content={content}
@@ -3262,6 +3632,7 @@ function MessageBubbleComponent({
                                 mine={mine}
                                 colors={colors}
                                 textColor={messageTextColor}
+                                maxTextWidth={maxTextWidth}
                             />
                         ) : (
                             <Text variant="body" style={[styles.messageText, { color: messageTextColor }, directionalTextStyle(content)]}>
@@ -3270,13 +3641,25 @@ function MessageBubbleComponent({
                         )
                     )}
 
-                            {!useInlineTextMeta && (
+                            {!hasNormalImage && !useInlineTextMeta && (
                                 <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.timeRow} />
                             )}
                         </View>
                     </Pressable>
-                </Animated.View>
+                </Reanimated.View>
                 </GestureDetector>
+                {message.failed && (
+                    <Pressable
+                        onPress={() => onRetry(message)}
+                        accessibilityRole="button"
+                        accessibilityLabel={translateChatText('tap_to_retry', 'Tap to retry')}
+                        style={[styles.messageRetryHint, mine ? styles.messageRetryHintMine : styles.messageRetryHintTheirs]}
+                    >
+                        <Text variant="caption" className="font-body-bold" style={{ color: colors.danger }}>
+                            {translateChatText('tap_to_retry', 'Tap to retry')}
+                        </Text>
+                    </Pressable>
+                )}
                 {reactions.length > 0 && (
                     <View style={styles.reactionWrap}>
                         {reactions.map((reaction, index) => {
@@ -3307,19 +3690,31 @@ function CachedImageMessageComponent({
     media,
     userId,
     onOpenImage,
+    frameWidth,
+    frameHeight,
+    crop,
+    onImageSize,
 }: {
     message: ChatMessage;
     media: MessageMedia;
     userId: string;
-    onOpenImage: (url: string) => void;
+    onOpenImage: (preview: ChatImagePreview) => void;
+    frameWidth: number;
+    frameHeight: number;
+    crop: boolean;
+    onImageSize: (width: number, height: number) => void;
 }) {
-    const toast = useToast();
     const palette = useColors();
-    const [displayUri, setDisplayUri] = useState(media.thumbnail || media.url || '');
-    const [cachedUri, setCachedUri] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [displayUri, setDisplayUri] = useState(media.localUri || media.thumbnail || media.url || '');
+    const [cachedUri, setCachedUri] = useState<string | null>(media.localUri || null);
 
     useEffect(() => {
+        setDisplayUri(media.localUri || media.thumbnail || media.url || '');
+        setCachedUri(media.localUri || null);
+    }, [media.localUri, media.thumbnail, media.url]);
+
+    useEffect(() => {
+        if (message.pending || message.failed || media.localUri) return;
         let disposed = false;
         (async () => {
             const cached = await getCachedChatMedia({
@@ -3337,41 +3732,34 @@ function CachedImageMessageComponent({
         return () => {
             disposed = true;
         };
-    }, [media, message.conversationId, message.id, userId]);
+    }, [media, message.conversationId, message.id, message.pending, message.failed, userId]);
 
-    const open = async () => {
-        if (cachedUri) {
-            onOpenImage(cachedUri);
-            return;
-        }
-        setLoading(true);
-        try {
-            const cached = await cacheChatMedia({
-                userId,
-                conversationId: message.conversationId,
-                messageId: message.id,
-                media,
-                kind: 'image',
-            });
-            setCachedUri(cached.uri);
-            setDisplayUri(cached.uri);
-            onOpenImage(cached.uri);
-        } catch {
-            toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const open = () => onOpenImage({
+        userId,
+        conversationId: message.conversationId,
+        messageId: message.id,
+        media,
+        initialUri: cachedUri || displayUri,
+    });
 
     return (
-        <PressableScale onPress={open} style={styles.mediaWrap}>
-            <Image source={{ uri: displayUri }} style={styles.mediaImage} contentFit="cover" transition={150} />
-            {(!cachedUri || loading) && (
-                <View style={styles.mediaDownloadOverlay}>
-                    {loading ? <ActivityIndicator color={palette.chrome.common.inverseText} /> : <Download size={scale(18)} color={palette.chrome.common.inverseText} />}
+        <Pressable onPress={open} style={[styles.mediaWrap, { width: frameWidth, height: frameHeight }]} accessibilityRole="button" accessibilityLabel={translateChatText('tap_to_open', 'Tap to open')}>
+            <Image
+                source={{ uri: displayUri }}
+                style={styles.mediaImage}
+                contentFit={crop ? 'cover' : 'contain'}
+                blurRadius={cachedUri || message.pending ? 0 : 8}
+                transition={150}
+                onLoad={(event) => {
+                    if (event.source.width && event.source.height) onImageSize(event.source.width, event.source.height);
+                }}
+            />
+            {!message.pending && !message.failed && !cachedUri && (
+                <View pointerEvents="none" style={styles.mediaDownloadOverlay}>
+                    <Download size={scale(18)} color={palette.chrome.common.inverseText} />
                 </View>
             )}
-        </PressableScale>
+        </Pressable>
     );
 }
 
@@ -3383,23 +3771,22 @@ function VoiceMessageComponent({
     mine,
     colors,
     userId,
-    onLongPress,
 }: {
     message: ChatMessage;
     media?: MessageMedia | null;
     mine: boolean;
     colors: Record<string, string>;
     userId: string;
-    onLongPress: () => void;
 }) {
     const toast = useToast();
     const playbackOwnerRef = useRef(createChatAudioPlaybackOwner(`voice-message:${message.id}`));
     const [downloading, setDownloading] = useState(false);
     const sourceUriRef = useRef<string | null>(null);
+    const disposedRef = useRef(false);
+    const sourceRequestRef = useRef(0);
     const pendingPlayRef = useRef(false);
     const pendingSeekRef = useRef<number | null>(null);
     const recoveryAttemptedRef = useRef(false);
-    const suppressNextPressRef = useRef(false);
     const [trackWidth, setTrackWidth] = useState(0);
     const [scrubProgress, setScrubProgress] = useState<number | null>(null);
     const player = useAudioPlayer(null, { updateInterval: 100 });
@@ -3411,8 +3798,7 @@ function VoiceMessageComponent({
         ? scrubProgress * effectiveDuration
         : status.playing ? status.currentTime : effectiveDuration || status.currentTime || 0));
     const waveform = useMemo(() => {
-        const real = waveformPeaks(media?.waveform || [], VOICE_MESSAGE_WAVE_BAR_COUNT);
-        return real.length ? real : Array.from({ length: VOICE_MESSAGE_WAVE_BAR_COUNT }, () => 0.22);
+        return waveformPeaks(media?.waveform || [], VOICE_MESSAGE_WAVE_BAR_COUNT);
     }, [media?.waveform]);
 
     const pauseThisPlayer = useCallback(() => {
@@ -3423,8 +3809,9 @@ function VoiceMessageComponent({
         }
     }, [player]);
 
-    const replaceSource = useCallback((uri: string, playWhenReady: boolean) => {
-        if (sourceUriRef.current === uri) {
+    const replaceSource = useCallback((uri: string, playWhenReady: boolean, force = false) => {
+        if (disposedRef.current) return;
+        if (!force && sourceUriRef.current === uri) {
             pendingPlayRef.current = pendingPlayRef.current || playWhenReady;
             return;
         }
@@ -3460,7 +3847,7 @@ function VoiceMessageComponent({
     }, [media?.key, media?.localUri, media?.mime, media?.url, message.conversationId, message.id, replaceSource, userId]);
 
     useEffect(() => {
-        if (!sourceUriRef.current || !status.isLoaded) return;
+        if (disposedRef.current || !sourceUriRef.current || !status.isLoaded) return;
         const seekFraction = pendingSeekRef.current;
         const shouldPlay = pendingPlayRef.current;
         if (seekFraction === null && !shouldPlay) return;
@@ -3470,8 +3857,8 @@ function VoiceMessageComponent({
             try {
                 const duration = status.duration || media?.duration || 0;
                 if (seekFraction !== null && duration > 0) await player.seekTo(seekFraction * duration);
-                if (shouldPlay) {
-                    claimChatAudioPlayback(playbackOwnerRef.current, pauseThisPlayer);
+                if (disposedRef.current) return;
+                if (shouldPlay && isChatAudioPlaybackOwner(playbackOwnerRef.current)) {
                     player.play();
                 }
             } catch {
@@ -3486,7 +3873,7 @@ function VoiceMessageComponent({
     }, [status.didJustFinish]);
 
     useEffect(() => {
-        if (!status.error || !sourceUriRef.current) return;
+        if (disposedRef.current || !status.error || !sourceUriRef.current) return;
         if (recoveryAttemptedRef.current) {
             pendingPlayRef.current = false;
             releaseChatAudioPlayback(playbackOwnerRef.current);
@@ -3495,7 +3882,9 @@ function VoiceMessageComponent({
         }
 
         recoveryAttemptedRef.current = true;
-        pendingPlayRef.current = true;
+        const shouldResume = isChatAudioPlaybackOwner(playbackOwnerRef.current);
+        pendingPlayRef.current = shouldResume;
+        const request = ++sourceRequestRef.current;
         setDownloading(true);
         void (async () => {
             await deleteCachedChatMediaForMessage({
@@ -3510,26 +3899,32 @@ function VoiceMessageComponent({
                 media: { ...media, localUri: undefined },
                 kind: 'voice',
             });
-            replaceSource(cached.uri, true);
+            if (disposedRef.current || request !== sourceRequestRef.current) return;
+            replaceSource(cached.uri, shouldResume, true);
         })().catch(() => {
+            if (disposedRef.current || request !== sourceRequestRef.current) return;
             pendingPlayRef.current = false;
+            releaseChatAudioPlayback(playbackOwnerRef.current);
             toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
-        }).finally(() => setDownloading(false));
+        }).finally(() => {
+            if (!disposedRef.current && request === sourceRequestRef.current) setDownloading(false);
+        });
     }, [media, message.conversationId, message.id, replaceSource, status.error, toast, userId]);
 
-    useEffect(() => () => {
-        pendingPlayRef.current = false;
-        pendingSeekRef.current = null;
-        releaseChatAudioPlayback(playbackOwnerRef.current);
-        pauseThisPlayer();
-        unpinCachedChatMedia(sourceUriRef.current);
+    useEffect(() => {
+        disposedRef.current = false;
+        return () => {
+            disposedRef.current = true;
+            sourceRequestRef.current += 1;
+            pendingPlayRef.current = false;
+            pendingSeekRef.current = null;
+            releaseChatAudioPlayback(playbackOwnerRef.current);
+            pauseThisPlayer();
+            unpinCachedChatMedia(sourceUriRef.current);
+        };
     }, [pauseThisPlayer]);
 
     const toggle = async () => {
-        if (suppressNextPressRef.current) {
-            suppressNextPressRef.current = false;
-            return;
-        }
         if (downloading) return;
         try {
             if (status.playing) {
@@ -3552,6 +3947,8 @@ function VoiceMessageComponent({
             return;
         }
 
+        claimChatAudioPlayback(playbackOwnerRef.current, pauseThisPlayer);
+        const request = ++sourceRequestRef.current;
         setDownloading(true);
         try {
             const cached = await cacheChatMedia({
@@ -3561,24 +3958,31 @@ function VoiceMessageComponent({
                 media,
                 kind: 'voice',
             });
+            if (disposedRef.current || request !== sourceRequestRef.current) return;
             recoveryAttemptedRef.current = false;
             replaceSource(cached.uri, true);
         } catch {
+            if (disposedRef.current || request !== sourceRequestRef.current) return;
+            releaseChatAudioPlayback(playbackOwnerRef.current);
             toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
         } finally {
-            setDownloading(false);
+            if (!disposedRef.current && request === sourceRequestRef.current) setDownloading(false);
         }
     };
 
     const fractionAt = (x: number) => trackWidth > 0 ? Math.max(0, Math.min(1, x / trackWidth)) : 0;
     const seekToFraction = async (fraction: number) => {
-        if (downloading) return;
+        if (downloading) {
+            pendingSeekRef.current = fraction;
+            return;
+        }
         const duration = status.duration || media?.duration || 0;
         if (sourceUriRef.current && status.isLoaded && duration > 0) {
             await player.seekTo(fraction * duration);
             return;
         }
         pendingSeekRef.current = fraction;
+        const request = ++sourceRequestRef.current;
         setDownloading(true);
         try {
             const cached = await cacheChatMedia({
@@ -3588,13 +3992,15 @@ function VoiceMessageComponent({
                 media,
                 kind: 'voice',
             });
+            if (disposedRef.current || request !== sourceRequestRef.current) return;
             recoveryAttemptedRef.current = false;
             replaceSource(cached.uri, false);
         } catch {
+            if (disposedRef.current || request !== sourceRequestRef.current) return;
             pendingSeekRef.current = null;
             toast.show(translateChatText('media_download_failed', 'Could not download media. Please try again.'), 'error');
         } finally {
-            setDownloading(false);
+            if (!disposedRef.current && request === sourceRequestRef.current) setDownloading(false);
         }
     };
 
@@ -3603,11 +4009,6 @@ function VoiceMessageComponent({
             <View style={styles.voicePlaybackControl}>
                 <Pressable
                     onPress={toggle}
-                    onLongPress={() => {
-                        suppressNextPressRef.current = true;
-                        onLongPress();
-                    }}
-                    delayLongPress={360}
                     disabled={downloading}
                     accessibilityRole="button"
                     accessibilityLabel={status.playing
@@ -3645,6 +4046,9 @@ function VoiceMessageComponent({
                     }}
                 >
                     <View pointerEvents="none" style={styles.wave}>
+                        {waveform.length === 0 && (
+                            <View style={[styles.waveUnavailable, { backgroundColor: mine ? colors.bubbleMineMuted : colors.waveMuted }]} />
+                        )}
                         {waveform.map((amplitude, index) => (
                             <View
                                 key={`voice-${message.id}-${index}`}
@@ -3694,9 +4098,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: scale(14),
         bottom: scale(14),
-        width: scale(36),
-        height: scale(36),
-        borderRadius: scale(18),
+        width: scale(32),
+        height: scale(32),
+        borderRadius: scale(16),
         borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
         justifyContent: 'center',
@@ -3796,20 +4200,29 @@ const styles = StyleSheet.create({
         paddingBottom: scale(7),
         borderWidth: StyleSheet.hairlineWidth,
     },
+    imageBubble: { minWidth: 0, paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, borderWidth: 0, overflow: 'hidden' },
+    imageCaptionBody: { paddingHorizontal: scale(12), paddingTop: scale(8), paddingBottom: scale(7) },
+    imageMetaOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, height: scale(56) },
+    imageTimeShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: scale(56) },
+    imageTimeRow: { position: 'absolute', right: scale(8), bottom: scale(8), flexDirection: 'row', alignItems: 'center', gap: scale(4) },
     mineBubble: { borderBottomRightRadius: scale(6) },
     theirBubble: { borderBottomLeftRadius: scale(6) },
     messageText: { fontSize: scale(15), lineHeight: scale(20) },
-    textMessageWithMeta: { position: 'relative' },
-    textMessageMetaStacked: { paddingBottom: scale(17) },
-    inlineMetaReserve: { fontSize: scale(10), lineHeight: scale(12) },
+    textMessageWithMeta: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+    textMessageBody: { flexShrink: 1, minWidth: 0 },
+    textInlineMeta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: scale(4), marginTop: 3, marginLeft: 5, minHeight: scale(14) },
+    messageStatusIcon: { flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+    messageRetryHint: { marginTop: scale(3), maxWidth: '100%' },
+    messageRetryHintMine: { alignSelf: 'flex-end' },
+    messageRetryHintTheirs: { alignSelf: 'flex-start' },
     inlineTimeRow: { position: 'absolute', right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: scale(4), minHeight: scale(14) },
-    timeRow: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: scale(4), marginTop: scale(6), minHeight: scale(14) },
+    timeRow: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: scale(4), marginTop: 3, minHeight: scale(14) },
     systemWrap: { alignItems: 'center', marginVertical: scale(7) },
     systemText: { paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden' },
     systemPillRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), overflow: 'hidden' },
     unsentBubble: { borderWidth: StyleSheet.hairlineWidth, borderStyle: 'dashed', borderRadius: scale(14), paddingHorizontal: scale(12), paddingVertical: scale(8) },
-    mediaWrap: { overflow: 'hidden', borderRadius: scale(9), marginBottom: scale(5), backgroundColor: '#E8E1D6' },
-    mediaImage: { width: scale(220), height: scale(220) },
+    mediaWrap: { overflow: 'hidden', backgroundColor: '#E8E1D6' },
+    mediaImage: { width: '100%', height: '100%' },
     viewOnceButton: {
         minWidth: scale(210),
         minHeight: scale(54),
@@ -3834,11 +4247,13 @@ const styles = StyleSheet.create({
     viewOnceTextWrap: { flex: 1, minWidth: 0, gap: scale(2) },
     mediaDownloadOverlay: {
         position: 'absolute',
-        right: scale(8),
-        bottom: scale(8),
-        width: scale(34),
-        height: scale(34),
-        borderRadius: scale(17),
+        top: '50%',
+        left: '50%',
+        marginTop: -scale(21),
+        marginLeft: -scale(21),
+        width: scale(42),
+        height: scale(42),
+        borderRadius: scale(21),
         backgroundColor: 'rgba(16, 16, 17,0.70)',
         alignItems: 'center',
         justifyContent: 'center',
@@ -3856,6 +4271,7 @@ const styles = StyleSheet.create({
     voiceProgressTrack: { flex: 1, minWidth: scale(90), height: scale(32), justifyContent: 'center', position: 'relative' },
     wave: { flex: 1, height: scale(30), flexDirection: 'row', alignItems: 'center', gap: scale(1.5) },
     waveBar: { flex: 1, maxWidth: scale(4), borderRadius: scale(2) },
+    waveUnavailable: { height: 2, width: '100%', borderRadius: 1 },
     voiceMessageScrubDot: {
         position: 'absolute',
         top: '50%',
@@ -3893,14 +4309,14 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'flex-end',
-        minHeight: scale(44),
-        borderRadius: scale(22),
+        minHeight: scale(40),
+        borderRadius: scale(20),
         borderWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: scale(4),
     },
     pillIcon: {
         width: scale(38),
-        height: scale(44),
+        height: scale(40),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -3932,19 +4348,19 @@ const styles = StyleSheet.create({
     recordingButton: { backgroundColor: PRIMARY },
     input: {
         flex: 1,
-        minHeight: scale(44),
+        minHeight: scale(40),
         maxHeight: scale(120),
         paddingHorizontal: scale(6),
         // Equal vertical padding keeps text centered in the pill
-        paddingTop: scale(12),
-        paddingBottom: scale(12),
+        paddingTop: scale(10),
+        paddingBottom: scale(10),
         fontSize: scale(14),
         lineHeight: scale(19),
     },
     send: {
-        width: scale(44),
-        height: scale(44),
-        borderRadius: scale(22),
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -4062,9 +4478,9 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     messageMenuSheet: {
-        flex: 1,
-        paddingHorizontal: scale(12),
-        gap: scale(2),
+        paddingHorizontal: scale(16),
+        paddingTop: scale(8),
+        gap: scale(4),
     },
     quickReactionRow: {
         flexDirection: 'row',
@@ -4073,7 +4489,7 @@ const styles = StyleSheet.create({
         borderRadius: scale(22),
         paddingHorizontal: scale(5),
         paddingVertical: scale(5),
-        marginBottom: scale(8),
+        marginBottom: scale(6),
         backgroundColor: 'rgba(160, 160, 168,0.12)',
     },
     quickReactionButton: {
@@ -4087,9 +4503,9 @@ const styles = StyleSheet.create({
     quickReactionText: { fontSize: scale(22), lineHeight: scale(26) },
     messageActionItem: {
         width: '100%',
-        minHeight: scale(52),
-        paddingHorizontal: scale(14),
-        borderRadius: scale(10),
+        height: scale(48),
+        paddingHorizontal: scale(10),
+        borderRadius: scale(8),
         justifyContent: 'center',
     },
     messageActionItemRow: {
@@ -4104,7 +4520,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(14), lineHeight: scale(18), fontWeight: '400' },
+    messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(16), lineHeight: scale(22), fontWeight: '400' },
     messageActionPressed: { backgroundColor: 'rgba(160, 160, 168,0.12)' },
     replyQuote: {
         borderLeftWidth: scale(3),
@@ -4114,9 +4530,8 @@ const styles = StyleSheet.create({
         marginBottom: scale(7),
     },
     reactionWrap: {
-        position: 'absolute',
-        left: scale(10),
-        bottom: -scale(12),
+        marginLeft: scale(10),
+        marginTop: -scale(8),
         alignSelf: 'flex-start',
         flexDirection: 'row',
         flexWrap: 'wrap',

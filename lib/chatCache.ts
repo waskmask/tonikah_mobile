@@ -41,7 +41,7 @@ export async function saveCachedMessages(
     const trimmed = sortAscending(
         messages.filter((message) => {
             if (!message || message.pending) return false;
-            const stableServerMessage = message.id && !String(message.id).startsWith('tmp_');
+            const stableServerMessage = message.id && !message.tempId && !String(message.id).startsWith('tmp_');
             const retryableTextMessage = message.failed
                 && message.type === 'text'
                 && Boolean(message.tempId)
@@ -62,6 +62,20 @@ export async function clearCachedMessages(
 ): Promise<void> {
     if (!userId || !conversationId) return;
     await storage.removeItem(keyFor(userId, conversationId));
+}
+
+export async function markCachedMessageUnsent(userId: string, conversationId: string, messageId: string): Promise<void> {
+    const messages = await loadCachedMessages(userId, conversationId);
+    if (!messages) return;
+    await saveCachedMessages(userId, conversationId, messages.map((message) => message.id === messageId
+        ? { ...message, type: 'system', content: 'message_unsent', media: null, unsent: true }
+        : message));
+}
+
+export async function removeCachedMessageForUser(userId: string, conversationId: string, messageId: string): Promise<void> {
+    const messages = await loadCachedMessages(userId, conversationId);
+    if (!messages) return;
+    await saveCachedMessages(userId, conversationId, messages.filter((message) => message.id !== messageId));
 }
 
 export async function clearAllCachedMessages(userId: string): Promise<void> {

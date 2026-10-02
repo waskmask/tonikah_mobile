@@ -19,3 +19,20 @@ export function releaseChatAudioPlayback(owner: ChatAudioPlaybackOwner) {
     activeOwner = null;
     pauseActivePlayback = null;
 }
+
+export function isChatAudioPlaybackOwner(owner: ChatAudioPlaybackOwner) {
+    return activeOwner === owner;
+}
+
+export function stopChatAudioPlaybackForMessage(messageId: string) {
+    if (activeOwner?.description !== `voice-message:${messageId}`) return;
+    pauseActivePlayback?.();
+    activeOwner = null;
+    pauseActivePlayback = null;
+}
+
+export function stopAllChatAudioPlayback() {
+    pauseActivePlayback?.();
+    activeOwner = null;
+    pauseActivePlayback = null;
+}

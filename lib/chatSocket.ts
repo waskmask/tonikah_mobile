@@ -8,6 +8,10 @@ import { queryClient } from '@/lib/queryClient';
 import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
 import { withMessagingAccessClock } from '@/lib/messagingAccess';
 import { applyAcceptedConversationById, applyConversationStateById } from '@/lib/chatInboxCache';
+import { useAuthStore } from '@/store/authStore';
+import { deleteCachedChatMediaForMessage } from '@/lib/chatMediaCache';
+import { markCachedMessageUnsent, removeCachedMessageForUser } from '@/lib/chatCache';
+import { stopChatAudioPlaybackForMessage } from '@/lib/chatAudioPlayback';
 
 /**
  * Singleton chat socket. Previously every useChatSocket() call opened its own
@@ -21,6 +25,7 @@ export type ChatSocketHandlers = {
     conversationId?: string | null;
     onMessage?: (message: ChatMessage, payload: any) => void;
     onMessageUnsent?: (messageId: string, payload: any) => void;
+    onMessageDeleted?: (messageId: string, payload: any) => void;
     onMessageUpdated?: (payload: any) => void;
     onConversationChanged?: (payload: any) => void;
     onRequestAccepted?: (payload: any) => void;
@@ -161,15 +166,44 @@ async function ensureSocket() {
         });
 
         nextSocket.on('chat:message:unsent', (payload) => {
+            const messageId = String(payload?.messageId || '');
+            const conversationId = String(payload?.conversationId || '');
+            const user = useAuthStore.getState().user;
+            const userId = String(user?._id || user?.id || '');
+            if (messageId && conversationId && userId) {
+                stopChatAudioPlaybackForMessage(messageId);
+                void Promise.allSettled([
+                    deleteCachedChatMediaForMessage({ userId, conversationId, messageId }),
+                    markCachedMessageUnsent(userId, conversationId, messageId),
+                ]);
+            }
             broadcast((handlers) => {
-                handlers.onMessageUnsent?.(String(payload?.messageId || ''), payload);
+                if (matchesConversation(handlers, payload)) handlers.onMessageUnsent?.(messageId, payload);
+                if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
+            });
+        });
+
+        nextSocket.on('chat:message:deleted-for-me', (payload) => {
+            const messageId = String(payload?.messageId || '');
+            const conversationId = String(payload?.conversationId || '');
+            const user = useAuthStore.getState().user;
+            const userId = String(user?._id || user?.id || '');
+            if (messageId && conversationId && userId) {
+                stopChatAudioPlaybackForMessage(messageId);
+                void Promise.allSettled([
+                    deleteCachedChatMediaForMessage({ userId, conversationId, messageId }),
+                    removeCachedMessageForUser(userId, conversationId, messageId),
+                ]);
+            }
+            broadcast((handlers) => {
+                if (matchesConversation(handlers, payload)) handlers.onMessageDeleted?.(messageId, payload);
                 if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
             });
         });
 
         const forwardUpdated = (payload: any) => {
             broadcast((handlers) => {
-                handlers.onMessageUpdated?.(payload);
+                if (matchesConversation(handlers, payload)) handlers.onMessageUpdated?.(payload);
                 if (!handlers.conversationId) handlers.onConversationChanged?.(payload);
             });
         };

@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Keyboard,
     Modal,
-    Platform,
     Pressable,
     StatusBar,
     StyleSheet,
@@ -12,22 +11,22 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { X } from '@/components/ui/icons/PhosphorCompat';
-import { ArrowCounterClockwise, Crop, NumberCircleOne, PaperPlaneTilt } from 'phosphor-react-native';
+import { ArrowClockwise, ArrowCounterClockwise, Crop, NumberCircleOne, PaperPlaneTilt } from 'phosphor-react-native';
 import Reanimated, { interpolate, useAnimatedStyle } from 'react-native-reanimated';
 import {
-    AndroidSoftInputModes,
-    KeyboardController,
     useKeyboardContext,
 } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale } from '@/hooks/useResponsive';
 import { Text } from '@/components/ui/Text';
 import { translateChatText } from '@/lib/chatDisplay';
+import { ChatImageCropEditor, type ChatImageCropEditorRef } from '@/components/chat/ChatImageCropEditor';
+import type { ImageSize } from '@/lib/chatImageCrop';
 
 export const IMAGE_CAPTION_LIMIT = 500;
 
 /** Opaque bar — prevents white flash through transparent layers during keyboard animation. */
-const MEDIA_PREVIEW = { footer: '#141C28', field: '#303945', text: '#FFFFFF' };
+const MEDIA_PREVIEW = { footer: '#18181A', field: '#252527', text: '#FFFFFF', placeholder: '#B8B8BE' };
 
 type ChatColors = {
     primary: string;
@@ -38,6 +37,7 @@ type ChatColors = {
 type Props = {
     visible: boolean;
     uri: string | null;
+    sourceSize?: ImageSize;
     caption: string;
     viewOnce: boolean;
     uploading: boolean;
@@ -56,14 +56,20 @@ type Props = {
     onClose: () => void;
     onSend: () => void;
     onCrop?: () => void;
+    onApplyCrop: (result: { uri: string; width: number; height: number }) => void;
+    onCropError: () => void;
     onReset?: () => void;
     cropLabel?: string;
     resetLabel?: string;
+    cancelLabel: string;
+    rotateLabel: string;
+    doneLabel: string;
 };
 
 export function ImageAttachmentComposer({
     visible,
     uri,
+    sourceSize,
     caption,
     viewOnce,
     uploading,
@@ -76,9 +82,14 @@ export function ImageAttachmentComposer({
     onClose,
     onSend,
     onCrop,
+    onApplyCrop,
+    onCropError,
     onReset,
     cropLabel,
     resetLabel,
+    cancelLabel,
+    rotateLabel,
+    doneLabel,
 }: Props) {
     const insets = useSafeAreaInsets();
     const bottomInset = Math.max(insets.bottom, scale(8));
@@ -87,11 +98,18 @@ export function ImageAttachmentComposer({
     const [imageState, setImageState] = useState<'loading' | 'ready' | 'error'>('loading');
     const [imageAttempt, setImageAttempt] = useState(0);
     const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [cropMode, setCropMode] = useState(false);
+    const [cropBusy, setCropBusy] = useState(false);
+    const cropEditorRef = useRef<ChatImageCropEditorRef>(null);
 
     useEffect(() => {
         setImageState('loading');
         setImageAttempt(0);
     }, [uri]);
+
+    useEffect(() => {
+        if (!visible) setCropMode(false);
+    }, [visible]);
 
     useEffect(() => {
         const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -100,6 +118,10 @@ export function ImageAttachmentComposer({
     }, []);
 
     const handleClose = () => {
+        if (cropMode) {
+            if (!cropBusy) setCropMode(false);
+            return;
+        }
         if (keyboardVisible) {
             Keyboard.dismiss();
             return;
@@ -112,22 +134,13 @@ export function ImageAttachmentComposer({
         onSend();
     };
 
-    useEffect(() => {
-        // Keep the image preview fixed while its caption keyboard is open.
-        if (!visible || Platform.OS !== 'android') return;
-        KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_NOTHING);
-        return () => {
-            KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE);
-        };
-    }, [visible]);
-
     // height is negative when the keyboard is open -> bar moves up by the keyboard height.
     const barLiftStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: reanimated.height.value }],
+        transform: [{ translateY: cropMode ? 0 : reanimated.height.value }],
     }));
 
     const barPadStyle = useAnimatedStyle(() => ({
-        paddingBottom: interpolate(reanimated.progress.value, [0, 1], [bottomInset, 0]),
+        paddingBottom: cropMode ? bottomInset : interpolate(reanimated.progress.value, [0, 1], [bottomInset, 0]),
     }));
 
     return (
@@ -141,34 +154,43 @@ export function ImageAttachmentComposer({
             <View style={styles.root} collapsable={false}>
                 {/* Image fills the screen via flex; the composer floats over it (absolute), so
                     opening the keyboard never resizes the image. ADJUST_NOTHING keeps it fixed. */}
-                <Pressable
-                    onPress={Keyboard.dismiss}
-                    style={[styles.imageStage, { paddingTop: insets.top + scale(8), paddingBottom: footerHeight + scale(8) }]}
-                    collapsable={false}
-                >
-                    {!!uri && (
-                        <Image
-                            key={`${uri}:${imageAttempt}`}
-                            source={{ uri }}
-                            style={styles.image}
-                            contentFit="contain"
-                            transition={0}
-                            onLoad={() => setImageState('ready')}
-                            onError={() => setImageState('error')}
+                <View style={[styles.imageStage, { paddingTop: insets.top + scale(8), paddingBottom: footerHeight + scale(8) }]} collapsable={false}>
+                    {cropMode && uri ? (
+                        <ChatImageCropEditor
+                            ref={cropEditorRef}
+                            uri={uri}
+                            sourceSize={sourceSize}
+                            onDone={(result) => { setCropMode(false); onApplyCrop(result); }}
+                            onError={onCropError}
+                            onBusyChange={setCropBusy}
                         />
+                    ) : (
+                        <Pressable onPress={Keyboard.dismiss} style={styles.imageCanvas}>
+                            {!!uri && (
+                                <Image
+                                    key={`${uri}:${imageAttempt}`}
+                                    source={{ uri }}
+                                    style={styles.image}
+                                    contentFit="contain"
+                                    transition={0}
+                                    onLoad={() => setImageState('ready')}
+                                    onError={() => setImageState('error')}
+                                />
+                            )}
+                            {imageState === 'loading' && <ActivityIndicator style={styles.imageStatus} color={MEDIA_PREVIEW.text} />}
+                            {imageState === 'error' && (
+                                <View style={styles.imageError}>
+                                    <Text style={{ color: MEDIA_PREVIEW.text }}>{translateChatText('image_unavailable', 'Could not open this image.')}</Text>
+                                    <Pressable onPress={() => { setImageState('loading'); setImageAttempt((value) => value + 1); }} style={styles.retryButton}>
+                                        <Text style={{ color: MEDIA_PREVIEW.text }}>{translateChatText('retry', 'Retry')}</Text>
+                                    </Pressable>
+                                </View>
+                            )}
+                        </Pressable>
                     )}
-                    {imageState === 'loading' && <ActivityIndicator style={styles.imageStatus} color={MEDIA_PREVIEW.text} />}
-                    {imageState === 'error' && (
-                        <View style={styles.imageError}>
-                            <Text style={{ color: MEDIA_PREVIEW.text }}>{translateChatText('image_unavailable', 'Could not open this image.')}</Text>
-                            <Pressable onPress={() => { setImageState('loading'); setImageAttempt((value) => value + 1); }} style={styles.retryButton}>
-                                <Text style={{ color: MEDIA_PREVIEW.text }}>{translateChatText('retry', 'Retry')}</Text>
-                            </Pressable>
-                        </View>
-                    )}
-                </Pressable>
+                </View>
 
-                <Pressable
+                {!cropMode && <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={labels.closeA11y}
                     onPress={handleClose}
@@ -176,19 +198,31 @@ export function ImageAttachmentComposer({
                     style={[styles.closeButton, { top: insets.top + scale(10) }]}
                 >
                     <X size={scale(22)} color="#FFFFFF" strokeWidth={2.6} />
-                </Pressable>
-                <View style={[styles.editToolbar, { top: insets.top + scale(10) }]}>
-                    {!!onCrop && <Pressable accessibilityRole="button" accessibilityLabel={cropLabel || 'Crop'} onPress={onCrop} disabled={uploading || imageState !== 'ready'} style={styles.editButton}>
+                </Pressable>}
+                {!cropMode && <View style={[styles.editToolbar, { top: insets.top + scale(10) }]}>
+                    {!!onCrop && <Pressable accessibilityRole="button" accessibilityLabel={cropLabel || 'Crop'} onPress={() => { Keyboard.dismiss(); onCrop(); setCropMode(true); }} disabled={uploading || imageState !== 'ready'} style={styles.editButton}>
                         <Crop size={scale(21)} color={imageState === 'ready' ? MEDIA_PREVIEW.text : colors.subtle} />
                     </Pressable>}
                     {!!onReset && <Pressable accessibilityRole="button" accessibilityLabel={resetLabel || 'Reset'} onPress={onReset} disabled={uploading} style={styles.editButton}>
                         <ArrowCounterClockwise size={scale(21)} color={MEDIA_PREVIEW.text} />
                     </Pressable>}
-                </View>
+                </View>}
 
                 <Reanimated.View style={[styles.barWrap, barLiftStyle]} collapsable={false}>
                     <Reanimated.View style={[styles.bar, barPadStyle]} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)} collapsable={false}>
-                        <View style={styles.composer}>
+                        {cropMode ? (
+                            <View style={[styles.cropActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <Pressable accessibilityRole="button" onPress={() => setCropMode(false)} disabled={cropBusy} style={styles.cropTextButton}>
+                                    <Text style={styles.cropActionText}>{cancelLabel}</Text>
+                                </Pressable>
+                                <Pressable accessibilityRole="button" accessibilityLabel={rotateLabel} onPress={() => cropEditorRef.current?.rotate()} disabled={cropBusy} style={styles.cropRotateButton}>
+                                    <ArrowClockwise size={scale(24)} color={MEDIA_PREVIEW.text} />
+                                </Pressable>
+                                <Pressable accessibilityRole="button" onPress={() => void cropEditorRef.current?.save()} disabled={cropBusy} style={[styles.cropTextButton, styles.cropDoneButton]}>
+                                    {cropBusy ? <ActivityIndicator color={MEDIA_PREVIEW.text} /> : <Text style={styles.cropDoneText}>{doneLabel}</Text>}
+                                </Pressable>
+                            </View>
+                        ) : <View style={styles.composer}>
                             <View style={[styles.captionPill, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                 <TextInput
                                     value={caption}
@@ -196,7 +230,7 @@ export function ImageAttachmentComposer({
                                     editable={!uploading}
                                     maxLength={IMAGE_CAPTION_LIMIT}
                                     placeholder={labels.captionPlaceholder}
-                                    placeholderTextColor={colors.subtle}
+                                    placeholderTextColor={MEDIA_PREVIEW.placeholder}
                                     style={[styles.captionInput, { fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                     multiline
                                 />
@@ -226,7 +260,7 @@ export function ImageAttachmentComposer({
                                     ? <ActivityIndicator color={colors.inverse} size="small" />
                                     : <PaperPlaneTilt size={scale(20)} color={imageState === 'ready' ? colors.inverse : colors.subtle} weight="fill" />}
                             </Pressable>
-                        </View>
+                        </View>}
                     </Reanimated.View>
                 </Reanimated.View>
             </View>
@@ -242,6 +276,7 @@ const styles = StyleSheet.create({
     imageStage: {
         flex: 1,
     },
+    imageCanvas: { flex: 1 },
     image: {
         flex: 1,
         width: '100%',
@@ -281,7 +316,13 @@ const styles = StyleSheet.create({
         paddingVertical: scale(10),
         backgroundColor: MEDIA_PREVIEW.footer,
     },
-    captionPill: { flex: 1, minHeight: scale(44), maxHeight: scale(120), borderRadius: scale(22), backgroundColor: MEDIA_PREVIEW.field, alignItems: 'flex-end' },
+    cropActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: scale(64), paddingHorizontal: scale(20), backgroundColor: MEDIA_PREVIEW.footer },
+    cropTextButton: { minWidth: scale(72), minHeight: scale(48), justifyContent: 'center' },
+    cropDoneButton: { alignItems: 'flex-end' },
+    cropRotateButton: { width: scale(48), height: scale(48), alignItems: 'center', justifyContent: 'center' },
+    cropActionText: { color: MEDIA_PREVIEW.text, fontSize: scale(15) },
+    cropDoneText: { color: '#F34B6F', fontSize: scale(15), fontWeight: '600' },
+    captionPill: { flex: 1, minHeight: scale(44), maxHeight: scale(120), borderRadius: scale(22), backgroundColor: MEDIA_PREVIEW.field, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.38)', alignItems: 'flex-end' },
     viewOnceButton: {
         width: scale(44),
         height: scale(44),

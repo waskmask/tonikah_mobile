@@ -4,6 +4,7 @@ import { clearCachedInbox } from '@/lib/chatInboxCache';
 import { clearChatMediaCache, clearChatMediaCacheForUser } from '@/lib/chatMediaCache';
 import { queryClient } from '@/lib/queryClient';
 import { clearOfflineMessageQueue } from '@/lib/offlineMessageQueue';
+import { stopAllChatAudioPlayback } from '@/lib/chatAudioPlayback';
 
 async function clearEveryCachedInbox(): Promise<void> {
     const keys = await AsyncStorage.getAllKeys();
@@ -12,6 +13,7 @@ async function clearEveryCachedInbox(): Promise<void> {
 }
 
 export async function clearPrivateChatData(userId?: string | null): Promise<void> {
+    stopAllChatAudioPlayback();
     await queryClient.cancelQueries({ queryKey: ['chat'] }).catch(() => undefined);
     queryClient.removeQueries({ queryKey: ['chat'] });
 

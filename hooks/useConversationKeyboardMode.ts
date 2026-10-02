@@ -7,7 +7,7 @@ import {
 } from 'react-native-keyboard-controller';
 
 /**
- * Keep the conversation in resize mode while it is focused.
+ * Let the keyboard-controller view own conversation resizing while focused.
  */
 export function useConversationKeyboardMode() {
     useFocusEffect(
@@ -15,7 +15,7 @@ export function useConversationKeyboardMode() {
             if (Platform.OS !== 'android') return undefined;
 
             const apply = () => {
-                KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE);
+                KeyboardController.setInputMode(AndroidSoftInputModes.SOFT_INPUT_ADJUST_NOTHING);
             };
 
             apply();

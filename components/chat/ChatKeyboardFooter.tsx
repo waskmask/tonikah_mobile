@@ -7,27 +7,50 @@ import {
     type ViewStyle,
 } from 'react-native';
 import Reanimated, { interpolate, useAnimatedStyle } from 'react-native-reanimated';
-import { KeyboardAvoidingView, useKeyboardContext } from 'react-native-keyboard-controller';
+import { useKeyboardContext } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale } from '@/hooks/useResponsive';
 
 /**
- * The header stays outside this view; only the message list and composer
- * resize as the keyboard moves on either platform.
+ * Keep the body at a stable height so the keyboard does not move the header.
  */
 export function ChatKeyboardAvoider({ children }: { children: React.ReactNode }) {
-    return (
-        <KeyboardAvoidingView behavior="height" automaticOffset style={styles.flex}>
-            {children}
-        </KeyboardAvoidingView>
-    );
+    return <View style={styles.flex}>{children}</View>;
+}
+
+export function ChatKeyboardViewport({
+    composerHeight,
+    children,
+}: {
+    composerHeight: number;
+    children: React.ReactNode;
+}) {
+    const insets = useSafeAreaInsets();
+    const bottomInset = Math.max(insets.bottom, scale(8));
+    const { reanimated } = useKeyboardContext();
+    const viewportStyle = useAnimatedStyle(() => ({
+        marginBottom: composerHeight
+            + interpolate(reanimated.progress.value, [0, 1], [bottomInset, 0])
+            - reanimated.height.value,
+    }));
+
+    return <Reanimated.View style={[styles.flex, viewportStyle]}>{children}</Reanimated.View>;
+}
+
+export function ChatStickyComposer({ children }: { children: React.ReactNode }) {
+    const { reanimated } = useKeyboardContext();
+    const stickyStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: reanimated.height.value }],
+    }));
+
+    return <Reanimated.View style={[styles.stickyComposer, stickyStyle]}>{children}</Reanimated.View>;
 }
 
 type ComposerBarProps = {
     backgroundColor: string;
     borderTopColor?: string;
-    onLayout?: (event: LayoutChangeEvent) => void;
     children: React.ReactNode;
+    onContentLayout?: (event: LayoutChangeEvent) => void;
     style?: StyleProp<ViewStyle>;
 };
 
@@ -38,8 +61,8 @@ type ComposerBarProps = {
 export function ChatComposerBar({
     backgroundColor,
     borderTopColor,
-    onLayout,
     children,
+    onContentLayout,
     style,
 }: ComposerBarProps) {
     const insets = useSafeAreaInsets();
@@ -64,7 +87,7 @@ export function ChatComposerBar({
             ]}
             collapsable={false}
         >
-            <View onLayout={onLayout} collapsable={false}>
+            <View collapsable={false} onLayout={onContentLayout}>
                 {children}
             </View>
         </Reanimated.View>
@@ -74,6 +97,12 @@ export function ChatComposerBar({
 const styles = StyleSheet.create({
     flex: {
         flex: 1,
+    },
+    stickyComposer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
     },
     bar: {
         elevation: 0,

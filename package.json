@@ -20,6 +20,7 @@
     "test:auth-token": "tsx scripts/test-auth-token.ts",
     "test:auth-return": "tsx scripts/test-auth-return.ts",
     "test:chat-relationship": "tsx scripts/test-chat-relationship.ts",
+    "test:chat-message-media": "tsx scripts/test-chat-message-media.ts",
     "test:language-names": "tsx scripts/test-language-names.ts",
     "generate:nationality-iso": "node scripts/generate-nationality-iso.cjs",
     "i18n:audit": "node scripts/audit-i18n.mjs"

@@ -4,6 +4,21 @@ Use this runbook to install the toNikah React Native app on registered iPhones
 through EAS Build. The app uses native modules, so use a development or preview
 build, not Expo Go.
 
+## Choose the Build
+
+Register the iPhone once using `npx eas-cli@latest device:create`, then choose
+**one** build profile:
+
+| Goal | Build command | Needs Metro? | After a JavaScript change |
+| --- | --- | --- | --- |
+| Test the app's standalone behavior or share it with registered testers | `npx eas-cli@latest build --profile preview --platform ios` | No | Build a new preview IPA |
+| Develop with Fast Refresh on your iPhone | `npx eas-cli@latest build --profile development --platform ios` | Yes | Reload the app from Metro |
+
+For a realistic keyboard-animation check, use **preview**. The commands below
+describe both workflows separately; they are alternatives, not steps to run
+one after the other. With the current bundle identifier, installing one profile
+replaces the other on the same iPhone.
+
 ## Environment
 
 Commands below run from the React Native project directory. In PowerShell:

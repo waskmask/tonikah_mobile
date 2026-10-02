@@ -170,17 +170,17 @@ export async function storeLocalChatMedia(input: CacheInput & { sourceUri: strin
 }
 
 export async function deleteCachedChatMediaForMessage(input: Pick<CacheInput, 'userId' | 'conversationId' | 'messageId'>) {
-    if (!FileSystem.documentDirectory || !input.messageId) return;
+    if (!FileSystem.documentDirectory || !input.userId || !input.conversationId || !input.messageId) return;
     const dir = await FileSystem.getInfoAsync(ROOT_DIR);
     if (!dir.exists) return;
 
-    const message = safePart(input.messageId);
+    const prefix = `${safePart(input.userId)}_${safePart(input.conversationId)}_${safePart(input.messageId)}_`;
     for (const uri of inFlightDownloads.keys()) {
-        if (uri.includes(`_${message}_`)) invalidateUri(uri);
+        if (uri.startsWith(`${ROOT_DIR}${prefix}`)) invalidateUri(uri);
     }
     const files = await FileSystem.readDirectoryAsync(ROOT_DIR);
     files
-        .filter((file) => file.includes(`_${message}_`))
+        .filter((file) => file.startsWith(prefix))
         .forEach((file) => {
             const uri = `${ROOT_DIR}${file.replace(/\.(download|pending)$/, '')}`;
             invalidateUri(uri);
@@ -188,7 +188,7 @@ export async function deleteCachedChatMediaForMessage(input: Pick<CacheInput, 'u
         });
     await Promise.all(
         files
-            .filter((file) => file.includes(`_${message}_`))
+            .filter((file) => file.startsWith(prefix))
             .map((file) => FileSystem.deleteAsync(`${ROOT_DIR}${file}`, { idempotent: true }).catch(() => undefined)),
     );
 }
@@ -202,10 +202,13 @@ export async function clearChatMediaCache() {
 
 export async function clearChatMediaCacheForUser(userId: string) {
     if (!FileSystem.documentDirectory || !userId) return;
+    const prefix = `${safePart(userId)}_`;
+    for (const uri of inFlightDownloads.keys()) {
+        if (uri.startsWith(`${ROOT_DIR}${prefix}`)) invalidateUri(uri);
+    }
     const dir = await FileSystem.getInfoAsync(ROOT_DIR);
     if (!dir.exists) return;
 
-    const prefix = `${safePart(userId)}_`;
     const files = await FileSystem.readDirectoryAsync(ROOT_DIR);
     files
         .filter((file) => file.startsWith(prefix))

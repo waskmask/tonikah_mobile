@@ -97,6 +97,7 @@ export type ChatMessage = {
     createdAt: string;
     pending?: boolean;
     failed?: boolean;
+    failureReason?: string;
     queued?: boolean;
     tempId?: string;
     clientMessageId?: string | null;

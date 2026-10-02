@@ -21,11 +21,18 @@ export function ConnectivityMonitor() {
     const refreshUser = useAuthStore((state) => state.refreshUser);
     const userId = useAuthStore((state) => String(state.user?._id || state.user?.id || ''));
     const previousStatusRef = useRef(status);
+    const lastFlushedUserRef = useRef('');
 
     useEffect(() => {
         void connectivity.check();
         const subscription = AppState.addEventListener('change', (nextState) => {
-            if (nextState === 'active') void connectivity.check();
+            if (nextState === 'active') {
+                void connectivity.check().then((online) => {
+                    if (!online) return;
+                    const currentUser = useAuthStore.getState().user;
+                    void flushOfflineMessageQueue(String(currentUser?._id || currentUser?.id || ''));
+                });
+            }
         });
         return () => subscription.remove();
     }, []);
@@ -39,7 +46,9 @@ export function ConnectivityMonitor() {
             void refreshUser();
             void queryClient.refetchQueries({ type: 'active' });
         }
-        if (status === 'online' && previous !== 'online') {
+        if (status !== 'online') lastFlushedUserRef.current = '';
+        if (status === 'online' && userId && (previous !== 'online' || lastFlushedUserRef.current !== userId)) {
+            lastFlushedUserRef.current = userId;
             void flushOfflineMessageQueue(userId);
         }
     }, [queryClient, refreshUser, status, userId]);
