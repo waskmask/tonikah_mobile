@@ -22,8 +22,6 @@ import { t } from '@/lib/profileDisplay';
 import { useLanguage } from '@/hooks/useLanguage';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 
-const PREVIEW_TOP_BADGES = __DEV__;
-
 export function ExploreDeckCard({
     profile,
     viewerLat,
@@ -69,12 +67,12 @@ export function ExploreDeckCard({
                 locations={[0, 0.42, 0.72, 1]}
                 style={StyleSheet.absoluteFill}
             />
-            {membership || PREVIEW_TOP_BADGES ? (
+            {membership ? (
                 <View style={[styles.topBadge, styles.membershipBadge]}>
                     <CrownSimple size={scale(22)} color="#201B15" weight="fill" />
                 </View>
             ) : null}
-            {verified || PREVIEW_TOP_BADGES ? (
+            {verified ? (
                 <View style={[styles.topBadge, styles.verifiedBadge]}>
                     <View style={styles.layeredBadgeIcon}>
                         <SealCheck size={scale(24)} color="#F34B6F" weight="fill" style={styles.layeredBadgeFill} />

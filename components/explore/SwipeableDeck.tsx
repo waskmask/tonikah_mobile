@@ -41,6 +41,7 @@ type Props = {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+const MIN_FLING_DISTANCE = scale(24);
 const FLING_VELOCITY = 900;
 const VERTICAL_OPEN_THRESHOLD = 36;
 const VERTICAL_FLING_VELOCITY = 650;
@@ -222,7 +223,7 @@ export const SwipeableDeck = forwardRef<SwipeableDeckHandle, Props>(function Swi
 
             const projectedX = event.translationX + event.velocityX * 0.16;
             const byDistance = Math.abs(event.translationX) > SWIPE_THRESHOLD;
-            const byVelocity = Math.abs(event.translationX) > scale(24)
+            const byVelocity = Math.abs(event.translationX) > MIN_FLING_DISTANCE
                 && Math.abs(event.velocityX) > FLING_VELOCITY
                 && Math.abs(projectedX) > SWIPE_THRESHOLD;
             if (!byDistance && !byVelocity) {

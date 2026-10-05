@@ -1875,6 +1875,19 @@
   "message_empty": "Lütfen göndermeden önce bir mesaj girin.",
   "yes": "Evet",
   "no": "Hayır",
+  "membership_show_benefits": "Avantajları göster",
+  "membership_hide_benefits": "Avantajları gizle",
+  "membership_duration": {
+    "month_one": "ay",
+    "month_other": "ay",
+    "year_one": "yıl",
+    "year_other": "yıl",
+    "week_one": "hafta",
+    "week_other": "hafta",
+    "day_one": "gün",
+    "day_other": "gün"
+  },
+  "membership_plans_title": "Üyelik planları",
   "membership_plans": {
     "shared_features": [
       "Ciddi profilleri keşfedin",

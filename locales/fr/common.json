@@ -1875,6 +1875,19 @@
   "message_empty": "Veuillez saisir un message avant l'envoi.",
   "yes": "Oui",
   "no": "Non",
+  "membership_show_benefits": "Afficher les avantages",
+  "membership_hide_benefits": "Masquer les avantages",
+  "membership_duration": {
+    "month_one": "mois",
+    "month_other": "mois",
+    "year_one": "an",
+    "year_other": "ans",
+    "week_one": "semaine",
+    "week_other": "semaines",
+    "day_one": "jour",
+    "day_other": "jours"
+  },
+  "membership_plans_title": "Formules d’adhésion",
   "membership_plans": {
     "shared_features": [
       "Explorer des profils sérieux",

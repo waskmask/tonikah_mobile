@@ -1875,6 +1875,19 @@
   "message_empty": "Harap masukkan pesan sebelum mengirim.",
   "yes": "Ya",
   "no": "Tidak",
+  "membership_show_benefits": "Tampilkan manfaat",
+  "membership_hide_benefits": "Sembunyikan manfaat",
+  "membership_duration": {
+    "month_one": "bulan",
+    "month_other": "bulan",
+    "year_one": "tahun",
+    "year_other": "tahun",
+    "week_one": "minggu",
+    "week_other": "minggu",
+    "day_one": "hari",
+    "day_other": "hari"
+  },
+  "membership_plans_title": "Paket keanggotaan",
   "membership_plans": {
     "shared_features": [
       "Jelajahi profil yang serius",

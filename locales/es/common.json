@@ -1875,6 +1875,19 @@
   "message_empty": "Por favor, introduce un mensaje antes de enviar.",
   "yes": "Sí",
   "no": "No",
+  "membership_show_benefits": "Mostrar ventajas",
+  "membership_hide_benefits": "Ocultar ventajas",
+  "membership_duration": {
+    "month_one": "mes",
+    "month_other": "meses",
+    "year_one": "año",
+    "year_other": "años",
+    "week_one": "semana",
+    "week_other": "semanas",
+    "day_one": "día",
+    "day_other": "días"
+  },
+  "membership_plans_title": "Planes de membresía",
   "membership_plans": {
     "shared_features": [
       "Explora perfiles serios",

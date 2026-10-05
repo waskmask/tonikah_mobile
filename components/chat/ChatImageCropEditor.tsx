@@ -177,7 +177,7 @@ export const ChatImageCropEditor = forwardRef<ChatImageCropEditorRef, Props>(fun
 });
 
 const styles = StyleSheet.create({
-    stage: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    stage: { flex: 1, width: '90%', alignSelf: 'center', justifyContent: 'center', alignItems: 'center' },
     imageBounds: { position: 'absolute' },
     shade: { position: 'absolute', backgroundColor: 'rgba(0,0,0,0.53)' },
     selection: { position: 'absolute', borderColor: '#FFFFFF', borderWidth: 1.5 },

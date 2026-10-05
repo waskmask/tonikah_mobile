@@ -2,12 +2,13 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { GlassView, isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import { Info, SlidersHorizontal } from 'phosphor-react-native';
-import { AppMenuButton } from '@/components/app/AppMenuButton';
+import { Info, List, SlidersHorizontal } from 'phosphor-react-native';
 import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { useTheme } from '@/hooks/useTheme';
 import { t } from '@/lib/profileDisplay';
+
+const HEADER_ICON_SIZE = scale(22);
 
 export function ExploreTopOverlay({
     filterCount,
@@ -72,9 +73,11 @@ export function ExploreTopOverlay({
             </Pressable>
             <View style={styles.actions}>
                 <IconButton onPress={onOpenTour} accessibilityLabel={t('explore_guide', 'Explore guide')}>
-                    <Info size={scale(Platform.OS === 'android' ? 20 : 18)} color={iconColor} weight="bold" />
+                    <Info size={HEADER_ICON_SIZE} style={styles.iconSvg} color={iconColor} weight="bold" />
                 </IconButton>
-                <AppMenuButton onPress={onOpenMenu} />
+                <IconButton onPress={onOpenMenu} accessibilityLabel={t('menu', 'Menu')}>
+                    <List size={HEADER_ICON_SIZE} style={styles.iconSvg} color={iconColor} weight="bold" />
+                </IconButton>
             </View>
         </View>
     );
@@ -82,20 +85,19 @@ export function ExploreTopOverlay({
 
 function IconButton({ children, onPress, accessibilityLabel }: { children: React.ReactNode; onPress: () => void; accessibilityLabel: string }) {
     return (
-        <View style={styles.buttonShell}>
-            <Pressable
-                onPress={onPress}
-                accessibilityRole="button"
-                accessibilityLabel={accessibilityLabel}
-                hitSlop={6}
-                style={({ pressed }) => [
-                    styles.button,
-                    pressed && styles.pressed,
-                ]}
-            >
-                {children}
-            </Pressable>
-        </View>
+        <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel}
+            hitSlop={6}
+            style={styles.button}
+        >
+            {({ pressed }) => (
+                <View pointerEvents="none" style={[styles.buttonIconCenter, pressed && styles.pressed]}>
+                    {children}
+                </View>
+            )}
+        </Pressable>
     );
 }
 
@@ -118,8 +120,8 @@ const styles = StyleSheet.create({
         gap: scale(14),
     },
     filterWrap: {
-        width: scale(Platform.OS === 'android' ? 38 : 46),
-        height: scale(Platform.OS === 'android' ? 38 : 46),
+        width: scale(Platform.OS === 'android' ? 38 : 42),
+        height: scale(Platform.OS === 'android' ? 38 : 42),
         position: 'relative',
         overflow: 'visible',
     },
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        borderRadius: scale(Platform.OS === 'android' ? 18 : 22),
+        borderRadius: scale(Platform.OS === 'android' ? 38 : 42) / 2,
     },
     filterGlass: {
         position: 'absolute',
@@ -137,7 +139,7 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         left: 0,
-        borderRadius: scale(22),
+        borderRadius: scale(21),
         borderCurve: 'continuous',
     },
     filterIconCenter: {
@@ -149,22 +151,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    buttonShell: {
+    button: {
         width: scale(34),
         height: scale(34),
         borderRadius: scale(17),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    button: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-        borderRadius: scale(17),
+    buttonIconCenter: {
+        width: HEADER_ICON_SIZE,
+        height: HEADER_ICON_SIZE,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    iconSvg: {
+        width: HEADER_ICON_SIZE,
+        height: HEADER_ICON_SIZE,
     },
     pressed: {
         opacity: 0.78,

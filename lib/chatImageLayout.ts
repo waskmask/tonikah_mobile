@@ -6,7 +6,7 @@ export function chatImageLayout(width: number | undefined, height: number | unde
 
     return {
         width: frameWidth,
-        height: tall ? frameWidth * 4 / 3 : frameWidth * sourceHeight / sourceWidth,
-        crop: tall,
+        height: tall ? frameWidth * 4 / 3 : frameWidth,
+        crop: true,
     };
 }

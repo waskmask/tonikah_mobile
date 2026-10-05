@@ -2038,6 +2038,19 @@
   "account_menu": "Account menu",
   "report_issue": "Report an issue",
   "memberships": "Memberships",
+  "membership_show_benefits": "Show benefits",
+  "membership_hide_benefits": "Hide benefits",
+  "membership_duration": {
+    "month_one": "month",
+    "month_other": "months",
+    "year_one": "year",
+    "year_other": "years",
+    "week_one": "week",
+    "week_other": "weeks",
+    "day_one": "day",
+    "day_other": "days"
+  },
+  "membership_plans_title": "Membership plans",
   "membership_plans": {
     "shared_features": [
       "Explore serious profiles",

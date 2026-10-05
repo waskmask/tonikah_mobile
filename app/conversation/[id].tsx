@@ -34,7 +34,7 @@ import {
 } from 'expo-audio';
 import { WaveformRecorderView, type WaveformRecorderCompleteEvent, type WaveformRecorderState, type WaveformRecorderViewRef } from 'react-native-waveform-recorder';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Bell, BellOff, Camera, Check, CheckCheck, Copy, Download, Flag, Mic, MoreVertical, Pause, Play, RefreshCw, Reply, Trash2, Undo2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
+import { Bell, BellOff, Camera, Check, CheckCheck, Clock3, Download, Mic, MoreVertical, Pause, Play, RefreshCw, Reply, Trash2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
 import { CaretDoubleDown, CaretLeft, CaretRight, Paperclip, PaperPlaneTilt } from 'phosphor-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
@@ -62,9 +62,12 @@ import { BRAND_PRIMARY } from '@/constants/Colors';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
 import { ChatImageLightbox, type ChatImagePreview } from '@/components/chat/ChatImageLightbox';
+import { BUBBLE_TAIL_WIDTH, ImageTailMask, SolidBubbleTail } from '@/components/chat/MessageBubbleTail';
+import { MessageContextOverlay, type MessageContextAction } from '@/components/chat/MessageContextOverlay';
+import { MessageDeleteDialog } from '@/components/chat/MessageDeleteDialog';
+import type { MessageAnchor } from '@/lib/messageContextLayout';
 import { KeyboardController } from 'react-native-keyboard-controller';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetView } from '@gorhom/bottom-sheet';
 import Reanimated, {
     Easing,
     FadeInDown,
@@ -116,7 +119,6 @@ import {
 
 const PRIMARY = BRAND_PRIMARY;
 const CHAT_ONE_LINE_BUBBLE_SCROLL_THRESHOLD = scale(69);
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const UNSEND_WINDOW_MIN = 15;
 const VOICE_WAVE_BAR_COUNT = 64;
 const VOICE_MESSAGE_WAVE_BAR_COUNT = 32;
@@ -298,7 +300,7 @@ function replyPreview(message?: ChatMessage | string | null) {
 }
 
 function canUnsendMessage(message: ChatMessage, userId: string) {
-    if (!message?.id || !userId || message.unsent || message.type === 'system') return false;
+    if (!message?.id || !userId || message.unsent || message.type === 'system' || message.pending || message.failed || message.queued) return false;
     if (String(message.sender) !== String(userId)) return false;
     const created = new Date(message.createdAt).getTime();
     if (Number.isNaN(created)) return false;
@@ -378,7 +380,7 @@ export default function ConversationScreen() {
     const { currentLanguage, isRTL } = useLanguage();
     const { status: connectivityStatus, isOffline } = useConnectivity();
     const toast = useToast();
-    const { lightImpact } = useHaptics();
+    const { lightImpact, selection } = useHaptics();
     const insets = useSafeAreaInsets();
     useConversationKeyboardMode();
     const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
@@ -460,13 +462,23 @@ export default function ConversationScreen() {
     const [unseenWhileAway, setUnseenWhileAway] = useState(0);
     const [messageAreaWidth, setMessageAreaWidth] = useState(0);
     const [composerHeight, setComposerHeight] = useState(scale(56));
+    const screenContentRef = useRef<View>(null);
+    const screenOriginRef = useRef({ x: 0, y: insets.top });
+    const [menuViewport, setMenuViewport] = useState({ width: 0, height: 0 });
+    const [chatHeaderHeight, setChatHeaderHeight] = useState(scale(56));
+    const [selectedAnchor, setSelectedAnchor] = useState<MessageAnchor | null>(null);
     const [profileSheetOpen, setProfileSheetOpen] = useState(false);
     const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
     const selectedMessage = items.find((message) => message.id === selectedMessageId) || null;
-    const messageSheetRef = useRef<BottomSheet>(null);
-    const setSelectedMessage = (message: ChatMessage | null) => setSelectedMessageId(message?.id || null);
+    const setSelectedMessage = (message: ChatMessage | null) => {
+        setSelectedMessageId(message?.id || null);
+        if (!message) setSelectedAnchor(null);
+    };
     const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
     const [messageActionBusy, setMessageActionBusy] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+    const [deleteAction, setDeleteAction] = useState<'delete' | 'unsend' | null>(null);
+    const [deleteError, setDeleteError] = useState('');
     const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
     const prevNewestMessageIdRef = useRef('');
     const [peerTyping, setPeerTyping] = useState(false);
@@ -476,26 +488,17 @@ export default function ConversationScreen() {
     const previousConnectivityRef = useRef(connectivityStatus);
 
     useEffect(() => {
-        if (selectedMessageId && selectedMessage) {
-            Keyboard.dismiss();
-            messageSheetRef.current?.snapToIndex(0);
-        } else {
-            messageSheetRef.current?.close();
-        }
-    }, [selectedMessageId]);
-
-    useEffect(() => {
         if (selectedMessageId && !selectedMessage) setSelectedMessageId(null);
     }, [selectedMessageId, selectedMessage]);
 
     useEffect(() => {
         if (!selectedMessageId) return;
         const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-            setSelectedMessageId(null);
+            if (!messageActionBusy) setSelectedMessage(null);
             return true;
         });
         return () => subscription.remove();
-    }, [selectedMessageId]);
+    }, [messageActionBusy, selectedMessageId]);
 
     const colors = useMemo(() => ({
         bg: palette.brand.bg.surface,
@@ -970,6 +973,14 @@ export default function ConversationScreen() {
     // message must come first. buildItems keeps date headers above each group;
     // reversing preserves that ordering once the list is flipped.
     const invertedItems = useMemo(() => [...listItems].reverse(), [listItems]);
+    const selectedIndex = selectedMessage ? invertedItems.findIndex((item) => item.kind === 'message' && item.message.id === selectedMessage.id) : -1;
+    const selectedAdjacent = selectedIndex > 0 ? invertedItems[selectedIndex - 1] : null;
+    const selectedHasTail = !!selectedMessage && (selectedAdjacent?.kind !== 'message'
+        || selectedAdjacent.message.type === 'system'
+        || String(selectedAdjacent.message.sender) !== String(selectedMessage.sender));
+    const selectedImageOnlyTail = selectedHasTail && selectedMessage?.type === 'image'
+        && !!selectedMessage.media?.url && !selectedMessage.media?.viewOnce
+        && !messageText(selectedMessage).trim() && !selectedMessage.replyTo;
     latestIncomingIdRef.current = [...listItems].reverse().find((item) =>
         item.kind === 'message' && !item.message.pending && !item.message.unsent
         && item.message.type !== 'system'
@@ -1199,6 +1210,7 @@ export default function ConversationScreen() {
                 message={message}
                 replyTarget={replyTarget}
                 mine={mine}
+                showTail={!sameSenderAsAdjacent}
                 rowGap={hasAdjacentMessage ? (sameSenderAsAdjacent ? 3 : 10) : 0}
                 messageAreaWidth={messageAreaWidth}
                 maxTextWidth={Math.max(0, (messageAreaWidth - scale(24)) * 0.78 - scale(24) - 2 * StyleSheet.hairlineWidth)}
@@ -1209,8 +1221,15 @@ export default function ConversationScreen() {
                 onOpenImage={setImagePreview}
                 onOpenViewOnce={openViewOnce}
                 viewOnceLoading={viewOnceLoadingId === message.id}
-                onOpenMenu={(target) => {
+                onOpenMenu={(target, windowAnchor) => {
                     void lightImpact();
+                    const root = screenOriginRef.current;
+                    setSelectedAnchor({
+                        x: windowAnchor.x - root.x,
+                        y: windowAnchor.y - root.y,
+                        width: windowAnchor.width,
+                        height: windowAnchor.height,
+                    });
                     setSelectedMessage(target);
                 }}
                 onRetry={retryFailedMessage}
@@ -2001,24 +2020,6 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
-    const messageActionCount = selectedMessage
-        ? 2
-            + (messageText(selectedMessage).trim() ? 1 : 0)
-            + (String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent ? 1 : 0)
-            + (canUnsendMessage(selectedMessage, String(user?._id || user?.id || '')) ? 1 : 0)
-        : 2;
-    const messageSheetHeight = scale(102 + messageActionCount * 48 + Math.max(0, messageActionCount - 1) * 4) + insets.bottom;
-
-    const renderMessageMenuBackdrop = useCallback((props: BottomSheetBackdropProps) => (
-        <BottomSheetBackdrop
-            {...props}
-            appearsOnIndex={0}
-            disappearsOnIndex={-1}
-            opacity={0.38}
-            pressBehavior={messageActionBusy ? 'none' : 'close'}
-        />
-    ), [messageActionBusy]);
-
     const copySelectedMessage = async () => {
         if (!selectedMessage || messageActionBusy) return;
         const text = messageText(selectedMessage).trim();
@@ -2068,47 +2069,69 @@ export default function ConversationScreen() {
         setSelectedMessage(null);
     };
 
-    const deleteSelectedMessage = async () => {
-        if (!selectedMessage || messageActionBusy) return;
-        setMessageActionBusy(true);
-        const message = selectedMessage;
-        const res = await chatService.deleteMessage(message.id);
-        setMessageActionBusy(false);
-        if (!res.success) {
-            toast.show(apiMessage(res.message || 'connection_error'), 'error');
+    const runMessageDelete = async (message: ChatMessage, action: 'delete' | 'unsend', fromDialog: boolean) => {
+        if (messageActionBusy) return;
+        if (action === 'unsend' && !canUnsendMessage(message, String(user?._id || user?.id || ''))) {
+            setDeleteError(t('chat:unsend_window_expired', 'The unsend window has expired.'));
             return;
         }
-        stopChatAudioPlaybackForMessage(message.id);
-        await deleteCachedChatMediaForMessage({
-            userId: String(user?._id || user?.id || ''),
-            conversationId: message.conversationId,
-            messageId: message.id,
-        });
-        setItems((current) => current.filter((item) => item.id !== message.id));
-        setSelectedMessage(null);
+        setMessageActionBusy(true);
+        setDeleteAction(action);
+        setDeleteError('');
+        try {
+            const res = action === 'unsend' ? await chatService.unsend(message.id) : await chatService.deleteMessage(message.id);
+            if (!res.success) {
+                const error = apiMessage(res.message || 'connection_error');
+                if (fromDialog) setDeleteError(error);
+                else toast.show(error, 'error');
+                return;
+            }
+            stopChatAudioPlaybackForMessage(message.id);
+            await deleteCachedChatMediaForMessage({
+                userId: String(user?._id || user?.id || ''),
+                conversationId: message.conversationId,
+                messageId: message.id,
+            }).catch(() => undefined);
+            setItems((current) => action === 'unsend'
+                ? current.map((item) => item.id === message.id
+                    ? { ...item, type: 'system', content: 'message_unsent', media: null, unsent: true, unsentAt: new Date().toISOString() }
+                    : item)
+                : current.filter((item) => item.id !== message.id));
+            setDeleteTarget(null);
+            setSelectedMessage(null);
+        } catch {
+            const error = apiMessage('connection_error');
+            if (fromDialog) setDeleteError(error);
+            else toast.show(error, 'error');
+        } finally {
+            setMessageActionBusy(false);
+            setDeleteAction(null);
+        }
     };
 
-    const unsendSelectedMessage = async () => {
-        if (!selectedMessage || messageActionBusy) return;
-        setMessageActionBusy(true);
-        const message = selectedMessage;
-        const res = await chatService.unsend(message.id);
-        setMessageActionBusy(false);
-        if (!res.success) {
-            toast.show(apiMessage(res.message || 'connection_error'), 'error');
-            return;
+    const openMessageDelete = (message: ChatMessage) => {
+        if (messageActionBusy) return;
+        if (canUnsendMessage(message, String(user?._id || user?.id || ''))) {
+            setSelectedMessage(null);
+            setDeleteError('');
+            setDeleteTarget(message);
+        } else {
+            void runMessageDelete(message, 'delete', false);
         }
-        stopChatAudioPlaybackForMessage(message.id);
-        await deleteCachedChatMediaForMessage({
-            userId: String(user?._id || user?.id || ''),
-            conversationId: message.conversationId,
-            messageId: message.id,
-        });
-        setItems((current) => current.map((item) => item.id === message.id
-            ? { ...item, type: 'system', content: 'message_unsent', media: null, unsent: true, unsentAt: new Date().toISOString() }
-            : item));
-        setSelectedMessage(null);
     };
+
+    const messageContextActions: MessageContextAction[] = selectedMessage ? [
+        { id: 'reply', label: translateChatText('reply', 'Reply'), onPress: () => beginReply(selectedMessage) },
+        ...(messageText(selectedMessage).trim()
+            ? [{ id: 'copy' as const, label: translateChatText('copy', 'Copy'), onPress: () => void copySelectedMessage() }]
+            : []),
+        ...(String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent
+            ? [{ id: 'report' as const, label: translateChatText('report_message', 'Report message'), onPress: reportSelectedMessage, danger: true }]
+            : []),
+        { id: 'delete', label: canUnsendMessage(selectedMessage, String(user?._id || user?.id || ''))
+            ? t('chat:delete', 'Delete')
+            : translateChatText('delete_for_me', 'Delete for me'), onPress: () => openMessageDelete(selectedMessage), danger: true },
+    ] : [];
 
     if (eligibility.isLoading) {
         return (
@@ -2170,7 +2193,17 @@ export default function ConversationScreen() {
 
     return (
         <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
-            <View style={[styles.screen, { backgroundColor: colors.body }]}>
+            <View
+                ref={screenContentRef}
+                style={[styles.screen, { backgroundColor: colors.body }]}
+                onLayout={(event) => {
+                    const { width, height } = event.nativeEvent.layout;
+                    setMenuViewport((current) => current.width === width && current.height === height ? current : { width, height });
+                    screenContentRef.current?.measureInWindow((x, y) => {
+                        screenOriginRef.current = { x, y };
+                    });
+                }}
+            >
                 <View style={[
                     styles.header,
                     {
@@ -2178,7 +2211,10 @@ export default function ConversationScreen() {
                         borderBottomColor: colors.border,
                         flexDirection: isRTL ? 'row-reverse' : 'row',
                     },
-                ]}>
+                ]} onLayout={(event) => {
+                    const height = event.nativeEvent.layout.height;
+                    setChatHeaderHeight((current) => current === height ? current : height);
+                }}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
                         {(isRTL ? <CaretRight size={scale(23)} color={colors.text} weight="bold" /> : <CaretLeft size={scale(23)} color={colors.text} weight="bold" />)}
                     </Pressable>
@@ -2523,6 +2559,23 @@ export default function ConversationScreen() {
                 </ChatComposerBar>
                 </ChatStickyComposer>
                 </ChatKeyboardAvoider>
+                {!!selectedMessage && !!selectedAnchor && menuViewport.width > 0 && menuViewport.height > 0 && (
+                    <MessageContextOverlay
+                        anchor={selectedAnchor}
+                        mine={String(selectedMessage.sender) === String(user?._id || user?.id || '')}
+                        hasTail={selectedHasTail}
+                        imageOnlyTail={selectedImageOnlyTail}
+                        viewport={menuViewport}
+                        headerHeight={chatHeaderHeight}
+                        colors={colors}
+                        actions={messageContextActions}
+                        busy={messageActionBusy}
+                        busyActionId={deleteAction === 'delete' ? 'delete' : undefined}
+                        onReact={(emoji) => void reactToSelectedMessage(emoji)}
+                        onActionFeedback={selection}
+                        onClose={closeMessageMenu}
+                    />
+                )}
             </View>
 
             <ImageAttachmentComposer
@@ -2661,78 +2714,6 @@ export default function ConversationScreen() {
                 </View>
             </Modal>
 
-            <BottomSheet
-                ref={messageSheetRef}
-                index={-1}
-                snapPoints={[messageSheetHeight]}
-                enableDynamicSizing={false}
-                enablePanDownToClose={!messageActionBusy}
-                onClose={closeMessageMenu}
-                backdropComponent={renderMessageMenuBackdrop}
-                backgroundStyle={{ backgroundColor: colors.card }}
-                handleIndicatorStyle={{ backgroundColor: colors.muted }}
-            >
-                    {!!selectedMessage && (
-                        <BottomSheetView style={[styles.messageMenuSheet, { paddingBottom: insets.bottom + scale(12) }]}>
-                            <View style={styles.quickReactionRow}>
-                                {QUICK_REACTIONS.map((emoji) => (
-                                    <Pressable
-                                        key={emoji}
-                                        disabled={messageActionBusy}
-                                        onPress={() => reactToSelectedMessage(emoji)}
-                                        style={({ pressed }) => [styles.quickReactionButton, pressed && styles.quickReactionPressed]}
-                                    >
-                                        <Text style={styles.quickReactionText}>{emoji}</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                            <MessageActionItem
-                                icon={Reply}
-                                label={translateChatText('reply', 'Reply')}
-                                color={colors.text}
-                                disabled={messageActionBusy}
-                                onPress={() => beginReply(selectedMessage)}
-                            />
-                            {!!messageText(selectedMessage).trim() && (
-                                <MessageActionItem
-                                    icon={Copy}
-                                    label={translateChatText('copy', 'Copy')}
-                                    color={colors.text}
-                                    disabled={messageActionBusy}
-                                    onPress={copySelectedMessage}
-                                />
-                            )}
-                            {String(selectedMessage.sender) !== String(user?._id || user?.id || '') && selectedMessage.type !== 'system' && !selectedMessage.unsent ? (
-                                <MessageActionItem
-                                    icon={Flag}
-                                    label={translateChatText('report_message', 'Report message')}
-                                    color={colors.danger}
-                                    danger
-                                    disabled={messageActionBusy}
-                                    onPress={reportSelectedMessage}
-                                />
-                            ) : null}
-                            <MessageActionItem
-                                icon={Trash2}
-                                label={translateChatText('delete_for_me', 'Delete for me')}
-                                color={colors.danger}
-                                danger
-                                disabled={messageActionBusy}
-                                onPress={deleteSelectedMessage}
-                            />
-                            {canUnsendMessage(selectedMessage, String(user?._id || user?.id || '')) && (
-                                <MessageActionItem
-                                    icon={Undo2}
-                                    label={translateChatText('unsend', 'Unsend')}
-                                    color={colors.danger}
-                                    danger
-                                    disabled={messageActionBusy}
-                                    onPress={unsendSelectedMessage}
-                                />
-                            )}
-                        </BottomSheetView>
-                    )}
-            </BottomSheet>
             <UserProfileSheet
                 visible={profileSheetOpen && Boolean(peerId)}
                 userId={peerId}
@@ -2763,6 +2744,27 @@ export default function ConversationScreen() {
                 cancelLabel={t('cancel', 'Cancel')}
                 confirmLoading={menuBusy}
             />
+            <MessageDeleteDialog
+                visible={deleteTarget !== null}
+                title={t('chat:delete_or_unsend_message', 'Delete or unsend this message')}
+                deleteLabel={translateChatText('delete_for_me', 'Delete for me')}
+                unsendLabel={deleteTarget?.type === 'image'
+                    ? t('chat:unsend_image', 'Unsend image')
+                    : deleteTarget?.type === 'voice'
+                        ? t('chat:unsend_audio', 'Unsend audio')
+                        : t('chat:unsend_text', 'Unsend message')}
+                cancelLabel={t('cancel', 'Cancel')}
+                busyChoice={deleteTarget ? deleteAction : null}
+                error={deleteError}
+                colors={colors}
+                onDelete={() => { if (deleteTarget) void runMessageDelete(deleteTarget, 'delete', true); }}
+                onUnsend={() => { if (deleteTarget) void runMessageDelete(deleteTarget, 'unsend', true); }}
+                onClose={() => {
+                    if (messageActionBusy) return;
+                    setDeleteTarget(null);
+                    setDeleteError('');
+                }}
+            />
         </SafeAreaView>
     );
 }
@@ -2790,36 +2792,6 @@ function ConversationMenuItem({
                     <Icon size={scale(18)} color={tint} strokeWidth={2.4} />
                 </View>
                 <RNText numberOfLines={1} style={[styles.conversationMenuLabel, { color: tint }]}>
-                    {label}
-                </RNText>
-            </View>
-        </Pressable>
-    );
-}
-
-function MessageActionItem({
-    icon: Icon,
-    label,
-    color,
-    danger,
-    disabled,
-    onPress,
-}: {
-    icon: any;
-    label: string;
-    color: string;
-    danger?: boolean;
-    disabled?: boolean;
-    onPress: () => void;
-}) {
-    const tint = danger ? color : color;
-    return (
-        <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.messageActionItem, pressed && styles.messageActionPressed, disabled && { opacity: 0.55 }]}>
-            <View style={styles.messageActionItemRow}>
-                <View style={styles.messageActionIcon}>
-                    <Icon size={scale(18)} color={tint} strokeWidth={2.4} />
-                </View>
-                <RNText numberOfLines={1} ellipsizeMode="tail" style={[styles.messageActionLabel, { color: tint }]}>
                     {label}
                 </RNText>
             </View>
@@ -3279,9 +3251,13 @@ function MessageTimeMeta({
                 </View>
             )}
             {mine && message.pending && (
-                <Text variant="caption" style={{ color: metaColor, fontSize: scale(9), lineHeight: scale(11) }}>
-                    {message.queued ? t('chat:queued', 'Queued') : t('chat:sending', 'Sending...')}
-                </Text>
+                <View
+                    style={[styles.messageStatusIcon, { width: statusIconSize, height: statusIconSize }]}
+                    accessible
+                    accessibilityLabel={message.queued ? t('chat:queued', 'Queued') : t('chat:sending', 'Sending...')}
+                >
+                    <Clock3 size={statusIconSize} color={metaColor} />
+                </View>
             )}
             {message.failed && (
                 <RefreshCw size={statusIconSize} color={colors.danger} />
@@ -3306,6 +3282,10 @@ function TextMessageWithInlineMeta({
     maxTextWidth: number;
 }) {
     const { currentLanguage } = useLanguage();
+    const [multiline, setMultiline] = useState(content.includes('\n'));
+    const [contentWidth, setContentWidth] = useState(0);
+    const [lastLineWidth, setLastLineWidth] = useState(0);
+    const [metaWidth, setMetaWidth] = useState(0);
     const direction = directionalTextStyle(content);
     const textStyle = [
         {
@@ -3318,10 +3298,50 @@ function TextMessageWithInlineMeta({
         { color: textColor },
         direction,
     ];
+    const inlineMetaFits = contentWidth > 0 && metaWidth > 0 && lastLineWidth + metaWidth + 5 <= contentWidth;
+
+    if (multiline) {
+        return (
+            <View
+                style={[styles.multilineTextWithMeta, { maxWidth: maxTextWidth || undefined }]}
+                onLayout={(event) => {
+                    const width = event.nativeEvent.layout.width;
+                    setContentWidth((current) => Math.abs(current - width) < 0.5 ? current : width);
+                }}
+            >
+                <RNText
+                    style={textStyle}
+                    onTextLayout={(event) => {
+                        const width = event.nativeEvent.lines.at(-1)?.width || 0;
+                        setLastLineWidth((current) => Math.abs(current - width) < 0.5 ? current : width);
+                    }}
+                >
+                    {content}
+                </RNText>
+                <MessageTimeMeta
+                    message={message}
+                    mine={mine}
+                    colors={colors}
+                    style={inlineMetaFits ? styles.inlineTimeRow : styles.timeRow}
+                    onLayout={(event) => {
+                        const width = event.nativeEvent.layout.width;
+                        setMetaWidth((current) => Math.abs(current - width) < 0.5 ? current : width);
+                    }}
+                />
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.textMessageWithMeta, { maxWidth: maxTextWidth || undefined }]}>
-            <RNText style={[textStyle, styles.textMessageBody]}>{content}</RNText>
+            <RNText
+                style={[textStyle, styles.textMessageBody]}
+                onTextLayout={(event) => {
+                    if (event.nativeEvent.lines.length > 1) setMultiline(true);
+                }}
+            >
+                {content}
+            </RNText>
             <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.textInlineMeta} />
         </View>
     );
@@ -3331,6 +3351,7 @@ function MessageBubbleComponent({
     message,
     replyTarget,
     mine,
+    showTail,
     rowGap,
     messageAreaWidth,
     maxTextWidth,
@@ -3349,6 +3370,7 @@ function MessageBubbleComponent({
     message: ChatMessage;
     replyTarget: ChatMessage | null;
     mine: boolean;
+    showTail: boolean;
     rowGap: number;
     messageAreaWidth: number;
     maxTextWidth: number;
@@ -3359,7 +3381,7 @@ function MessageBubbleComponent({
     onOpenImage: (preview: ChatImagePreview) => void;
     onOpenViewOnce: (message: ChatMessage) => void;
     viewOnceLoading: boolean;
-    onOpenMenu: (message: ChatMessage) => void;
+    onOpenMenu: (message: ChatMessage, anchor: MessageAnchor) => void;
     onRetry: (message: ChatMessage) => void;
     onSwipeReply: (message: ChatMessage) => void;
     onReplyClick: (messageId: string) => void;
@@ -3373,6 +3395,7 @@ function MessageBubbleComponent({
     const hasVoice = message.type === 'voice';
     const replyTo = replyTarget;
     const imageHasDetails = !!(content.trim() || replyTo);
+    const imageOnlyTail = Boolean(showTail && hasNormalImage && !imageHasDetails);
     const imageSize = observedImageSize?.messageId === message.id ? observedImageSize : null;
     const imageLayout = chatImageLayout(
         media?.width || imageSize?.width,
@@ -3384,6 +3407,13 @@ function MessageBubbleComponent({
     const messageTextColor = mine ? colors.bubbleMineText : colors.text;
     const messageMetaColor = mine ? colors.bubbleMineMuted : colors.muted;
     const useInlineTextMeta = message.type === 'text' && !!content;
+    const bubblePressRef = useRef<View>(null);
+    const openContext = () => {
+        if (message.failed || message.pending) return;
+        bubblePressRef.current?.measureInWindow((x, y, width, height) => {
+            onOpenMenu(message, { x, y, width, height });
+        });
+    };
     const swipeX = useSharedValue(0);
     const swipeLimit = scale(72);
     const replyThreshold = scale(56);
@@ -3409,14 +3439,8 @@ function MessageBubbleComponent({
             .onFinalize(() => {
                 if (swipeX.value > 0) swipeX.value = withSpring(0, { damping: 20, stiffness: 270 });
             });
-        const longPress = Gesture.LongPress()
-            .enabled(!message.failed && !message.pending)
-            .minDuration(280)
-            .maxDistance(10)
-            .runOnJS(true)
-            .onStart(() => onOpenMenu(message));
-        return Gesture.Race(swipe, longPress);
-    }, [hasVoice, message, onOpenMenu, onSwipeReply, replyThreshold, swipeLimit, swipeX]);
+        return swipe;
+    }, [hasVoice, message, onSwipeReply, replyThreshold, swipeLimit, swipeX]);
 
     if (message.type === 'system') {
         const systemContent = String(message.content || '').trim().toLowerCase().replace(/\s+/g, '_');
@@ -3487,13 +3511,25 @@ function MessageBubbleComponent({
                 <GestureDetector gesture={bubbleGesture}>
                 <Reanimated.View style={[styles.swipeReplyBubble, swipeStyle]}>
                     <Pressable
+                        ref={bubblePressRef}
+                        style={showTail && !imageOnlyTail && {
+                            paddingLeft: mine ? 0 : BUBBLE_TAIL_WIDTH,
+                            paddingRight: mine ? BUBBLE_TAIL_WIDTH : 0,
+                        }}
+                        onLongPress={openContext}
+                        delayLongPress={280}
                         onPress={message.failed ? () => onRetry(message) : undefined}
                         accessibilityRole={message.failed ? 'button' : undefined}
                         accessibilityLabel={message.failed ? translateChatText('tap_to_retry', 'Tap to retry') : undefined}
                     >
+                        {showTail && !imageOnlyTail && (
+                            <SolidBubbleTail mine={mine} color={mine ? colors.bubbleMine : colors.surface}
+                                borderColor={mine ? colors.bubbleMineBorder : colors.border} />
+                        )}
+                        <ImageTailMask enabled={imageOnlyTail} width={imageLayout.width} height={imageLayout.height} mine={mine}>
                         <View style={[
                             styles.bubble,
-                            mine ? styles.mineBubble : styles.theirBubble,
+                            showTail && (mine ? styles.mineBubble : styles.theirBubble),
                             hasNormalImage && styles.imageBubble,
                             {
                                 backgroundColor: hasNormalImage && !imageHasDetails ? 'transparent' : mine ? colors.bubbleMine : colors.surface,
@@ -3504,10 +3540,16 @@ function MessageBubbleComponent({
                                 shadowOffset: { width: 0, height: 0 },
                                 elevation: hasNormalImage || mine ? 0 : 1,
                             },
+                            showTail && !imageOnlyTail && {
+                                backgroundColor: 'transparent', borderColor: 'transparent',
+                                shadowOpacity: 0, elevation: 0,
+                            },
                         ]}>
                             {replyTo && !hasNormalImage && (
                                 <Pressable
                                     onPress={() => onReplyClick(replyTo.id)}
+                                    onLongPress={openContext}
+                                    delayLongPress={280}
                                     style={[styles.replyQuote, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface, borderLeftColor: colors.primary }]}
                                 >
                                     <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
@@ -3530,6 +3572,7 @@ function MessageBubbleComponent({
                                 frameWidth={imageLayout.width}
                                 frameHeight={imageLayout.height}
                                 crop={imageLayout.crop}
+                                onLongPress={openContext}
                                 onImageSize={(width, height) => {
                                     if (media.width && media.height) return;
                                     setObservedImageSize((current) => current?.messageId === message.id
@@ -3544,6 +3587,8 @@ function MessageBubbleComponent({
                                 {replyTo && (
                                     <Pressable
                                         onPress={() => onReplyClick(replyTo.id)}
+                                        onLongPress={openContext}
+                                        delayLongPress={280}
                                         style={[styles.replyQuote, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface, borderLeftColor: colors.primary }]}
                                     >
                                         <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
@@ -3588,7 +3633,9 @@ function MessageBubbleComponent({
                     {hasViewOnce && (
                         <Pressable
                             onPress={() => !mine && !media?.viewedAt && onOpenViewOnce(message)}
-                            disabled={mine || !!media?.viewedAt || viewOnceLoading}
+                            onLongPress={openContext}
+                            delayLongPress={280}
+                            disabled={viewOnceLoading}
                             pointerEvents={message.failed ? 'none' : 'auto'}
                             style={[styles.viewOnceButton, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface }]}
                         >
@@ -3620,6 +3667,7 @@ function MessageBubbleComponent({
                                 mine={mine}
                                 colors={colors}
                                 userId={userId}
+                                onLongPress={openContext}
                             />
                         </View>
                     )}
@@ -3645,6 +3693,7 @@ function MessageBubbleComponent({
                                 <MessageTimeMeta message={message} mine={mine} colors={colors} style={styles.timeRow} />
                             )}
                         </View>
+                        </ImageTailMask>
                     </Pressable>
                 </Reanimated.View>
                 </GestureDetector>
@@ -3693,6 +3742,7 @@ function CachedImageMessageComponent({
     frameWidth,
     frameHeight,
     crop,
+    onLongPress,
     onImageSize,
 }: {
     message: ChatMessage;
@@ -3702,6 +3752,7 @@ function CachedImageMessageComponent({
     frameWidth: number;
     frameHeight: number;
     crop: boolean;
+    onLongPress: () => void;
     onImageSize: (width: number, height: number) => void;
 }) {
     const palette = useColors();
@@ -3743,7 +3794,7 @@ function CachedImageMessageComponent({
     });
 
     return (
-        <Pressable onPress={open} style={[styles.mediaWrap, { width: frameWidth, height: frameHeight }]} accessibilityRole="button" accessibilityLabel={translateChatText('tap_to_open', 'Tap to open')}>
+        <Pressable onPress={open} onLongPress={onLongPress} delayLongPress={280} style={[styles.mediaWrap, { width: frameWidth, height: frameHeight }]} accessibilityRole="button" accessibilityLabel={translateChatText('tap_to_open', 'Tap to open')}>
             <Image
                 source={{ uri: displayUri }}
                 style={styles.mediaImage}
@@ -3771,12 +3822,14 @@ function VoiceMessageComponent({
     mine,
     colors,
     userId,
+    onLongPress,
 }: {
     message: ChatMessage;
     media?: MessageMedia | null;
     mine: boolean;
     colors: Record<string, string>;
     userId: string;
+    onLongPress: () => void;
 }) {
     const toast = useToast();
     const playbackOwnerRef = useRef(createChatAudioPlaybackOwner(`voice-message:${message.id}`));
@@ -3822,29 +3875,19 @@ function VoiceMessageComponent({
         player.replace(uri);
     }, [player]);
 
-    useEffect(() => {
-        let disposed = false;
-        (async () => {
-            if (media?.localUri) {
-                const local = await FileSystem.getInfoAsync(media.localUri).catch(() => null);
-                if (!disposed && !pendingPlayRef.current && !sourceUriRef.current && local?.exists) {
-                    replaceSource(media.localUri, false);
-                    return;
-                }
-            }
-            const cached = await getCachedChatMedia({
-                userId,
-                conversationId: message.conversationId,
-                messageId: message.id,
-                media,
-                kind: 'voice',
-            }).catch(() => null);
-            if (!disposed && !pendingPlayRef.current && !sourceUriRef.current && cached?.cached) replaceSource(cached.uri, false);
-        })();
-        return () => {
-            disposed = true;
-        };
-    }, [media?.key, media?.localUri, media?.mime, media?.url, message.conversationId, message.id, replaceSource, userId]);
+    const resolveSource = async () => {
+        if (media?.localUri) {
+            const local = await FileSystem.getInfoAsync(media.localUri).catch(() => null);
+            if (local?.exists) return { uri: media.localUri };
+        }
+        return cacheChatMedia({
+            userId,
+            conversationId: message.conversationId,
+            messageId: message.id,
+            media,
+            kind: 'voice',
+        });
+    };
 
     useEffect(() => {
         if (disposedRef.current || !sourceUriRef.current || !status.isLoaded) return;
@@ -3951,13 +3994,7 @@ function VoiceMessageComponent({
         const request = ++sourceRequestRef.current;
         setDownloading(true);
         try {
-            const cached = await cacheChatMedia({
-                userId,
-                conversationId: message.conversationId,
-                messageId: message.id,
-                media,
-                kind: 'voice',
-            });
+            const cached = await resolveSource();
             if (disposedRef.current || request !== sourceRequestRef.current) return;
             recoveryAttemptedRef.current = false;
             replaceSource(cached.uri, true);
@@ -3985,13 +4022,7 @@ function VoiceMessageComponent({
         const request = ++sourceRequestRef.current;
         setDownloading(true);
         try {
-            const cached = await cacheChatMedia({
-                userId,
-                conversationId: message.conversationId,
-                messageId: message.id,
-                media,
-                kind: 'voice',
-            });
+            const cached = await resolveSource();
             if (disposedRef.current || request !== sourceRequestRef.current) return;
             recoveryAttemptedRef.current = false;
             replaceSource(cached.uri, false);
@@ -4009,6 +4040,8 @@ function VoiceMessageComponent({
             <View style={styles.voicePlaybackControl}>
                 <Pressable
                     onPress={toggle}
+                    onLongPress={onLongPress}
+                    delayLongPress={280}
                     disabled={downloading}
                     accessibilityRole="button"
                     accessibilityLabel={status.playing
@@ -4016,7 +4049,9 @@ function VoiceMessageComponent({
                         : translateChatText('voice_play', 'Play')}
                     style={styles.voicePlayButton}
                 >
-                    {downloading || status.isBuffering
+                    {/* iOS reports buffering even when the player has no source. */}
+                    {downloading || (sourceUriRef.current !== null && !status.error && status.isBuffering
+                        && (status.playing || pendingPlayRef.current || pendingSeekRef.current !== null))
                         ? <ActivityIndicator color={colors.inverse} size="small" />
                         : status.playing
                             ? <Pause size={scale(14)} color={colors.inverse} fill={colors.inverse} />
@@ -4205,10 +4240,11 @@ const styles = StyleSheet.create({
     imageMetaOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, height: scale(56) },
     imageTimeShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: scale(56) },
     imageTimeRow: { position: 'absolute', right: scale(8), bottom: scale(8), flexDirection: 'row', alignItems: 'center', gap: scale(4) },
-    mineBubble: { borderBottomRightRadius: scale(6) },
-    theirBubble: { borderBottomLeftRadius: scale(6) },
+    mineBubble: { borderBottomRightRadius: 0 },
+    theirBubble: { borderBottomLeftRadius: 0 },
     messageText: { fontSize: scale(15), lineHeight: scale(20) },
     textMessageWithMeta: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+    multilineTextWithMeta: { width: '100%' },
     textMessageBody: { flexShrink: 1, minWidth: 0 },
     textInlineMeta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: scale(4), marginTop: 3, marginLeft: 5, minHeight: scale(14) },
     messageStatusIcon: { flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
@@ -4477,51 +4513,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'flex-end',
     },
-    messageMenuSheet: {
-        paddingHorizontal: scale(16),
-        paddingTop: scale(8),
-        gap: scale(4),
-    },
-    quickReactionRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderRadius: scale(22),
-        paddingHorizontal: scale(5),
-        paddingVertical: scale(5),
-        marginBottom: scale(6),
-        backgroundColor: 'rgba(160, 160, 168,0.12)',
-    },
-    quickReactionButton: {
-        width: scale(42),
-        height: scale(38),
-        borderRadius: scale(19),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    quickReactionPressed: { backgroundColor: 'rgba(160, 160, 168,0.18)' },
-    quickReactionText: { fontSize: scale(22), lineHeight: scale(26) },
-    messageActionItem: {
-        width: '100%',
-        height: scale(48),
-        paddingHorizontal: scale(10),
-        borderRadius: scale(8),
-        justifyContent: 'center',
-    },
-    messageActionItemRow: {
-        width: '100%',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: scale(12),
-    },
-    messageActionIcon: {
-        width: scale(24),
-        height: scale(24),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    messageActionLabel: { flexGrow: 1, flexShrink: 1, minWidth: scale(120), fontSize: scale(16), lineHeight: scale(22), fontWeight: '400' },
-    messageActionPressed: { backgroundColor: 'rgba(160, 160, 168,0.12)' },
     replyQuote: {
         borderLeftWidth: scale(3),
         borderRadius: scale(8),

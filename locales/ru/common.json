@@ -1875,6 +1875,27 @@
   "message_empty": "Пожалуйста, введите сообщение перед отправкой.",
   "yes": "Да",
   "no": "Нет",
+  "membership_show_benefits": "Показать преимущества",
+  "membership_hide_benefits": "Скрыть преимущества",
+  "membership_duration": {
+    "month_one": "месяц",
+    "month_other": "месяцев",
+    "month_few": "месяца",
+    "month_many": "месяцев",
+    "year_one": "год",
+    "year_other": "лет",
+    "year_few": "года",
+    "year_many": "лет",
+    "week_one": "неделя",
+    "week_other": "недель",
+    "week_few": "недели",
+    "week_many": "недель",
+    "day_one": "день",
+    "day_other": "дней",
+    "day_few": "дня",
+    "day_many": "дней"
+  },
+  "membership_plans_title": "Планы подписки",
   "membership_plans": {
     "shared_features": [
       "Просматривайте серьёзные профили",

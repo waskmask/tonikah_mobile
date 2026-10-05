@@ -1,4 +1,4 @@
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 import { Drawer } from 'expo-router/drawer';
 import { AppMenuDrawerContent } from '@/components/app/AppMenuDrawer';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -31,7 +31,7 @@ export default function TabsDrawerLayout() {
                     backgroundColor: 'transparent',
                 },
                 overlayColor: isDark ? 'rgba(0,0,0,0.58)' : 'rgba(16,16,17,0.45)',
-                swipeEnabled: true,
+                swipeEnabled: Platform.OS !== 'ios',
                 swipeEdgeWidth: 28,
                 swipeMinDistance: 24,
             }}

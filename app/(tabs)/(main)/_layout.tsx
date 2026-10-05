@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, Text as NativeText, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -8,12 +8,14 @@ import { User } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppMenuProvider } from '@/components/app/AppMenuProvider';
 import { MembershipAccessListener } from '@/components/app/MembershipAccessListener';
+import { NativeTabAvatarRenderer, type NativeTabAvatar } from '@/components/app/NativeTabAvatarRenderer';
 import { usePeriodicLocationRefresh } from '@/hooks/usePeriodicLocationRefresh';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scheduleIdleWork } from '@/lib/idleWork';
 import { chatService } from '@/lib/chatService';
+import { galleryService, type GalleryItem, type GalleryResponse } from '@/lib/galleryService';
 import { profileService } from '@/lib/profileService';
 import { profileAvatarImage } from '@/lib/profileDisplay';
 import { queryKeys } from '@/lib/queryKeys';
@@ -30,6 +32,7 @@ const TRANSPARENT_TAB_ICON = {
     uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=',
 };
 const ANDROID_TAB_ICON_SIZE = 26;
+const IOS_TAB_ICON_SIZE = 26;
 const ANDROID_TAB_BAR_CONTENT_HEIGHT = 68;
 const ANDROID_TAB_INDICATOR_TOP = 12;
 const ANDROID_TAB_INDICATOR_HEIGHT = 32;
@@ -52,6 +55,7 @@ export default function TabsLayout() {
     const tabChrome = colors.chrome.tabBar;
     const { width: windowWidth } = useWindowDimensions();
     const insets = useSafeAreaInsets();
+    const [iosAvatar, setIosAvatar] = useState<NativeTabAvatar | null>(null);
     const { currentLanguage, isRTL, t } = useLanguage();
     const queryClient = useQueryClient();
     const cachedUser = useAuthStore((state) => state.user);
@@ -83,6 +87,12 @@ export default function TabsLayout() {
         },
         staleTime: 60_000,
     });
+    const { data: myGallery } = useQuery<GalleryResponse>({
+        queryKey: queryKeys.gallery.me,
+        queryFn: galleryService.fetchMe,
+        enabled: !mySummary?.avatarThumbUrl,
+        staleTime: 60_000,
+    });
 
     useChatSocket({
         onUnread: (payload) => {
@@ -105,13 +115,25 @@ export default function TabsLayout() {
     const hasCompletion = rawCompletion !== undefined && rawCompletion !== null && Number.isFinite(Number(rawCompletion));
     const completionPercent = Math.min(100, Math.max(0, Math.round(Number(rawCompletion) || 0)));
     const profileBadge = hasCompletion && completionPercent < 100 ? `${completionPercent}%` : '';
-    const profileAvatarUrl = mySummary?.avatarThumbUrl || profileAvatarImage(cachedProfile);
+    const galleryItems = myGallery?.gallery || cachedProfile?.gallery || [];
+    const galleryAvatar = Array.isArray(galleryItems)
+        ? galleryItems.find((item: GalleryItem) => item.uuid === myGallery?.avatarUuid)
+            || galleryItems.find((item: GalleryItem) => item.isPrimary)
+            || galleryItems[0]
+        : null;
+    const profileAvatarUrl = myGallery?.success
+        ? profileAvatarImage(galleryAvatar)
+        : mySummary?.avatarThumbUrl
+            || profileAvatarImage(cachedProfile?.avatar)
+            || profileAvatarImage(galleryAvatar)
+            || profileAvatarImage(cachedProfile);
     const androidAvatarLeft = (isRTL ? windowWidth / 8 : windowWidth * 7 / 8) - ANDROID_TAB_ICON_SIZE / 2;
     const androidAvatarBottom = insets.bottom
         + ANDROID_TAB_BAR_CONTENT_HEIGHT
         - ANDROID_TAB_ICON_TOP
         - ANDROID_TAB_ICON_SIZE
         + ANDROID_PROFILE_AVATAR_VERTICAL_OFFSET;
+    const iosAvatarSource = iosAvatar && iosAvatar.url === profileAvatarUrl ? iosAvatar.source : null;
 
     return (
         <AppMenuProvider>
@@ -173,21 +195,18 @@ export default function TabsLayout() {
                     <NativeTabs.Trigger.Label>{safeLabel(t('activities'), 'Activities')}</NativeTabs.Trigger.Label>
                     <NativeTabs.Trigger.Icon
                         src={{
-                            default: require('../../../assets/icon/phosphor/hourglass-bold.png'),
-                            selected: require('../../../assets/icon/phosphor/hourglass-high-fill.png'),
+                            default: require('../../../assets/icon/phosphor/hand-tap-bold.png'),
+                            selected: require('../../../assets/icon/phosphor/hand-tap-bold.png'),
                         }}
                         renderingMode="template"
                     />
                 </NativeTabs.Trigger>
 
-                <NativeTabs.Trigger name="profile">
+                <NativeTabs.Trigger name="profile" disableAutomaticContentInsets={Platform.OS === 'ios'}>
                     <NativeTabs.Trigger.Label>{safeLabel(t('profile'), 'Profile')}</NativeTabs.Trigger.Label>
                     <NativeTabs.Trigger.Icon
-                        src={Platform.OS === 'android'
-                            ? TRANSPARENT_TAB_ICON
-                            : profileAvatarUrl
-                                ? { uri: profileAvatarUrl }
-                                : require('../../../assets/icon/icon.png')}
+                        sf={Platform.OS === 'ios' && !iosAvatarSource ? 'person' : undefined}
+                        src={Platform.OS === 'ios' && iosAvatarSource ? iosAvatarSource : TRANSPARENT_TAB_ICON}
                         renderingMode="original"
                     />
                     {Platform.OS !== 'android' && profileBadge ? (
@@ -195,6 +214,14 @@ export default function TabsLayout() {
                     ) : null}
                 </NativeTabs.Trigger>
                 </NativeTabs>
+                {Platform.OS === 'ios' && profileAvatarUrl && !iosAvatarSource ? (
+                    <NativeTabAvatarRenderer
+                        key={profileAvatarUrl}
+                        url={profileAvatarUrl}
+                        size={IOS_TAB_ICON_SIZE}
+                        onReady={setIosAvatar}
+                    />
+                ) : null}
                 {Platform.OS === 'android' ? (
                     <View
                         pointerEvents="none"
@@ -215,7 +242,7 @@ export default function TabsLayout() {
                             {
                                 left: androidAvatarLeft,
                                 bottom: androidAvatarBottom,
-                                borderColor: tabChrome.inactive,
+                                borderColor: profileAvatarUrl ? tabChrome.inactive : 'transparent',
                                 backgroundColor: tabChrome.background,
                             },
                         ]}

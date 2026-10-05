@@ -230,7 +230,8 @@ export function UserProfileView({
         && !!requireOptionalNativeModule('ExpoGlassEffect')
         && isGlassEffectAPIAvailable()
         && isLiquidGlassAvailable();
-    const headerActionIconColor = isDark ? '#E5E5E7' : '#201B15';
+    const headerActionIconColor = isDark ? '#E5E5E7' : '#FFFFFF';
+    const messageActionBackground = isDark ? colors.chrome.explore.actionCircle : '#201B15';
     const commonColors = colors.chrome.common;
     const toast = useToast();
     const { currentLanguage, isRTL } = useLanguage();
@@ -893,14 +894,15 @@ export function UserProfileView({
                             pointerEvents="none"
                             style={[
                                 styles.profileMessageSurface,
-                                { backgroundColor: '#201B15' },
+                                { backgroundColor: messageActionBackground },
                             ]}
                         />
                         {hasNativeHeaderGlass ? (
                             <GlassView
                                 pointerEvents="none"
                                 glassEffectStyle="regular"
-                                colorScheme={isDark ? 'dark' : 'light'}
+                                colorScheme="dark"
+                                tintColor={messageActionBackground}
                                 style={styles.profileMessageGlass}
                             />
                         ) : null}
@@ -911,6 +913,7 @@ export function UserProfileView({
                                 <ProfileMessage
                                     width={scale(20)}
                                     height={scale(18.2)}
+                                    color={headerActionIconColor}
                                 />
                             )}
                         </View>
@@ -2944,18 +2947,18 @@ const styles = StyleSheet.create({
         borderRadius: scale(18),
     },
     profileMessageAction: {
-        width: scale(Platform.OS === 'android' ? 38 : 46),
-        height: scale(Platform.OS === 'android' ? 38 : 46),
+        width: scale(Platform.OS === 'android' ? 38 : 42),
+        height: scale(Platform.OS === 'android' ? 38 : 42),
         position: 'relative',
         overflow: 'visible',
     },
     profileMessageSurface: {
         ...StyleSheet.absoluteFill,
-        borderRadius: scale(Platform.OS === 'android' ? 18 : 22),
+        borderRadius: scale(Platform.OS === 'android' ? 38 : 42) / 2,
     },
     profileMessageGlass: {
         ...StyleSheet.absoluteFill,
-        borderRadius: scale(22),
+        borderRadius: scale(42) / 2,
         borderCurve: 'continuous',
     },
     profileMessageIconCenter: {

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import BottomSheet, {
     BottomSheetBackdrop,
@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowFatUp, ArrowUDownLeft, BookmarkSimple, SlidersHorizontal } from 'phosphor-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Easing } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { scale } from '@/hooks/useResponsive';
@@ -20,13 +20,31 @@ import { t } from '@/lib/profileDisplay';
 import { ExploreSharpX } from '@/components/explore/ExploreActionBar';
 
 export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+    if (!visible) return null;
+
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="none"
+            statusBarTranslucent
+            navigationBarTranslucent
+            hardwareAccelerated
+            onRequestClose={onClose}
+        >
+            <SafeAreaProvider>
+                <ExploreTourSheet onClose={onClose} />
+            </SafeAreaProvider>
+        </Modal>
+    );
+}
+
+function ExploreTourSheet({ onClose }: { onClose: () => void }) {
     const { isDark } = useTheme();
     const { height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const surface = isDark ? '#1D1D1F' : '#FFFFFF';
     const border = isDark ? '#303033' : '#EEEEEE';
-    const sheetHeight = Math.min(height * 0.9, scale(520) + insets.bottom);
-    const snapPoints = useMemo(() => [sheetHeight], [sheetHeight]);
     const animationConfigs = useBottomSheetTimingConfigs({
         duration: 220,
         easing: Easing.bezier(0.32, 0.72, 0, 1),
@@ -44,23 +62,12 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
         [],
     );
 
-    if (!visible) return null;
-
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            navigationBarTranslucent
-            hardwareAccelerated
-            onRequestClose={onClose}
-        >
             <GestureHandlerRootView style={styles.fill}>
                 <BottomSheet
                     index={0}
-                    snapPoints={snapPoints}
-                    enableDynamicSizing={false}
+                    enableDynamicSizing
+                    maxDynamicContentSize={height * 0.9}
                     enablePanDownToClose
                     animateOnMount
                     animationConfigs={animationConfigs}
@@ -72,8 +79,9 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
                     <BottomSheetScrollView
                         contentContainerStyle={[
                             styles.sheetContent,
-                            { paddingBottom: insets.bottom + scale(20) },
+                            { paddingBottom: Math.max(insets.bottom, scale(16)) },
                         ]}
+                        contentInsetAdjustmentBehavior="never"
                         showsVerticalScrollIndicator={false}
                     >
                     <View style={styles.header}>
@@ -95,7 +103,6 @@ export function ExploreTourModal({ visible, onClose }: { visible: boolean; onClo
                     </BottomSheetScrollView>
                 </BottomSheet>
             </GestureHandlerRootView>
-        </Modal>
     );
 }
 

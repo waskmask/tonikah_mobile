@@ -1875,6 +1875,27 @@
   "message_empty": "Wpisz wiadomość przed wysłaniem.",
   "yes": "Tak",
   "no": "Nie",
+  "membership_show_benefits": "Pokaż korzyści",
+  "membership_hide_benefits": "Ukryj korzyści",
+  "membership_duration": {
+    "month_one": "miesiąc",
+    "month_other": "miesięcy",
+    "month_few": "miesiące",
+    "month_many": "miesięcy",
+    "year_one": "rok",
+    "year_other": "lat",
+    "year_few": "lata",
+    "year_many": "lat",
+    "week_one": "tydzień",
+    "week_other": "tygodni",
+    "week_few": "tygodnie",
+    "week_many": "tygodni",
+    "day_one": "dzień",
+    "day_other": "dni",
+    "day_few": "dni",
+    "day_many": "dni"
+  },
+  "membership_plans_title": "Plany członkostwa",
   "membership_plans": {
     "shared_features": [
       "Przeglądaj poważne profile",

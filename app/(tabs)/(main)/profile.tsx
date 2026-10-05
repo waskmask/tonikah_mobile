@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -9,7 +9,7 @@ import Animated, {
     useSharedValue,
     withTiming,
 } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EditProfileScreen from '../../edit-profile';
 import { Text } from '@/components/ui/Text';
@@ -192,6 +192,7 @@ function ProfileModeBar({ mode, onChange }: { mode: ProfileMode; onChange: (mode
 
 export default function ProfileScreen() {
     const colors = useColors();
+    const insets = useSafeAreaInsets();
     const { width: pageWidth } = useWindowDimensions();
     const queryClient = useQueryClient();
     const authUser = useAuthStore((state) => state.user);
@@ -438,7 +439,15 @@ export default function ProfileScreen() {
     }
 
     return (
-        <View style={[styles.root, { backgroundColor: colors.brand.bg.surface }]}>
+        <View
+            style={[
+                styles.root,
+                {
+                    backgroundColor: colors.brand.bg.surface,
+                    paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
+                },
+            ]}
+        >
             <ProfileModeBar mode={mode} onChange={changeMode} />
             <GestureDetector gesture={pagerGesture}>
                 <View style={styles.content}>

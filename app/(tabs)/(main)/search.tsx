@@ -614,9 +614,11 @@ export default function ExploreScreen() {
                 {
                     backgroundColor: palette.chrome.explore.screen,
                     paddingTop: insets.top,
-                    paddingBottom: compensateInitialAndroidTabBar
-                        ? ANDROID_TAB_BAR_CONTENT_HEIGHT + insets.bottom
-                        : 0,
+                    paddingBottom: Platform.OS === 'ios'
+                        ? insets.bottom
+                        : compensateInitialAndroidTabBar
+                            ? ANDROID_TAB_BAR_CONTENT_HEIGHT + insets.bottom
+                            : 0,
                 },
             ]}
         >

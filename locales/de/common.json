@@ -1877,6 +1877,19 @@
   "message_empty": "Bitte geben Sie eine Nachricht ein, bevor Sie senden.",
   "yes": "Ja",
   "no": "Nein",
+  "membership_show_benefits": "Vorteile anzeigen",
+  "membership_hide_benefits": "Vorteile ausblenden",
+  "membership_duration": {
+    "month_one": "Monat",
+    "month_other": "Monate",
+    "year_one": "Jahr",
+    "year_other": "Jahre",
+    "week_one": "Woche",
+    "week_other": "Wochen",
+    "day_one": "Tag",
+    "day_other": "Tage"
+  },
+  "membership_plans_title": "Mitgliedschaftspläne",
   "membership_plans": {
     "shared_features": [
       "Ernsthafte Profile entdecken",

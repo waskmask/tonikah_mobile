@@ -3,14 +3,17 @@ import {
     ActivityIndicator,
     AppState,
     Platform,
+    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, Check, Clock3, CreditCard, Gift, History, RefreshCw, ShieldCheck, ShoppingBag } from '@/components/ui/icons/PhosphorCompat';
+import { CalendarDays, Check, Clock3, Gift, History, RefreshCw, ShieldCheck } from '@/components/ui/icons/PhosphorCompat';
+import { CaretDown, CaretUp } from 'phosphor-react-native';
 
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import {
@@ -125,12 +128,29 @@ function translatedPlanName(plan?: MembershipPlan | null) {
     return t(`membership_plans.${plan.slug}.title`, plan.displayName || plan.slug);
 }
 
-function translatedPlanFeatures(plan: MembershipPlan) {
-    const translated = i18n.t(`membership_plans.${plan.slug}.features`, {
-        defaultValue: plan.features,
+function translatedMembershipBenefits() {
+    const translated = i18n.t('membership_plans.shared_features', {
+        defaultValue: [],
         returnObjects: true,
     });
-    return Array.isArray(translated) ? translated.map(String) : plan.features;
+    return Array.isArray(translated) ? translated.map(String) : [];
+}
+
+function planDurationParts(days: number, locale: string) {
+    const unit = days >= 365 && days % 365 === 0 ? 'year'
+        : days >= 30 && days % 30 === 0 ? 'month'
+            : days > 0 && days % 7 === 0 ? 'week' : 'day';
+    const amount = days / (unit === 'year' ? 365 : unit === 'month' ? 30 : unit === 'week' ? 7 : 1);
+    const unitLabel = String(i18n.t(`membership_duration.${unit}`, {
+        count: amount,
+        defaultValue: amount === 1 ? unit : `${unit}s`,
+    }));
+    const number = new Intl.NumberFormat(locale).format(amount);
+    return {
+        amount: number,
+        unit: unitLabel,
+        label: `${number} ${unitLabel}`,
+    };
 }
 
 function giftCardErrorMessage(message?: string) {
@@ -152,11 +172,14 @@ function giftCardErrorMessage(message?: string) {
 
 export default function MembershipsScreen() {
     const colors = useColors();
+    const insets = useSafeAreaInsets();
     const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
-    const { currentLanguage } = useLanguage();
+    const { currentLanguage, isRTL } = useLanguage();
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
     const [plans, setPlans] = useState<MembershipPlan[]>([]);
+    const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
+    const [benefitsExpanded, setBenefitsExpanded] = useState(false);
     const [overview, setOverview] = useState<MembershipOverview>(EMPTY_OVERVIEW);
     const [mobilePurchase, setMobilePurchase] = useState<MobilePurchasePolicy | null>(null);
     const [loading, setLoading] = useState(true);
@@ -197,6 +220,7 @@ export default function MembershipsScreen() {
     }, [returnTo]);
 
     const paidPlans = useMemo(() => plans.filter((plan) => !isTrialPlan(plan)), [plans]);
+    const selectedPlan = paidPlans.find((plan) => plan.slug === selectedPlanSlug) || paidPlans[0];
     const trialPlan = useMemo(
         () => plans.find(isTrialPlan) || null,
         [plans],
@@ -577,8 +601,11 @@ export default function MembershipsScreen() {
 
     if (loading) {
         return (
-            <View style={[styles.centered, { backgroundColor: colors.brand.bg.surface }]}>
-                <ActivityIndicator color={colors.chrome.primary} />
+            <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
+                <AppBackTitleBar title="" fallbackHref="/settings" showMenu />
+                <View style={styles.centered}>
+                    <ActivityIndicator color={colors.chrome.primary} />
+                </View>
             </View>
         );
     }
@@ -586,7 +613,7 @@ export default function MembershipsScreen() {
     if (loadError) {
         return (
             <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
-                <AppBackTitleBar title={t('memberships', 'Memberships')} fallbackHref="/settings" showMenu />
+                <AppBackTitleBar title="" fallbackHref="/settings" showMenu />
                 <View style={styles.centered}>
                     <InlineLoadError
                         title={t('membership_load_failed', 'Could not load membership')}
@@ -604,10 +631,10 @@ export default function MembershipsScreen() {
 
     return (
         <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
-            <AppBackTitleBar title={t('memberships', 'Memberships')} fallbackHref="/settings" showMenu />
+            <AppBackTitleBar title="" fallbackHref="/settings" showMenu />
             <ScrollView
                 style={styles.scroll}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={(
                     <RefreshControl
@@ -618,6 +645,113 @@ export default function MembershipsScreen() {
                     />
                 )}
             >
+
+                {paidPlans.length > 0 && (
+                    <View style={styles.benefitsSection}>
+                        <Text variant="caption" className="font-body-bold" align="center"
+                            style={[styles.membershipTitle, { color: colors.chrome.common.membershipGold }]}>
+                            {t('membership_plans_title', 'Membership plans')}
+                        </Text>
+                        <Pressable
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded: benefitsExpanded }}
+                            onPress={() => setBenefitsExpanded((expanded) => !expanded)}
+                            style={[styles.benefitsToggle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                        >
+                            <Text variant="body-sm" className="font-body-semi">
+                                {benefitsExpanded ? t('membership_hide_benefits', 'Hide benefits') : t('membership_show_benefits', 'Show benefits')}
+                            </Text>
+                            {benefitsExpanded
+                                ? <CaretUp size={18} color={colors.brand.text.body} />
+                                : <CaretDown size={18} color={colors.brand.text.body} />}
+                        </Pressable>
+                        {benefitsExpanded && <View style={styles.features}>
+                            {translatedMembershipBenefits().map((feature, index) => (
+                                <View key={index} style={[styles.feature, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                    <Check size={18} color={colors.chrome.primary} />
+                                    <Text variant="body-sm" style={styles.featureText}>{feature}</Text>
+                                </View>
+                            ))}
+                        </View>}
+                    </View>
+                )}
+
+                <View accessibilityRole="radiogroup" accessibilityLabel={t('memberships', 'Memberships')} style={styles.planOptions}>
+                    {paidPlans.map((plan) => {
+                        const selected = plan.slug === selectedPlan?.slug;
+                        const price = nativeProducts[plan.slug]?.displayPrice || plan.price?.formatted;
+                        const duration = planDurationParts(plan.durationDays, currentLanguage);
+                        return (
+                            <Pressable
+                                key={plan.id || plan.slug}
+                                accessibilityRole="radio"
+                                accessibilityState={{ checked: selected }}
+                                accessibilityLabel={[translatedPlanName(plan), duration.label, price].filter(Boolean).join(', ')}
+                                onPress={() => setSelectedPlanSlug(plan.slug)}
+                                style={[styles.planOption, {
+                                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                                    borderColor: selected ? colors.chrome.primary : colors.brand.bg.border,
+                                    backgroundColor: selected ? colors.chrome.common.primaryTint : colors.chrome.common.card,
+                                }]}
+                            >
+                                <Text className="font-body-bold" style={[styles.durationNumber, { backgroundColor: colors.chrome.toast.info.bg }]}>{duration.amount}</Text>
+                                <View style={styles.planCopy}>
+                                    <Text variant="body" className="font-body-bold">{duration.unit}</Text>
+                                    {price ? <Text variant="body-sm" style={styles.optionPrice}>{price}</Text> : null}
+                                </View>
+                                {selected && <View style={[styles.selectedBadge, {
+                                    backgroundColor: colors.chrome.primary,
+                                    ...(isRTL ? { left: 12 } : { right: 12 }),
+                                }]}><Check size={16} color={colors.chrome.common.inverseText} /></View>}
+                            </Pressable>
+                        );
+                    })}
+                </View>
+
+                {(selectedPlan ? [selectedPlan] : []).map((plan) => {
+                    const paymentChoices = paymentChoicesForPlan(plan);
+                    const visiblePrice = nativeProducts[plan.slug]?.displayPrice || plan.price?.formatted;
+                    return (
+                        <View
+                            key={plan.id || plan.slug}
+                            style={[
+                                styles.planCard,
+                                {
+                                    backgroundColor: colors.chrome.common.card,
+                                    borderColor: colors.brand.bg.border,
+                                },
+                            ]}
+                        >
+                                <GradientButton
+                                    title={visiblePrice ? `${visiblePrice}  ${t('continue', 'Continue')}` : t('continue', 'Continue')}
+                                    onPress={() => {
+                                        if (!requireVerified('checkout')) return;
+                                        setPaymentPlan(plan);
+                                    }}
+                                    loading={openingPlan === plan.slug || Boolean(busyPaymentChoice)}
+                                    disabled={!paymentChoices.length || Boolean(openingPlan) || Boolean(busyPaymentChoice) || checkoutState === 'pending' || checkoutState === 'refreshing'}
+                                    widthMode='full'
+                                    height={48}
+                                    textSize={15}
+                                />
+                            {!paymentChoices.length && (
+                                <View style={[styles.paymentUnavailable, { backgroundColor: colors.brand.bg.surface }]}>
+                                    {nativeCatalogLoading ? (
+                                        <ActivityIndicator size='small' color={colors.chrome.primary} />
+                                    ) : null}
+                                    <Text variant='body-sm' style={[styles.paymentUnavailableText, { color: colors.brand.text.subtitle }]}>
+                                        {nativeCatalogLoading
+                                            ? t('loading_payment_options', 'Loading payment options...')
+                                            : nativeCatalogError
+                                                ? t('payment_options_unavailable', 'Payment options could not be loaded. Pull down to try again.')
+                                                : t('payment_not_available_region', 'This plan is not available for purchase in your region yet.')}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    );
+                })}
+
                 <View
                     style={[
                         styles.statusPanel,
@@ -672,6 +806,7 @@ export default function MembershipsScreen() {
 
                 <View style={styles.quickActions}>
                     <PressableScale
+                        containerStyle={styles.quickActionContainer}
                         onPress={() => {
                             setHistoryOpen(false);
                             setGiftCardError('');
@@ -682,18 +817,19 @@ export default function MembershipsScreen() {
                         style={[styles.quickAction, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}
                     >
                         <Gift size={scale(17)} color={colors.chrome.primary} />
-                        <Text variant='body-sm' className='font-body-semi' numberOfLines={1}>
+                        <Text variant='body-sm' className='font-body-semi' style={styles.quickActionLabel}>
                             {t('redeem_gift_card', 'Redeem gift card')}
                         </Text>
                     </PressableScale>
                     <PressableScale
                         onPress={openHistory}
+                        containerStyle={styles.quickActionContainer}
                         accessibilityRole='button'
                         accessibilityLabel={t('membership_history', 'Membership history')}
                         style={[styles.quickAction, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}
                     >
                         <History size={scale(17)} color={colors.chrome.primary} />
-                        <Text variant='body-sm' className='font-body-semi' numberOfLines={1}>
+                        <Text variant='body-sm' className='font-body-semi' style={styles.quickActionLabel}>
                             {t('membership_history', 'History')}
                         </Text>
                         {overview.historyCount > 0 ? (
@@ -749,103 +885,6 @@ export default function MembershipsScreen() {
                         />
                     </View>
                 ) : null}
-
-                {paidPlans.length ? (
-                    <View style={styles.sectionHeader}>
-                        <Text variant='h3'>{t('memberships', 'Memberships')}</Text>
-                    </View>
-                ) : null}
-
-                {paidPlans.map((plan) => {
-                    const features = translatedPlanFeatures(plan);
-                    const paymentChoices = paymentChoicesForPlan(plan);
-                    const nativeOnly = paymentChoices.length === 1
-                        && paymentChoices[0].kind !== 'external_web';
-                    const nativePrice = nativeProducts[plan.slug]?.displayPrice;
-                    const visiblePrice = nativePrice
-                        || (paymentChoices.some((choice) => choice.kind === 'external_web')
-                            ? plan.price?.formatted
-                            : null);
-                    return (
-                        <View
-                            key={plan.id || plan.slug}
-                            style={[
-                                styles.planCard,
-                                {
-                                    backgroundColor: colors.chrome.common.card,
-                                    borderColor: colors.brand.bg.border,
-                                },
-                            ]}
-                        >
-                            <View style={styles.planHeading}>
-                                <View style={styles.planCopy}>
-                                    <Text variant='h3' style={styles.planTitle}>
-                                        {translatedPlanName(plan)}
-                                    </Text>
-                                    <Text variant='body-sm' style={[styles.planDescription, { color: colors.brand.text.subtitle }]}>
-                                        {plan.durationDays} {t('days', 'days')}
-                                    </Text>
-                                </View>
-                                {visiblePrice ? (
-                                    <View style={[styles.pricePill, { backgroundColor: colors.brand.bg.surface }]}>
-                                        <Text variant='body' className='font-body-bold'>
-                                            {visiblePrice}
-                                        </Text>
-                                    </View>
-                                ) : null}
-                            </View>
-
-                            {features.length ? (
-                                <View style={styles.features}>
-                                    {features.slice(0, 5).map((feature) => (
-                                        <View key={feature} style={styles.feature}>
-                                            <View style={[styles.check, { backgroundColor: colors.chrome.toast.success.bg }]}>
-                                                <Check size={scale(13)} color={colors.chrome.toast.success.text} strokeWidth={3} />
-                                            </View>
-                                            <Text variant='body-sm' style={[styles.featureText, { color: colors.brand.text.subtitle }]}>
-                                                {feature}
-                                            </Text>
-                                        </View>
-                                    ))}
-                                </View>
-                            ) : null}
-
-                            {paymentChoices.length ? (
-                                <GradientButton
-                                    title={paymentChoices.length > 1
-                                        ? t('choose_payment_method', 'Choose how to pay')
-                                        : paymentChoices[0].label}
-                                    onPress={() => {
-                                        if (!requireVerified('checkout')) return;
-                                        setPaymentPlan(plan);
-                                    }}
-                                    loading={openingPlan === plan.slug || Boolean(busyPaymentChoice)}
-                                    disabled={Boolean(openingPlan) || Boolean(busyPaymentChoice) || checkoutState === 'pending' || checkoutState === 'refreshing'}
-                                    widthMode='full'
-                                    height={48}
-                                    textSize={15}
-                                    rightIcon={(buttonColor) => nativeOnly
-                                        ? <ShoppingBag size={scale(18)} color={buttonColor} />
-                                        : <CreditCard size={scale(18)} color={buttonColor} />}
-                                />
-                            ) : (
-                                <View style={[styles.paymentUnavailable, { backgroundColor: colors.brand.bg.surface }]}>
-                                    {nativeCatalogLoading ? (
-                                        <ActivityIndicator size='small' color={colors.chrome.primary} />
-                                    ) : null}
-                                    <Text variant='body-sm' style={[styles.paymentUnavailableText, { color: colors.brand.text.subtitle }]}>
-                                        {nativeCatalogLoading
-                                            ? t('loading_payment_options', 'Loading payment options...')
-                                            : nativeCatalogError
-                                                ? t('payment_options_unavailable', 'Payment options could not be loaded. Pull down to try again.')
-                                                : t('payment_not_available_region', 'This plan is not available for purchase in your region yet.')}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    );
-                })}
-
             </ScrollView>
             <MembershipPaymentSheet
                 visible={Boolean(paymentPlan)}
@@ -909,9 +948,8 @@ const styles = StyleSheet.create({
         gap: scale(8),
     },
     statusPanel: {
-        borderWidth: 1,
-        borderRadius: scale(8),
-        padding: scale(16),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        padding: 16,
     },
     statusHeader: { flexDirection: 'row', alignItems: 'center', gap: scale(12) },
     statusIcon: {
@@ -932,8 +970,9 @@ const styles = StyleSheet.create({
         gap: scale(8),
     },
     quickActions: { flexDirection: 'row', gap: scale(10) },
+    quickActionContainer: { flex: 1, minWidth: 0 },
+    quickActionLabel: { flexShrink: 1 },
     quickAction: {
-        flex: 1,
         minWidth: 0,
         minHeight: scale(44),
         borderWidth: 1,
@@ -970,18 +1009,24 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     trialBand: {
-        borderWidth: 1,
-        borderRadius: scale(8),
-        padding: scale(16),
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        padding: 16,
         gap: scale(14),
     },
     sectionHeader: { paddingTop: scale(4) },
     planCard: {
-        borderWidth: 1,
-        borderRadius: scale(8),
-        padding: scale(16),
+        paddingVertical: 4,
         gap: scale(16),
     },
+    membershipTitle: { fontSize: scale(16), lineHeight: scale(21), letterSpacing: 0, textTransform: 'none' },
+    benefitsSection: { gap: 10 },
+    benefitsToggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    planOptions: { gap: 16, paddingTop: 8 },
+    planOption: { direction: 'ltr', paddingVertical: 12, paddingHorizontal: 16, borderWidth: 2, borderRadius: 8, alignItems: 'center', gap: 16 },
+    durationNumber: { fontSize: scale(32), lineHeight: 46, minWidth: 46, textAlign: 'center', flexShrink: 0, includeFontPadding: false },
+    selectedBadge: { position: 'absolute', top: -12, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+    optionPrice: { marginTop: 4 },
     planHeading: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -989,7 +1034,7 @@ const styles = StyleSheet.create({
         gap: scale(12),
     },
     planCopy: { flex: 1, minWidth: 0 },
-    planTitle: { fontSize: scale(20) },
+    planTitle: { fontSize: 20 },
     planDescription: { marginTop: scale(5), lineHeight: scale(20) },
     pricePill: {
         borderRadius: scale(8),
