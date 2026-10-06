@@ -55,6 +55,7 @@ module.exports = ({ config }) => {
             'expo-notifications',
             'expo-status-bar',
             'expo-web-browser',
+            'expo-sharing',
             withPhoneOnlyAndroid,
         ],
         ios: {

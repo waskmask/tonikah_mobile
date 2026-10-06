@@ -391,6 +391,21 @@ const formDataRequest = async (endpoint: string, body: FormData, timeout = 90000
 };
 
 export const api = {
+    getPdf: async (endpoint: string): Promise<Uint8Array> => {
+        const options = { method: 'GET', headers: { Accept: 'application/pdf' } };
+        let response = await performFetch(endpoint, options);
+        if (response.status === 401) {
+            const session = await refreshAccessTokenResult();
+            if (!session.accessToken) throw new Error(session.reason || 'unauthorized');
+            response = await performFetch(endpoint, options);
+        }
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/pdf')) {
+            throw new Error('receipt_download_failed');
+        }
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (String.fromCharCode(...bytes.slice(0, 5)) !== '%PDF-') throw new Error('invalid_pdf');
+        return bytes;
+    },
     get: (endpoint: string) => apiRequest(endpoint, { method: 'GET' }),
     post: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'POST', body: JSON.stringify(body) }),
     postFormData: (endpoint: string, body: FormData) => formDataRequest(endpoint, body),

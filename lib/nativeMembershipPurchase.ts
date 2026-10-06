@@ -11,6 +11,8 @@ export type NativeStoreProduct = {
     title: string;
     description: string;
     displayPrice: string;
+    price?: number | null;
+    currency?: string;
     type: 'in-app' | 'subs';
 };
 
@@ -166,6 +168,8 @@ export async function fetchNativeMembershipProducts(
             title: product.title,
             description: product.description,
             displayPrice: product.displayPrice,
+            price: product.price,
+            currency: product.currency,
             type: product.type,
         },
     ]));

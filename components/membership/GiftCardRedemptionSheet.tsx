@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { X } from '@/components/ui/icons/PhosphorCompat';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradientButton } from '@/components/ui/GradientButton';
 import { Text } from '@/components/ui/Text';
+import { Input } from '@/components/ui/Input';
 import { useColors } from '@/hooks/useColors';
-import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 
@@ -24,7 +24,6 @@ const cleanPin = (value: string) => value.replace(/\D/g, '').slice(0, 4);
 
 export function GiftCardRedemptionSheet({ visible, busy, error, onClose, onRedeem }: Props) {
     const colors = useColors();
-    const { isRTL } = useLanguage();
     const pinRef = useRef<TextInput>(null);
     const [code, setCode] = useState('');
     const [pin, setPin] = useState('');
@@ -79,60 +78,47 @@ export function GiftCardRedemptionSheet({ visible, busy, error, onClose, onRedee
                         <Text variant='body-sm' className='font-body-semi'>
                             {t('gift_card_code_label', 'Gift card code')}
                         </Text>
-                        <View
-                            style={[
-                                styles.codeField,
-                                { backgroundColor: colors.chrome.common.card, borderColor: error ? colors.brand.accent.error : colors.brand.bg.border },
-                            ]}
-                        >
-                            <View style={[styles.prefix, { borderRightColor: colors.brand.bg.border }]}>
-                                <Text variant='body-sm' className='font-body-bold'>TGC-</Text>
-                            </View>
-                            <TextInput
+                            <Input
+                                containerStyle="mb-0"
+                                leftIcon={<Text variant="body-sm" className="font-body-semi">TGC-</Text>}
+                                accessibilityLabel={t('gift_card_code_label', 'Gift card code')}
+                                editable={!busy}
                                 value={code}
                                 onChangeText={(value) => setCode(cleanCode(value))}
                                 placeholder='F0DC8BC7'
-                                placeholderTextColor={colors.brand.text.muted}
+                                placeholderTextColor={colors.chrome.common.iconNeutral}
                                 autoCapitalize='characters'
                                 autoCorrect={false}
-                                maxLength={8}
+                                maxLength={12}
                                 returnKeyType='next'
                                 onSubmitEditing={() => pinRef.current?.focus()}
-                                textAlign={isRTL ? 'right' : 'left'}
-                                style={[styles.input, { color: colors.brand.text.heading }]}
+                                textAlign='left'
                             />
-                        </View>
                     </View>
 
                     <View style={styles.fieldGroup}>
                         <Text variant='body-sm' className='font-body-semi'>
                             {t('gift_card_pin_label', '4-digit PIN')}
                         </Text>
-                        <TextInput
-                            ref={pinRef}
+                        <Input
+                            inputRef={pinRef}
+                            containerStyle="mb-0"
+                            accessibilityLabel={t('gift_card_pin_label', '4-digit PIN')}
+                            editable={!busy}
                             value={pin}
                             onChangeText={(value) => setPin(cleanPin(value))}
                             placeholder='1234'
-                            placeholderTextColor={colors.brand.text.muted}
+                            placeholderTextColor={colors.chrome.common.iconNeutral}
                             keyboardType='number-pad'
                             maxLength={4}
                             secureTextEntry
-                            textContentType='oneTimeCode'
-                            autoComplete='one-time-code'
-                            textAlign='center'
-                            style={[
-                                styles.pinInput,
-                                {
-                                    color: colors.brand.text.heading,
-                                    backgroundColor: colors.chrome.common.card,
-                                    borderColor: error ? colors.brand.accent.error : colors.brand.bg.border,
-                                },
-                            ]}
+                            autoComplete='off'
+                            textAlign='left'
                         />
                     </View>
 
                     {error ? (
-                        <Text variant='body-sm' className='font-body-semi' style={{ color: colors.brand.accent.error }}>
+                        <Text variant='body-sm' className='font-body-semi' accessibilityRole="alert" style={{ color: colors.brand.accent.error }}>
                             {error}
                         </Text>
                     ) : null}
@@ -145,8 +131,7 @@ export function GiftCardRedemptionSheet({ visible, busy, error, onClose, onRedee
                         disabled={!canSubmit}
                         loading={busy}
                         widthMode='full'
-                        height={48}
-                        textSize={15}
+                        size="compact"
                     />
                 </View>
             </SafeAreaView>
@@ -169,9 +154,5 @@ const styles = StyleSheet.create({
     scroll: { flex: 1 },
     content: { width: '100%', maxWidth: 560, alignSelf: 'center', padding: scale(20), gap: scale(22) },
     fieldGroup: { gap: scale(8) },
-    codeField: { minHeight: scale(52), borderWidth: 1, borderRadius: scale(8), flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
-    prefix: { height: '100%', justifyContent: 'center', paddingHorizontal: scale(14), borderRightWidth: 1 },
-    input: { flex: 1, minWidth: 0, height: scale(52), paddingHorizontal: scale(12), fontSize: scale(16), fontWeight: '600', letterSpacing: 1.2 },
-    pinInput: { height: scale(52), borderWidth: 1, borderRadius: scale(8), paddingHorizontal: scale(12), fontSize: scale(19), fontWeight: '700', letterSpacing: 5 },
     footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: scale(20), paddingTop: scale(12), paddingBottom: scale(12) },
 });

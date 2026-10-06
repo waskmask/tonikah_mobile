@@ -12,8 +12,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, Check, Clock3, Gift, History, RefreshCw, ShieldCheck } from '@/components/ui/icons/PhosphorCompat';
-import { CaretDown, CaretUp } from 'phosphor-react-native';
+import { Check, Gift, RefreshCw } from '@/components/ui/icons/PhosphorCompat';
+import { CaretDown, CaretUp, Info } from 'phosphor-react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import {
@@ -22,6 +24,7 @@ import {
 } from '@/components/membership/MembershipPaymentSheet';
 import { GiftCardRedemptionSheet } from '@/components/membership/GiftCardRedemptionSheet';
 import { MembershipHistorySheet } from '@/components/membership/MembershipHistorySheet';
+import { MembershipCouponInput, type AppliedMembershipCoupon } from '@/components/membership/MembershipCouponInput';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
 import { InlineLoadError } from '@/components/ui/InlineLoadError';
@@ -33,6 +36,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { useToast } from '@/hooks/useToast';
 import i18n from '@/lib/i18n';
+import { membershipSavingsPercent } from '@/lib/membershipSavings';
 import {
     membershipService,
     type MembershipOverview,
@@ -57,6 +61,9 @@ import { withMessagingAccessClock } from '@/lib/messagingAccess';
 import { firstSearchParam, sanitizeAuthReturnPath } from '@/lib/authReturn';
 
 type CheckoutState = 'idle' | 'creating' | 'browser_open' | 'refreshing' | 'pending';
+
+// Opt in to store connections when testing IAP; layout work needs no billing service.
+const NATIVE_BILLING_ENABLED = !__DEV__ || process.env.EXPO_PUBLIC_ENABLE_MEMBERSHIP_IAP === 'true';
 
 const EMPTY_OVERVIEW: MembershipOverview = {
     membership: null,
@@ -173,13 +180,30 @@ function giftCardErrorMessage(message?: string) {
 export default function MembershipsScreen() {
     const colors = useColors();
     const insets = useSafeAreaInsets();
-    const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+    const params = useLocalSearchParams<{ returnTo?: string | string[]; view?: string | string[] }>();
     const { currentLanguage, isRTL } = useLanguage();
     const { requireVerified } = useEmailVerificationGuard();
     const toast = useToast();
     const [plans, setPlans] = useState<MembershipPlan[]>([]);
     const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
+    const [appliedCoupon, setAppliedCoupon] = useState<AppliedMembershipCoupon | null>(null);
+    const [couponBusy, setCouponBusy] = useState(false);
     const [benefitsExpanded, setBenefitsExpanded] = useState(false);
+    const [benefitsHeight, setBenefitsHeight] = useState(0);
+    const reduceMotion = useReducedMotion();
+    const animatedBenefitsHeight = useSharedValue(0);
+    const benefitsProgress = useSharedValue(0);
+    useEffect(() => {
+        const animation = {
+            duration: reduceMotion ? 0 : benefitsExpanded ? 280 : 240,
+            easing: Easing.inOut(Easing.cubic),
+        };
+        animatedBenefitsHeight.value = withTiming(benefitsExpanded ? benefitsHeight : 0, animation);
+        benefitsProgress.value = withTiming(benefitsExpanded ? 1 : 0, animation);
+    }, [benefitsExpanded, benefitsHeight, reduceMotion, animatedBenefitsHeight, benefitsProgress]);
+    const benefitsAnimation = useAnimatedStyle(() => ({ height: animatedBenefitsHeight.value }));
+    const benefitsFade = useAnimatedStyle(() => ({ opacity: benefitsProgress.value }));
+    const benefitsChevron = useAnimatedStyle(() => ({ transform: [{ rotate: `${benefitsProgress.value * 180}deg` }] }));
     const [overview, setOverview] = useState<MembershipOverview>(EMPTY_OVERVIEW);
     const [mobilePurchase, setMobilePurchase] = useState<MobilePurchasePolicy | null>(null);
     const [loading, setLoading] = useState(true);
@@ -197,6 +221,8 @@ export default function MembershipsScreen() {
     const [giftCardBusy, setGiftCardBusy] = useState(false);
     const [giftCardError, setGiftCardError] = useState('');
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [showMembershipDetails, setShowMembershipDetails] = useState(true);
+    const detailsLinkHandledRef = useRef(false);
     const [historyItems, setHistoryItems] = useState<MembershipHistoryItem[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
@@ -221,6 +247,10 @@ export default function MembershipsScreen() {
 
     const paidPlans = useMemo(() => plans.filter((plan) => !isTrialPlan(plan)), [plans]);
     const selectedPlan = paidPlans.find((plan) => plan.slug === selectedPlanSlug) || paidPlans[0];
+    const couponEligible = Boolean(mobilePurchase?.externalHandoffEnabled && selectedPlan?.checkoutEnabled && selectedPlan?.price);
+    const activeCoupon = couponEligible && appliedCoupon?.planSlug === selectedPlan?.slug && appliedCoupon?.currency === selectedPlan?.price?.currency ? appliedCoupon : null;
+    const couponPrice = activeCoupon ? new Intl.NumberFormat(currentLanguage, { style: 'currency', currency: activeCoupon.currency }).format(activeCoupon.finalAmountMinor / 100) : '';
+    useEffect(() => { setAppliedCoupon(null); }, [selectedPlan?.slug, selectedPlan?.price?.amountMinor, selectedPlan?.price?.currency, couponEligible]);
     const trialPlan = useMemo(
         () => plans.find(isTrialPlan) || null,
         [plans],
@@ -248,7 +278,7 @@ export default function MembershipsScreen() {
     }, [completeMembershipReturn]);
 
     const recoverNativePurchase = useCallback(async () => {
-        if (Platform.OS === 'web') return;
+        if (Platform.OS === 'web' || !NATIVE_BILLING_ENABLED) return;
         if (nativeRecoveryInFlightRef.current) return nativeRecoveryInFlightRef.current;
         const request = recoverPendingNativeMembershipPurchase()
             .then(async (result) => {
@@ -272,7 +302,7 @@ export default function MembershipsScreen() {
     const loadScreen = useCallback(async () => {
         setLoadError(false);
         try {
-            const storefront = Platform.OS === 'web'
+            const storefront = Platform.OS === 'web' || !NATIVE_BILLING_ENABLED
                 ? ''
                 : await getNativeStorefrontCountryCode().catch(() => '');
             const [nextOverview, planResponse] = await Promise.all([
@@ -324,7 +354,7 @@ export default function MembershipsScreen() {
         const nativeOption = mobilePurchase?.options?.find(
             (option) => option.kind === expectedKind && option.enabled,
         );
-        if (!nativeOption) {
+        if (!nativeOption || !NATIVE_BILLING_ENABLED) {
             setNativeProducts({});
             setNativeCatalogLoading(false);
             setNativeCatalogError(false);
@@ -389,6 +419,7 @@ export default function MembershipsScreen() {
 
     const openHistory = () => {
         setGiftCardOpen(false);
+        setShowMembershipDetails(false);
         setHistoryOpen(true);
         if (!historyItems.length && !historyLoading) void loadHistory();
     };
@@ -463,6 +494,7 @@ export default function MembershipsScreen() {
             const response = await membershipService.createCheckoutHandoff(
                 plan.slug,
                 storefrontCountryCode,
+                activeCoupon?.planSlug === plan.slug ? activeCoupon.code : '',
             );
             if (!response.success || !response.handoffUrl) {
                 toast.show(apiMessage(response.message), 'error', 3500);
@@ -522,7 +554,7 @@ export default function MembershipsScreen() {
         const nativeProduct = nativeProducts[plan.slug];
         const choices: MembershipPaymentChoice[] = [];
 
-        if (nativeConfig && nativeProduct) {
+        if (nativeConfig && nativeProduct && activeCoupon?.planSlug !== plan.slug) {
             choices.push({
                 kind: expectedKind,
                 label: Platform.OS === 'ios'
@@ -540,11 +572,11 @@ export default function MembershipsScreen() {
                 kind: 'external_web',
                 label: t('pay_with_card', 'Pay with card'),
                 description: t('card_payment_description', 'Continue in your browser with secure web checkout.'),
-                price: plan.price.formatted,
+                price: activeCoupon?.planSlug === plan.slug ? couponPrice : plan.price.formatted,
             });
         }
         return choices;
-    }, [mobilePurchase, nativeProducts]);
+    }, [mobilePurchase, nativeProducts, activeCoupon, couponPrice]);
 
     const choosePayment = async (choice: MembershipPaymentChoice) => {
         const plan = paymentPlan;
@@ -593,11 +625,34 @@ export default function MembershipsScreen() {
         }
     };
 
-    const endsOn = overview.membership?.currentPeriodEnd
-        ? new Intl.DateTimeFormat(currentLanguage, { dateStyle: 'medium' })
-            .format(new Date(overview.membership.currentPeriodEnd))
+    const expiryDate = overview.membership?.currentPeriodEnd
+        ? new Date(overview.membership.currentPeriodEnd) : null;
+    const endsOn = expiryDate && !Number.isNaN(expiryDate.getTime())
+        ? new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', numberingSystem: 'latn' })
+            .format(expiryDate)
         : '';
     const activePlan = plans.find((plan) => plan.slug === overview.membership?.planSlug);
+    const membershipName = activePlan ? translatedPlanName(activePlan)
+        : overview.membership?.planName || t('memberships', 'Memberships');
+    const membershipExpiry = endsOn
+        ? String(i18n.t('membership_expires_on', { date: endsOn })) : '';
+    const membershipExpired = !overview.isActive && (
+        overview.membership?.status === 'expired'
+        || (overview.membership?.status === 'active' && !!expiryDate && expiryDate.getTime() <= Date.now())
+    );
+    const showMembershipIntro = !overview.isActive && !membershipExpired;
+    const membershipStrips = overview.isActive || membershipExpired ? [{
+        key: 'membership', name: membershipName, expired: membershipExpired,
+        expiry: membershipExpired && endsOn
+            ? String(i18n.t('membership_expired_on', { date: endsOn })) : membershipExpiry,
+    }] : [];
+
+    useEffect(() => {
+        if (loading || loadError || detailsLinkHandledRef.current || firstSearchParam(params.view) !== 'details') return;
+        detailsLinkHandledRef.current = true;
+        setShowMembershipDetails(true);
+        setHistoryOpen(true);
+    }, [loading, loadError, params.view]);
 
     if (loading) {
         return (
@@ -646,33 +701,77 @@ export default function MembershipsScreen() {
                 )}
             >
 
+                {showMembershipIntro && <View style={styles.membershipIntro}>
+                    <Text variant="body" className="font-body-bold" align="center" style={[styles.membershipIntroTitle, { color: colors.chrome.common.textStrong }]}>
+                        {t('membership_join_title', 'Become a premium member to find your spouse')}
+                    </Text>
+                </View>}
+
+                {membershipStrips.map((strip) => (
+                    <View key={strip.key} style={[styles.activeMembershipPill, {
+                        borderColor: strip.expired ? colors.brand.accent.error : colors.chrome.common.membershipStatusBorder,
+                        backgroundColor: strip.expired ? colors.chrome.common.membershipExpiredTint : colors.chrome.common.membershipStatusTint,
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                    }]}>
+                        <View style={styles.planCopy}>
+                            <Text variant="body-sm" className="font-body-bold" style={{ color: colors.chrome.common.textStrong }}>
+                                {strip.name}
+                            </Text>
+                            {!!strip.expiry && <Text variant="caption" className="font-body-medium" style={{ color: colors.chrome.common.textStrong, marginTop: 4 }}>{strip.expiry}</Text>}
+                        </View>
+                        <View style={[styles.membershipStatusActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.membershipActiveBadge, { backgroundColor: strip.expired ? colors.brand.accent.error : colors.chrome.common.membershipStatusBorder }]}>
+                                <Text variant="caption" className="font-body-semi" style={{ color: colors.chrome.common.inverseText }}>
+                                    {strip.expired ? t('membership_expired', 'Expired') : t('active', 'Active')}
+                                </Text>
+                            </View>
+                            <Pressable accessibilityRole="button" accessibilityLabel={t('membership_payment_history', 'Payment history')}
+                                onPress={openHistory}
+                                style={styles.membershipInfoButton}>
+                                <Info size={22} color={colors.chrome.common.textStrong} />
+                            </Pressable>
+                        </View>
+                    </View>
+                ))}
+
                 {paidPlans.length > 0 && (
                     <View style={styles.benefitsSection}>
                         <Text variant="caption" className="font-body-bold" align="center"
                             style={[styles.membershipTitle, { color: colors.chrome.common.membershipGold }]}>
                             {t('membership_plans_title', 'Membership plans')}
                         </Text>
+                        <Animated.View style={[styles.benefitsClip, benefitsAnimation]}
+                            pointerEvents={benefitsExpanded ? 'auto' : 'none'}
+                            accessibilityElementsHidden={!benefitsExpanded}
+                            importantForAccessibility={benefitsExpanded ? 'auto' : 'no-hide-descendants'}>
+                            <Animated.View style={[styles.benefitsMeasure, benefitsFade]} onLayout={(event) => setBenefitsHeight(event.nativeEvent.layout.height)}>
+                                <View style={styles.features}>
+                                    {translatedMembershipBenefits().map((feature, index) => (
+                                        <View key={index} style={[styles.feature, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={[styles.check, { backgroundColor: colors.chrome.common.membershipGold }]}>
+                                                <Check size={scale(14)} color={colors.chrome.common.inverseText} />
+                                            </View>
+                                            <Text variant="body-sm" className="font-body-bold" style={[styles.featureText, { color: colors.chrome.common.textStrong }]}>{feature}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </Animated.View>
+                        </Animated.View>
                         <Pressable
                             accessibilityRole="button"
                             accessibilityState={{ expanded: benefitsExpanded }}
                             onPress={() => setBenefitsExpanded((expanded) => !expanded)}
                             style={[styles.benefitsToggle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                         >
-                            <Text variant="body-sm" className="font-body-semi">
-                                {benefitsExpanded ? t('membership_hide_benefits', 'Hide benefits') : t('membership_show_benefits', 'Show benefits')}
+                            <View style={[styles.benefitsDivider, { backgroundColor: colors.chrome.common.membershipBenefitsDivider }]} />
+                            <Text variant="body-sm" className="font-body-semi" align="center" style={{ color: colors.chrome.common.textStrong, flexShrink: 1 }}>
+                                {benefitsExpanded ? t('membership_hide_benefits', 'Hide benefits') : t('membership_show_benefits', 'See premium benefits')}
                             </Text>
-                            {benefitsExpanded
-                                ? <CaretUp size={18} color={colors.brand.text.body} />
-                                : <CaretDown size={18} color={colors.brand.text.body} />}
+                            <Animated.View style={benefitsChevron}>
+                                <CaretDown size={18} color={colors.chrome.common.textStrong} />
+                            </Animated.View>
+                            <View style={[styles.benefitsDivider, { backgroundColor: colors.chrome.common.membershipBenefitsDivider }]} />
                         </Pressable>
-                        {benefitsExpanded && <View style={styles.features}>
-                            {translatedMembershipBenefits().map((feature, index) => (
-                                <View key={index} style={[styles.feature, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                    <Check size={18} color={colors.chrome.primary} />
-                                    <Text variant="body-sm" style={styles.featureText}>{feature}</Text>
-                                </View>
-                            ))}
-                        </View>}
                     </View>
                 )}
 
@@ -681,26 +780,41 @@ export default function MembershipsScreen() {
                         const selected = plan.slug === selectedPlan?.slug;
                         const price = nativeProducts[plan.slug]?.displayPrice || plan.price?.formatted;
                         const duration = planDurationParts(plan.durationDays, currentLanguage);
+                        const savings = membershipSavingsPercent(plan, paidPlans.find((item) => item.durationDays === 30), nativeProducts);
+                        const savingLabel = savings === null ? '' : String(i18n.t('membership_save_percent', { percent: new Intl.NumberFormat(currentLanguage).format(savings) }));
+                        const planBadgeLabel = plan.durationDays === 90
+                            ? t('membership_recommended', 'Recommended')
+                            : plan.durationDays === 180 ? t('membership_best_value', 'Best value') : '';
                         return (
                             <Pressable
                                 key={plan.id || plan.slug}
                                 accessibilityRole="radio"
                                 accessibilityState={{ checked: selected }}
-                                accessibilityLabel={[translatedPlanName(plan), duration.label, price].filter(Boolean).join(', ')}
+                                accessibilityLabel={[translatedPlanName(plan), duration.label, price, savingLabel, planBadgeLabel].filter(Boolean).join(', ')}
                                 onPress={() => setSelectedPlanSlug(plan.slug)}
                                 style={[styles.planOption, {
                                     flexDirection: isRTL ? 'row-reverse' : 'row',
-                                    borderColor: selected ? colors.chrome.primary : colors.brand.bg.border,
-                                    backgroundColor: selected ? colors.chrome.common.primaryTint : colors.chrome.common.card,
+                                    borderColor: selected ? colors.chrome.common.membershipPlanSelectedBorder : colors.chrome.common.membershipPlanBorder,
+                                    backgroundColor: selected ? colors.chrome.common.membershipPlanSelected : colors.chrome.common.card,
                                 }]}
                             >
-                                <Text className="font-body-bold" style={[styles.durationNumber, { backgroundColor: colors.chrome.toast.info.bg }]}>{duration.amount}</Text>
+                                <Text className="font-body-bold" style={styles.durationNumber}>{duration.amount}</Text>
                                 <View style={styles.planCopy}>
-                                    <Text variant="body" className="font-body-bold">{duration.unit}</Text>
+                                    <Text variant="body" className="font-body-bold" style={{ color: colors.chrome.common.textStrong }}>
+                                        {duration.unit}
+                                    </Text>
                                     {price ? <Text variant="body-sm" style={styles.optionPrice}>{price}</Text> : null}
                                 </View>
+                                    {!!(planBadgeLabel || savingLabel) && <View style={[styles.planBadges, { alignItems: isRTL ? 'flex-start' : 'flex-end' }]}>
+                                        {!!planBadgeLabel && <Text variant="caption" className="font-body-semi" style={{ color: colors.chrome.common.membershipGold, textAlign: isRTL ? 'left' : 'right' }}>
+                                            {planBadgeLabel}
+                                        </Text>}
+                                        {!!savingLabel && <View style={[styles.savingsBadge, { backgroundColor: colors.chrome.common.membershipGold }]}>
+                                            <Text variant="caption" className="font-body-bold" style={{ color: colors.brand.bg.surface }}>{savingLabel}</Text>
+                                        </View>}
+                                    </View>}
                                 {selected && <View style={[styles.selectedBadge, {
-                                    backgroundColor: colors.chrome.primary,
+                                    backgroundColor: colors.chrome.common.membershipPlanSelectedBadge,
                                     ...(isRTL ? { left: 12 } : { right: 12 }),
                                 }]}><Check size={16} color={colors.chrome.common.inverseText} /></View>}
                             </Pressable>
@@ -708,9 +822,34 @@ export default function MembershipsScreen() {
                     })}
                 </View>
 
+                {couponEligible && selectedPlan?.price && <MembershipCouponInput
+                    key={`${selectedPlan.slug}:${selectedPlan.price.currency}:${selectedPlan.price.amountMinor}`}
+                    planSlug={selectedPlan.slug}
+                    currency={selectedPlan.price.currency}
+                    applied={activeCoupon}
+                    onApply={setAppliedCoupon}
+                    onBusy={setCouponBusy}
+                />}
+
+                <PressableScale
+                    onPress={() => {
+                        setHistoryOpen(false);
+                        setGiftCardError('');
+                        setGiftCardOpen(true);
+                    }}
+                    accessibilityRole='button'
+                    accessibilityLabel={t('redeem_gift_card', 'Redeem gift card')}
+                    style={[styles.quickAction, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}
+                >
+                    <Gift size={scale(17)} color={colors.chrome.primary} />
+                    <Text variant='body-sm' className='font-body-semi' style={styles.quickActionLabel}>
+                        {t('redeem_gift_card', 'Redeem gift card')}
+                    </Text>
+                </PressableScale>
+
                 {(selectedPlan ? [selectedPlan] : []).map((plan) => {
                     const paymentChoices = paymentChoicesForPlan(plan);
-                    const visiblePrice = nativeProducts[plan.slug]?.displayPrice || plan.price?.formatted;
+                    const visiblePrice = couponPrice || nativeProducts[plan.slug]?.displayPrice || plan.price?.formatted;
                     return (
                         <View
                             key={plan.id || plan.slug}
@@ -729,10 +868,9 @@ export default function MembershipsScreen() {
                                         setPaymentPlan(plan);
                                     }}
                                     loading={openingPlan === plan.slug || Boolean(busyPaymentChoice)}
-                                    disabled={!paymentChoices.length || Boolean(openingPlan) || Boolean(busyPaymentChoice) || checkoutState === 'pending' || checkoutState === 'refreshing'}
+                                    disabled={couponBusy || !paymentChoices.length || Boolean(openingPlan) || Boolean(busyPaymentChoice) || checkoutState === 'pending' || checkoutState === 'refreshing'}
                                     widthMode='full'
-                                    height={48}
-                                    textSize={15}
+                                    size="compact"
                                 />
                             {!paymentChoices.length && (
                                 <View style={[styles.paymentUnavailable, { backgroundColor: colors.brand.bg.surface }]}>
@@ -752,95 +890,6 @@ export default function MembershipsScreen() {
                     );
                 })}
 
-                <View
-                    style={[
-                        styles.statusPanel,
-                        {
-                            backgroundColor: overview.isActive
-                                ? colors.chrome.toast.success.bg
-                                : colors.chrome.common.card,
-                            borderColor: overview.isActive
-                                ? colors.chrome.toast.success.border
-                                : colors.brand.bg.border,
-                        },
-                    ]}
-                >
-                    <View style={styles.statusHeader}>
-                        <View
-                            style={[
-                                styles.statusIcon,
-                                {
-                                    backgroundColor: overview.isActive
-                                        ? colors.chrome.toast.success.border
-                                        : colors.chrome.common.primaryTint,
-                                },
-                            ]}
-                        >
-                            {overview.isActive
-                                ? <ShieldCheck size={scale(22)} color={colors.chrome.common.inverseText} />
-                                : <Clock3 size={scale(22)} color={colors.chrome.primary} />}
-                        </View>
-                        <View style={styles.statusCopy}>
-                            <Text variant='subtitle'>{t('current_membership', 'Current membership')}</Text>
-                            <Text variant='h3' style={styles.statusTitle}>
-                                {overview.isActive ? t('active', 'Active') : t('membership_inactive', 'Membership inactive')}
-                            </Text>
-                        </View>
-                    </View>
-                    {overview.isActive ? (
-                        <View style={styles.statusMeta}>
-                            <View style={styles.metaItem}>
-                                <Text variant='caption' style={{ color: colors.brand.text.subtitle }}>
-                                    {activePlan ? translatedPlanName(activePlan) : overview.membership?.planName || t('memberships', 'Memberships')}
-                                </Text>
-                            </View>
-                            <View style={styles.metaItem}>
-                                <CalendarDays size={scale(15)} color={colors.chrome.toast.success.text} />
-                                <Text variant='caption' className='font-body-semi' style={{ color: colors.chrome.toast.success.text }}>
-                                    {endsOn || `${overview.daysLeft} ${t('days', 'days')}`}
-                                </Text>
-                            </View>
-                        </View>
-                    ) : null}
-                </View>
-
-                <View style={styles.quickActions}>
-                    <PressableScale
-                        containerStyle={styles.quickActionContainer}
-                        onPress={() => {
-                            setHistoryOpen(false);
-                            setGiftCardError('');
-                            setGiftCardOpen(true);
-                        }}
-                        accessibilityRole='button'
-                        accessibilityLabel={t('redeem_gift_card', 'Redeem gift card')}
-                        style={[styles.quickAction, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}
-                    >
-                        <Gift size={scale(17)} color={colors.chrome.primary} />
-                        <Text variant='body-sm' className='font-body-semi' style={styles.quickActionLabel}>
-                            {t('redeem_gift_card', 'Redeem gift card')}
-                        </Text>
-                    </PressableScale>
-                    <PressableScale
-                        onPress={openHistory}
-                        containerStyle={styles.quickActionContainer}
-                        accessibilityRole='button'
-                        accessibilityLabel={t('membership_history', 'Membership history')}
-                        style={[styles.quickAction, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}
-                    >
-                        <History size={scale(17)} color={colors.chrome.primary} />
-                        <Text variant='body-sm' className='font-body-semi' style={styles.quickActionLabel}>
-                            {t('membership_history', 'History')}
-                        </Text>
-                        {overview.historyCount > 0 ? (
-                            <View style={[styles.countBadge, { backgroundColor: colors.chrome.common.primaryTint }]}>
-                                <Text variant='caption' className='font-body-bold' style={{ color: colors.chrome.primary }}>
-                                    {Math.min(overview.historyCount, 99)}{overview.historyCount > 99 ? '+' : ''}
-                                </Text>
-                            </View>
-                        ) : null}
-                    </PressableScale>
-                </View>
 
                 {checkoutState === 'pending' || checkoutState === 'refreshing' ? (
                     <View style={[styles.processingPanel, { borderColor: colors.brand.bg.border }]}>
@@ -907,6 +956,9 @@ export default function MembershipsScreen() {
             />
             <MembershipHistorySheet
                 visible={historyOpen}
+                showDetails={showMembershipDetails}
+                details={{ planName: membershipName, isActive: overview.isActive, endsOn: membershipExpiry, provider: overview.membership?.provider }}
+                onShowHistory={openHistory}
                 items={historyItems}
                 loading={historyLoading}
                 loadingMore={historyLoadingMore}
@@ -924,6 +976,12 @@ export default function MembershipsScreen() {
 
 const styles = StyleSheet.create({
     screen: { flex: 1 },
+    activeMembershipPill: { borderWidth: scale(1.5), borderStyle: 'dashed', borderRadius: 8, paddingVertical: 8, paddingLeft: 12, paddingRight: 6, alignItems: 'flex-start', gap: 8, marginBottom: scale(6) },
+    membershipIntro: { gap: scale(8), marginBottom: 11, paddingHorizontal: 6 },
+    membershipIntroTitle: { fontSize: scale(20), lineHeight: 28 },
+    membershipStatusActions: { alignItems: 'center', alignSelf: 'flex-start', maxWidth: '50%', gap: 4 },
+    membershipActiveBadge: { flexShrink: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+    membershipInfoButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     scroll: { flex: 1 },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     content: {
@@ -1019,14 +1077,19 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         gap: scale(16),
     },
-    membershipTitle: { fontSize: scale(16), lineHeight: scale(21), letterSpacing: 0, textTransform: 'none' },
-    benefitsSection: { gap: 10 },
+    membershipTitle: { fontSize: scale(16), lineHeight: scale(21), letterSpacing: 0, textTransform: 'none', marginBottom: 10 },
+    benefitsSection: {},
+    benefitsClip: { overflow: 'hidden' },
+    benefitsMeasure: { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: 10, paddingBottom: 10 },
     benefitsToggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    benefitsDivider: { flex: 1, minWidth: 12, height: 1 },
     planOptions: { gap: 16, paddingTop: 8 },
-    planOption: { direction: 'ltr', paddingVertical: 12, paddingHorizontal: 16, borderWidth: 2, borderRadius: 8, alignItems: 'center', gap: 16 },
-    durationNumber: { fontSize: scale(32), lineHeight: 46, minWidth: 46, textAlign: 'center', flexShrink: 0, includeFontPadding: false },
+    planOption: { direction: 'ltr', paddingVertical: 10, paddingHorizontal: 16, borderWidth: 2, borderRadius: 10, alignItems: 'center', gap: 6 },
+    durationNumber: { fontSize: scale(32), lineHeight: 46, minWidth: 36, textAlign: 'center', flexShrink: 0, includeFontPadding: false },
     selectedBadge: { position: 'absolute', top: -12, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-    optionPrice: { marginTop: 4 },
+    optionPrice: { marginTop: 2 },
+    planBadges: { flexDirection: 'column', alignSelf: 'stretch', justifyContent: 'flex-end', maxWidth: '42%', gap: 4, marginStart: 6, paddingBottom: 2 },
+    savingsBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
     planHeading: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -1042,17 +1105,17 @@ const styles = StyleSheet.create({
         paddingVertical: scale(8),
         flexShrink: 0,
     },
-    features: { gap: scale(10) },
+    features: { gap: 14, paddingHorizontal: 6, alignSelf: 'center', maxWidth: '100%' },
     feature: { flexDirection: 'row', alignItems: 'flex-start', gap: scale(9) },
     check: {
-        width: scale(22),
-        height: scale(22),
-        borderRadius: scale(11),
+        width: scale(20),
+        height: scale(20),
+        borderRadius: scale(10),
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
     },
-    featureText: { flex: 1, lineHeight: scale(20) },
+    featureText: { flexShrink: 1, lineHeight: scale(20) },
     paymentUnavailable: {
         minHeight: scale(48),
         borderRadius: scale(8),

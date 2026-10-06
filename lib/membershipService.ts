@@ -112,6 +112,17 @@ export type MembershipHistoryResponse = ApiResponse & {
     };
 };
 
+export type MembershipReceipt = {
+    id: string;
+    documentNumber: string;
+    issuedAt: string;
+    downloadReady: boolean;
+    currency: string;
+    grossAmountMinor: number;
+    seller?: { legalName?: string };
+    lineItems?: { description?: string; durationDays?: number }[];
+};
+
 export type GiftCardRedemptionResponse = ApiResponse & {
     purchaseId?: string;
     documentId?: string;
@@ -170,6 +181,10 @@ function checkoutClientContext(): CheckoutClientContext {
 }
 
 export const membershipService = {
+    validateCoupon: (planSlug: string, couponCode: string): Promise<ApiResponse> =>
+        api.post('/membership/coupon/validate', { planSlugOrId: planSlug, couponCode }),
+    receipt: (purchaseId: string): Promise<ApiResponse & { document?: MembershipReceipt }> =>
+        api.get(`/membership/purchase/${encodeURIComponent(purchaseId)}/receipt`),
     me: (): Promise<MembershipOverviewResponse> => api.get('/membership/me'),
     plans: (storefrontCountryCode = ''): Promise<MembershipPlansResponse> => {
         const query = storefrontCountryCode
@@ -190,10 +205,11 @@ export const membershipService = {
             pin,
             lang: String(getLocales()[0]?.languageCode || 'en'),
         }),
-    createCheckoutHandoff: (planSlug: string, storefrontCountryCode = ''): Promise<ApiResponse> =>
+    createCheckoutHandoff: (planSlug: string, storefrontCountryCode = '', couponCode = ''): Promise<ApiResponse> =>
         api.post('/app-user/membership-handoff/create', {
             planSlug,
             storefrontCountryCode,
+            couponCode: couponCode || undefined,
             clientContext: checkoutClientContext(),
         }),
     createNativePurchaseIntent: (input: {

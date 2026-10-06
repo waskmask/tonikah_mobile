@@ -1,17 +1,20 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import BottomSheet, {
     BottomSheetBackdrop,
     type BottomSheetBackdropProps,
     BottomSheetFlatList,
+    BottomSheetScrollView,
 } from '@gorhom/bottom-sheet';
-import { CalendarDays, Clock3, X } from '@/components/ui/icons/PhosphorCompat';
-import { CaretLeft, CaretRight } from 'phosphor-react-native';
+import { CalendarDays, Clock3 } from '@/components/ui/icons/PhosphorCompat';
+import { CaretLeft, CaretRight, Receipt } from 'phosphor-react-native';
+import { MembershipReceiptView } from './MembershipReceiptView';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/Text';
+import { GradientButton } from '@/components/ui/GradientButton';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
@@ -28,6 +31,10 @@ type Props = {
     onClose: () => void;
     onRetry: () => void;
     onLoadMore: () => void;
+    showDetails?: boolean;
+    details?: { planName: string; isActive: boolean; endsOn: string; provider?: string };
+    onShowHistory?: () => void;
+    onShowDetails?: () => void;
 };
 
 function formatAmount(item: MembershipHistoryItem, locale: string) {
@@ -74,12 +81,18 @@ export function MembershipHistorySheet({
     onClose,
     onRetry,
     onLoadMore,
+    showDetails = false,
+    details,
+    onShowHistory,
+    onShowDetails,
 }: Props) {
     const colors = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const BackIcon = isRTL ? CaretRight : CaretLeft;
-    const snapPoints = useMemo(() => ['92%'], []);
+    const [receiptItem, setReceiptItem] = useState<MembershipHistoryItem | null>(null);
+    useEffect(() => { if (!visible || showDetails) setReceiptItem(null); }, [visible, showDetails]);
+    const snapPoints = useMemo(() => [showDetails ? '55%' : '92%'], [showDetails]);
     const renderBackdrop = useCallback(
         (props: BottomSheetBackdropProps) => (
             <BottomSheetBackdrop
@@ -101,7 +114,7 @@ export function MembershipHistorySheet({
             statusBarTranslucent
             navigationBarTranslucent
             hardwareAccelerated
-            onRequestClose={onClose}
+            onRequestClose={receiptItem ? () => setReceiptItem(null) : onClose}
         >
             <GestureHandlerRootView style={styles.fill}>
                 <BottomSheet
@@ -116,21 +129,35 @@ export function MembershipHistorySheet({
                 >
                     <View style={[styles.header, { borderBottomColor: colors.brand.bg.border }]}>
                         <Pressable
-                            onPress={onClose}
+                            onPress={receiptItem ? () => setReceiptItem(null) : !showDetails && onShowDetails ? onShowDetails : onClose}
                             hitSlop={10}
                             accessibilityRole='button'
-                            accessibilityLabel={t('close', 'Close')}
+                            accessibilityLabel={receiptItem || (!showDetails && onShowDetails) ? t('back', 'Back') : t('close', 'Close')}
                             style={[styles.iconButton, { backgroundColor: colors.chrome.header.iconBackground }]}
                         >
                             <BackIcon size={scale(23)} color={colors.chrome.header.icon} weight="bold" />
                         </Pressable>
                         <Text variant='body' className='font-body-bold' style={styles.title} numberOfLines={1}>
-                            {t('membership_history', 'Membership history')}
+                            {receiptItem ? t('membership_receipt_title', 'Receipt') : showDetails ? t('membership_details', 'Membership details') : t('membership_payment_history', 'Payment history')}
                         </Text>
                         <View style={styles.iconButton} />
                     </View>
 
-                    <BottomSheetFlatList
+                    {receiptItem ? <MembershipReceiptView key={receiptItem.id} item={receiptItem} bottomInset={insets.bottom} /> : showDetails && details ? (
+                        <BottomSheetScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + scale(28) }]}>
+                            <Text variant="h3">{details.planName}</Text>
+                            <Text variant="body-sm" style={{ color: colors.brand.text.subtitle }}>
+                                {details.isActive ? t('active', 'Active') : t('membership_inactive', 'Membership inactive')}
+                            </Text>
+                            {!!details.endsOn && <Text variant="body-sm">{details.endsOn}</Text>}
+                            {!!details.provider && <Text variant="body-sm" style={{ color: colors.brand.text.subtitle }}>
+                                {t('payment', 'Payment')}: {providerLabel(details.provider)}
+                            </Text>}
+                            <GradientButton size="compact" widthMode="full"
+                                title={t('membership_payment_history', 'Payment history')}
+                                onPress={() => onShowHistory?.()} />
+                        </BottomSheetScrollView>
+                    ) : <BottomSheetFlatList
                         data={items}
                         keyExtractor={(item, index) => item.id || `${item.purchasedAt}-${index}`}
                         contentContainerStyle={[
@@ -152,7 +179,7 @@ export function MembershipHistorySheet({
                                     },
                                 ]}
                             >
-                                <View style={[styles.itemTop, { flexDirection: 'row' }]}>
+                                <View style={[styles.itemTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                     <View style={styles.itemCopy}>
                                         <Text variant='body' className='font-body-semi' numberOfLines={2}>
                                             {item.planName || t('memberships', 'Membership')}
@@ -186,6 +213,16 @@ export function MembershipHistorySheet({
                                         </Text>
                                     ) : null}
                                 </View>
+                                <Pressable
+                                    accessibilityRole="button"
+                                    onPress={() => setReceiptItem(item)}
+                                    style={[styles.receiptAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                                >
+                                    <Receipt size={scale(20)} color={colors.chrome.primary} />
+                                    <Text variant="body-sm" className="font-body-semi" style={{ color: colors.chrome.primary, flexShrink: 1 }}>
+                                        {t('membership_receipt_view', 'View receipt')}
+                                    </Text>
+                                </Pressable>
                             </View>
                         )}
                         ListHeaderComponent={(
@@ -225,7 +262,7 @@ export function MembershipHistorySheet({
                         ListFooterComponent={loadingMore ? (
                             <ActivityIndicator style={styles.footerLoader} color={colors.chrome.primary} />
                         ) : null}
-                    />
+                    />}
                 </BottomSheet>
             </GestureHandlerRootView>
         </Modal>
@@ -257,6 +294,7 @@ const styles = StyleSheet.create({
     historyItem: { borderWidth: 1, borderRadius: scale(8), padding: scale(14), gap: scale(12) },
     itemTop: { alignItems: 'flex-start', gap: scale(12) },
     itemCopy: { flex: 1, minWidth: 0, gap: scale(3) },
+    receiptAction: { minHeight: scale(44), alignItems: 'center', gap: scale(8) },
     amountPill: { borderRadius: scale(8), paddingHorizontal: scale(10), paddingVertical: scale(6) },
     details: { gap: scale(7) },
     detailRow: { flexDirection: 'row', alignItems: 'center', gap: scale(7) },

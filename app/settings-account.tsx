@@ -225,8 +225,8 @@ export default function SettingsAccountScreen() {
                     <SettingsNavRow
                         icon={<CreditCard size={scale(18)} color={fieldIconColor} />}
                         label={t('membership_billing', 'Membership & billing')}
-                        description={t('membership_billing_desc', 'Manage your membership, purchases, gift cards, and billing history.')}
-                        onPress={() => router.push('/memberships')}
+                        description={t('membership_billing_desc', 'Membership details and payment history.')}
+                        onPress={() => router.push({ pathname: '/memberships', params: { view: 'details' } })}
                     />
                 </SettingsFieldSection>
 

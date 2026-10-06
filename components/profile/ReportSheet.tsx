@@ -15,7 +15,6 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useKeyboardState } from 'react-native-keyboard-controller';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useColors } from '@/hooks/useColors';
@@ -37,6 +36,7 @@ import {
     reportReasons,
 } from '@/lib/reportTaxonomy';
 import { usersService } from '@/lib/usersService';
+import { reportEditorVisibility } from '@/lib/reportEditorVisibility';
 
 export type ReportTarget = {
     type: ReportEntityType;
@@ -67,14 +67,17 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
-    const keyboardState = useKeyboardState((state) => ({
-        duration: state.duration,
-        isVisible: state.isVisible,
-    }));
-    const keyboardVisible = keyboardState.isVisible;
     const { lightImpact } = useHaptics();
     const scrollRef = useRef<BottomSheetScrollViewMethods>(null);
-    const editorYRef = useRef(0);
+    const editorRef = useRef<View>(null);
+    const viewportRef = useRef<View>(null);
+    const footerRef = useRef<View>(null);
+    const editorFocusedRef = useRef(false);
+    const scrollOffsetRef = useRef(0);
+    const keyboardTopRef = useRef<number | undefined>(undefined);
+    const revealFrameRef = useRef<number | null>(null);
+    const revealVersionRef = useRef(0);
+    const [bottomOverlap, setBottomOverlap] = useState(0);
     const primaryActionRef = useRef<() => void>(() => undefined);
     const didNotifyOpenRef = useRef(false);
     const [step, setStep] = useState<'reason' | 'detail'>('reason');
@@ -98,6 +101,9 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
     useEffect(() => {
         if (!target) return;
         didNotifyOpenRef.current = false;
+        editorFocusedRef.current = false;
+        scrollOffsetRef.current = 0;
+        setBottomOverlap(0);
         setStep('reason');
         setReason(null);
         setReasonDetail(null);
@@ -114,19 +120,58 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
     }, [onOpened]);
 
     const revealEditor = useCallback(() => {
-        scrollRef.current?.scrollTo({ y: Math.max(0, editorYRef.current - scale(16)), animated: true });
+        if (!editorFocusedRef.current) return;
+        const version = ++revealVersionRef.current;
+        viewportRef.current?.measureInWindow((_x, viewportTop, _width, viewportHeight) => {
+            editorRef.current?.measureInWindow((_editorX, editorTop, _editorWidth, editorHeight) => {
+                footerRef.current?.measureInWindow((_footerX, footerTop, _footerWidth, footerHeight) => {
+                    if (!editorFocusedRef.current || version !== revealVersionRef.current || viewportHeight <= 0 || editorHeight <= 0) return;
+                    const result = reportEditorVisibility({
+                        viewportTop, viewportHeight, editorTop, editorHeight,
+                        scrollOffset: scrollOffsetRef.current,
+                        keyboardTop: keyboardTopRef.current,
+                        footerTop: footerHeight > 0 ? footerTop : undefined,
+                        gap: scale(12),
+                    });
+                    setBottomOverlap(current => Math.abs(current - result.bottomOverlap) > 1 ? result.bottomOverlap : current);
+                    if (Math.abs(result.scrollOffset - scrollOffsetRef.current) > 1) {
+                        scrollRef.current?.scrollTo({ y: result.scrollOffset, animated: true });
+                    }
+                });
+            });
+        });
     }, []);
 
-    useEffect(() => {
-        if (!keyboardVisible || step !== 'detail') return;
+    const scheduleRevealEditor = useCallback(() => {
+        if (revealFrameRef.current !== null) cancelAnimationFrame(revealFrameRef.current);
+        revealFrameRef.current = requestAnimationFrame(() => {
+            revealFrameRef.current = null;
+            revealEditor();
+        });
+    }, [revealEditor]);
 
-        const frame = requestAnimationFrame(revealEditor);
-        const timer = setTimeout(revealEditor, Math.max(0, keyboardState.duration));
+    useEffect(() => {
+        const shown = RNKeyboard.addListener('keyboardDidShow', event => {
+            keyboardTopRef.current = event.endCoordinates.screenY;
+            scheduleRevealEditor();
+        });
+        const changed = RNKeyboard.addListener('keyboardDidChangeFrame', event => {
+            keyboardTopRef.current = event.endCoordinates.height > 0 ? event.endCoordinates.screenY : undefined;
+            scheduleRevealEditor();
+        });
+        const hidden = RNKeyboard.addListener('keyboardDidHide', () => {
+            keyboardTopRef.current = undefined;
+            setBottomOverlap(0);
+        });
         return () => {
-            cancelAnimationFrame(frame);
-            clearTimeout(timer);
+            shown.remove();
+            changed.remove();
+            hidden.remove();
+            editorFocusedRef.current = false;
+            revealVersionRef.current++;
+            if (revealFrameRef.current !== null) cancelAnimationFrame(revealFrameRef.current);
         };
-    }, [keyboardState.duration, keyboardVisible, revealEditor, step]);
+    }, [scheduleRevealEditor]);
 
     const snapPoints = useMemo(() => ['100%'], []);
     const renderBackdrop = useCallback(
@@ -316,7 +361,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                 bottomInset={Math.max(0, insets.bottom - scale(12))}
                 style={{ backgroundColor: palette.brand.bg.surface }}
             >
-                <View style={[styles.footer, { backgroundColor: palette.brand.bg.surface }]}>
+                <View ref={footerRef} collapsable={false} onLayout={scheduleRevealEditor} style={[styles.footer, { backgroundColor: palette.brand.bg.surface }]}>
                     <GradientButton
                         title={step === 'reason' ? t('continue', 'Continue') : submitting ? t('report_submitting', 'Submitting report...') : t('report_submit', 'Submit report')}
                         onPress={() => primaryActionRef.current()}
@@ -329,7 +374,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                 </View>
             </BottomSheetFooter>
         ),
-        [canSubmit, insets.bottom, palette.brand.bg.surface, reason, step, submitting],
+        [canSubmit, insets.bottom, palette.brand.bg.surface, reason, step, submitting, scheduleRevealEditor],
     );
 
     if (!target) return null;
@@ -372,10 +417,13 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                     </View>
                 </View>
 
+                <View ref={viewportRef} collapsable={false} style={styles.scroll} onLayout={scheduleRevealEditor}>
                 <BottomSheetScrollView
                     ref={scrollRef}
                     style={styles.scroll}
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={[styles.scrollContent, { paddingBottom: scale(96) + bottomOverlap }]}
+                    onScroll={event => { scrollOffsetRef.current = event.nativeEvent.contentOffset.y; }}
+                    onContentSizeChange={scheduleRevealEditor}
                     keyboardShouldPersistTaps="never"
                     keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                 >
@@ -450,7 +498,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                             )}
 
                             {(reason === 'other' || reasonDetail) ? (
-                                <View onLayout={(event) => { editorYRef.current = event.nativeEvent.layout.y; }}>
+                                <View ref={editorRef} collapsable={false} onLayout={scheduleRevealEditor}>
                                     <Text variant="body-sm" className="font-body-semi" style={styles.editorLabel}>
                                         {reason === 'other' ? t('report_description_required', 'Details') : t('report_description', 'Additional details (optional)')}
                                     </Text>
@@ -460,7 +508,13 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                                         placeholder={t('report_description_ph', 'Add any details that help us review this report.')}
                                         placeholderTextColor={palette.brand.text.muted}
                                         multiline
-                                        onFocus={() => requestAnimationFrame(revealEditor)}
+                                        scrollEnabled
+                                        onFocus={() => {
+                                            editorFocusedRef.current = true;
+                                            keyboardTopRef.current = RNKeyboard.metrics()?.screenY;
+                                            scheduleRevealEditor();
+                                        }}
+                                        onBlur={() => { editorFocusedRef.current = false; revealVersionRef.current++; }}
                                         textAlignVertical="top"
                                         style={[styles.description, { color: palette.brand.text.body, borderBottomColor: palette.chrome.primary, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                     />
@@ -528,6 +582,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
                     )}
                     </View>
                 </BottomSheetScrollView>
+                </View>
 
             </SafeAreaView>
         </BottomSheet>
@@ -591,7 +646,7 @@ const styles = StyleSheet.create({
     radio: { width: scale(22), height: scale(22), borderRadius: scale(11), borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
     radioDot: { width: scale(12), height: scale(12), borderRadius: scale(6) },
     editorLabel: { marginTop: scale(20), marginBottom: scale(6) },
-    description: { minHeight: scale(92), borderBottomWidth: 1, paddingHorizontal: scale(6), paddingVertical: scale(8), fontSize: scale(14), lineHeight: scale(21) },
+    description: { minHeight: scale(92), maxHeight: scale(160), borderBottomWidth: 1, paddingHorizontal: scale(6), paddingVertical: scale(8), fontSize: scale(14), lineHeight: scale(21) },
     countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: scale(6) },
     evidenceSection: { gap: scale(5), paddingTop: scale(18) },
     screenshotRow: { flexDirection: 'row', flexWrap: 'wrap', gap: scale(10), paddingTop: scale(6) },
