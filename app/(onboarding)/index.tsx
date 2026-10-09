@@ -12,6 +12,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
+import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/hooks/useTheme";
@@ -20,43 +22,30 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { Text } from "@/components/ui/Text";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { PressableScale } from "@/components/ui/PressableScale";
-import { OnboardingBackground } from "@/components/onboarding/OnboardingBackground";
-import { HeartLogo } from "@/components/onboarding/HeartLogo";
 import { scale, wp, hp, isTablet } from "@/hooks/useResponsive";
 import { Typography } from "@/constants/typography";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Onboarding keeps its expressive coral treatment while sharing the app's
-// white light canvas and charcoal dark canvas.
+// Photo-backed onboarding uses light foregrounds in both app themes.
 const TOKENS = {
     light: {
-        bg: "#FFFFFF",
-        glowColor: "#FF9678",
-        glowOpacity: 0.09,
-        fg: "#141826",
-        eyebrow: "#A2968B",
-        muted: "rgba(32,28,40,0.64)",
-        wordmark: "#111C3A",
-        line: "rgba(96,64,52,0.32)",
-        lattice: "rgba(120,80,60,0.10)",
-        dot: "rgba(26, 22, 17,0.16)",
-        terms: "#141826",
+        bg: "#172418",
+        fg: "#FFFFFF",
+        eyebrow: "rgba(255,255,255,0.90)",
+        muted: "rgba(255,255,255,0.94)",
+        wordmark: "#FFFFFF",
+        dot: "rgba(255,255,255,0.50)",
         contrastBtnBg: "#141826",
         contrastBtnText: "#FFFFFF",
     },
     dark: {
         bg: "#101011",
-        glowColor: "#FF786E",
-        glowOpacity: 0.05,
-        fg: "#F5F5F5",
-        eyebrow: "#B0B0B5",
-        muted: "rgba(229,229,231,0.64)",
-        wordmark: "#F5F5F5",
-        line: "rgba(229,229,231,0.24)",
-        lattice: "rgba(229,229,231,0.07)",
-        dot: "rgba(229,229,231,0.20)",
-        terms: "#F5F5F5",
+        fg: "#FFFFFF",
+        eyebrow: "rgba(255,255,255,0.90)",
+        muted: "rgba(255,255,255,0.94)",
+        wordmark: "#FFFFFF",
+        dot: "rgba(255,255,255,0.50)",
         contrastBtnBg: "#F5F5F5",
         contrastBtnText: "#101011",
     },
@@ -114,11 +103,16 @@ export default function OnboardingScreen() {
     const renderItem = ({ item }: { item: { id: string; type: SlideType } }) => {
         if (item.type === "welcome") {
             return (
-                <View style={[styles.slide, styles.slideCentered, { width: SCREEN_WIDTH }]}>
+                <View style={[styles.slide, styles.slideWelcome, { width: SCREEN_WIDTH, paddingTop: insets.top + hp(7) }]}>
                     <Animated.View
                         entering={reduceMotion ? undefined : ZoomIn.duration(650).springify().damping(13)}
                     >
-                        <HeartLogo height={scale(118)} />
+                        <Image
+                            source={require("../../assets/icon/heart-white.svg")}
+                            style={{ height: scale(72), width: scale(72) * (312.179 / 304.96) }}
+                            contentFit="contain"
+                            accessible={false}
+                        />
                     </Animated.View>
                     <Animated.View entering={entering(120)} style={{ alignItems: "center" }}>
                         <RNText
@@ -177,10 +171,23 @@ export default function OnboardingScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: tokens.bg }}>
-            <OnboardingBackground
-                tokens={tokens}
-                medallionOpacity={realIndex === 0 ? 0.5 : 0.85}
-            />
+            <StatusBar style="light" />
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <Image
+                    source={require("../../assets/images/onboarding-background.webp")}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    contentPosition="center"
+                    accessible={false}
+                />
+                <LinearGradient
+                    colors={isDark
+                        ? ["rgba(0,0,0,0.40)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.32)"]
+                        : ["rgba(0,0,0,0.28)", "rgba(0,0,0,0)", "rgba(0,0,0,0.24)"]}
+                    locations={[0, 0.6, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            </View>
 
             <FlatList
                 ref={flatListRef}
@@ -278,34 +285,34 @@ const styles = StyleSheet.create({
         // Leave room for the bottom bar
         paddingBottom: hp(16),
     },
-    slideCentered: {
+    slideWelcome: {
         alignItems: "center",
-        justifyContent: "center",
-        gap: scale(20),
+        justifyContent: "flex-start",
+        gap: scale(15),
     },
     wordmark: {
         fontSize: scale(46),
-        letterSpacing: -1.2,
+        letterSpacing: 0,
         includeFontPadding: false,
         textAlign: "center",
     },
     tagline: {
         fontSize: scale(11),
-        letterSpacing: 3.6,
+        letterSpacing: 0,
         textTransform: "uppercase",
         textAlign: "center",
         marginTop: scale(10),
     },
     eyebrow: {
         fontSize: scale(11),
-        letterSpacing: 3.2,
+        letterSpacing: 0,
         textTransform: "uppercase",
         marginBottom: scale(14),
     },
     headline: {
         fontSize: scale(31),
         lineHeight: scale(40),
-        letterSpacing: -0.6,
+        letterSpacing: 0,
         marginBottom: scale(22),
     },
     para: {
