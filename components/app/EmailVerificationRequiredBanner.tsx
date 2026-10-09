@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { ShieldAlert, X } from '@/components/ui/icons/PhosphorCompat';
@@ -37,9 +37,21 @@ export function EmailVerificationRequiredBanner({
     const cachedEmail = useAuthStore((state) => state.user?.email);
     const refreshUser = useAuthStore((state) => state.refreshUser);
     const [resending, setResending] = useState(false);
+    const resendInFlight = useRef(false);
+    const retryUntil = useRef(0);
+    const [cooldown, setCooldown] = useState(0);
+
+    useEffect(() => {
+        if (cooldown <= 0) return;
+        const timer = setInterval(() => {
+            setCooldown(Math.max(0, Math.ceil((retryUntil.current - Date.now()) / 1000)));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [cooldown]);
 
     const resend = async () => {
-        if (resending) return;
+        if (resendInFlight.current || Date.now() < retryUntil.current) return;
+        resendInFlight.current = true;
         setResending(true);
         try {
             let accountEmail = String(email || cachedEmail || '').trim();
@@ -54,12 +66,21 @@ export function EmailVerificationRequiredBanner({
             }
 
             const res = await authService.resendVerification(accountEmail, currentLanguage);
+            const retryAfter = Number(res.retryAfter);
+            const seconds = Number.isFinite(retryAfter) && retryAfter > 0
+                ? Math.ceil(retryAfter)
+                : res.success ? 60 : 0;
+            retryUntil.current = Date.now() + seconds * 1000;
+            setCooldown(seconds);
             if (res.success) {
                 toast.show(t(res.message || 'verification_email_sent', 'Verification email sent.'), 'success', 3000);
             } else {
                 toast.show(apiMessage(res.message || 'resend_failed', 'Resend failed'), 'error', 3500);
             }
+        } catch {
+            toast.show(apiMessage('resend_failed', 'Resend failed'), 'error', 3500);
         } finally {
+            resendInFlight.current = false;
             setResending(false);
         }
     };
@@ -70,8 +91,7 @@ export function EmailVerificationRequiredBanner({
     const muted = colors.brand.text.subtitle;
     const accent = colors.chrome.primary;
     const iconBackground = isDark ? 'rgba(243,75,111,0.16)' : 'rgba(243,75,111,0.10)';
-    const darkButton = '#101011';
-    const outline = isDark ? colors.brand.text.heading : darkButton;
+    const resendDisabled = resending || cooldown > 0;
 
     return (
         <View
@@ -116,23 +136,25 @@ export function EmailVerificationRequiredBanner({
                     <View style={[styles.actions]}>
                         <Pressable
                             accessibilityRole="button"
+                            accessibilityState={{ disabled: resendDisabled, busy: resending }}
                             onPress={resend}
-                            disabled={resending}
+                            disabled={resendDisabled}
                             style={({ pressed }) => [
-                                styles.button,
-                                styles.filledButton,
-                                { backgroundColor: darkButton },
-                                (pressed || resending) && styles.buttonPressed,
+                                styles.textAction,
+                                { direction: isRTL ? 'rtl' : 'ltr' },
+                                (pressed || resendDisabled) && styles.buttonPressed,
                             ]}
                         >
-                            {resending ? <ActivityIndicator size="small" color="#FFFFFF" /> : null}
+                            {resending ? <ActivityIndicator size="small" color={text} /> : null}
                             <Text
-                                numberOfLines={1}
-                                adjustsFontSizeToFit
-                                minimumFontScale={0.78}
-                                style={[styles.buttonText, { color: '#FFFFFF' }]}
+                                className="font-body-bold"
+                                style={[styles.buttonText, { color: text, textAlign: isRTL ? 'right' : 'left' }]}
                             >
-                                {resending ? t('please_wait', 'Please wait...') : t('resend_email', 'Resend Email')}
+                                {resending
+                                    ? t('please_wait', 'Please wait...')
+                                    : cooldown > 0
+                                        ? t('resend_cooldown_in', 'Resend in {{seconds}}s', { seconds: cooldown })
+                                        : t('resend_verification_link', 'Resend verification link')}
                             </Text>
                         </Pressable>
                         <Pressable
@@ -142,17 +164,14 @@ export function EmailVerificationRequiredBanner({
                                 router.push('/change-email' as any);
                             }}
                             style={({ pressed }) => [
-                                styles.button,
-                                styles.outlineButton,
-                                { borderColor: outline },
+                                styles.textAction,
+                                { direction: isRTL ? 'rtl' : 'ltr' },
                                 pressed && styles.buttonPressed,
                             ]}
                         >
                             <Text
-                                numberOfLines={1}
-                                adjustsFontSizeToFit
-                                minimumFontScale={0.78}
-                                style={[styles.buttonText, { color: outline }]}
+                                className="font-body-bold"
+                                style={[styles.buttonText, { color: text, textAlign: isRTL ? 'right' : 'left' }]}
                             >
                                 {t('change_email_short', 'Change Email')}
                             </Text>
@@ -229,36 +248,26 @@ const styles = StyleSheet.create({
         marginTop: scale(2),
     },
     actions: {
-        flexDirection: 'row',
-        gap: scale(8),
-        marginTop: scale(9),
+        gap: scale(12),
+        marginTop: scale(16),
+        paddingBottom: scale(8),
         width: '100%',
     },
-    button: {
+    textAction: {
         alignItems: 'center',
-        borderRadius: scale(8),
-        flex: 1,
         flexDirection: 'row',
         gap: scale(5),
-        minHeight: scale(38),
-        justifyContent: 'center',
-        paddingHorizontal: scale(9),
+        minHeight: scale(44),
+        justifyContent: 'flex-start',
+        paddingHorizontal: 0,
         paddingVertical: scale(7),
-    },
-    filledButton: {
-        borderWidth: 0,
-    },
-    outlineButton: {
-        backgroundColor: 'transparent',
-        borderWidth: 1,
     },
     buttonPressed: {
         opacity: 0.72,
     },
     buttonText: {
         fontSize: scale(12),
-        fontWeight: '700',
+        flexShrink: 1,
         lineHeight: scale(16),
-        textAlign: 'center',
     },
 });

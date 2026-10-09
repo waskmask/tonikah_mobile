@@ -39,6 +39,7 @@ export function messageContextLayout(
     menuHeight: number,
     androidHeaderHeight: number,
     reactionHeight = 48,
+    mine = false,
 ) {
     const edge = 8;
     const gap = 8;
@@ -52,9 +53,9 @@ export function messageContextLayout(
         width: Math.max(0, Math.min(anchor.x + anchor.width, viewport.width) - bubbleX),
         height: Math.max(0, Math.min(anchor.y + anchor.height, viewport.height) - bubbleY),
     };
-    const reactionX = clamp(anchor.x + (anchor.width - reactionWidth) / 2, 16, viewport.width - reactionWidth - 16);
+    const reactionX = clamp(mine ? anchor.x + anchor.width - reactionWidth : anchor.x, 16, viewport.width - reactionWidth - 16);
     const reactionYAndroid = clamp(anchor.y - reactionHeight - gap, androidHeaderHeight + edge, viewport.height - reactionHeight - edge);
-    const menuX = clamp(anchor.x + anchor.width - menuWidth, 16, viewport.width - menuWidth - 16);
+    const menuX = clamp(mine ? anchor.x + anchor.width - menuWidth : anchor.x, 16, viewport.width - menuWidth - 16);
     const belowY = anchor.y + anchor.height + gap;
     const groupHeight = reactionHeight + gap + menuHeight;
     const fitsBelow = belowY + menuHeight + edge <= viewport.height;

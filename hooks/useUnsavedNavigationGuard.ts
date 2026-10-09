@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 
 type Options = {
     dirty: boolean;
@@ -17,29 +18,36 @@ export function useUnsavedNavigationGuard({
     const navigation = useNavigation();
     const [confirmationVisible, setConfirmationVisible] = useState(false);
     const pendingActionRef = useRef<any>(null);
-    const allowRemovalRef = useRef(false);
+    const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
 
     const allowAndRun = useCallback((action: () => void) => {
-        allowRemovalRef.current = true;
-        action();
-        setTimeout(() => {
-            allowRemovalRef.current = false;
-        }, 0);
+        setPendingLeave(() => action);
     }, []);
 
-    useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
-        if (allowRemovalRef.current) return;
+    usePreventRemove((dirty || redirectRemovalToFallback) && pendingLeave === null, ({ data }) => {
         if (dirty) {
-            event.preventDefault();
-            pendingActionRef.current = event.data.action;
+            pendingActionRef.current = data.action;
             setConfirmationVisible(true);
             return;
         }
         if (redirectRemovalToFallback) {
-            event.preventDefault();
             allowAndRun(leaveFallback);
         }
-    }), [allowAndRun, dirty, leaveFallback, navigation, redirectRemovalToFallback]);
+    });
+
+    useEffect(() => {
+        if (!pendingLeave) return;
+        // Let native-stack receive the released guard before dispatching navigation.
+        const frame = requestAnimationFrame(() => {
+            pendingLeave();
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [pendingLeave]);
+
+    // Router actions may be queued; don't re-arm while the approved exit is pending.
+    useEffect(() => navigation.addListener('focus', () => {
+        setPendingLeave(null);
+    }), [navigation]);
 
     const requestClose = useCallback(() => {
         if (dirty) {
@@ -51,6 +59,7 @@ export function useUnsavedNavigationGuard({
     }, [allowAndRun, dirty, leaveFallback]);
 
     const stay = useCallback(() => {
+        setPendingLeave(null);
         pendingActionRef.current = null;
         setConfirmationVisible(false);
     }, []);

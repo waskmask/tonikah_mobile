@@ -1,39 +1,29 @@
 import { router } from 'expo-router';
-import { Camera, TriangleAlert } from '@/components/ui/icons/PhosphorCompat';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Camera } from '@/components/ui/icons/PhosphorCompat';
+import { TouchableOpacity, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
-import { useTheme } from '@/hooks/useTheme';
 import { t } from '@/lib/profileDisplay';
 
 export function QualifiedPhotoRequiredNotice() {
     const colors = useColors();
-    const { isDark } = useTheme();
     const { isRTL } = useLanguage();
-    const warning = '#D78324';
-    const backgroundColor = isDark
-        ? 'rgba(215, 131, 36, 0.10)'
-        : 'rgba(215, 131, 36, 0.08)';
+    const warning = colors.chrome.toast.warning;
 
     return (
         <View
             style={[
                 styles.card,
                 {
-                    backgroundColor,
-                    borderColor: 'rgba(215, 131, 36, 0.28)',
+                    backgroundColor: warning.bg,
+                    borderColor: warning.border,
                 },
             ]}
         >
             <View style={[styles.content]}>
-                <TriangleAlert
-                    color={warning}
-                    size={scale(20)}
-                    strokeWidth={2.3}
-                />
                 <View style={styles.copy}>
                     <Text
                         variant="body-sm"
@@ -51,7 +41,7 @@ export function QualifiedPhotoRequiredNotice() {
                     <Text
                         variant="caption"
                         style={{
-                            color: colors.brand.text.subtitle,
+                            color: warning.text,
                             marginTop: scale(3),
                             textAlign: isRTL ? 'right' : 'left',
                         }}
@@ -61,13 +51,13 @@ export function QualifiedPhotoRequiredNotice() {
                             'You need at least one approved photo of yourself before sending messages.',
                         )}
                     </Text>
-                    <Pressable
+                    <TouchableOpacity
                         accessibilityRole="button"
+                        activeOpacity={0.76}
                         onPress={() => router.push('/edit-profile' as any)}
-                        style={({ pressed }) => [
+                        style={[
                             styles.button,
                             { backgroundColor: colors.chrome.primary },
-                            pressed && styles.pressed,
                         ]}
                     >
                         <Camera
@@ -82,7 +72,7 @@ export function QualifiedPhotoRequiredNotice() {
                         >
                             {t('add_profile_photo', 'Add profile photo')}
                         </Text>
-                    </Pressable>
+                    </TouchableOpacity>
                 </View>
             </View>
         </View>
@@ -115,8 +105,5 @@ const styles = StyleSheet.create({
         marginTop: scale(9),
         minHeight: scale(36),
         paddingHorizontal: scale(13),
-    },
-    pressed: {
-        opacity: 0.76,
     },
 });

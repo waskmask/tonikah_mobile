@@ -5,6 +5,7 @@ const config = getDefaultConfig(__dirname);
 
 if (process.platform === "win32") {
   config.maxWorkers = 2;
+  config.cacheStores = require("./scripts/limit-metro-cache.cjs")(config.cacheStores);
 }
 
 module.exports = withNativeWind(config, { input: "./global.css" });

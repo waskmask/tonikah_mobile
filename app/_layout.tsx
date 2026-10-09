@@ -288,6 +288,7 @@ export default function RootLayout() {
                 <Stack
                     screenOptions={{
                         headerShown: false,
+                        headerBackButtonMenuEnabled: false,
                         // Pushed detail screens such as conversations and profiles support swipe-back.
                         animation: isRTL ? "slide_from_left" : "slide_from_right",
                         gestureEnabled: true,

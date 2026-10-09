@@ -33,7 +33,7 @@ import {
     useAudioPlayerStatus,
 } from 'expo-audio';
 import { WaveformRecorderView, type WaveformRecorderCompleteEvent, type WaveformRecorderState, type WaveformRecorderViewRef } from 'react-native-waveform-recorder';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { Bell, BellOff, Camera, Check, CheckCheck, Clock3, Download, Mic, MoreVertical, Pause, Play, RefreshCw, Reply, Trash2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
 import { CaretDoubleDown, CaretLeft, CaretRight, Paperclip, PaperPlaneTilt } from 'phosphor-react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -101,7 +101,7 @@ import { ReportSheet, type ReportTarget } from '@/components/profile/ReportSheet
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
 import { QualifiedPhotoRequiredNotice } from '@/components/app/QualifiedPhotoRequiredNotice';
-import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
+import { EmailVerificationModal } from '@/components/app/EmailVerificationModal';
 import { useMessagingAccessExpiry, useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
 import { useConnectivity } from '@/hooks/useConnectivity';
 import { MessagingMembershipGate } from '@/components/membership/MessagingMembershipGate';
@@ -342,6 +342,7 @@ export default function ConversationScreen() {
     const routeRequestRole = routeParam(params.requestRole);
     const { user } = useAuthStore();
     const { requireVerified } = useEmailVerificationGuard();
+    const isFocused = useIsFocused();
     const eligibility = useMessagingEligibilityStatus();
     useMessagingAccessExpiry();
     const emailVerified = eligibility.data
@@ -1003,6 +1004,11 @@ export default function ConversationScreen() {
             screenFocusedRef.current = false;
         };
     }, []));
+
+    const refetchEligibility = eligibility.refetch;
+    useFocusEffect(useCallback(() => {
+        void refetchEligibility();
+    }, [refetchEligibility]));
 
     useEffect(() => {
         if (!messagesReady || invertedItems.length === 0) return;
@@ -2151,13 +2157,13 @@ export default function ConversationScreen() {
                         {isRTL ? <CaretRight size={24} color={colors.text} weight="bold" /> : <CaretLeft size={24} color={colors.text} weight="bold" />}
                     </Pressable>
                 </View>
-                <View style={styles.gateContent}>
-                    <EmailVerificationRequiredBanner
-                        email={eligibility.email || user?.email}
-                        title={t('verify_email_full_chat_title', 'Verify your email to use full chat')}
-                        message={t('verify_email_full_chat_message', 'Please verify your email before opening conversations or sending messages.')}
-                    />
-                </View>
+                <EmailVerificationModal
+                    visible={isFocused}
+                    onDismiss={goBackToMessages}
+                    email={eligibility.email || user?.email}
+                    title={t('verify_email_full_chat_title', 'Verify your email to use full chat')}
+                    message={t('verify_email_full_chat_message', 'Please verify your email before opening conversations or sending messages.')}
+                />
             </SafeAreaView>
         );
     }
@@ -4157,7 +4163,6 @@ const styles = StyleSheet.create({
         right: -scale(4),
     },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    gateContent: { flex: 1, justifyContent: 'center', paddingHorizontal: scale(16) },
     header: {
         minHeight: scale(56),
         flexDirection: 'row',

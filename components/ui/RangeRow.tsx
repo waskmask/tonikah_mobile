@@ -27,6 +27,7 @@ type RangeRowProps = {
     /** Unframed, divider-based treatment used by full-width editing surfaces. */
     presentation?: 'card' | 'band';
     insetDivider?: boolean;
+    preserveLabelSize?: boolean;
     isRTL?: boolean;
 };
 
@@ -52,6 +53,7 @@ export function RangeRow({
     anyLabel,
     presentation = 'card',
     insetDivider = false,
+    preserveLabelSize = false,
     isRTL = false,
 }: RangeRowProps) {
     const { currentLanguage } = useLanguage();
@@ -140,22 +142,22 @@ export function RangeRow({
             accessibilityLabel={label}
             accessibilityValue={{ text: valueText }}
         >
-            <View style={styles.rangeHeader}>
+            <View style={[styles.rangeHeader, preserveLabelSize && styles.wrappingHeader]}>
                 <Text
                     variant="body-sm"
                     className="font-body-bold"
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.86}
+                    numberOfLines={preserveLabelSize ? undefined : 1}
+                    adjustsFontSizeToFit={!preserveLabelSize}
+                    minimumFontScale={preserveLabelSize ? undefined : 0.86}
                     style={[
-                        styles.rangeTitle,
+                        preserveLabelSize ? styles.preservedTitle : styles.rangeTitle,
                         usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
                         { color: mutedColor, textAlign: isRTL ? 'right' : 'left' },
                     ]}
                 >
                     {label}
                 </Text>
-                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, { color: isAny ? mutedColor : primaryColor, textAlign: isRTL ? 'left' : 'right' }]}>
+                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, preserveLabelSize && styles.wrappingValue, { color: isAny ? mutedColor : primaryColor, textAlign: isRTL ? 'left' : 'right' }]}>
                     {valueText}
                 </Text>
             </View>
@@ -235,6 +237,19 @@ const styles = StyleSheet.create({
         minWidth: 0,
         fontSize: 13,
         lineHeight: 17,
+    },
+    wrappingHeader: {
+        alignItems: 'flex-start',
+        gap: 8,
+    },
+    preservedTitle: {
+        flex: 1,
+        fontSize: 13,
+        lineHeight: 20,
+    },
+    wrappingValue: {
+        flexShrink: 1,
+        maxWidth: '70%',
     },
     latinFieldLabel: {
         letterSpacing: 1.2,

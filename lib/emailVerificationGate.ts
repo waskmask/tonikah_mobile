@@ -16,13 +16,13 @@ type VerificationGateCopy = {
 export const VERIFICATION_GATE_COPY: Record<VerificationGuardAction, VerificationGateCopy> = {
     profileActions: {
         title: 'verify_email_profile_actions_title',
-        titleFallback: 'Verify your email to save profiles',
+        titleFallback: 'Verify your email to continue',
         message: 'verify_email_profile_actions_message',
         messageFallback: 'Please verify your email before saving or skipping profiles.',
     },
     save: {
         title: 'verify_email_profile_actions_title',
-        titleFallback: 'Verify your email to save changes',
+        titleFallback: 'Verify your email to continue',
         message: 'verify_email_profile_actions_message',
         messageFallback: 'Please verify your email before saving changes.',
     },

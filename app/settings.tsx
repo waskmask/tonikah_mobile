@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { ShieldCheck, UserRound, FileLock2 } from '@/components/ui/icons/PhosphorCompat';
-import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
+import { EmailVerificationModal } from '@/components/app/EmailVerificationModal';
 import { HeardAboutUsSettingsPrompt } from '@/components/settings/HeardAboutUsSettingsPrompt';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { SettingsNavRow } from '@/components/settings/SettingsRows';
@@ -26,6 +26,7 @@ export default function SettingsScreen() {
     const iconColor = colors.chrome.common.textStrong;
     const emailVerified = Boolean(user?.email_verified ?? user?.emailVerified);
     const [verificationBannerVisible, setVerificationBannerVisible] = useState(true);
+    const isFocused = useIsFocused();
     const [heardAboutUsAnswered, setHeardAboutUsAnswered] = useState(
         Boolean(user?.heard_about_us_answered),
     );
@@ -62,22 +63,18 @@ export default function SettingsScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('settings', 'Settings')} fallbackHref="/(tabs)/profile" showMenu />
+            <EmailVerificationModal
+                visible={isFocused && !emailVerified && verificationBannerVisible}
+                email={user?.email}
+                onDismiss={() => setVerificationBannerVisible(false)}
+                title={t('email_not_verified', 'Email not verified')}
+                message={emailNotVerifiedDesc}
+            />
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={{ paddingTop: 0, paddingBottom: scale(120) }}
                 showsVerticalScrollIndicator={false}
             >
-                {!emailVerified && verificationBannerVisible ? (
-                    <View style={[styles.promptWrap, styles.topPromptWrap]}>
-                        <EmailVerificationRequiredBanner
-                            email={user?.email}
-                            onDismiss={() => setVerificationBannerVisible(false)}
-                            title={t('email_not_verified', 'Email not verified')}
-                            message={emailNotVerifiedDesc}
-                        />
-                    </View>
-                ) : null}
-
                 <SettingsFieldSection>
                     <SettingsNavRow
                         icon={<UserRound size={scale(19)} color={iconColor} />}
@@ -125,8 +122,5 @@ const styles = StyleSheet.create({
     promptWrap: {
         marginBottom: scale(14),
         paddingHorizontal: scale(14),
-    },
-    topPromptWrap: {
-        paddingTop: scale(14),
     },
 });

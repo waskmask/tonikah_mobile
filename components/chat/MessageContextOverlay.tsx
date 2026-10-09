@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Reanimated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { Copy, Info, Reply, Trash2, X } from '@/components/ui/icons/PhosphorCompat';
@@ -46,11 +46,11 @@ export function MessageContextOverlay({
     onClose: () => void;
 }) {
     const android = Platform.OS === 'android';
-    const menuHeight = actions.length * scale(46) + scale(8);
+    const menuHeight = actions.length * scale(44) + scale(8);
     const headerActions = [...actions.filter((action) => action.id !== 'report'), ...actions.filter((action) => action.id === 'report')];
-    const layout = messageContextLayout(anchor, viewport, menuHeight, headerHeight, scale(48));
+    const layout = messageContextLayout(anchor, viewport, menuHeight, headerHeight, scale(48), mine);
     const { bubble } = layout;
-    const dim = 'rgba(0,0,0,0.42)';
+    const dim = 'rgba(0,0,0,0.55)';
     const holeInset = 1;
     const hole = messageBubbleHolePath({
         x: bubble.x + holeInset,
@@ -111,15 +111,16 @@ export function MessageContextOverlay({
 
             {!android && (
                 <Reanimated.View entering={FadeInDown.duration(180)} style={[styles.menu, { left: layout.menu.x, top: layout.menu.y, width: layout.menu.width, backgroundColor: colors.card, borderColor: colors.border }]}>
-                    {actions.map((action, index) => {
+                    {actions.map((action) => {
                         const Icon = ICONS[action.id];
                         const tint = action.danger ? colors.danger : colors.text;
                         return (
-                            <Pressable
+                            <TouchableOpacity
                                 key={action.id}
                                 onPress={() => { onActionFeedback(); action.onPress(); }}
                                 disabled={busy}
-                                style={({ pressed }) => [styles.menuAction, index > 0 && { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth }, pressed && { backgroundColor: colors.border }]}
+                                activeOpacity={0.65}
+                                style={styles.menuAction}
                                 accessibilityRole="button"
                                 accessibilityLabel={action.label}
                             >
@@ -127,7 +128,7 @@ export function MessageContextOverlay({
                                 {busy && busyActionId === action.id
                                     ? <ActivityIndicator size="small" color={tint} />
                                     : <Icon size={scale(20)} color={tint} strokeWidth={2} />}
-                            </Pressable>
+                            </TouchableOpacity>
                         );
                     })}
                 </Reanimated.View>
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
     reactionRow: { position: 'absolute', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderRadius: scale(24), borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: scale(4), shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 7 },
     reactionButton: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center' },
     reactionEmoji: { fontSize: scale(24), lineHeight: scale(30) },
-    menu: { position: 'absolute', borderRadius: scale(12), borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 8, paddingVertical: scale(4) },
-    menuAction: { height: scale(46), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(14), gap: scale(8) },
-    menuLabel: { flex: 1, fontSize: scale(15), fontWeight: '400' },
+    menu: { position: 'absolute', borderRadius: scale(12), overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 8, paddingVertical: scale(4) },
+    menuAction: { height: scale(44), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: scale(14), gap: scale(12) },
+    menuLabel: { flex: 1, minWidth: 0, fontSize: scale(15), lineHeight: scale(20), fontWeight: '400' },
 });

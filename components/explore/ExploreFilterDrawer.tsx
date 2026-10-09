@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { CaretLeft, CaretRight, X } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -140,7 +140,11 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
             navigationBarTranslucent
             onRequestClose={onClose}
         >
-            <SafeAreaView edges={['top', 'bottom']} style={[styles.root, { backgroundColor: colors.chrome.header.background }]}>
+            {/* Measure this full-screen modal, not the underlying tab screen. */}
+            <SafeAreaProvider>
+            <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.root, {
+                backgroundColor: colors.chrome.header.background,
+            }]}>
                 <View style={[styles.header, { backgroundColor: colors.chrome.header.background, borderBottomColor: colors.brand.bg.border }]}>
                     <Pressable onPress={clearAll} disabled={activeCount === 0} style={styles.clearButton}>
                         <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: activeCount ? colors.chrome.primary : colors.brand.text.muted }}>
@@ -162,6 +166,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                 >
                     <RangeRow
                         label={t('age', 'Age')}
+                        preserveLabelSize={Platform.OS === 'ios'}
                         min={18}
                         max={80}
                         step={1}
@@ -180,6 +185,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                     />
                     <RangeRow
                         label={t('height', 'Height')}
+                        preserveLabelSize={Platform.OS === 'ios'}
                         min={120}
                         max={220}
                         step={5}
@@ -239,6 +245,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
                     />
                 ) : null}
             </SafeAreaView>
+            </SafeAreaProvider>
         </Modal>
     );
 }
@@ -292,9 +299,9 @@ function SelectRow({
                 <Text
                     variant="body-sm"
                     className="font-body-bold"
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.86}
+                    numberOfLines={Platform.OS === 'ios' ? undefined : 1}
+                    adjustsFontSizeToFit={Platform.OS !== 'ios'}
+                    minimumFontScale={Platform.OS === 'ios' ? undefined : 0.86}
                     style={[
                         styles.selectTitle,
                         usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
@@ -402,6 +409,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         paddingHorizontal: 14,
         paddingTop: 10,
-        paddingBottom: 10,
+        paddingBottom: 0,
     },
 });

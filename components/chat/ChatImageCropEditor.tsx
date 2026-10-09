@@ -144,7 +144,9 @@ export const ChatImageCropEditor = forwardRef<ChatImageCropEditorRef, Props>(fun
                 }]}>
                     <Image
                         source={{ uri }}
-                        contentFit="fill"
+                        // The frame already matches the source ratio; contain also enables preview downsampling.
+                        contentFit="contain"
+                        allowDownscaling
                         style={{
                             position: 'absolute',
                             left: (imageFrame.width - originalWidth) / 2,

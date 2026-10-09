@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import { messageBubbleHolePath, messageContextLayout } from '../lib/messageContextLayout';
 
 const viewport = { width: 375, height: 740 };
+const received = messageContextLayout({ x: 24, y: 200, width: 200, height: 60 }, viewport, 184, 64, 48, false);
+assert.equal(received.menu.x, 24);
+assert.equal(received.reaction.x, 24);
+assert.equal(received.menu.y, 268);
+assert.equal(received.reaction.yIos + received.reaction.height, 192);
+const sent = messageContextLayout({ x: 139, y: 200, width: 220, height: 60 }, viewport, 184, 64, 48, true);
+assert.equal(sent.menu.x + sent.menu.width, 359);
+assert.equal(sent.reaction.x + sent.reaction.width, 359);
+assert.equal(sent.menu.y, 268);
 for (const anchor of [
     { x: 12, y: 92, width: 180, height: 56 },
     { x: 160, y: 510, width: 200, height: 100 },

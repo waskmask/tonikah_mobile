@@ -5,7 +5,8 @@ import { Compass, MapPin } from 'phosphor-react-native';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAppMenu } from '@/components/app/AppMenuProvider';
-import { EmailVerificationRequiredBanner } from '@/components/app/EmailVerificationRequiredBanner';
+import { EmailVerificationModal } from '@/components/app/EmailVerificationModal';
+import { useIsFocused } from 'expo-router';
 import { ExploreActionBar, ExploreActionBarSkeleton } from '@/components/explore/ExploreActionBar';
 import { ExploreFilterDrawer } from '@/components/explore/ExploreFilterDrawer';
 import { SwipeableDeck, SwipeableDeckHandle, SwipeDirection } from '@/components/explore/SwipeableDeck';
@@ -162,6 +163,7 @@ export default function ExploreScreen() {
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [tourOpen, setTourOpen] = useState(false);
     const [verificationReason, setVerificationReason] = useState<VerificationReason>(null);
+    const isFocused = useIsFocused();
     const nextCursorRef = useRef<string | null>(null);
     const hasMoreRef = useRef(true);
     const isFetchingRef = useRef(false);
@@ -429,12 +431,14 @@ export default function ExploreScreen() {
     }, [emailVerified, verificationReason]);
 
     useEffect(() => {
-        if (emailVerified) return;
+        if (emailVerified || !isFocused) return;
+        const refresh = () => { void refreshUser().catch(() => undefined); };
+        refresh();
         const subscription = AppState.addEventListener('change', (nextState) => {
-            if (nextState === 'active') void refreshUser();
+            if (nextState === 'active') refresh();
         });
         return () => subscription.remove();
-    }, [emailVerified, refreshUser]);
+    }, [emailVerified, isFocused, refreshUser]);
 
     useEffect(() => {
         if (locationState !== 'ready' || !cacheHydrated) return;
@@ -705,24 +709,21 @@ export default function ExploreScreen() {
             )}
 
             {verificationReason ? (
-                <View style={[styles.verificationToast, { top: insets.top + scale(48) }]}>
-                    <EmailVerificationRequiredBanner
-                        compact
-                        floating
-                        email={user?.email}
-                        onDismiss={() => setVerificationReason(null)}
-                        title={
-                            verificationReason === 'browse_limit'
-                                ? t('verify_email_browse_limit_title', 'Verify your email to keep browsing')
-                                : t('verify_email_profile_actions_title', 'Verify your email to save profiles')
-                        }
-                        message={
-                            verificationReason === 'browse_limit'
-                                ? t('verify_email_browse_limit_message', 'You can browse your first profiles now. Verify your email to continue exploring more matches.')
-                                : t('verify_email_profile_actions_message', 'Please verify your email before saving or skipping profiles.')
-                        }
-                    />
-                </View>
+                <EmailVerificationModal
+                    visible={isFocused}
+                    email={user?.email}
+                    onDismiss={() => setVerificationReason(null)}
+                    title={
+                        verificationReason === 'browse_limit'
+                            ? t('verify_email_browse_limit_title', 'Verify your email to keep browsing')
+                            : t('verify_email_profile_actions_title', 'Verify your email to continue')
+                    }
+                    message={
+                        verificationReason === 'browse_limit'
+                            ? t('verify_email_browse_limit_message', 'You can browse your first profiles now. Verify your email to continue exploring more matches.')
+                            : t('verify_email_profile_actions_message', 'Please verify your email before saving or skipping profiles.')
+                    }
+                />
             ) : null}
 
             <ExploreFilterDrawer
@@ -758,13 +759,6 @@ const styles = StyleSheet.create({
         position: 'relative',
         paddingHorizontal: scale(16),
         paddingTop: scale(7),
-    },
-    verificationToast: {
-        elevation: 20,
-        left: scale(12),
-        position: 'absolute',
-        right: scale(12),
-        zIndex: 40,
     },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: scale(24) },
 });
