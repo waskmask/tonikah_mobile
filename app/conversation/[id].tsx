@@ -101,6 +101,7 @@ import { ReportSheet, type ReportTarget } from '@/components/profile/ReportSheet
 import { profileId } from '@/lib/exploreProfile';
 import { routeParam } from '@/lib/routeParams';
 import { QualifiedPhotoRequiredNotice } from '@/components/app/QualifiedPhotoRequiredNotice';
+import { ViewOncePhotoViewer } from '@/components/chat/ViewOncePhotoViewer';
 import { EmailVerificationModal } from '@/components/app/EmailVerificationModal';
 import { useMessagingAccessExpiry, useMessagingEligibilityStatus } from '@/hooks/useCurrentUserStatus';
 import { useConnectivity } from '@/hooks/useConnectivity';
@@ -957,16 +958,8 @@ export default function ConversationScreen() {
     }, [id, isOffline, user?._id, user?.id]);
 
     useEffect(() => {
-        if (!viewOnce) return;
-        if (viewOnce.seconds <= 0) {
-            setViewOnce(null);
-            return;
-        }
-        const timer = setTimeout(() => {
-            setViewOnce((current) => current ? { ...current, seconds: current.seconds - 1 } : null);
-        }, 1000);
-        return () => clearTimeout(timer);
-    }, [viewOnce]);
+        if (!isFocused) setViewOnce(null);
+    }, [isFocused]);
 
     const listItems = useMemo(() => buildItems(items), [items]);
     const messagesById = useMemo(() => new Map(items.map((message) => [message.id, message])), [items]);
@@ -2643,26 +2636,19 @@ export default function ConversationScreen() {
                 />
             )}
 
-            <Modal visible={!!viewOnce} transparent animationType="fade" onRequestClose={() => setViewOnce(null)}>
-                <View style={styles.previewModal}>
-                    <Pressable style={[styles.modalClose, { top: insets.top + scale(14) }]} onPress={() => setViewOnce(null)}>
-                        <X size={scale(22)} color="#FFFFFF" />
-                    </Pressable>
-                    {!!viewOnce && (
-                        <View style={[styles.countdown, { top: insets.top + scale(18) }]}>
-                            <Text variant="caption" className="font-body-bold" style={{ color: '#FFFFFF' }}>{viewOnce.seconds}s</Text>
-                        </View>
-                    )}
-                    {!!viewOnce?.url && (
-                        <RNImage
-                            source={{ uri: viewOnce.url }}
-                            style={styles.previewImage}
-                            resizeMode="contain"
-                            onLoad={markViewOnceLoaded}
-                        />
-                    )}
-                </View>
-            </Modal>
+            {viewOnce && isFocused && (
+                <ViewOncePhotoViewer
+                    key={viewOnce.messageId}
+                    url={viewOnce.url}
+                    seconds={viewOnce.seconds}
+                    onClose={() => setViewOnce(null)}
+                    onLoaded={markViewOnceLoaded}
+                    onError={() => {
+                        setViewOnce(null);
+                        toast.show(t('something_went_wrong', 'Something went wrong, please try again.'), 'error', 3500);
+                    }}
+                />
+            )}
 
             <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => !menuBusy && setMenuOpen(false)}>
                 <View style={styles.menuLayer} pointerEvents="box-none">

@@ -1,4 +1,16 @@
 {
+  "verifications_page": {
+    "title": "Verifikasi",
+    "notice": "Segera hadir untuk anggota berbayar",
+    "notice_description": "Verifikasi belum tersedia. Setelah diluncurkan, fitur ini hanya tersedia bagi anggota dengan keanggotaan berbayar yang aktif.",
+    "selfie": "Verifikasi swafoto",
+    "selfie_description": "Cocokkan swafoto baru dengan foto profil Anda.",
+    "age": "Verifikasi usia",
+    "age_description": "Konfirmasikan usia Anda melalui pemeriksaan verifikasi.",
+    "phone": "Nomor telepon",
+    "phone_description": "Konfirmasikan bahwa nomor telepon Anda adalah milik Anda.",
+    "summary": "Verifikasi swafoto, usia, dan nomor telepon."
+  },
   "ios": {
     "CFBundleDisplayName": "toNikah"
   },

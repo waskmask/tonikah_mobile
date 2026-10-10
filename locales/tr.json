@@ -1,4 +1,16 @@
 {
+  "verifications_page": {
+    "title": "Doğrulamalar",
+    "notice": "Yakında ücretli üyeler için",
+    "notice_description": "Doğrulama henüz kullanılamıyor. Kullanıma sunulduğunda yalnızca aktif ücretli üyeliği olan üyeler yararlanabilecek.",
+    "selfie": "Selfie doğrulaması",
+    "selfie_description": "Yeni bir selfieyi profil fotoğrafınızla karşılaştırın.",
+    "age": "Yaş doğrulaması",
+    "age_description": "Doğrulama işlemiyle yaşınızı onaylayın.",
+    "phone": "Telefon numarası",
+    "phone_description": "Telefon numaranızın size ait olduğunu doğrulayın.",
+    "summary": "Selfie, yaş ve telefon numarası doğrulaması."
+  },
   "ios": {
     "CFBundleDisplayName": "toNikah"
   },

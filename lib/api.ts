@@ -407,7 +407,7 @@ export const api = {
         return bytes;
     },
     get: (endpoint: string) => apiRequest(endpoint, { method: 'GET' }),
-    post: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+    post: (endpoint: string, body: object, options?: Pick<FetchOptions, 'timeout'>) => apiRequest(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
     postFormData: (endpoint: string, body: FormData) => formDataRequest(endpoint, body),
     patch: (endpoint: string, body: object) => apiRequest(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (endpoint: string) => apiRequest(endpoint, { method: 'DELETE' }),

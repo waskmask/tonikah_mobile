@@ -13,7 +13,7 @@ import { ImagePlus, X } from '@/components/ui/icons/PhosphorCompat';
 import { CaretLeft, CaretRight, Check } from 'phosphor-react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -63,7 +63,26 @@ const MAX_SCREENSHOTS = 3;
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 const SCREENSHOT_MIME_TYPES = new Set<ReportScreenshot['type']>(['image/jpeg', 'image/png', 'image/webp']);
 
-export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = false }: Props) {
+export function ReportSheet(props: Props) {
+    const requestClose = useRef<() => void>(() => undefined);
+    if (!props.target) return null;
+
+    const content = <ReportSheetContent {...props} requestClose={requestClose} />;
+    if (props.embedded) return content;
+
+    return (
+        <Modal visible transparent animationType="none" statusBarTranslucent navigationBarTranslucent
+            hardwareAccelerated onRequestClose={() => requestClose.current()}>
+            <SafeAreaProvider>
+                <GestureHandlerRootView style={styles.container}>{content}</GestureHandlerRootView>
+            </SafeAreaProvider>
+        </Modal>
+    );
+}
+
+function ReportSheetContent({ target, onClose, onOpened, onBlocked, embedded = false, requestClose }: Props & {
+    requestClose: React.MutableRefObject<() => void>;
+}) {
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
@@ -217,6 +236,8 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
         onClose();
     }, [onClose]);
 
+    requestClose.current = () => { if (!submitting) closeSheet(); };
+
     const pickScreenshots = async () => {
         const remaining = MAX_SCREENSHOTS - screenshots.length;
         if (remaining <= 0) {
@@ -358,7 +379,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
         (props: BottomSheetFooterProps) => (
             <BottomSheetFooter
                 {...props}
-                bottomInset={Math.max(0, insets.bottom - scale(12))}
+                bottomInset={Platform.OS === 'ios' ? insets.bottom : Math.max(0, insets.bottom - scale(12))}
                 style={{ backgroundColor: palette.brand.bg.surface }}
             >
                 <View ref={footerRef} collapsable={false} onLayout={scheduleRevealEditor} style={[styles.footer, { backgroundColor: palette.brand.bg.surface }]}>
@@ -592,19 +613,7 @@ export function ReportSheet({ target, onClose, onOpened, onBlocked, embedded = f
         return <View style={styles.embeddedHost}>{sheet}<ToastProvider /></View>;
     }
 
-    return (
-        <Modal
-            visible
-            transparent
-            animationType="none"
-            statusBarTranslucent
-            navigationBarTranslucent
-            hardwareAccelerated
-            onRequestClose={submitting ? undefined : closeSheet}
-        >
-            <GestureHandlerRootView style={styles.container}>{sheet}<ToastProvider /></GestureHandlerRootView>
-        </Modal>
-    );
+    return <>{sheet}<ToastProvider /></>;
 }
 
 function ReportOptionRow({ active, title, description, onPress }: { active: boolean; title: string; description?: string; onPress: () => void }) {
@@ -658,6 +667,6 @@ const styles = StyleSheet.create({
     checkbox: { width: scale(20), height: scale(20), borderRadius: scale(6), borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: scale(1) },
     checkboxCheck: { transform: [{ translateX: 0.5 }] },
     blockText: { flex: 1, gap: scale(3) },
-    footer: { paddingHorizontal: scale(26), paddingTop: scale(12), paddingBottom: scale(12) },
+    footer: { paddingHorizontal: scale(26), paddingTop: scale(12), paddingBottom: Platform.OS === 'ios' ? 0 : scale(12) },
     drawerSaveButton: { height: scale(40) },
 });

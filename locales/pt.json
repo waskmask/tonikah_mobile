@@ -1,4 +1,16 @@
 {
+  "verifications_page": {
+    "title": "Verificações",
+    "notice": "Em breve para membros pagantes",
+    "notice_description": "A verificação ainda não está disponível. Quando for lançada, estará disponível apenas para membros com uma assinatura paga ativa.",
+    "selfie": "Verificação por selfie",
+    "selfie_description": "Compare uma selfie recente com a sua foto de perfil.",
+    "age": "Verificação de idade",
+    "age_description": "Confirme a sua idade através de uma verificação.",
+    "phone": "Número de telefone",
+    "phone_description": "Confirme que o seu número de telefone lhe pertence.",
+    "summary": "Verificação de selfie, idade e número de telefone."
+  },
   "ios": {
     "CFBundleDisplayName": "toNikah"
   },

@@ -525,15 +525,16 @@ export default function MembershipsScreen() {
     };
 
     const refreshAfterCheckout = async () => {
+        const hadPendingCheckout = checkoutState === 'pending' || checkoutState === 'browser_open';
         const beforeRefresh = membershipSignature(overview);
         setCheckoutState('refreshing');
         try {
             const nextOverview = await refreshMembership();
             setCheckoutState(
-                membershipSignature(nextOverview) === beforeRefresh ? 'pending' : 'idle',
+                hadPendingCheckout && membershipSignature(nextOverview) === beforeRefresh ? 'pending' : 'idle',
             );
         } catch {
-            setCheckoutState('pending');
+            setCheckoutState(hadPendingCheckout ? 'pending' : 'idle');
             toast.show(t('membership_refresh_failed', 'Could not refresh membership. Try again.'), 'error');
         }
     };
@@ -775,6 +776,28 @@ export default function MembershipsScreen() {
                     </View>
                 )}
 
+                {overview.trialOffer?.available && !overview.trial.used && trialPlan ? (
+                    <View style={[styles.trialBand, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
+                        <View style={styles.planCopy}>
+                            <Text variant='body' className='font-body-semi'>
+                                {translatedPlanName(trialPlan)}
+                            </Text>
+                            <Text variant='body-sm' style={[styles.planDescription, { color: colors.brand.text.subtitle }]}>
+                                {t(`membership_plans.${trialPlan.slug}.description`, `${trialPlan.durationDays} ${t('days', 'days')}`)}
+                            </Text>
+                        </View>
+                        <GradientButton
+                            title={t('start_free_trial', 'Start free trial')}
+                            onPress={() => void startTrial(trialPlan)}
+                            loading={startingPlan === trialPlan.slug}
+                            disabled={Boolean(startingPlan) || Boolean(openingPlan)}
+                            widthMode='full'
+                            height={46}
+                            textSize={15}
+                        />
+                    </View>
+                ) : null}
+
                 <View accessibilityRole="radiogroup" accessibilityLabel={t('memberships', 'Memberships')} style={styles.planOptions}>
                     {paidPlans.map((plan) => {
                         const selected = plan.slug === selectedPlan?.slug;
@@ -913,27 +936,6 @@ export default function MembershipsScreen() {
                     </View>
                 ) : null}
 
-                {!overview.trial.used && trialPlan ? (
-                    <View style={[styles.trialBand, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
-                        <View style={styles.planCopy}>
-                            <Text variant='body' className='font-body-semi'>
-                                {translatedPlanName(trialPlan)}
-                            </Text>
-                            <Text variant='body-sm' style={[styles.planDescription, { color: colors.brand.text.subtitle }]}>
-                                {t(`membership_plans.${trialPlan.slug}.description`, `${trialPlan.durationDays} ${t('days', 'days')}`)}
-                            </Text>
-                        </View>
-                        <GradientButton
-                            title={t('start_free_trial', 'Start free trial')}
-                            onPress={() => void startTrial(trialPlan)}
-                            loading={startingPlan === trialPlan.slug}
-                            disabled={Boolean(startingPlan) || Boolean(openingPlan)}
-                            widthMode='full'
-                            height={46}
-                            textSize={15}
-                        />
-                    </View>
-                ) : null}
             </ScrollView>
             <MembershipPaymentSheet
                 visible={Boolean(paymentPlan)}

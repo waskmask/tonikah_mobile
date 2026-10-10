@@ -77,10 +77,17 @@ export default function SettingsScreen() {
             >
                 <SettingsFieldSection>
                     <SettingsNavRow
+                        icon={<ShieldCheck size={scale(19)} color={iconColor} />}
+                        label={t('verifications_page.title', 'Verifications')}
+                        description={t('verifications_page.summary', 'Selfie, age and phone number verification.')}
+                        onPress={() => router.push('/verifications' as any)}
+                    />
+                    <SettingsNavRow
                         icon={<UserRound size={scale(19)} color={iconColor} />}
                         label={t('account', 'Account')}
                         description={t('settings_hub_account_desc', 'Email, language, personal info and sessions.')}
                         onPress={() => router.push('/settings-account' as any)}
+                        divider
                     />
                     <SettingsNavRow
                         icon={<FileLock2 size={scale(19)} color={iconColor} />}
