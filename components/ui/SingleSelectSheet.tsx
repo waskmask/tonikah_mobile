@@ -29,7 +29,7 @@ import { scale } from '@/hooks/useResponsive';
 import { CaretLeft, CaretRight, Check, MagnifyingGlass, X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
 
 export interface SelectOption {
@@ -82,12 +82,11 @@ export function SingleSelectSheet({
 }: SingleSelectSheetProps) {
     const { isDark } = useTheme();
     const palette = useColors();
-    const { currentLanguage, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const { lightImpact } = useHaptics();
-    const searchFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
-    const optionFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.medium;
     const [search, setSearch] = useState('');
+    const searchFontFamily = fontFamilyForText(search || searchPlaceholder);
     const sheetRef = useRef<BottomSheet>(null);
     const nextPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
     const wasVisibleRef = useRef(false);
@@ -178,8 +177,8 @@ export function SingleSelectSheet({
                         style={[
                             {
                                 fontSize: scale(15),
-                                fontFamily: optionFontFamily,
-                                textAlign: isRTL ? 'right' : 'left',
+                                fontFamily: fontFamilyForText(item.label, 'medium'),
+                                textAlign: 'left',
                                 color: optionColor,
                             },
                         ]}
@@ -192,7 +191,7 @@ export function SingleSelectSheet({
                             style={{
                                 color: palette.brand.text.muted,
                                 marginTop: scale(2),
-                                textAlign: isRTL ? 'right' : 'left',
+                                textAlign: 'left',
                             }}
                         >
                             {item.description}
@@ -305,7 +304,7 @@ export function SingleSelectSheet({
                 hardwareAccelerated
                 onRequestClose={onClose}
             >
-                <GestureHandlerRootView style={{ flex: 1 }}>
+                <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                     <BottomSheet
                         ref={sheetRef}
                         snapPoints={snapPoints}
@@ -325,7 +324,7 @@ export function SingleSelectSheet({
                             <Text
                                 variant="body-sm"
                                 className="font-body-bold"
-                                style={styles.sheetTitle}
+                                style={[styles.sheetTitle, { textAlign: 'left' }]}
                             >
                                 {title}
                             </Text>
@@ -400,7 +399,7 @@ export function SingleSelectSheet({
             hardwareAccelerated
             onRequestClose={onClose}
         >
-            <GestureHandlerRootView style={styles.drawerOverlay}>
+            <GestureHandlerRootView style={[styles.drawerOverlay, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={styles.drawerWrapper}

@@ -12,7 +12,7 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { toast } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { profileService } from '@/lib/profileService';
 import { apiMessage, cleanProfileMultilineText, cleanProfileText, t } from '@/lib/profileDisplay';
 import { getTextDirection, localeTextDirection, localeUsesLatinScript } from '@/lib/textDirection';
@@ -149,12 +149,10 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
     const localeDirection = localeTextDirection(currentLanguage);
     const headlineDirection = getTextDirection(headline, localeDirection);
     const bioDirection = getTextDirection(bio, localeDirection);
-    const headlineFontFamily = headlineDirection === 'rtl'
-        ? Typography.font.arabic.regular
-        : Typography.font.body.regular;
-    const bioFontFamily = bioDirection === 'rtl'
-        ? Typography.font.arabic.regular
-        : Typography.font.body.regular;
+    const headlinePlaceholder = t('profile.headline_placeholder', 'Write a headline for this profile');
+    const bioPlaceholder = t('profile.bio_placeholder', 'Share brief description to help others understand you better.');
+    const headlineFontFamily = fontFamilyForText(headline || headlinePlaceholder);
+    const bioFontFamily = fontFamilyForText(bio || bioPlaceholder);
 
     const bioCount = countNonSpace(bio);
     const headlineDirty = showHeadline && headline !== initialValues.headline;
@@ -391,7 +389,12 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                                         row.field === 'headline' && row.value && styles.headlineValue,
                                         row.field === 'bio' && styles.editBioValue,
                                         !row.value && styles.editPlaceholder,
-                                        { color: row.value ? palette.brand.text.body : palette.brand.text.muted },
+                                        {
+                                            color: row.value ? palette.brand.text.body : palette.brand.text.muted,
+                                            textAlign: 'left',
+                                            writingDirection: row.field === 'headline' ? headlineDirection : bioDirection,
+                                            fontFamily: fontFamilyForText(row.value || row.placeholder),
+                                        },
                                     ]}
                                 >
                                     {row.value || row.placeholder}
@@ -408,6 +411,11 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                                             styles.editRowValue,
                                             styles.editBioValue,
                                             styles.bioMeasure,
+                                            {
+                                                textAlign: 'left',
+                                                writingDirection: bioDirection,
+                                                fontFamily: fontFamilyForText(row.value),
+                                            },
                                         ]}
                                     >
                                         {row.value}
@@ -539,7 +547,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                             setHeadline(nextHeadline);
                             if (errors.headline) setErrors((current) => ({ ...current, headline: '' }));
                         }}
-                        placeholder={t('profile.headline_placeholder', 'Write a headline for this profile')}
+                        placeholder={headlinePlaceholder}
                         placeholderTextColor={palette.brand.text.muted}
                         maxLength={140}
                         error={Boolean(errors.headline)}
@@ -596,7 +604,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                             setBio(nextBio);
                             if (errors.bio) setErrors((current) => ({ ...current, bio: '' }));
                         }}
-                        placeholder={t('profile.bio_placeholder', 'Share brief description to help others understand you better.')}
+                        placeholder={bioPlaceholder}
                         placeholderTextColor={palette.brand.text.muted}
                         multiline
                         textAlignVertical="top"
@@ -682,6 +690,7 @@ const styles = StyleSheet.create({
         fontSize: scale(13),
         lineHeight: scale(17),
         flexShrink: 1,
+        textAlign: 'left',
     },
     editRow: {
         minHeight: scale(72),

@@ -4,6 +4,7 @@ import { Text } from "./Text";
 import { scale } from "@/hooks/useResponsive";
 import { X } from "phosphor-react-native";
 import { useColors } from "@/hooks/useColors";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface ModalProps {
     visible: boolean;
@@ -14,6 +15,7 @@ interface ModalProps {
 
 export const Modal: React.FC<ModalProps> = ({ visible, onClose, title, children }) => {
     const colors = useColors();
+    const { isRTL } = useLanguage();
 
     return (
         <RNModal
@@ -22,7 +24,7 @@ export const Modal: React.FC<ModalProps> = ({ visible, onClose, title, children 
             animationType="fade"
             onRequestClose={onClose}
         >
-            <View className="flex-1 bg-black/50 justify-end">
+            <View className="flex-1 bg-black/50 justify-end" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
                 <TouchableOpacity
                     className="absolute inset-0"
                     onPress={onClose}

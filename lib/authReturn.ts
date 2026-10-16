@@ -17,6 +17,10 @@ const ROOT_RETURN_PATHS = new Set([
     '/settings-notifications',
     '/settings-privacy',
     '/settings-security',
+    '/verifications',
+    '/phone-verification',
+    '/change-email',
+    '/set-password',
 ]);
 
 const DYNAMIC_RETURN_PATH = /^\/(conversation|user)\/([a-zA-Z0-9._~-]{1,128})$/;
@@ -29,7 +33,7 @@ export function sanitizeAuthReturnPath(
 
     const tabMatch = value.match(/^\/(?:\(tabs\)\/)?([a-z-]+)$/);
     if (tabMatch && TAB_RETURN_PATHS.has(tabMatch[1])) {
-        return `/(tabs)/${tabMatch[1]}`;
+        return `/${tabMatch[1]}`;
     }
 
     if (ROOT_RETURN_PATHS.has(value)) return value;

@@ -63,6 +63,7 @@ import { LegalConsentGate } from "@/components/app/LegalConsentGate";
 import { EmailVerificationGate } from "@/components/app/EmailVerificationGate";
 import { firstSearchParam, sanitizeAuthReturnPath } from "@/lib/authReturn";
 import { RootAppMenuDrawer } from "@/components/app/RootAppMenuDrawer";
+import { ForceUpdateGate } from "@/components/app/ForceUpdateGate";
 import { markStartup } from "@/lib/performanceDiagnostics";
 
 // Keep the splash screen visible while we fetch resources
@@ -279,6 +280,7 @@ export default function RootLayout() {
                 backgroundColor={colors.chrome.header.background}
             />
             <QueryClientProvider client={queryClient}>
+                <ForceUpdateGate />
                 {nonVisualServicesReady ? <ConnectivityMonitor /> : null}
                 {nonVisualServicesReady ? <GalleryEligibilityListener /> : null}
                 <BottomSheetModalProvider>
@@ -304,14 +306,6 @@ export default function RootLayout() {
                     <Stack.Screen name="(auth)" options={{ animation: "fade", gestureEnabled: false }} />
                     <Stack.Screen name="(profile-setup)" options={{ animation: "fade", gestureEnabled: false }} />
                     <Stack.Screen name="(tabs)" options={{ animation: "none", gestureEnabled: false }} />
-                    <Stack.Screen
-                        name="edit-profile"
-                        options={{
-                            animation: isRTL ? "slide_from_left" : "slide_from_right",
-                            gestureEnabled: true,
-                            fullScreenGestureEnabled: true,
-                        }}
-                    />
                 </Stack>
                 <StartupNavigatorMarker />
                 </RootAppMenuDrawer>

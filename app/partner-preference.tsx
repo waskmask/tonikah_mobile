@@ -92,7 +92,7 @@ export default function PartnerPreferenceScreen() {
             candidate.includes('://') ||
             candidate.includes('partner-preference')
         ) {
-            return '/(tabs)/profile';
+            return '/profile';
         }
         return candidate;
     }, [returnTo]);

@@ -72,7 +72,7 @@ export default function Index() {
             }
             return <LoadingRedirect href={`/(profile-setup)/step${incompleteStep}` as Href} />;
         }
-        return <LoadingRedirect href={(returnTo || '/(tabs)/search') as Href} />;
+        return <LoadingRedirect href={(returnTo || '/search') as Href} />;
     }
 
     return <LoadingRedirect href="/(auth)/login" />;

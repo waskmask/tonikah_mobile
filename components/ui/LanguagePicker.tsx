@@ -164,7 +164,7 @@ export function LanguagePicker({ variant = 'default' }: LanguagePickerProps) {
                                                         variant="body"
                                                         className={isActive ? 'font-body-semi' : ''}
                                                         style={[
-                                                            { flex: 1, marginLeft: scale(12) },
+                                                            { flex: 1, marginStart: scale(12) },
                                                             isActive && { color: colors.chrome.primary },
                                                         ]}
                                                     >

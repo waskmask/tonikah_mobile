@@ -10,7 +10,7 @@ export default function UserProfileDetailScreen() {
             router.back();
             return;
         }
-        router.replace('/(tabs)/search');
+        router.replace('/search');
     };
 
     return (

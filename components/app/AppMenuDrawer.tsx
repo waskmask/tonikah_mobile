@@ -1,14 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, {
-    useAnimatedStyle,
-    useReducedMotion,
-    useSharedValue,
-    withDelay,
-    withTiming,
-} from 'react-native-reanimated';
 import {
     PencilLine,
     X,
@@ -19,6 +12,7 @@ import {
     HandHeart,
     Plant,
     Prohibit,
+    SealCheck,
     ShieldWarning,
     SignOut,
     Translate,
@@ -32,7 +26,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
 import { useWebSupport } from '@/hooks/useWebSupport';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { NavigationTypeTokens } from '@/constants/uiTokens';
 
 type MenuItemBase = {
@@ -40,6 +34,7 @@ type MenuItemBase = {
     fallback: string;
     icon: PhosphorIcon;
     iconWeight?: IconWeight;
+    iconElement?: React.ReactNode;
 };
 
 type MenuItem = MenuItemBase & (
@@ -54,8 +49,13 @@ const QUICK_ITEMS: MenuItem[] = [
 ];
 
 const ACCOUNT_ITEMS: MenuItem[] = [
-    { href: '/(tabs)/profile', labelKey: 'edit_profile', fallback: 'Edit profile', icon: PencilLine },
+    { href: '/profile', labelKey: 'edit_profile', fallback: 'Edit profile', icon: PencilLine },
     { href: '/memberships', labelKey: 'memberships', fallback: 'Memberships', icon: CreditCard, iconWeight: 'bold' },
+    { href: '/verifications', labelKey: 'get_verified', fallback: 'Get verified', icon: SealCheck,
+        iconElement: <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+            <SealCheck size={22} color="#F34B6F" weight="fill" />
+            <SealCheck size={24} color="#FFFFFF" weight="light" style={{ position: 'absolute' }} />
+        </View> },
     { href: '/blocked-users', labelKey: 'blocked_users', fallback: 'Blocked users', icon: Prohibit, iconWeight: 'bold' },
     { action: 'support', labelKey: 'report_issue', fallback: 'Report an issue', icon: ShieldWarning, iconWeight: 'bold' },
     { href: '/settings', labelKey: 'settings', fallback: 'Settings', icon: GearSix, iconWeight: 'bold' },
@@ -65,17 +65,13 @@ function textValue(value: unknown, fallback: string) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
 
-const DRAWER_FADE_DELAY_MS = 100;
-const DRAWER_FADE_DURATION_MS = 55;
-const DRAWER_NAVIGATION_DELAY_MS = 115;
-const DRAWER_RESET_DELAY_MS = 300;
-const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
-
 export function AppMenuDrawerContent({
     onClose,
+    onCloseThenRun,
     isOpen = true,
 }: {
     onClose: () => void;
+    onCloseThenRun: (action: () => void) => void;
     isOpen?: boolean;
 }) {
     const { t, isRTL } = useLanguage();
@@ -83,35 +79,14 @@ export function AppMenuDrawerContent({
     const { logout, isLoading } = useAuthStore();
     const openSupport = useWebSupport();
     const pathname = usePathname();
-    const reduceMotion = useReducedMotion();
-    const opacity = useSharedValue(1);
-    const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [transitioning, setTransitioning] = useState(false);
     const surfaceColor = isDark ? '#1D1D1F' : '#FFFFFF';
     const borderColor = isDark ? '#303033' : '#EEEEEE';
     const headingColor = isDark ? '#E5E5E7' : '#241E17';
 
     useEffect(() => {
-        if (!isOpen) return;
-        if (navigationTimerRef.current) {
-            clearTimeout(navigationTimerRef.current);
-            navigationTimerRef.current = null;
-        }
-        if (resetTimerRef.current) {
-            clearTimeout(resetTimerRef.current);
-            resetTimerRef.current = null;
-        }
-        opacity.value = 1;
         setTransitioning(false);
-    }, [isOpen, opacity]);
-
-    useEffect(() => () => {
-        if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
-        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-    }, []);
-
-    const contentStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+    }, [isOpen]);
 
     const openDestination = (href: Href) => {
         if (href === '/hobbies-faith') {
@@ -133,27 +108,8 @@ export function AppMenuDrawerContent({
 
     const closeThenRun = (action: () => void) => {
         if (isLoading || transitioning) return;
-        if (reduceMotion) {
-            onClose();
-            action();
-            return;
-        }
-
         setTransitioning(true);
-        onClose();
-        opacity.value = withDelay(
-            DRAWER_FADE_DELAY_MS,
-            withTiming(0, { duration: DRAWER_FADE_DURATION_MS }),
-        );
-        navigationTimerRef.current = setTimeout(() => {
-            navigationTimerRef.current = null;
-            action();
-        }, DRAWER_NAVIGATION_DELAY_MS);
-        resetTimerRef.current = setTimeout(() => {
-            resetTimerRef.current = null;
-            opacity.value = 1;
-            setTransitioning(false);
-        }, DRAWER_RESET_DELAY_MS);
+        onCloseThenRun(action);
     };
 
     const navigate = (href: Href) => closeThenRun(() => openDestination(href));
@@ -161,18 +117,18 @@ export function AppMenuDrawerContent({
 
     const handleLogout = async () => {
         if (isLoading) return;
-        await logout();
+        closeThenRun(() => { void logout(); });
     };
 
     return (
-        <AnimatedSafeAreaView
+        <SafeAreaView
             edges={['top', 'bottom']}
             pointerEvents={transitioning ? 'none' : 'auto'}
             style={[
                 styles.drawer,
-                contentStyle,
                 {
                     backgroundColor: surfaceColor,
+                    direction: isRTL ? 'rtl' : 'ltr',
                     borderColor,
                     borderLeftWidth: isRTL ? 0 : StyleSheet.hairlineWidth,
                     borderRightWidth: isRTL ? StyleSheet.hairlineWidth : 0,
@@ -183,7 +139,7 @@ export function AppMenuDrawerContent({
                 <Text
                     variant="body-sm"
                     className="font-body-bold"
-                    style={[styles.headerTitle, { color: headingColor, textAlign: isRTL ? 'right' : 'left' }]}
+                    style={[styles.headerTitle, { color: headingColor, textAlign: 'left' }]}
                 >
                     {textValue(t('menu'), 'Menu')}
                 </Text>
@@ -198,7 +154,7 @@ export function AppMenuDrawerContent({
                     iconWeight="bold"
                     label={textValue(t('my_profile'), 'My profile')}
                     disabled={isLoading}
-                    onPress={() => navigate('/(tabs)/profile')}
+                    onPress={() => navigate('/profile')}
                 />
 
                 {QUICK_ITEMS.map((item) => (
@@ -215,6 +171,7 @@ export function AppMenuDrawerContent({
                 {ACCOUNT_ITEMS.map((item) => (
                     <MenuRow
                         key={item.labelKey}
+                        iconElement={item.iconElement}
                         icon={item.icon}
                         iconWeight={item.iconWeight}
                         label={textValue(t(item.labelKey), item.fallback)}
@@ -235,13 +192,14 @@ export function AppMenuDrawerContent({
                     onPress={handleLogout}
                 />
             </View>
-        </AnimatedSafeAreaView>
+        </SafeAreaView>
     );
 }
 
 function MenuRow({
     icon: Icon,
     iconWeight,
+    iconElement,
     label,
     onPress,
     danger = false,
@@ -250,6 +208,7 @@ function MenuRow({
 }: {
     icon: PhosphorIcon;
     iconWeight?: IconWeight;
+    iconElement?: React.ReactNode;
     label: string;
     onPress: () => void;
     danger?: boolean;
@@ -257,9 +216,9 @@ function MenuRow({
     loading?: boolean;
 }) {
     const { isDark } = useTheme();
-    const { currentLanguage, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const color = danger ? '#E64E67' : isDark ? '#E5E5E7' : '#241E17';
-    const fontFamily = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.semi;
+    const fontFamily = fontFamilyForText(label, 'semi');
 
     return (
         <Pressable
@@ -278,14 +237,14 @@ function MenuRow({
                     {loading ? (
                         <ActivityIndicator size="small" color={color} />
                     ) : (
-                        <Icon size={20} color={color} weight={iconWeight || 'regular'} />
+                        iconElement ?? <Icon size={20} color={color} weight={iconWeight || 'regular'} />
                     )}
                 </View>
                 <Text
                     variant="body"
                     numberOfLines={1}
                     className="font-body-semi"
-                    style={[styles.menuLabel, { color, fontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                    style={[styles.menuLabel, { color, fontFamily, textAlign: 'left' }]}
                 >
                     {label}
                 </Text>

@@ -1,4 +1,52 @@
 {
+  "preview": "Preview",
+  "verifications_page": {
+    "title": "Verifications",
+    "notice": "Available to paid members",
+    "notice_description": "Verification is available to members with an active paid membership.",
+    "selfie": "Selfie verification",
+    "selfie_description": "Match a fresh selfie to your profile photo.",
+    "age": "Age verification",
+    "age_description": "Confirm your age through a verification check.",
+    "phone": "Phone number",
+    "phone_description": "Confirm that your phone number belongs to you.",
+    "summary": "Selfie, age and phone number verification."
+  },
+  "phone_verification": {
+    "code_title": "Enter verification code",
+    "code_description": "We sent a 6-digit code on WhatsApp to",
+    "entry_title": "Enter your phone number",
+    "privacy": "Your number is not shown to other members. Twilio and WhatsApp process it to deliver your verification code.",
+    "title": "Phone verification",
+    "notice": "Verification for paid members",
+    "notice_description": "Verification is available to members with an active paid membership.",
+    "coming_soon": "Coming soon",
+    "intro": "Receive a verification code on WhatsApp.",
+    "country": "Country / calling code",
+    "number": "Phone number",
+    "consent": "I agree to receive a verification code on WhatsApp at this number.",
+    "send": "Send code on WhatsApp",
+    "code": "Six-digit code",
+    "sent": "Enter the code sent to {{number}} on WhatsApp.",
+    "expires": "Code expires in {{time}}",
+    "expired": "This code has expired. Request a new code.",
+    "verify": "Verify number",
+    "resend": "Resend code",
+    "resend_in": "Resend in {{seconds}}s",
+    "change": "Change number",
+    "verified": "Phone number verified",
+    "paid": "Phone verification requires an active paid membership. Trials are not eligible.",
+    "email": "Verify your email before verifying your phone number.",
+    "invalid_number": "Enter a valid phone number with the correct country code.",
+    "invalid_code": "The code is incorrect, expired, or has no attempts left. Try again or request a new code.",
+    "unavailable_number": "This number cannot be linked to your account. Use another number or contact support.",
+    "rate_limit": "Too many requests. Wait before trying again. Daily limits also apply.",
+    "send_failed": "We could not send the code. Check that this number has WhatsApp and try again later.",
+    "unavailable": "Phone verification is temporarily unavailable. Please try again later.",
+    "already_verified": "This number is already verified.",
+    "network": "Connection interrupted. Check your connection before trying again.",
+    "failed": "Verification could not be completed. Please try again."
+  },
   "membership_join_title": "Become a premium member to find your spouse",
   "membership_join_description": "Find your life partner.",
   "membership_expired": "Expired",
@@ -2059,6 +2107,7 @@
   "account_menu": "Account menu",
   "report_issue": "Report an issue",
   "memberships": "Memberships",
+  "get_verified": "Get verified",
   "membership_show_benefits": "See premium benefits",
   "membership_hide_benefits": "Hide benefits",
   "membership_duration": {
@@ -2502,7 +2551,23 @@
   "privacy_policy": "Privacy Policy",
   "age_must_be_18": "You must be at least 18 years old to use toNikah.",
   "showing_already_viewed_profiles": "Showing profiles you have already viewed.",
+  "verification_details_title": "Verification details",
+  "verification_whatsapp_title": "WhatsApp number verified",
+  "verification_whatsapp_description": "The WhatsApp number linked to this profile has been confirmed.",
+  "verification_selfie_title": "Selfie verified",
+  "verification_selfie_description": "A live selfie was matched with this profile’s primary photo.",
+  "verification_age_title": "Age verified",
+  "verification_age_description": "The age shown on this profile was confirmed using an accepted identity document.",
   "profile_manager_info_title": "About profile manager",
+  "profile_manager_messages": {
+    "father": "This profile is managed by <name/>'s father. When you message this profile, you're speaking with <name/>'s father.",
+    "mother": "This profile is managed by <name/>'s mother. When you message this profile, you're speaking with <name/>'s mother.",
+    "brother": "This profile is managed by <name/>'s brother. When you message this profile, you're speaking with <name/>'s brother.",
+    "sister": "This profile is managed by <name/>'s sister. When you message this profile, you're speaking with <name/>'s sister.",
+    "relative": "This profile is managed by <name/>'s relative. When you message this profile, you're speaking with <name/>'s relative.",
+    "friend": "This profile is managed by <name/>'s friend. When you message this profile, you're speaking with <name/>'s friend.",
+    "other": "Someone else manages this profile for <name/>. When you message this profile, you're speaking with that person."
+  },
   "profile_manager_info_description": "This profile may be operated with help from a trusted family member, such as a parent or sibling. We show this label so you know who may be helping with profile updates and communication.",
   "text_moderation_contact_phone": "Please remove phone numbers before saving.",
   "text_moderation_contact_email": "Please remove email addresses before saving.",
@@ -2597,53 +2662,53 @@
   "explore_location_unavailable": "We could not get your current location. Move to an open area and try again.",
   "explore_location_network_error": "We could not verify your location. Check your connection and try again.",
   "open_settings": "Open Settings",
-  "image_moderation_rejected_toast": "Photo rejected and removed from your gallery."
-  ,"checkout_untrusted_url": "Secure checkout returned an invalid address."
-  ,"membership_refresh_failed": "Could not refresh membership. Try again."
-  ,"refreshing_membership": "Refreshing membership..."
-  ,"payment_may_be_processing": "Payment may still be processing. Refresh before starting another checkout."
-  ,"refresh_membership": "Refresh membership"
-  ,"choose_payment_method": "Choose how to pay"
-  ,"pay_with_app_store": "Pay with App Store"
-  ,"pay_with_google_play": "Pay with Google Play"
-  ,"pay_with_card": "Pay with card"
-  ,"app_store_payment_description": "Use your Apple account and App Store payment method."
-  ,"google_play_payment_description": "Use your Google account and Play payment method."
-  ,"card_payment_description": "Continue in your browser with secure web checkout."
-  ,"payment_choice_ios_note": "App Store purchases are handled by Apple. Card payments open secure web checkout."
-  ,"payment_choice_android_note": "Google Play purchases are handled by Google. Card payments open secure web checkout."
-  ,"processing_payment": "Processing payment..."
-  ,"membership_purchase_success": "Your membership is active."
-  ,"payment_not_completed": "Payment not completed"
-  ,"native_purchase_failed": "We could not confirm this purchase yet. Check your membership before trying again, or contact support."
-  ,"restore_purchases": "Restore purchases"
-  ,"restoring_purchases": "Restoring purchases..."
-  ,"purchases_restored": "Your membership has been restored."
-  ,"no_purchases_to_restore": "No active membership purchase was found."
-  ,"restore_purchases_failed": "Purchases could not be restored. Please try again later."
-  ,"payment_pending_store": "Your store payment is pending. Membership activates after confirmation."
-  ,"error_gift_redeem_failed": "Could not redeem the gift card. Please try again."
-  ,"error_too_many_attempts": "Too many attempts. Please try again later."
-  ,"free": "Free"
-  ,"gift_card_code_label": "Gift card code"
-  ,"gift_card_helper": "Enter the gift card code and 4-digit PIN."
-  ,"gift_card_pin_label": "4-digit PIN"
-  ,"gift_card_processing": "Gift card accepted. Membership activation is processing."
-  ,"gift_code_invalid_length": "Enter the 8-character gift card code."
-  ,"gift_pin_invalid_length": "Enter the 4-digit gift card PIN."
-  ,"gift_redeemed_success": "Gift card redeemed. Your membership is active."
-  ,"history_load_failed": "Could not load membership history."
-  ,"loading_payment_options": "Loading payment options..."
-  ,"membership_ends": "Ends"
-  ,"membership_history": "Membership history"
-  ,"membership_history_description": "Your membership purchases and rewards."
-  ,"no_membership_history": "No membership history yet"
-  ,"no_membership_history_description": "Purchases, gift cards, trials, and admin grants will appear here."
-  ,"payment_not_available_region": "This plan is not available for purchase in your region yet."
-  ,"payment_options_unavailable": "Payment options could not be loaded. Pull down to try again."
-  ,"redeem_gift_card": "Redeem gift card"
-  ,"redeeming_gift_card": "Redeeming..."
-  ,"report_profile_reason_prompt": "Why are you reporting this profile?",
+  "image_moderation_rejected_toast": "Photo rejected and removed from your gallery.",
+  "checkout_untrusted_url": "Secure checkout returned an invalid address.",
+  "membership_refresh_failed": "Could not refresh membership. Try again.",
+  "refreshing_membership": "Refreshing membership...",
+  "payment_may_be_processing": "Payment may still be processing. Refresh before starting another checkout.",
+  "refresh_membership": "Refresh membership",
+  "choose_payment_method": "Choose how to pay",
+  "pay_with_app_store": "Pay with App Store",
+  "pay_with_google_play": "Pay with Google Play",
+  "pay_with_card": "Pay with card",
+  "app_store_payment_description": "Use your Apple account and App Store payment method.",
+  "google_play_payment_description": "Use your Google account and Play payment method.",
+  "card_payment_description": "Continue in your browser with secure web checkout.",
+  "payment_choice_ios_note": "App Store purchases are handled by Apple. Card payments open secure web checkout.",
+  "payment_choice_android_note": "Google Play purchases are handled by Google. Card payments open secure web checkout.",
+  "processing_payment": "Processing payment...",
+  "membership_purchase_success": "Your membership is active.",
+  "payment_not_completed": "Payment not completed",
+  "native_purchase_failed": "We could not confirm this purchase yet. Check your membership before trying again, or contact support.",
+  "restore_purchases": "Restore purchases",
+  "restoring_purchases": "Restoring purchases...",
+  "purchases_restored": "Your membership has been restored.",
+  "no_purchases_to_restore": "No active membership purchase was found.",
+  "restore_purchases_failed": "Purchases could not be restored. Please try again later.",
+  "payment_pending_store": "Your store payment is pending. Membership activates after confirmation.",
+  "error_gift_redeem_failed": "Could not redeem the gift card. Please try again.",
+  "error_too_many_attempts": "Too many attempts. Please try again later.",
+  "free": "Free",
+  "gift_card_code_label": "Gift card code",
+  "gift_card_helper": "Enter the gift card code and 4-digit PIN.",
+  "gift_card_pin_label": "4-digit PIN",
+  "gift_card_processing": "Gift card accepted. Membership activation is processing.",
+  "gift_code_invalid_length": "Enter the 8-character gift card code.",
+  "gift_pin_invalid_length": "Enter the 4-digit gift card PIN.",
+  "gift_redeemed_success": "Gift card redeemed. Your membership is active.",
+  "history_load_failed": "Could not load membership history.",
+  "loading_payment_options": "Loading payment options...",
+  "membership_ends": "Ends",
+  "membership_history": "Membership history",
+  "membership_history_description": "Your membership purchases and rewards.",
+  "no_membership_history": "No membership history yet",
+  "no_membership_history_description": "Purchases, gift cards, trials, and admin grants will appear here.",
+  "payment_not_available_region": "This plan is not available for purchase in your region yet.",
+  "payment_options_unavailable": "Payment options could not be loaded. Pull down to try again.",
+  "redeem_gift_card": "Redeem gift card",
+  "redeeming_gift_card": "Redeeming...",
+  "report_profile_reason_prompt": "Why are you reporting this profile?",
   "report_photo_reason_prompt": "What is wrong with this photo?",
   "close_keyboard": "Close keyboard",
   "report_detail_prompt": "Select the option that best describes the issue.",
@@ -2757,6 +2822,10 @@
   "report_detail_desc_phone_or_email_visible": "A phone number or email address is visible in the photo.",
   "report_detail_social_media_handle_visible": "Social media username",
   "report_detail_desc_social_media_handle_visible": "A social media username or account is visible in the photo.",
+  "update_required_title": "Update required",
+  "update_required_message": "Install the latest version of toNikah to continue.",
+  "update_store_open_failed": "Could not open the store. Please try again.",
+  "update_now": "Update now",
   "report_detail_address_or_document_visible": "Address or identity document",
   "report_detail_desc_address_or_document_visible": "A home address, identity document, or other sensitive record is visible."
 }

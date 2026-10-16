@@ -94,7 +94,7 @@ export function MediaGuidelinesModal({
                                 <Text
                                     variant="body"
                                     className="font-body-bold"
-                                    style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}
+                                    style={[styles.title, { textAlign: 'left' }]}
                                 >
                                     {t('media_guidelines_title', 'Choose clear images')}
                                 </Text>
@@ -104,7 +104,7 @@ export function MediaGuidelinesModal({
                                         styles.intro,
                                         {
                                             color: colors.brand.text.subtitle,
-                                            textAlign: isRTL ? 'right' : 'left',
+                                            textAlign: 'left',
                                         },
                                     ]}
                                 >
@@ -157,7 +157,7 @@ export function MediaGuidelinesModal({
                                                 styles.reasonText,
                                                 {
                                                     color: colors.brand.text.subtitle,
-                                                    textAlign: isRTL ? 'right' : 'left',
+                                                    textAlign: 'left',
                                                 },
                                             ]}
                                         >
@@ -190,7 +190,7 @@ export function MediaGuidelinesModal({
                                             styles.privateMessage,
                                             {
                                                 color: colors.brand.text.subtitle,
-                                                textAlign: isRTL ? 'right' : 'left',
+                                                textAlign: 'left',
                                             },
                                         ]}
                                     >

@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import { profileService } from '@/lib/profileService';
 import { useAuthStore } from '@/store/authStore';
 import { markStartup } from '@/lib/performanceDiagnostics';
+import { resolvedLocation, resolveCachedOrCurrentPosition } from '@/lib/locationResolution';
 import {
     hasRecentExploreLocationVerification,
     rememberExploreLocationVerification,
@@ -102,15 +103,10 @@ async function getFreshPosition(): Promise<Location.LocationObject | null> {
 async function resolvePosition({ forceFresh }: { forceFresh: boolean }) {
     if (forceFresh) return getFreshPosition();
 
-    const lastKnown = await Location.getLastKnownPositionAsync({
-        maxAge: 15 * 60 * 1000,
-        requiredAccuracy: 5000,
-    });
-    if (lastKnown) return lastKnown;
-
     try {
-        return await withTimeout(
-            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        return await resolveCachedOrCurrentPosition(
+            () => withTimeout(Location.getLastKnownPositionAsync({ maxAge: 15 * 60 * 1000, requiredAccuracy: 5000 })),
+            () => withTimeout(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })),
         );
     } catch {
         return null;
@@ -138,6 +134,7 @@ export function useExploreLocationGate() {
 
     const checkLocation = useCallback(async ({ forceFresh = false }: { forceFresh?: boolean } = {}) => {
         if (inFlightRef.current) return;
+        if (__DEV__) console.info('[Explore location] Checking', { forceFresh });
         inFlightRef.current = true;
         if (stateRef.current === 'checking') {
             updateState('checking');
@@ -179,6 +176,7 @@ export function useExploreLocationGate() {
 
             position = await resolvePosition({ forceFresh });
             markStartup('explore-device-position-resolved', { available: Boolean(position) });
+            if (__DEV__) console.info('[Explore location] Device position', { available: Boolean(position) });
             if (!position) {
                 if (!usingCachedVerification) updateState('location_unavailable');
                 inFlightRef.current = false;
@@ -186,6 +184,7 @@ export function useExploreLocationGate() {
                 return;
             }
         } catch {
+            if (__DEV__) console.warn('[Explore location] Device location request failed');
             if (!usingCachedVerification) updateState('location_unavailable');
             inFlightRef.current = false;
             if (mountedRef.current) setRetrying(false);
@@ -199,33 +198,23 @@ export function useExploreLocationGate() {
                 'en',
             );
             markStartup('explore-location-reverse-finished', { success: Boolean(reverse.success) });
-            const place = reverse.data as Record<string, any> | undefined;
-            const lat = Number(place?.lat);
-            const lng = Number(place?.lng);
-            if (
-                !reverse.success ||
-                !place?.place_id ||
-                !place?.city ||
-                !String(place?.countryCode || '').match(/^[A-Z]{2}$/i) ||
-                !Number.isFinite(lat) ||
-                !Number.isFinite(lng)
-            ) {
+            const location = resolvedLocation(reverse.data);
+            if (!reverse.success || !location) {
+                if (__DEV__) console.warn('[Explore location] Reverse lookup failed', {
+                    status: reverse.status, responseSucceeded: Boolean(reverse.success),
+                    validLocation: Boolean(location),
+                });
                 if (!usingCachedVerification) updateState('network_error');
                 return;
             }
 
             const currentLocation = useAuthStore.getState().user?.profile?.current_location;
-            if (currentLocation?.place_id !== place.place_id) {
+            if (currentLocation?.place_id !== location.place_id) {
                 const update = await profileService.updateProfile({
-                    current_location: {
-                        place_id: place.place_id,
-                        city: place.city,
-                        ...(place.state ? { state: place.state } : {}),
-                        country: String(place.countryCode).toUpperCase(),
-                        geo: { type: 'Point', coordinates: [lng, lat] },
-                    },
+                    current_location: location,
                 });
                 if (!update.success) {
+                    if (__DEV__) console.warn('[Explore location] Saving current location failed', { status: update.status });
                     if (!usingCachedVerification) updateState('network_error');
                     return;
                 }
@@ -237,7 +226,9 @@ export function useExploreLocationGate() {
                 await rememberExploreLocationVerification(userId);
             }
             updateState('ready');
+            if (__DEV__) console.info('[Explore location] Verified');
         } catch {
+            if (__DEV__) console.warn('[Explore location] Reverse lookup or profile update threw an exception');
             if (!usingCachedVerification) updateState('network_error');
         } finally {
             inFlightRef.current = false;

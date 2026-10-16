@@ -1,9 +1,46 @@
+import { useCallback, useEffect, useRef } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
-import { Drawer } from 'expo-router/drawer';
+import { Drawer, useDrawerProgress, useDrawerStatus } from 'expo-router/drawer';
+import { runOnJS, useAnimatedReaction, useSharedValue } from 'react-native-reanimated';
 import { AppMenuDrawerContent } from '@/components/app/AppMenuDrawer';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
 import { completeInteraction } from '@/lib/performanceDiagnostics';
+
+function TabsMenuContent({ closeDrawer }: { closeDrawer: () => void }) {
+    const pendingAction = useRef<(() => void) | null>(null);
+    const queued = useSharedValue(false);
+    const progress = useDrawerProgress();
+    const isOpen = useDrawerStatus() === 'open';
+    const finishClose = useCallback(() => {
+        const action = pendingAction.current;
+        pendingAction.current = null;
+        action?.();
+    }, []);
+    useEffect(() => () => { pendingAction.current = null; }, []);
+    useAnimatedReaction(
+        () => queued.value && progress.value === 0,
+        (closed) => {
+            if (!closed) return;
+            queued.value = false;
+            runOnJS(finishClose)();
+        },
+        [finishClose],
+    );
+    useAnimatedReaction(
+        () => progress.value === 1,
+        (opened, previous) => {
+            if (opened && !previous) runOnJS(completeInteraction)('drawer', 'visible');
+        },
+    );
+    return <AppMenuDrawerContent onClose={closeDrawer} isOpen={isOpen}
+        onCloseThenRun={(action) => {
+            if (pendingAction.current) return;
+            pendingAction.current = action;
+            closeDrawer();
+            queued.value = true;
+        }} />;
+}
 
 export default function TabsDrawerLayout() {
     const { width } = useWindowDimensions();
@@ -15,13 +52,8 @@ export default function TabsDrawerLayout() {
         <Drawer
             backBehavior="history"
             drawerContent={({ navigation }) => (
-                <AppMenuDrawerContent onClose={() => navigation.closeDrawer()} />
+                <TabsMenuContent closeDrawer={() => navigation.closeDrawer()} />
             )}
-            screenListeners={{
-                transitionEnd: (event) => {
-                    if (!event.data.closing) completeInteraction('drawer', 'visible');
-                },
-            }}
             screenOptions={{
                 headerShown: false,
                 drawerPosition: isRTL ? 'left' : 'right',

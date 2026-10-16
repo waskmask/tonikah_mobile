@@ -24,15 +24,7 @@ export function profileAge(profile: any) {
     return profile?.age ?? calculateAge(profile?.dob);
 }
 
-export function isVerifiedProfile(profile: any) {
-    const verified = profile?.verified || profile?.verified_account;
-    return Boolean(
-        profile?.verified_profile ||
-        verified === true ||
-        verified?.selfie ||
-        (verified?.id && verified?.age && verified?.selfie)
-    );
-}
+export { isVerifiedProfile } from './profileVerification';
 
 export function isMembershipActive(profile: any) {
     const membership = profile?.membership || profile?.membership_status || profile?.membershipStatus;

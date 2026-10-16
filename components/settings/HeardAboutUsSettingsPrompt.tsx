@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/useToast';
 import { authService } from '@/lib/authService';
 import { translateApiError } from '@/lib/apiErrorTranslator';
 import { t } from '@/lib/profileDisplay';
+import { fontFamilyForText } from '@/constants/typography';
 
 const OPTIONS = [
     { value: 'google_search', fallback: 'Google search' },
@@ -93,6 +94,7 @@ function HeardAboutUsSheet({
     const [otherText, setOtherText] = useState('');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const otherPlaceholder = t('heard_about_us_other_placeholder', 'Please tell us');
 
     const options = useMemo(
         () =>
@@ -174,7 +176,7 @@ function HeardAboutUsSheet({
                             <Megaphone size={scale(20)} color={colors.chrome.primary} />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text variant="h3" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                            <Text variant="h3" style={{ textAlign: 'left' }}>
                                 {t('heard_about_us_title', 'How did you hear about ToNikah?')}
                             </Text>
                             <Text
@@ -182,7 +184,7 @@ function HeardAboutUsSheet({
                                 style={{
                                     marginTop: scale(4),
                                     color: colors.brand.text.subtitle,
-                                    textAlign: isRTL ? 'right' : 'left',
+                                    textAlign: 'left',
                                 }}
                             >
                                 {t('heard_about_us_desc', 'One quick answer helps us improve where we spend our time.')}
@@ -230,7 +232,7 @@ function HeardAboutUsSheet({
                                         style={{
                                             flex: 1,
                                             color: active ? colors.chrome.primary : colors.chrome.common.textStrong,
-                                            textAlign: isRTL ? 'right' : 'left',
+                                            textAlign: 'left',
                                         }}
                                     >
                                         {option.label}
@@ -246,7 +248,7 @@ function HeardAboutUsSheet({
                                 onChangeText={(value) => setOtherText(value.slice(0, 120))}
                                 editable={!saving}
                                 maxLength={120}
-                                placeholder={t('heard_about_us_other_placeholder', 'Please tell us')}
+                                placeholder={otherPlaceholder}
                                 placeholderTextColor={colors.brand.text.muted}
                                 style={[
                                     styles.otherInput,
@@ -255,6 +257,7 @@ function HeardAboutUsSheet({
                                         color: colors.chrome.common.textStrong,
                                         backgroundColor: colors.brand.bg.surface,
                                         textAlign: isRTL ? 'right' : 'left',
+                                        fontFamily: fontFamilyForText(otherText || otherPlaceholder),
                                     },
                                 ]}
                             />

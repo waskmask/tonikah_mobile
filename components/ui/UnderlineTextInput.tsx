@@ -3,6 +3,7 @@ import { StyleSheet, TextInput, TextInputProps } from 'react-native';
 
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
+import { fontFamilyForText } from '@/constants/typography';
 
 type Props = TextInputProps & {
     error?: boolean;
@@ -25,6 +26,7 @@ export const UnderlineTextInput = forwardRef<TextInput, Props>(function Underlin
 ) {
     const colors = useColors();
     const [focused, setFocused] = useState(false);
+    const visibleText = props.value || props.defaultValue || props.placeholder;
 
     return (
         <TextInput
@@ -53,6 +55,7 @@ export const UnderlineTextInput = forwardRef<TextInput, Props>(function Underlin
                             : colors.brand.bg.border,
                     borderBottomWidth: focused ? 1.5 : 1,
                     color: colors.brand.text.body,
+                    fontFamily: fontFamilyForText(visibleText),
                 },
                 style,
             ]}

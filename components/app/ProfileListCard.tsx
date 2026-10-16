@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, Lock, ShieldCheck, X } from '@/components/ui/icons/PhosphorCompat';
+import { Bookmark, Lock, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -12,6 +12,7 @@ import { scale } from '@/hooks/useResponsive';
 import { displayText, profileListImage, t, translateCountry, translateNamespace } from '@/lib/profileDisplay';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { flagEmoji } from '@/lib/exploreProfile';
+import { ProfileVerificationBadge } from '@/components/profile/ProfileVerificationBadge';
 
 type ProfileListCardProps = {
     item: any;
@@ -93,7 +94,6 @@ export function ProfileListCard({
     const name = item.profileName || item.username || t('not_set', 'Not set');
     const imageKey = String(item.id || item._id || image || name);
     const age = item.age || item.profile?.age;
-    const verified = Boolean(item.verified?.selfie || item.verified_profile);
     const pills = collectPills(item);
     const actionColor = actionTone === 'danger' ? colors.brand.accent.error : actionTone === 'neutral' ? colors.chrome.header.icon : colors.chrome.primary;
     const showOverlayAction = onFavorite && actionPlacement !== 'footer';
@@ -134,11 +134,13 @@ export function ProfileListCard({
                         <Lock size={scale(12)} color={common.inverseText} />
                     </View>
                 )}
-                {verified && (
-                    <View style={[styles.verifiedBadge, { left: isRTL ? scale(8) : undefined, right: isRTL ? undefined : scale(8) }]}>
-                        <ShieldCheck size={scale(13)} color={common.inverseText} />
-                    </View>
-                )}
+                <ProfileVerificationBadge
+                    profile={item}
+                    size={scale(14)}
+                    fillColor={common.inverseText}
+                    outlineColor="transparent"
+                    style={[styles.verifiedBadge, { left: isRTL ? scale(8) : undefined, right: isRTL ? undefined : scale(8) }]}
+                />
                 {showOverlayAction ? (
                     <Pressable
                         accessibilityRole="button"

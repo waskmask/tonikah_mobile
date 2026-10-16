@@ -30,7 +30,7 @@ export function QualifiedPhotoRequiredNotice() {
                         className="font-body-bold"
                         style={{
                             color: colors.brand.text.heading,
-                            textAlign: isRTL ? 'right' : 'left',
+                            textAlign: 'left',
                         }}
                     >
                         {t(
@@ -43,7 +43,7 @@ export function QualifiedPhotoRequiredNotice() {
                         style={{
                             color: warning.text,
                             marginTop: scale(3),
-                            textAlign: isRTL ? 'right' : 'left',
+                            textAlign: 'left',
                         }}
                     >
                         {t(

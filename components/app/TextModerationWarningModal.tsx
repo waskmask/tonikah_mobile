@@ -53,7 +53,7 @@ export function TextModerationWarningModal({ warning, submitting, onEdit, onClos
                             <Text
                                 variant="body"
                                 className="font-body-bold"
-                                style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}
+                                style={[styles.title, { textAlign: 'left' }]}
                             >
                                 {t(moderationTitleKeys[warning.field], 'This text needs review')}
                             </Text>
@@ -75,7 +75,7 @@ export function TextModerationWarningModal({ warning, submitting, onEdit, onClos
                             styles.description,
                             {
                                 color: palette.brand.text.subtitle,
-                                textAlign: isRTL ? 'right' : 'left',
+                                textAlign: 'left',
                             },
                         ]}
                     >
@@ -98,7 +98,7 @@ export function TextModerationWarningModal({ warning, submitting, onEdit, onClos
                                 color: palette.brand.accent.error,
                                 letterSpacing: 1.1,
                                 textTransform: 'uppercase',
-                                textAlign: isRTL ? 'right' : 'left',
+                                textAlign: 'left',
                             }}
                         >
                             {t('moderation_text_detected', 'Detected')}

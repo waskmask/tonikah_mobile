@@ -712,7 +712,7 @@ export default function MembershipsScreen() {
                     <View key={strip.key} style={[styles.activeMembershipPill, {
                         borderColor: strip.expired ? colors.brand.accent.error : colors.chrome.common.membershipStatusBorder,
                         backgroundColor: strip.expired ? colors.chrome.common.membershipExpiredTint : colors.chrome.common.membershipStatusTint,
-                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        flexDirection: 'row',
                     }]}>
                         <View style={styles.planCopy}>
                             <Text variant="body-sm" className="font-body-bold" style={{ color: colors.chrome.common.textStrong }}>
@@ -720,7 +720,7 @@ export default function MembershipsScreen() {
                             </Text>
                             {!!strip.expiry && <Text variant="caption" className="font-body-medium" style={{ color: colors.chrome.common.textStrong, marginTop: 4 }}>{strip.expiry}</Text>}
                         </View>
-                        <View style={[styles.membershipStatusActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={[styles.membershipStatusActions, { flexDirection: 'row' }]}>
                             <View style={[styles.membershipActiveBadge, { backgroundColor: strip.expired ? colors.brand.accent.error : colors.chrome.common.membershipStatusBorder }]}>
                                 <Text variant="caption" className="font-body-semi" style={{ color: colors.chrome.common.inverseText }}>
                                     {strip.expired ? t('membership_expired', 'Expired') : t('active', 'Active')}
@@ -748,7 +748,7 @@ export default function MembershipsScreen() {
                             <Animated.View style={[styles.benefitsMeasure, benefitsFade]} onLayout={(event) => setBenefitsHeight(event.nativeEvent.layout.height)}>
                                 <View style={styles.features}>
                                     {translatedMembershipBenefits().map((feature, index) => (
-                                        <View key={index} style={[styles.feature, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                        <View key={index} style={[styles.feature, { flexDirection: 'row' }]}>
                                             <View style={[styles.check, { backgroundColor: colors.chrome.common.membershipGold }]}>
                                                 <Check size={scale(14)} color={colors.chrome.common.inverseText} />
                                             </View>
@@ -762,7 +762,7 @@ export default function MembershipsScreen() {
                             accessibilityRole="button"
                             accessibilityState={{ expanded: benefitsExpanded }}
                             onPress={() => setBenefitsExpanded((expanded) => !expanded)}
-                            style={[styles.benefitsToggle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                            style={[styles.benefitsToggle, { flexDirection: 'row' }]}
                         >
                             <View style={[styles.benefitsDivider, { backgroundColor: colors.chrome.common.membershipBenefitsDivider }]} />
                             <Text variant="body-sm" className="font-body-semi" align="center" style={{ color: colors.chrome.common.textStrong, flexShrink: 1 }}>
@@ -816,7 +816,7 @@ export default function MembershipsScreen() {
                                 accessibilityLabel={[translatedPlanName(plan), duration.label, price, savingLabel, planBadgeLabel].filter(Boolean).join(', ')}
                                 onPress={() => setSelectedPlanSlug(plan.slug)}
                                 style={[styles.planOption, {
-                                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                                    flexDirection: 'row',
                                     borderColor: selected ? colors.chrome.common.membershipPlanSelectedBorder : colors.chrome.common.membershipPlanBorder,
                                     backgroundColor: selected ? colors.chrome.common.membershipPlanSelected : colors.chrome.common.card,
                                 }]}

@@ -165,7 +165,7 @@ export function MembershipPaymentSheet({
 
                         <Text
                             variant='caption'
-                            style={[styles.note, { color: colors.brand.text.muted, textAlign: isRTL ? 'right' : 'left' }]}
+                            style={[styles.note, { color: colors.brand.text.muted, textAlign: 'left' }]}
                         >
                             {Platform.OS === 'ios'
                                 ? t('payment_choice_ios_note', 'App Store purchases are handled by Apple. Card payments open secure web checkout.')

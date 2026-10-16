@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 const REASONS = [
@@ -38,7 +38,8 @@ export default function DeleteAccountScreen() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmText, setConfirmText] = useState('');
     const [deleting, setDeleting] = useState(false);
-    const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
+    const otherPlaceholder = t('delete_reason_other_placeholder', 'Tell us what happened...');
+    const confirmPlaceholder = t('delete_account_type_placeholder', 'Type DELETE');
 
     const submitReason = () => {
         if (!reason) {
@@ -110,13 +111,13 @@ export default function DeleteAccountScreen() {
                 {reason === 'delete_reason_other' ? (
                     <View style={[styles.otherBox, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
                         <TextInput
-                            accessibilityLabel={t('delete_reason_other_placeholder', 'Tell us what happened...')}
+                            accessibilityLabel={otherPlaceholder}
                             value={otherText}
                             onChangeText={(value) => setOtherText(value.slice(0, 250))}
                             multiline
-                            placeholder={t('delete_reason_other_placeholder', 'Tell us what happened...')}
+                            placeholder={otherPlaceholder}
                             placeholderTextColor={colors.brand.text.muted}
-                            style={[styles.otherInput, { color: colors.brand.text.body, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                            style={[styles.otherInput, { color: colors.brand.text.body, fontFamily: fontFamilyForText(otherText || otherPlaceholder), textAlign: isRTL ? 'right' : 'left' }]}
                             textAlignVertical="top"
                         />
                         <View style={styles.otherMeta}>
@@ -166,13 +167,13 @@ export default function DeleteAccountScreen() {
                             {t('delete_account_type_label', 'Type to confirm:')} DELETE
                         </Text>
                         <TextInput
-                            accessibilityLabel={t('delete_account_type_placeholder', 'Type DELETE')}
+                            accessibilityLabel={confirmPlaceholder}
                             value={confirmText}
                             onChangeText={(value) => setConfirmText(value.toUpperCase())}
                             autoCapitalize="characters"
-                            placeholder={t('delete_account_type_placeholder', 'Type DELETE')}
+                            placeholder={confirmPlaceholder}
                             placeholderTextColor={colors.brand.text.muted}
-                            style={[styles.confirmInput, { color: colors.brand.text.body, borderColor: colors.brand.bg.border, backgroundColor: colors.brand.bg.surface, fontFamily: inputFontFamily }]}
+                            style={[styles.confirmInput, { color: colors.brand.text.body, borderColor: colors.brand.bg.border, backgroundColor: colors.brand.bg.surface, fontFamily: fontFamilyForText(confirmText || confirmPlaceholder) }]}
                         />
                         <View style={styles.modalActions}>
                             <Pressable

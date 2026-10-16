@@ -24,7 +24,7 @@ import { UnderReviewPill } from '@/components/app/UnderReviewPill';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
 import { getTextDirection, localeTextDirection } from '@/lib/textDirection';
 import { countNonSpace, trimToNonSpaceLimit } from '@/lib/profileValidation';
@@ -148,7 +148,7 @@ export function TextEditSheet({
     const belowMinimum = Boolean(minCount && draftCount > 0 && draftCount < minCount);
     const saveButtonTitle = belowMinimum ? `${draftCount}/${minCount}` : t('save', 'Save');
     const direction = getTextDirection(draft, localeTextDirection(currentLanguage));
-    const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
+    const inputFontFamily = fontFamilyForText(draft || placeholder);
     const dirty = edited && draft.trim() !== initialValue.trim();
     const sheetHeight = Math.min(
         scale(multiline ? 420 : 300) + insets.bottom,
@@ -322,7 +322,7 @@ export function TextEditSheet({
                 onShow={focusDrawerInput}
                 onRequestClose={handleAndroidBack}
             >
-                <View style={[styles.drawer, { backgroundColor: palette.brand.bg.surface }]}>
+                <View style={[styles.drawer, { backgroundColor: palette.brand.bg.surface, direction: isRTL ? 'rtl' : 'ltr' }]}>
                     <Animated.View
                         entering={drawerEntering}
                         style={[styles.drawer, { backgroundColor: palette.brand.bg.surface }]}
@@ -372,7 +372,7 @@ export function TextEditSheet({
             hardwareAccelerated
             onRequestClose={saving ? () => undefined : onClose}
         >
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                 <BottomSheet
                     snapPoints={[sheetHeight]}
                     index={0}

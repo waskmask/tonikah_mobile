@@ -31,7 +31,7 @@ import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { useToast } from '@/hooks/useToast';
 import {
     enablePushNotifications,
@@ -100,13 +100,12 @@ export default function MessagesScreen() {
     const { isDark } = useTheme();
     const palette = useColors();
     const primary = palette.chrome.primary;
-    const { currentLanguage, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const userId = useAuthStore((state) => String(state.user?._id || state.user?.id || ''));
     const { status: connectivityStatus } = useConnectivity();
     const toast = useToast();
     const eligibility = useMessagingEligibilityStatus();
     const { requireVerified } = useEmailVerificationGuard();
-    const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const cachedInbox = queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox);
     const sharedInbox = useCachedInbox();
     const [activeTab, setActiveTab] = useState<ConversationTab>('chats');
@@ -116,6 +115,8 @@ export default function MessagesScreen() {
     const [nextCursor, setNextCursor] = useState<string | null>(() => cachedInbox?.nextCursor || null);
     const [slots, setSlots] = useState<{ used?: number; total?: number } | null>(() => cachedInbox?.slots || null);
     const [search, setSearch] = useState('');
+    const searchPlaceholder = t('chat:search_placeholder', 'Search messages...');
+    const inputFontFamily = fontFamilyForText(search || searchPlaceholder);
     const [loading, setLoading] = useState(!cachedInbox);
     const [loadingMore, setLoadingMore] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -467,7 +468,7 @@ export default function MessagesScreen() {
                     <TextInput
                         value={search}
                         onChangeText={setSearch}
-                        placeholder={t('chat:search_placeholder', 'Search messages...')}
+                        placeholder={searchPlaceholder}
                         placeholderTextColor={palette.brand.text.muted}
                         style={[styles.searchInput, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                     />
@@ -565,7 +566,7 @@ export default function MessagesScreen() {
                                         : t('chat:no_chats_desc', 'Your conversations will appear here.')}
                             actions={activeTab === 'chats' ? [{
                                 label: t('explore', 'Explore'),
-                                onPress: () => router.push('/(tabs)/search'),
+                                onPress: () => router.push('/search'),
                             }] : undefined}
                         />
                     </View>

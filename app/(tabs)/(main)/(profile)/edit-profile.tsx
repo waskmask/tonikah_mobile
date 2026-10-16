@@ -58,7 +58,7 @@ import { TextEditSheet } from "@/components/ui/TextEditSheet";
 import { Mosque } from "@/components/ui/icons/Mosque";
 import { BabyCarriage as Pram } from "@/components/ui/icons/BabyCarriage";
 import { COUNTRY_OPTIONS, LANGUAGE_OPTIONS, NATIONALITY_OPTIONS } from "@/constants/profileOptions";
-import { Typography } from "@/constants/typography";
+import { fontFamilyForText, Typography } from "@/constants/typography";
 import { useEmailVerificationGuard } from "@/hooks/useEmailVerificationGuard";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useMasterdataLists } from "@/hooks/useMasterdataLists";
@@ -93,7 +93,7 @@ import { profileService } from "@/lib/profileService";
 import { hasPartnerPreferenceContent } from "@/lib/partnerPreference";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
-import { localeUsesLatinScript } from "@/lib/textDirection";
+import { getTextDirection, localeTextDirection, localeUsesLatinScript } from "@/lib/textDirection";
 import {
   getTextModerationWarning,
   moderationCandidateForEditing,
@@ -439,7 +439,7 @@ export default function EditProfileScreen({
       candidate.includes("://") ||
       candidate.includes("edit-profile")
     ) {
-      return "/(tabs)/profile";
+      return "/profile";
     }
     return candidate;
   }, [returnTo]);
@@ -535,7 +535,8 @@ export default function EditProfileScreen({
   const summaryNavigation = useUnsavedNavigationGuard({
     dirty: summaryDirty,
     leaveFallback: leaveEditProfile,
-    redirectRemovalToFallback: !isProfileOverlay,
+    // An embedded editor must not redirect removal of its owning tabs route.
+    redirectRemovalToFallback: !embedded && !isProfileOverlay,
   });
 
   useFocusEffect(
@@ -1464,7 +1465,7 @@ export default function EditProfileScreen({
         style={[
           styles.sectionTitle,
           usesLatinLabels ? styles.latinSectionLabel : styles.naturalLabel,
-          { color: palette.chrome.common.textStrong, fontSize: scale(16), lineHeight: scale(21) },
+          { color: palette.chrome.common.textStrong, fontSize: scale(16), lineHeight: scale(21), textAlign: "left" },
         ]}
       >
         {section.title}
@@ -1474,6 +1475,7 @@ export default function EditProfileScreen({
         const missing = row.completionKey ? missingKeySet.has(row.completionKey) : false;
         const impact = missing && row.completionKey ? missingImpacts[row.completionKey] || 0 : 0;
         const notSet = row.value === fallbackText;
+        const valueDirection = getTextDirection(row.value, localeTextDirection(currentLanguage));
 
         return (
           <Fragment key={row.id}>
@@ -1519,7 +1521,13 @@ export default function EditProfileScreen({
                     style={[
                       styles.rowLabel,
                       usesLatinLabels ? styles.latinFieldLabel : styles.naturalLabel,
-                      { color: palette.chrome.common.textMuted },
+                      {
+                        color: palette.chrome.common.textMuted,
+                        textAlign: "left",
+                        writingDirection: isRTL ? "rtl" : "ltr",
+                        fontFamily: fontFamilyForText(row.label, "bold"),
+                        fontWeight: undefined,
+                      },
                     ]}
                   >
                     {row.label}
@@ -1531,7 +1539,13 @@ export default function EditProfileScreen({
                   numberOfLines={1}
                   style={[
                     styles.rowValue,
-                    { color: missing ? colors.primary : notSet ? colors.muted : colors.text },
+                    {
+                      color: missing ? colors.primary : notSet ? colors.muted : colors.text,
+                      textAlign: "left",
+                      writingDirection: valueDirection,
+                      fontFamily: fontFamilyForText(row.value, "semi"),
+                      fontWeight: undefined,
+                    },
                     notSet && !missing && styles.rowValueNotSet,
                   ]}
                 >
@@ -1604,7 +1618,7 @@ export default function EditProfileScreen({
               styles.sectionTitle,
               styles.chipHeaderTitle,
               usesLatinLabels ? styles.latinSectionLabel : styles.naturalLabel,
-              { color: palette.chrome.common.textStrong, fontSize: scale(16), lineHeight: scale(21) },
+              { color: palette.chrome.common.textStrong, fontSize: scale(16), lineHeight: scale(21), textAlign: "left" },
             ]}
           >
             {config.title}
@@ -1624,14 +1638,26 @@ export default function EditProfileScreen({
                 style={[styles.chip, { backgroundColor: palette.chrome.common.subtleSurface }]}
               >
                 <Text style={styles.chipEmoji}>{item.emoji}</Text>
-                <Text style={[styles.chipLabel, { color: colors.text }]} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.chipLabel,
+                    {
+                      color: colors.text,
+                      textAlign: "left",
+                      writingDirection: getTextDirection(item.label, localeTextDirection(currentLanguage)),
+                      fontFamily: fontFamilyForText(item.label, "medium"),
+                      fontWeight: undefined,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
                   {item.label}
                 </Text>
               </View>
             ))}
           </View>
         ) : (
-          <Text style={[styles.chipEmpty, { color: config.impact ? colors.primary : colors.muted }]}>
+          <Text style={[styles.chipEmpty, { color: config.impact ? colors.primary : colors.muted, textAlign: "left" }]}> 
             {config.emptyLabel}
           </Text>
         )}
@@ -1683,7 +1709,7 @@ export default function EditProfileScreen({
       {!embedded ? (
         <AppBackTitleBar
           title={t("edit_profile", "Edit profile")}
-          fallbackHref="/(tabs)/profile"
+          fallbackHref="/profile"
           onBack={summaryNavigation.requestClose}
         />
       ) : null}
@@ -1739,7 +1765,7 @@ export default function EditProfileScreen({
             actionLabel={t("add", "Add")}
             onPress={() => router.push({
               pathname: "/partner-preference",
-              params: { returnTo: "/(tabs)/profile" },
+              params: { returnTo: "/profile" },
             })}
             style={{ marginTop: 0, marginBottom: scale(24) }}
           />

@@ -22,6 +22,7 @@ import { Text } from '@/components/ui/Text';
 import { translateChatText } from '@/lib/chatDisplay';
 import { ChatImageCropEditor, type ChatImageCropEditorRef } from '@/components/chat/ChatImageCropEditor';
 import type { ImageSize } from '@/lib/chatImageCrop';
+import { fontFamilyForText } from '@/constants/typography';
 
 export const IMAGE_CAPTION_LIMIT = 500;
 
@@ -42,8 +43,6 @@ type Props = {
     viewOnce: boolean;
     uploading: boolean;
     colors: ChatColors;
-    // undefined on iOS where the system font is used
-    inputFontFamily: string | undefined;
     isRTL: boolean;
     labels: {
         captionPlaceholder: string;
@@ -74,7 +73,6 @@ export function ImageAttachmentComposer({
     viewOnce,
     uploading,
     colors,
-    inputFontFamily,
     isRTL,
     labels,
     onChangeCaption,
@@ -211,7 +209,7 @@ export function ImageAttachmentComposer({
                 <Reanimated.View style={[styles.barWrap, barLiftStyle]} collapsable={false}>
                     <Reanimated.View style={[styles.bar, barPadStyle]} onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)} collapsable={false}>
                         {cropMode ? (
-                            <View style={[styles.cropActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.cropActions, { flexDirection: 'row' }]}>
                                 <Pressable accessibilityRole="button" onPress={() => setCropMode(false)} disabled={cropBusy} style={styles.cropTextButton}>
                                     <Text style={styles.cropActionText}>{cancelLabel}</Text>
                                 </Pressable>
@@ -223,7 +221,7 @@ export function ImageAttachmentComposer({
                                 </Pressable>
                             </View>
                         ) : <View style={styles.composer}>
-                            <View style={[styles.captionPill, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.captionPill, { flexDirection: 'row' }]}>
                                 <TextInput
                                     value={caption}
                                     onChangeText={(value) => onChangeCaption(value.slice(0, IMAGE_CAPTION_LIMIT))}
@@ -231,7 +229,7 @@ export function ImageAttachmentComposer({
                                     maxLength={IMAGE_CAPTION_LIMIT}
                                     placeholder={labels.captionPlaceholder}
                                     placeholderTextColor={MEDIA_PREVIEW.placeholder}
-                                    style={[styles.captionInput, { fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                    style={[styles.captionInput, { fontFamily: fontFamilyForText(caption || labels.captionPlaceholder), textAlign: isRTL ? 'right' : 'left' }]}
                                     multiline
                                 />
                                 <Pressable
@@ -258,7 +256,7 @@ export function ImageAttachmentComposer({
                             >
                                 {uploading
                                     ? <ActivityIndicator color={colors.inverse} size="small" />
-                                    : <PaperPlaneTilt size={scale(20)} color={imageState === 'ready' ? colors.inverse : colors.subtle} weight="fill" />}
+                                    : <PaperPlaneTilt size={scale(20)} color={imageState === 'ready' ? colors.inverse : colors.subtle} weight="fill" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />}
                             </Pressable>
                         </View>}
                     </Reanimated.View>

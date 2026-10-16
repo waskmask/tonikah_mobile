@@ -179,7 +179,7 @@ export function MembershipHistorySheet({
                                     },
                                 ]}
                             >
-                                <View style={[styles.itemTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <View style={[styles.itemTop, { direction: isRTL ? 'rtl' : 'ltr', flexDirection: 'row' }]}>
                                     <View style={styles.itemCopy}>
                                         <Text variant='body' className='font-body-semi' numberOfLines={2}>
                                             {item.planName || t('memberships', 'Membership')}
@@ -216,7 +216,7 @@ export function MembershipHistorySheet({
                                 <Pressable
                                     accessibilityRole="button"
                                     onPress={() => setReceiptItem(item)}
-                                    style={[styles.receiptAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                                    style={[styles.receiptAction, { direction: isRTL ? 'rtl' : 'ltr', flexDirection: 'row' }]}
                                 >
                                     <Receipt size={scale(20)} color={colors.chrome.primary} />
                                     <Text variant="body-sm" className="font-body-semi" style={{ color: colors.chrome.primary, flexShrink: 1 }}>

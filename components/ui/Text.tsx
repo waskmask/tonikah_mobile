@@ -1,7 +1,6 @@
 import React from "react";
-import { Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native";
-import { useLanguage } from "@/hooks/useLanguage";
-import { Typography } from "@/constants/typography";
+import { StyleSheet, Text as RNText, TextProps as RNTextProps, TextStyle } from "react-native";
+import { textUsesArabicScript, Typography } from "@/constants/typography";
 
 export type TextVariant =
     | "h1"
@@ -22,6 +21,15 @@ interface TextProps extends RNTextProps {
     align?: "left" | "center" | "right";
 }
 
+function textFromNode(node: React.ReactNode): string {
+    if (typeof node === "string" || typeof node === "number") return String(node);
+    if (Array.isArray(node)) return node.map(textFromNode).join("");
+    if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+        return textFromNode(node.props.children);
+    }
+    return "";
+}
+
 export const Text: React.FC<TextProps> = ({
     variant = "body",
     children,
@@ -30,8 +38,7 @@ export const Text: React.FC<TextProps> = ({
     style,
     ...props
 }) => {
-    const { currentLanguage, isRTL } = useLanguage();
-    const isArabicFamily = currentLanguage === "ar";
+    const isArabicFamily = textUsesArabicScript(textFromNode(children));
     const font = (fontFamily: string | undefined, fontWeight: TextStyle["fontWeight"]): TextStyle => ({
         fontFamily,
         fontWeight: fontFamily ? undefined : fontWeight,
@@ -140,6 +147,11 @@ export const Text: React.FC<TextProps> = ({
     };
 
     const variantStyle = getVariantStyles();
+    const resolvedStyle = StyleSheet.flatten([variantStyle, fontOverride(), style]);
+    // Arabic ascenders and marks need more room than compact Latin line boxes.
+    const arabicLineHeight = resolvedStyle.fontFamily?.startsWith('NotoSansArabic')
+        ? Math.max(resolvedStyle.lineHeight ?? 0, Math.ceil((resolvedStyle.fontSize ?? 16) * 1.6))
+        : undefined;
 
     const colorClass = variant === "subtitle" ? "text-brand-text-subtitle" :
         variant === "caption" ? "text-brand-text-muted" :
@@ -147,8 +159,8 @@ export const Text: React.FC<TextProps> = ({
                 (variant === "h1" || variant === "h2" || variant === "h3" || variant === "heading" || variant === "heading-sm") ? "text-brand-text-heading" : "text-brand-text-body";
 
     const alignmentClass = align === "center" ? "text-center" :
-        align === "right" ? (isRTL ? "text-left" : "text-right") :
-            align === "left" ? (isRTL ? "text-right" : "text-left") : "";
+        align === "right" ? "text-right" :
+            align === "left" ? "text-left" : "";
 
     return (
         <RNText
@@ -163,7 +175,8 @@ export const Text: React.FC<TextProps> = ({
                     textTransform: variantStyle.textTransform,
                 },
                 fontOverride(),
-                style
+                style,
+                arabicLineHeight === undefined ? undefined : { lineHeight: arabicLineHeight }
             ]}
             {...props}
         >

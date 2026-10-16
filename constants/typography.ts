@@ -14,6 +14,12 @@ const jakarta = {
     extra: nativeFontName("PlusJakartaSans_800ExtraBold", "PlusJakartaSans-ExtraBold"),
 };
 
+const ARABIC_SCRIPT_REGEX = /[\u0600-\u06ff\u0750-\u077f\u0870-\u089f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]/u;
+
+export function textUsesArabicScript(value: unknown): boolean {
+    return ARABIC_SCRIPT_REGEX.test(String(value ?? ''));
+}
+
 export const Typography = {
     size: {
         xs: 12,
@@ -55,3 +61,20 @@ export const Typography = {
         },
     },
 };
+
+export type TypographyWeight = 'regular' | 'medium' | 'semi' | 'bold' | 'extra';
+
+/** Select a loaded family from the text's script, independently of app locale. */
+export function fontFamilyForText(value: unknown, weight: TypographyWeight = 'regular'): string {
+    if (textUsesArabicScript(value)) {
+        if (weight === 'bold' || weight === 'extra') return Typography.font.arabic.bold;
+        if (weight === 'medium' || weight === 'semi') return Typography.font.arabic.semi;
+        return Typography.font.arabic.regular;
+    }
+
+    if (weight === 'extra') return Typography.font.heading.extra;
+    if (weight === 'bold') return Typography.font.body.bold;
+    if (weight === 'semi') return Typography.font.body.semi;
+    if (weight === 'medium') return Typography.font.body.medium;
+    return Typography.font.body.regular;
+}

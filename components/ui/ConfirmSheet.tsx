@@ -77,7 +77,7 @@ export function ConfirmSheet({
                 if (!busy) onClose();
             }}
         >
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                 <BottomSheet
                     snapPoints={[sheetHeight]}
                     index={0}
@@ -109,7 +109,7 @@ export function ConfirmSheet({
                                 styles.message,
                                 {
                                     color: palette.brand.text.body,
-                                    textAlign: isRTL ? 'right' : 'left',
+                                    textAlign: 'left',
                                 },
                             ]}
                         >

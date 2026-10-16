@@ -66,6 +66,9 @@ export default function TabsLayout() {
     const selectedLabelFontFamily = currentLanguage === 'ar'
         ? Typography.font.arabic.bold
         : Typography.font.body.bold;
+    const isIOSArabic = Platform.OS === 'ios' && currentLanguage === 'ar';
+    const tabLabelFontSize = isIOSArabic ? 9 : NavigationTypeTokens.tabLabel.fontSize;
+    const tabTitleVerticalOffset = Platform.OS === 'ios' ? (isIOSArabic ? 0 : 3) : undefined;
 
     const { data: unreadCount = 0 } = useQuery({
         queryKey: queryKeys.chat.unreadCount,
@@ -106,7 +109,7 @@ export default function TabsLayout() {
         router.prefetch('/language');
         router.prefetch('/blocked-users');
         router.prefetch('/settings');
-        router.prefetch('/(tabs)/profile');
+        router.prefetch('/profile');
     }), []);
 
     const cachedProfile = cachedUser?.profile || cachedUser;
@@ -134,26 +137,77 @@ export default function TabsLayout() {
         - ANDROID_TAB_ICON_SIZE
         + ANDROID_PROFILE_AVATAR_VERTICAL_OFFSET;
     const iosAvatarSource = iosAvatar && iosAvatar.url === profileAvatarUrl ? iosAvatar.source : null;
+    const tabTriggers = [
+        <NativeTabs.Trigger key="search" name="search">
+            <NativeTabs.Trigger.Label>{safeLabel(t('explore'), 'Explore')}</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Icon
+                src={{
+                    default: require('../../../assets/icon/phosphor/compass-bold.png'),
+                    selected: require('../../../assets/icon/phosphor/compass-fill.png'),
+                }}
+                renderingMode="template"
+            />
+        </NativeTabs.Trigger>,
+        <NativeTabs.Trigger key="messages" name="(messages)" disableAutomaticContentInsets={Platform.OS === 'ios'}>
+            <NativeTabs.Trigger.Label>{safeLabel(t('messages'), 'Messages')}</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Icon
+                src={{
+                    default: require('../../../assets/icon/phosphor/paper-plane-tilt-bold.png'),
+                    selected: require('../../../assets/icon/phosphor/paper-plane-tilt-fill.png'),
+                }}
+                renderingMode="template"
+            />
+            {unreadCount > 0 ? (
+                <NativeTabs.Trigger.Badge>{formatBadgeCount(unreadCount)}</NativeTabs.Trigger.Badge>
+            ) : null}
+        </NativeTabs.Trigger>,
+        <NativeTabs.Trigger key="activities" name="activities">
+            <NativeTabs.Trigger.Label>{safeLabel(t('activities'), 'Activities')}</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Icon
+                src={{
+                    default: require('../../../assets/icon/phosphor/hand-tap-bold.png'),
+                    selected: require('../../../assets/icon/phosphor/hand-tap-bold.png'),
+                }}
+                renderingMode="template"
+            />
+        </NativeTabs.Trigger>,
+        <NativeTabs.Trigger key="profile" name="(profile)" disableAutomaticContentInsets={Platform.OS === 'ios'}>
+            <NativeTabs.Trigger.Label>{safeLabel(t('profile'), 'Profile')}</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Icon
+                sf={Platform.OS === 'ios' && !iosAvatarSource ? 'person' : undefined}
+                src={Platform.OS === 'ios' && iosAvatarSource ? iosAvatarSource : TRANSPARENT_TAB_ICON}
+                renderingMode="original"
+            />
+            {Platform.OS !== 'android' && profileBadge ? (
+                <NativeTabs.Trigger.Badge>{profileBadge}</NativeTabs.Trigger.Badge>
+            ) : null}
+        </NativeTabs.Trigger>,
+    ];
+    const orderedTabTriggers = Platform.OS === 'ios' && isRTL
+        ? [...tabTriggers].reverse()
+        : tabTriggers;
 
     return (
         <AppMenuProvider>
             <MembershipAccessListener />
             <View style={styles.navigatorHost}>
                 <NativeTabs
+                key={`${Platform.OS}-${currentLanguage}`}
                 backBehavior="history"
                 minimizeBehavior="never"
                 disableTransparentOnScrollEdge
                 labelVisibilityMode="labeled"
+                titlePositionAdjustment={tabTitleVerticalOffset === undefined ? undefined : { vertical: tabTitleVerticalOffset }}
                 labelStyle={{
                     default: {
-                        fontFamily: labelFontFamily,
-                        fontSize: NavigationTypeTokens.tabLabel.fontSize,
+                        fontFamily: isIOSArabic ? undefined : labelFontFamily,
+                        fontSize: tabLabelFontSize,
                         fontWeight: '500',
                         color: tabChrome.label,
                     },
                     selected: {
-                        fontFamily: selectedLabelFontFamily,
-                        fontSize: NavigationTypeTokens.tabLabel.selectedFontSize,
+                        fontFamily: isIOSArabic ? undefined : selectedLabelFontFamily,
+                        fontSize: Platform.OS === 'ios' ? tabLabelFontSize : NavigationTypeTokens.tabLabel.selectedFontSize,
                         fontWeight: '700',
                         color: tabChrome.label,
                     },
@@ -166,53 +220,7 @@ export default function TabsLayout() {
                 badgeTextColor={colors.chrome.badge.text}
                 shadowColor={tabChrome.border}
             >
-                <NativeTabs.Trigger name="search">
-                    <NativeTabs.Trigger.Label>{safeLabel(t('explore'), 'Explore')}</NativeTabs.Trigger.Label>
-                    <NativeTabs.Trigger.Icon
-                        src={{
-                            default: require('../../../assets/icon/phosphor/compass-bold.png'),
-                            selected: require('../../../assets/icon/phosphor/compass-fill.png'),
-                        }}
-                        renderingMode="template"
-                    />
-                </NativeTabs.Trigger>
-
-                <NativeTabs.Trigger name="messages">
-                    <NativeTabs.Trigger.Label>{safeLabel(t('messages'), 'Messages')}</NativeTabs.Trigger.Label>
-                    <NativeTabs.Trigger.Icon
-                        src={{
-                            default: require('../../../assets/icon/phosphor/paper-plane-tilt-bold.png'),
-                            selected: require('../../../assets/icon/phosphor/paper-plane-tilt-fill.png'),
-                        }}
-                        renderingMode="template"
-                    />
-                    {unreadCount > 0 ? (
-                        <NativeTabs.Trigger.Badge>{formatBadgeCount(unreadCount)}</NativeTabs.Trigger.Badge>
-                    ) : null}
-                </NativeTabs.Trigger>
-
-                <NativeTabs.Trigger name="activities">
-                    <NativeTabs.Trigger.Label>{safeLabel(t('activities'), 'Activities')}</NativeTabs.Trigger.Label>
-                    <NativeTabs.Trigger.Icon
-                        src={{
-                            default: require('../../../assets/icon/phosphor/hand-tap-bold.png'),
-                            selected: require('../../../assets/icon/phosphor/hand-tap-bold.png'),
-                        }}
-                        renderingMode="template"
-                    />
-                </NativeTabs.Trigger>
-
-                <NativeTabs.Trigger name="profile" disableAutomaticContentInsets={Platform.OS === 'ios'}>
-                    <NativeTabs.Trigger.Label>{safeLabel(t('profile'), 'Profile')}</NativeTabs.Trigger.Label>
-                    <NativeTabs.Trigger.Icon
-                        sf={Platform.OS === 'ios' && !iosAvatarSource ? 'person' : undefined}
-                        src={Platform.OS === 'ios' && iosAvatarSource ? iosAvatarSource : TRANSPARENT_TAB_ICON}
-                        renderingMode="original"
-                    />
-                    {Platform.OS !== 'android' && profileBadge ? (
-                        <NativeTabs.Trigger.Badge>{profileBadge}</NativeTabs.Trigger.Badge>
-                    ) : null}
-                </NativeTabs.Trigger>
+                {orderedTabTriggers}
                 </NativeTabs>
                 {Platform.OS === 'ios' && profileAvatarUrl && !iosAvatarSource ? (
                     <NativeTabAvatarRenderer

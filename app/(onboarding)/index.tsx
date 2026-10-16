@@ -23,7 +23,7 @@ import { Text } from "@/components/ui/Text";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { scale, wp, hp, isTablet } from "@/hooks/useResponsive";
-import { Typography } from "@/constants/typography";
+import { fontFamilyForText, Typography } from "@/constants/typography";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -62,7 +62,7 @@ export default function OnboardingScreen() {
     const { completeOnboarding } = useFirstLaunch();
     const { isDark } = useTheme();
     const reduceMotion = useReducedMotion();
-    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeIndex, setActiveIndex] = useState(isRTL ? 2 : 0);
     const flatListRef = useRef<FlatList>(null);
     const insets = useSafeAreaInsets();
     const tokens = isDark ? TOKENS.dark : TOKENS.light;
@@ -103,7 +103,7 @@ export default function OnboardingScreen() {
     const renderItem = ({ item }: { item: { id: string; type: SlideType } }) => {
         if (item.type === "welcome") {
             return (
-                <View style={[styles.slide, styles.slideWelcome, { width: SCREEN_WIDTH, paddingTop: insets.top + hp(7) }]}>
+                <View style={[styles.slide, styles.slideWelcome, { direction: isRTL ? 'rtl' : 'ltr', width: SCREEN_WIDTH, paddingTop: insets.top + hp(7) }]}>
                     <Animated.View
                         entering={reduceMotion ? undefined : ZoomIn.duration(650).springify().damping(13)}
                     >
@@ -139,7 +139,7 @@ export default function OnboardingScreen() {
         const prefix = isIntention ? "onboarding.screen3" : "onboarding.screen2";
 
         return (
-            <View style={[styles.slide, { width: SCREEN_WIDTH, paddingTop: insets.top + hp(7) }]}>
+            <View style={[styles.slide, { direction: isRTL ? 'rtl' : 'ltr', width: SCREEN_WIDTH, paddingTop: insets.top + hp(7) }]}>
                 <View style={{ width: "100%", maxWidth: contentMaxWidth, alignSelf: "center" }}>
                     <Text
                         variant="body-sm"
@@ -194,6 +194,7 @@ export default function OnboardingScreen() {
                 data={displayData}
                 renderItem={renderItem}
                 horizontal
+                style={{ direction: 'ltr' }}
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 onMomentumScrollEnd={onMomentumScrollEnd}
@@ -224,7 +225,7 @@ export default function OnboardingScreen() {
                                     <RNText
                                         style={[
                                             styles.contrastButtonText,
-                                            { color: tokens.contrastBtnText, fontFamily: Typography.font.body.bold },
+                                            { color: tokens.contrastBtnText, fontFamily: fontFamilyForText(t("login"), 'bold') },
                                         ]}
                                     >
                                         {t("login")}

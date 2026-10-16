@@ -29,7 +29,7 @@ import { scale } from '@/hooks/useResponsive';
 import { CaretLeft, CaretRight, Check, MagnifyingGlass, X } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
 
 export interface MultiSelectOption {
@@ -79,10 +79,10 @@ export function MultiSelectSheet({
 }: MultiSelectSheetProps) {
     const { isDark } = useTheme();
     const palette = useColors();
-    const { currentLanguage, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
-    const searchFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const [search, setSearch] = useState('');
+    const searchFontFamily = fontFamilyForText(search || searchPlaceholder);
     const sheetRef = React.useRef<BottomSheet>(null);
     const [localSelected, setLocalSelected] = useState<string[]>(initialSelected);
     const resolvedPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
@@ -232,7 +232,7 @@ export function MultiSelectSheet({
                 hardwareAccelerated
                 onRequestClose={handleClose}
             >
-                <GestureHandlerRootView style={styles.modalRoot}>
+                <GestureHandlerRootView style={[styles.modalRoot, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                     <BottomSheet
                         ref={sheetRef}
                         snapPoints={[sheetHeight]}
@@ -249,7 +249,7 @@ export function MultiSelectSheet({
                         android_keyboardInputMode="adjustResize"
                     >
                         <View style={styles.header}>
-                            <Text variant="body-sm" className="font-body-bold" style={styles.sheetTitle}>
+                            <Text variant="body-sm" className="font-body-bold" style={[styles.sheetTitle, { textAlign: 'left' }]}>
                                 {title}
                             </Text>
                             <Pressable onPress={handleClose} hitSlop={12}>
@@ -321,7 +321,7 @@ export function MultiSelectSheet({
                                             variant="body"
                                             style={[
                                                 styles.optionLabel,
-                                                { color: palette.brand.text.body, textAlign: isRTL ? 'right' : 'left' },
+                                                { color: palette.brand.text.body, textAlign: 'left' },
                                                 isChecked && { color: palette.chrome.primary },
                                             ]}
                                         >
@@ -364,7 +364,7 @@ export function MultiSelectSheet({
             hardwareAccelerated
             onRequestClose={handleClose}
         >
-            <GestureHandlerRootView style={isDrawer ? styles.drawerOverlay : styles.modalRoot}>
+            <GestureHandlerRootView style={[isDrawer ? styles.drawerOverlay : styles.modalRoot, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                 {!isDrawer && (
                     <Animated.View entering={FadeIn.duration(140)} style={styles.backdrop}>
                         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
@@ -512,7 +512,7 @@ export function MultiSelectSheet({
                                                 styles.optionLabel,
                                                 {
                                                     color: palette.brand.text.body,
-                                                    textAlign: isRTL ? 'right' : 'left',
+                                                    textAlign: 'left',
                                                 },
                                                 isChecked && { color: palette.chrome.primary },
                                             ]}

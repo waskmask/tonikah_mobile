@@ -13,10 +13,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from './Text';
 import { GradientButton } from './GradientButton';
 import { useColors } from '@/hooks/useColors';
+import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 import { formatAmount } from '@/lib/profileValidation';
 import { Easing } from 'react-native-reanimated';
+import { fontFamilyForText } from '@/constants/typography';
 
 type Props = {
     visible: boolean;
@@ -44,6 +46,7 @@ export function IncomeEditSheet({
     onSave,
 }: Props) {
     const palette = useColors();
+    const { isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const [currency, setCurrency] = useState(initialCurrency);
     const [amount, setAmount] = useState(initialAmount);
@@ -85,7 +88,7 @@ export function IncomeEditSheet({
             hardwareAccelerated
             onRequestClose={saving ? () => undefined : onClose}
         >
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                 <BottomSheet
                     snapPoints={[sheetHeight]}
                     index={0}
@@ -172,6 +175,7 @@ export function IncomeEditSheet({
                                     {
                                         borderColor: errorText ? palette.brand.accent.error : palette.brand.bg.border,
                                         color: palette.brand.text.body,
+                                        fontFamily: fontFamilyForText(amount || t('amount', 'Amount')),
                                     },
                                 ]}
                             />
@@ -244,6 +248,7 @@ const styles = StyleSheet.create({
         paddingVertical: 0,
         fontSize: scale(14),
         writingDirection: 'ltr',
+        direction: 'ltr',
         textAlign: 'left',
     },
     footer: {

@@ -7,6 +7,7 @@ import { scale } from '@/hooks/useResponsive';
 import { useColors } from '@/hooks/useColors';
 import { useTheme } from '@/hooks/useTheme';
 import { t } from '@/lib/profileDisplay';
+import { Typography } from '@/constants/typography';
 
 const HEADER_ICON_SIZE = scale(22);
 
@@ -67,7 +68,7 @@ export function ExploreTopOverlay({
                 </View>
                 {filterCount > 0 ? (
                     <View pointerEvents="none" style={[styles.countBadge, { backgroundColor: colors.chrome.badge.background, borderColor: colors.chrome.explore.screen }]}>
-                        <RNText style={[styles.countText, { color: colors.chrome.common.inverseText }]}>{filterCount}</RNText>
+                        <RNText style={[styles.countText, { color: colors.chrome.common.inverseText, fontFamily: Typography.font.body.bold }]}>{filterCount}</RNText>
                     </View>
                 ) : null}
             </Pressable>

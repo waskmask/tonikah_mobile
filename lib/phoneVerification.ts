@@ -1,4 +1,14 @@
-import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import { getCountries, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+
+export function defaultPhoneCountry(phone?: string, locationCountry?: string, region?: string | null): CountryCode {
+    const saved = parsePhoneNumberFromString(phone || '')?.country;
+    const supported = getCountries();
+    for (const candidate of [saved, locationCountry, region]) {
+        const code = candidate?.trim().toUpperCase() as CountryCode;
+        if (supported.includes(code)) return code;
+    }
+    return 'US';
+}
 
 export function asciiDigits(value: string) {
     return value.replace(/[\u0660-\u0669\u06f0-\u06f9]/g, (char) =>
@@ -12,16 +22,19 @@ export function normalizeVerificationPhone(value: string, country: CountryCode):
     return phone?.isValid() && !phone.ext ? phone.number : null;
 }
 
+export function phoneInput(value: string, country: CountryCode) {
+    const input = asciiDigits(value).trim();
+    const international = input.startsWith('+') ? parsePhoneNumberFromString(input) : undefined;
+    if (international?.isValid() && international.country && !international.ext) {
+        return { country: international.country, number: international.nationalNumber as string };
+    }
+    return { country, number: input.replace(/\D/g, '').slice(0, 15) };
+}
+
 export function secondsRemaining(deadline: string | number | undefined, now = Date.now()) {
     if (!deadline) return 0;
     const end = typeof deadline === 'number' ? deadline : Date.parse(deadline);
     return Number.isFinite(end) ? Math.max(0, Math.ceil((end - now) / 1000)) : 0;
-}
-
-export function canVerifyPhone(membership: { provider?: string; status?: string; currentPeriodEnd?: string } | undefined, now = Date.now()) {
-    return Boolean(membership?.status === 'active' &&
-        ['stripe', 'razorpay', 'phonepe', 'apple_iap', 'google_play', 'giftcard'].includes(membership.provider || '') &&
-        Date.parse(membership.currentPeriodEnd || '') > now);
 }
 
 export type PhoneChallenge = { challengeId: string; expiresAt: string; resendAt: string; number: string };

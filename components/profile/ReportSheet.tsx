@@ -22,7 +22,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useHaptics } from '@/hooks/useHaptics';
 import { toast, ToastProvider } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { apiMessage, t } from '@/lib/profileDisplay';
 import { reportsService, ReportEntityType, ReportScreenshot } from '@/lib/reportsService';
 import {
@@ -84,7 +84,7 @@ function ReportSheetContent({ target, onClose, onOpened, onBlocked, embedded = f
     requestClose: React.MutableRefObject<() => void>;
 }) {
     const palette = useColors();
-    const { currentLanguage, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const { lightImpact } = useHaptics();
     const scrollRef = useRef<BottomSheetScrollViewMethods>(null);
@@ -107,7 +107,8 @@ function ReportSheetContent({ target, onClose, onOpened, onBlocked, embedded = f
     const [screenshots, setScreenshots] = useState<ReportScreenshot[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
-    const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
+    const descriptionPlaceholder = t('report_description_ph', 'Add any details that help us review this report.');
+    const inputFontFamily = fontFamilyForText(description || descriptionPlaceholder);
     const targetKey = target
         ? `${target.type}:${target.userId}:${target.imageId || ''}:${target.messageId || ''}:${target.imageUrl || ''}`
         : null;
@@ -419,7 +420,7 @@ function ReportSheetContent({ target, onClose, onOpened, onBlocked, embedded = f
             keyboardBlurBehavior="restore"
             android_keyboardInputMode="adjustResize"
         >
-            <SafeAreaView edges={[]} style={styles.container}>
+            <SafeAreaView edges={[]} style={[styles.container, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                 <View style={[styles.header, { borderBottomColor: palette.brand.bg.border }]}>
                     <View style={styles.headerSide}>
                         {step === 'detail' ? (
@@ -526,7 +527,7 @@ function ReportSheetContent({ target, onClose, onOpened, onBlocked, embedded = f
                                     <BottomSheetTextInput
                                         value={description}
                                         onChangeText={(value) => setDescription(value.slice(0, DESCRIPTION_MAX))}
-                                        placeholder={t('report_description_ph', 'Add any details that help us review this report.')}
+                                        placeholder={descriptionPlaceholder}
                                         placeholderTextColor={palette.brand.text.muted}
                                         multiline
                                         scrollEnabled

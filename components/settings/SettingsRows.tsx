@@ -23,6 +23,10 @@ export function SettingsNavRow({
     accessory,
     showChevron = true,
     selected,
+    labelColor,
+    descriptionColor,
+    descriptionContent,
+    iconAlign = 'flex-start',
 }: {
     icon: React.ReactNode;
     label: string;
@@ -35,6 +39,10 @@ export function SettingsNavRow({
     accessory?: React.ReactNode;
     showChevron?: boolean;
     selected?: boolean;
+    labelColor?: string;
+    descriptionColor?: string;
+    descriptionContent?: React.ReactNode;
+    iconAlign?: 'center' | 'flex-start';
 }) {
     const colors = useColors();
     const { isRTL } = useLanguage();
@@ -63,6 +71,7 @@ export function SettingsNavRow({
                 <View
                     style={[
                         styles.iconTile,
+                        { alignSelf: iconAlign },
                         { backgroundColor: danger ? colors.chrome.common.dangerTint : colors.chrome.header.iconBackground },
                     ]}
                 >
@@ -73,13 +82,13 @@ export function SettingsNavRow({
                         />
                     ) : icon}
                 </View>
-                <View style={[styles.fieldContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                <View style={[styles.fieldContent, { alignItems: 'flex-start' }]}>
                     <Text
                         variant="caption"
                         numberOfLines={1}
                         style={{
-                            color: danger ? colors.brand.accent.error : colors.chrome.common.textStrong,
-                            textAlign: isRTL ? 'right' : 'left',
+                            color: danger ? colors.brand.accent.error : labelColor ?? colors.chrome.common.textStrong,
+                            textAlign: 'left',
                             width: '100%',
                             fontSize: scale(13),
                             lineHeight: scale(17),
@@ -89,12 +98,12 @@ export function SettingsNavRow({
                     >
                         {label}
                     </Text>
-                    {description ? (
+                    {descriptionContent ?? (description ? (
                         <Text
                             variant="body-sm"
                             style={{
-                                color: colors.brand.text.subtitle,
-                                textAlign: isRTL ? 'right' : 'left',
+                                color: descriptionColor ?? colors.brand.text.subtitle,
+                                textAlign: 'left',
                                 width: '100%',
                                 fontSize: scale(14),
                                 lineHeight: scale(20),
@@ -103,7 +112,7 @@ export function SettingsNavRow({
                         >
                             {description}
                         </Text>
-                    ) : null}
+                    ) : null)}
                 </View>
                 {accessory ?? (loading || !showChevron ? null : (
                     <Chevron
@@ -123,13 +132,17 @@ export function SettingsInfoRow({
     label,
     value,
     note,
+    noteColor,
     locked,
     divider,
+    iconAlign = 'flex-start',
 }: {
     icon: React.ReactNode;
     label: string;
     value: string;
+    iconAlign?: 'center' | 'flex-start';
     note?: string;
+    noteColor?: string;
     locked?: boolean;
     divider?: boolean;
 }) {
@@ -149,27 +162,27 @@ export function SettingsInfoRow({
                 accessibilityLabel={`${label}: ${value}`}
                 style={styles.fieldRow}
             >
-                <View style={[styles.iconTile, { backgroundColor: colors.chrome.header.iconBackground }]}>
+                <View style={[styles.iconTile, { backgroundColor: colors.chrome.header.iconBackground, alignSelf: iconAlign }]}>
                     {icon}
                 </View>
-                <View style={[styles.fieldContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                <View style={[styles.fieldContent, { alignItems: 'flex-start' }]}>
                     <Text
                         variant="caption"
                         numberOfLines={1}
-                        style={[styles.fieldLabel, { color: colors.chrome.common.textMuted, textAlign: isRTL ? 'right' : 'left' }]}
+                        style={[styles.fieldLabel, { color: colors.chrome.common.textMuted, textAlign: 'left' }]}
                     >
                         {label}
                     </Text>
                     <Text
                         variant="body-sm"
-                        style={[styles.fieldValue, { textAlign: isRTL ? 'right' : 'left' }]}
+                        style={[styles.fieldValue, { textAlign: 'left' }]}
                     >
                         {value || t('not_set', 'Not set')}
                     </Text>
                     {note ? (
                         <Text
                             variant="caption"
-                            style={[styles.fieldNote, { color: colors.brand.text.muted, textAlign: isRTL ? 'right' : 'left' }]}
+                            style={[styles.fieldNote, { color: noteColor ?? colors.brand.text.muted, textAlign: 'left' }]}
                         >
                             {note}
                         </Text>
@@ -210,10 +223,10 @@ export function SettingsToggleRow({
                         {icon}
                     </View>
                 ) : null}
-                <View style={[styles.fieldContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                    <Text variant="body-sm" style={[styles.fieldValue, { textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+                <View style={[styles.fieldContent, { alignItems: 'flex-start' }]}>
+                    <Text variant="body-sm" style={[styles.fieldValue, { textAlign: 'left' }]}>{label}</Text>
                     {description ? (
-                        <Text variant="caption" style={{ color: colors.brand.text.subtitle, textAlign: isRTL ? 'right' : 'left' }}>
+                        <Text variant="caption" style={{ color: colors.brand.text.subtitle, textAlign: 'left' }}>
                             {description}
                         </Text>
                     ) : null}
@@ -244,6 +257,7 @@ const styles = StyleSheet.create({
         gap: scale(12),
     },
     iconTile: {
+        alignSelf: 'flex-start',
         width: scale(40),
         height: scale(40),
         borderRadius: scale(8),

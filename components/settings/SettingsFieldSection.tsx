@@ -30,8 +30,8 @@ export function SettingsFieldSection({
     return (
         <View style={[styles.section, { borderColor: colors.brand.bg.border }, style]}>
             {title ? (
-                <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <Text variant="h3" style={[styles.title, { textAlign: isRTL ? 'right' : 'left' }]}>
+                <View style={[styles.header, { flexDirection: 'row' }]}>
+                    <Text variant="h3" style={[styles.title, { textAlign: 'left' }]}>
                         {title}
                     </Text>
                     {actionLabel && onAction ? (

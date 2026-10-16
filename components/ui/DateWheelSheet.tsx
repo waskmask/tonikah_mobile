@@ -32,7 +32,7 @@ import { scale } from '@/hooks/useResponsive';
 import { X } from 'phosphor-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
 
 interface DateWheelSheetProps {
@@ -68,7 +68,6 @@ interface WheelProps {
     data: WheelItem[];
     selected: number;
     onChange: (value: number) => void;
-    fontFamily: string;
     activeColor: string;
     idleColor: string;
 }
@@ -77,7 +76,6 @@ interface WheelRowProps {
     label: string;
     index: number;
     scrollY: SharedValue<number>;
-    fontFamily: string;
     activeColor: string;
     idleColor: string;
 }
@@ -88,7 +86,6 @@ const WheelRow = React.memo(function WheelRow({
     label,
     index,
     scrollY,
-    fontFamily,
     activeColor,
     idleColor,
 }: WheelRowProps) {
@@ -110,14 +107,14 @@ const WheelRow = React.memo(function WheelRow({
 
     return (
         <View style={styles.wheelItem}>
-            <Animated.Text style={[{ fontFamily, fontSize: scale(14) }, animatedStyle]}>
+            <Animated.Text style={[{ fontFamily: fontFamilyForText(label, 'medium'), fontSize: scale(14) }, animatedStyle]}>
                 {label}
             </Animated.Text>
         </View>
     );
 });
 
-function Wheel({ data, selected, onChange, fontFamily, activeColor, idleColor }: WheelProps) {
+function Wheel({ data, selected, onChange, activeColor, idleColor }: WheelProps) {
     const listRef = useRef<FlatList<WheelItem>>(null);
     const userScrolling = useRef(false);
     const { lightImpact } = useHaptics();
@@ -168,12 +165,11 @@ function Wheel({ data, selected, onChange, fontFamily, activeColor, idleColor }:
                 label={item.label}
                 index={index}
                 scrollY={scrollY}
-                fontFamily={fontFamily}
                 activeColor={activeColor}
                 idleColor={idleColor}
             />
         ),
-        [scrollY, fontFamily, activeColor, idleColor],
+        [scrollY, activeColor, idleColor],
     );
 
     return (
@@ -210,7 +206,6 @@ export function DateWheelSheet({
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
-    const fontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.medium;
 
     const initial = value ?? maxDate;
     const [year, setYear] = useState(initial.getFullYear());
@@ -301,7 +296,7 @@ export function DateWheelSheet({
             hardwareAccelerated
             onRequestClose={onClose}
         >
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                 <BottomSheet
                     snapPoints={[sheetHeight]}
                     index={0}
@@ -338,7 +333,6 @@ export function DateWheelSheet({
                                     data={days}
                                     selected={day}
                                     onChange={setDay}
-                                    fontFamily={fontFamily}
                                     activeColor={palette.chrome.primary}
                                     idleColor={palette.brand.text.muted}
                                 />
@@ -346,7 +340,6 @@ export function DateWheelSheet({
                                     data={months}
                                     selected={month}
                                     onChange={setMonth}
-                                    fontFamily={fontFamily}
                                     activeColor={palette.chrome.primary}
                                     idleColor={palette.brand.text.muted}
                                 />
@@ -354,7 +347,6 @@ export function DateWheelSheet({
                                     data={years}
                                     selected={year}
                                     onChange={setYear}
-                                    fontFamily={fontFamily}
                                     activeColor={palette.chrome.primary}
                                     idleColor={palette.brand.text.muted}
                                 />

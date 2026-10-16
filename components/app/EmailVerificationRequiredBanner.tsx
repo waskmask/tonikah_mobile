@@ -127,10 +127,10 @@ export function EmailVerificationRequiredBanner({
                         onDismiss && (isRTL ? styles.bodyWithCloseRTL : styles.bodyWithClose),
                     ]}
                 >
-                    <Text style={[styles.title, { color: text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <Text style={[styles.title, { color: text, textAlign: 'left' }]}>
                         {title}
                     </Text>
-                    <Text style={[styles.message, { color: muted, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <Text style={[styles.message, { color: muted, textAlign: 'left' }]}>
                         {message}
                     </Text>
                     <View style={[styles.actions]}>
@@ -148,7 +148,7 @@ export function EmailVerificationRequiredBanner({
                             {resending ? <ActivityIndicator size="small" color={text} /> : null}
                             <Text
                                 className="font-body-bold"
-                                style={[styles.buttonText, { color: text, textAlign: isRTL ? 'right' : 'left' }]}
+                                style={[styles.buttonText, { color: text, textAlign: 'left' }]}
                             >
                                 {resending
                                     ? t('please_wait', 'Please wait...')
@@ -171,7 +171,7 @@ export function EmailVerificationRequiredBanner({
                         >
                             <Text
                                 className="font-body-bold"
-                                style={[styles.buttonText, { color: text, textAlign: isRTL ? 'right' : 'left' }]}
+                                style={[styles.buttonText, { color: text, textAlign: 'left' }]}
                             >
                                 {t('change_email_short', 'Change Email')}
                             </Text>

@@ -67,7 +67,7 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
                 accessibilityLabel={typeof label === 'string' ? label : undefined}
                 accessibilityState={{ checked, disabled }}
                 className={`flex-row items-start ${disabled ? 'opacity-50' : ''}`}
-                style={{ gap: scale(12), flexDirection: isRTL ? 'row-reverse' : 'row' }}
+                style={{ gap: scale(12), flexDirection: 'row' }}
             >
                 <Animated.View
                     style={[
@@ -90,12 +90,12 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
                         <Text
                             variant="body-sm"
                             className="leading-5 text-brand-text-subtitle flex-wrap"
-                            style={{ textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}
+                            style={{ textAlign: 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}
                         >
                             {label}
                         </Text>
                     ) : (
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                             {label}
                         </View>
                     )}
@@ -109,7 +109,7 @@ export function Checkbox({ checked, onChange, label, error, disabled }: Checkbox
                     accessibilityRole="alert"
                     accessibilityLiveRegion="assertive"
                     className="text-red-500 mt-1"
-                    style={{ paddingStart: scale(36), textAlign: isRTL ? 'right' : 'left' }}
+                    style={{ paddingStart: scale(36), textAlign: 'left' }}
                 >
                     {error}
                 </Text>

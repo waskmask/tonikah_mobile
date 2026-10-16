@@ -20,41 +20,46 @@ export default function VerificationsScreen() {
     const colors = useColors();
     const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
-    const textAlign = isRTL ? 'right' : 'left';
     const sections = [
+        ['phone', 'Phone number', 'Confirm that your phone number belongs to you.', Phone],
         ['selfie', 'Selfie verification', 'Match a fresh selfie to your profile photo.', Camera],
         ['age', 'Age verification', 'Confirm your age through a verification check.', CalendarDots],
-        ['phone', 'Phone number', 'Confirm that your phone number belongs to you.', Phone],
     ] as const;
 
     return (
         <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
             <AppBackTitleBar title={t('verifications_page.title', 'Verifications')} fallbackHref="/settings" showMenu />
             <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + scale(24) }}>
-                <View style={[styles.notice, {
-                    borderColor: colors.chrome.primary,
-                    backgroundColor: colors.chrome.common.primaryTint,
-                }]}>
-                    <Text variant="body-sm" className="font-body-bold" style={{ textAlign, color: colors.chrome.common.textStrong }}>
-                        {t('phone_verification.notice')}
-                    </Text>
-                    <Text variant="body-sm" style={{ textAlign, color: colors.brand.text.subtitle }}>
-                        {t('phone_verification.notice_description')}
-                    </Text>
-                </View>
                 <SettingsFieldSection>
                     {sections.map(([key, title, description, Icon], index) => key === 'phone' ? (
                         <SettingsNavRow key={key} icon={<Icon size={scale(19)} color={colors.chrome.common.textStrong} />}
+                            iconAlign="flex-start"
+                            labelColor={colors.chrome.common.textMuted}
+                            descriptionColor={colors.brand.text.body}
                             label={t(`verifications_page.${key}`, title)}
-                            description={user?.phone?.verified ? `${t('phone_verification.verified')} · ${user.phone.number}` : t('phone_verification.intro')}
+                            description={t('phone_verification.intro')}
+                            descriptionContent={user?.phone?.verified ? (
+                                <View style={[styles.verifiedNumber, { flexDirection: 'row' }]}>
+                                    <Text variant="body-sm" style={{ color: colors.brand.text.body, writingDirection: 'ltr', fontSize: scale(14), lineHeight: scale(20) }}>
+                                        {user.phone.number}
+                                    </Text>
+                                    <View style={[styles.verifiedPill, { backgroundColor: colors.chrome.primary }]}>
+                                        <Text variant="caption" className="font-body-bold" style={[styles.verifiedText, { color: colors.chrome.common.inverseText }]}>
+                                            {t('badge_verified', 'Verified')}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : undefined}
                             divider={index > 0} onPress={() => router.push('/phone-verification' as any)} />
                     ) : (
                         <SettingsInfoRow
+                            iconAlign="flex-start"
                             key={key}
                             icon={<Icon size={scale(19)} color={colors.chrome.common.textStrong} />}
                             label={t(`verifications_page.${key}`, title)}
                             value={t(`verifications_page.${key}_description`, description)}
-                            note={t('phone_verification.coming_soon')}
+                            note={t('verifications_page.notice', 'Available to paid members')}
+                            noteColor={colors.chrome.primary}
                             divider={index > 0}
                         />
                     ))}
@@ -66,5 +71,7 @@ export default function VerificationsScreen() {
 
 const styles = StyleSheet.create({
     screen: { flex: 1 },
-    notice: { margin: scale(16), padding: scale(16), gap: scale(8), borderWidth: 2, borderStyle: 'dashed', borderRadius: 8 },
+    verifiedNumber: { width: '100%', flexWrap: 'wrap', alignItems: 'center', gap: scale(6) },
+    verifiedPill: { borderRadius: 999, paddingHorizontal: scale(8), paddingVertical: scale(2), maxWidth: '100%' },
+    verifiedText: { fontSize: scale(11), lineHeight: scale(16), textAlign: 'center' },
 });

@@ -148,6 +148,7 @@ export function GalleryCropModal({
     const { isRTL } = useLanguage();
     const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0, pinchDistance: 0, pinchZoom: 1 });
     const sliderOriginXRef = useRef(0);
+    const sliderGrabOffsetRef = useRef(0);
     const pendingZoomRef = useRef<number | null>(null);
     const zoomFrameRef = useRef<number | null>(null);
     const [natural, setNatural] = useState<Size>({ width: 0, height: 0 });
@@ -177,8 +178,8 @@ export function GalleryCropModal({
     const previewRotation = submittedPreview?.rotation ?? rotation;
     const metrics = useMemo(() => getRotatedMetrics(natural, frame, zoom, rotation), [frame, natural, rotation, zoom]);
     const previewMetrics = useMemo(
-        () => getRotatedMetrics(natural, frame, previewZoom, previewRotation),
-        [frame, natural, previewRotation, previewZoom],
+        () => getRotatedMetrics(natural, frame, MIN_ZOOM, previewRotation),
+        [frame, natural, previewRotation],
     );
     const zoomPercent = ((previewZoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100;
 
@@ -305,6 +306,11 @@ export function GalleryCropModal({
                 onPanResponderTerminationRequest: () => false,
                 onPanResponderGrant: (event) => {
                     sliderOriginXRef.current = event.nativeEvent.pageX - event.nativeEvent.locationX;
+                    const current = interactionRef.current;
+                    const thumbX = (current.zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM) * current.sliderWidth;
+                    const distance = event.nativeEvent.locationX - thumbX;
+                    // Drag from the grab point; tapping elsewhere on the track still seeks.
+                    sliderGrabOffsetRef.current = Math.abs(distance) <= scale(22) ? distance : 0;
                     setZoomFromPageX(event.nativeEvent.pageX);
                 },
                 onPanResponderMove: (event) => {
@@ -317,7 +323,7 @@ export function GalleryCropModal({
     function setZoomFromPageX(pageX: number) {
         const width = interactionRef.current.sliderWidth;
         if (!width) return;
-        const percent = clamp((pageX - sliderOriginXRef.current) / width, 0, 1);
+        const percent = clamp((pageX - sliderOriginXRef.current - sliderGrabOffsetRef.current) / width, 0, 1);
         const next = MIN_ZOOM + percent * (MAX_ZOOM - MIN_ZOOM);
         pendingZoomRef.current = next;
         if (zoomFrameRef.current !== null) return;
@@ -471,10 +477,13 @@ export function GalleryCropModal({
                                     {
                                         width: previewMetrics.imageWidth,
                                         height: previewMetrics.imageHeight,
-                                        left: frame.width / 2 - previewMetrics.imageWidth / 2 + previewOffset.x,
-                                        top: frame.height / 2 - previewMetrics.imageHeight / 2 + previewOffset.y,
+                                        left: frame.width / 2 - previewMetrics.imageWidth / 2,
+                                        top: frame.height / 2 - previewMetrics.imageHeight / 2,
                                         transform: [
+                                            { translateX: previewOffset.x },
+                                            { translateY: previewOffset.y },
                                             { rotate: `${previewRotation}deg` },
+                                            { scale: previewZoom },
                                         ],
                                     },
                                 ]}
@@ -520,7 +529,7 @@ export function GalleryCropModal({
                 <View style={styles.controls}>
                     <View
                         style={styles.sliderHitArea}
-                        pointerEvents={busy ? 'none' : 'auto'}
+                        pointerEvents={busy ? 'none' : 'box-only'}
                         onLayout={(event) => {
                             const width = event.nativeEvent.layout.width;
                             setSliderWidth((current) => current === width ? current : width);
@@ -685,6 +694,8 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.36)',
     },
     controls: {
+        // Keep the visual track consistent with left-to-right gesture coordinates.
+        direction: 'ltr',
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(20),

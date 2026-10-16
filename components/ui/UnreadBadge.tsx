@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, Text as RNText, View, type ViewStyle } from "react-native";
 import { BadgeSize, formatBadgeCount } from "@/constants/uiTokens";
 import { useColors } from "@/hooks/useColors";
+import { Typography } from "@/constants/typography";
 
 type BadgeVariant = keyof typeof BadgeSize;
 
@@ -45,7 +46,8 @@ export function UnreadBadge({
                     color: colors.chrome.badge.text,
                     fontSize: tokens.fontSize,
                     lineHeight: tokens.lineHeight,
-                    fontWeight: "700",
+                    fontWeight: undefined,
+                    fontFamily: Typography.font.body.bold,
                     includeFontPadding: false,
                     textAlign: "center",
                 }}

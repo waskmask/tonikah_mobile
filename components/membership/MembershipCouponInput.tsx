@@ -7,6 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { scale } from '@/hooks/useResponsive';
 import { membershipService } from '@/lib/membershipService';
 import { t } from '@/lib/profileDisplay';
+import { fontFamilyForText } from '@/constants/typography';
 
 export type AppliedMembershipCoupon = { planSlug: string; code: string; currency: string; finalAmountMinor: number; discountMinor: number };
 
@@ -49,8 +50,9 @@ export function MembershipCouponInput({ planSlug, currency, applied, onApply, on
         }
     }
 
-    const row = { flexDirection: isRTL ? 'row-reverse' as const : 'row' as const };
+    const row = { direction: isRTL ? 'rtl' as const : 'ltr' as const, flexDirection: 'row' as const };
     const Chevron = expanded ? CaretUp : CaretDown;
+    const codePlaceholder = t('membership_coupon_code', 'Coupon code');
     return <View style={styles.container}>
         <Pressable onPress={() => setExpanded(v => !v)} accessibilityRole="button" accessibilityState={{ expanded }} style={[styles.toggle, row]}>
             <Text variant="body-sm" className="font-body-semi">{t('membership_coupon_toggle', 'Have a coupon?')}</Text>
@@ -67,9 +69,9 @@ export function MembershipCouponInput({ planSlug, currency, applied, onApply, on
             </View> : <View style={[styles.row, row]}>
                 <TextInput value={code} onChangeText={value => { setCode(value); setError(false); }} editable={!busy}
                     maxLength={32} autoCapitalize="characters" autoCorrect={false} returnKeyType="done" onSubmitEditing={() => void apply()}
-                    placeholder={t('membership_coupon_code', 'Coupon code')} accessibilityLabel={t('membership_coupon_code', 'Coupon code')}
+                    placeholder={codePlaceholder} accessibilityLabel={codePlaceholder}
                     placeholderTextColor={colors.brand.text.muted}
-                    style={[styles.input, { color: colors.brand.text.body, borderColor: colors.brand.bg.border, backgroundColor: colors.brand.bg.surface, textAlign: isRTL ? 'right' : 'left' }]} />
+                    style={[styles.input, { color: colors.brand.text.body, borderColor: colors.brand.bg.border, backgroundColor: colors.brand.bg.surface, textAlign: isRTL ? 'right' : 'left', fontFamily: fontFamilyForText(code || codePlaceholder) }]} />
                 <Pressable onPress={() => void apply()} disabled={busy || !code.trim()} accessibilityRole="button" accessibilityState={{ disabled: busy || !code.trim(), busy }}
                     style={[styles.apply, { backgroundColor: colors.chrome.common.primaryTint }]}>
                     {busy ? <ActivityIndicator color={colors.chrome.primary} /> : <Text variant="body-sm" style={{ color: colors.chrome.primary }}>{t('membership_coupon_apply', 'Apply')}</Text>}

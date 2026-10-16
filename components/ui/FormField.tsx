@@ -3,13 +3,11 @@ import { View, Pressable, StyleSheet, Keyboard } from 'react-native';
 import { Text } from './Text';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
-import { useLanguage } from '@/hooks/useLanguage';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
 
 /** Field label with optional red asterisk */
 export function FieldLabel({ text, required }: { text: string; required?: boolean }) {
-    const { isRTL } = useLanguage();
     return (
         <View style={{ flexDirection: 'row', marginBottom: scale(6), marginTop: scale(12) }}>
             <Text variant="body-sm" className="font-medium">{text}</Text>
@@ -21,7 +19,6 @@ export function FieldLabel({ text, required }: { text: string; required?: boolea
 /** Error message text — rendered absolutely inside the gap below the field so
     it never pushes the layout */
 export function ErrorText({ text }: { text: string }) {
-    const { isRTL } = useLanguage();
     return (
         <View style={{ height: 0, zIndex: 1 }} pointerEvents="none">
             <Text
@@ -36,7 +33,7 @@ export function ErrorText({ text }: { text: string }) {
                     right: scale(6),
                     color: '#EF4444',
                     fontSize: scale(12),
-                    textAlign: isRTL ? 'right' : 'left',
+                    textAlign: 'left',
                 }}
             >
                 {text}
@@ -63,12 +60,10 @@ export function SelectField({
     required?: boolean;
 }) {
     const { isDark } = useTheme();
-    const { isRTL, currentLanguage } = useLanguage();
     // Mirror the auth Input exactly: 14pt; placeholder regular (light),
     // selected value semibold (600 — Jakarta's 500 reads too close to 400)
-    const valueFont = currentLanguage === 'ar'
-        ? (value ? Typography.font.arabic.semi : Typography.font.arabic.regular)
-        : value ? Typography.font.body.semi : Typography.font.body.regular;
+    const displayedValue = value || (required ? `${placeholder} *` : placeholder);
+    const valueFont = fontFamilyForText(displayedValue, value ? 'semi' : 'regular');
 
     return (
         <Pressable
@@ -110,7 +105,7 @@ export function SelectField({
                 style={[
                     {
                         flex: 1,
-                        textAlign: isRTL ? 'right' : 'left',
+                        textAlign: 'left',
                         fontSize: scale(15),
                         fontFamily: valueFont,
                     },
@@ -119,7 +114,7 @@ export function SelectField({
                         : { color: isDark ? '#B0B0B5' : '#5C5348' },
                 ]}
             >
-                {value || (required ? `${placeholder} *` : placeholder)}
+                {displayedValue}
             </Text>
             {icon}
         </Pressable>

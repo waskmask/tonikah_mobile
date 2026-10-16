@@ -4,7 +4,7 @@ import { Text } from "./Text";
 import { scale } from "@/hooks/useResponsive";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useTheme } from "@/hooks/useTheme";
-import { Typography } from "@/constants/typography";
+import { fontFamilyForText } from "@/constants/typography";
 
 interface InputProps extends TextInputProps {
     label?: string;
@@ -32,7 +32,7 @@ export const Input: React.FC<InputProps> = ({
     ...props
 }) => {
     const [isFocused, setIsFocused] = useState(false);
-    const { currentLanguage, isRTL } = useLanguage();
+    const { isRTL } = useLanguage();
     const { isDark } = useTheme();
     // Placeholder can't be styled separately in RN, but it only shows while the
     // field is empty — so swap the whole font: regular (light) when empty,
@@ -46,9 +46,8 @@ export const Input: React.FC<InputProps> = ({
         || textContentType.includes('password')
         || autoComplete.includes('email')
         || autoComplete.includes('password');
-    const inputFontFamily = currentLanguage === "ar"
-        ? (hasValue ? Typography.font.arabic.semi : Typography.font.arabic.regular)
-        : hasValue ? Typography.font.body.semi : Typography.font.body.regular;
+    const visibleText = hasValue ? props.value : placeholder;
+    const inputFontFamily = fontFamilyForText(visibleText, hasValue ? 'semi' : 'regular');
 
     return (
         // containerStyle replaces the default bottom margin when provided
@@ -111,6 +110,7 @@ export const Input: React.FC<InputProps> = ({
                         color: isDark ? '#E5E5E7' : '#201B15',
                         textAlign: forceLTR ? 'left' : isRTL ? 'right' : 'left',
                         writingDirection: forceLTR ? 'ltr' : isRTL ? 'rtl' : 'ltr',
+                        direction: forceLTR ? 'ltr' : isRTL ? 'rtl' : 'ltr',
                     }}
                     {...props}
                 />

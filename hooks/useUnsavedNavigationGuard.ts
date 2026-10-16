@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigation } from 'expo-router';
-import { usePreventRemove } from 'expo-router/react-navigation';
+import { useIsFocused, usePreventRemove } from 'expo-router/react-navigation';
 
 type Options = {
     dirty: boolean;
@@ -16,6 +16,7 @@ export function useUnsavedNavigationGuard({
     redirectRemovalToFallback = false,
 }: Options) {
     const navigation = useNavigation();
+    const isFocused = useIsFocused();
     const [confirmationVisible, setConfirmationVisible] = useState(false);
     const pendingActionRef = useRef<any>(null);
     const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
@@ -24,7 +25,8 @@ export function useUnsavedNavigationGuard({
         setPendingLeave(() => action);
     }, []);
 
-    usePreventRemove((dirty || redirectRemovalToFallback) && pendingLeave === null, ({ data }) => {
+    // Prefetched screens have no active route to protect yet.
+    usePreventRemove(isFocused && (dirty || redirectRemovalToFallback) && pendingLeave === null, ({ data }) => {
         if (dirty) {
             pendingActionRef.current = data.action;
             setConfirmationVisible(true);

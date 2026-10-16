@@ -6,7 +6,7 @@ import { LanguagePicker } from '@/components/ui/LanguagePicker';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText } from '@/constants/typography';
 
 type AuthTopBarProps = {
     leftLabel?: string;
@@ -14,11 +14,11 @@ type AuthTopBarProps = {
 };
 
 export function AuthTopBar({ leftLabel, onLeftPress }: AuthTopBarProps) {
-    const { isRTL, currentLanguage } = useLanguage();
+    const { isRTL } = useLanguage();
     const { isDark } = useTheme();
     // Explicit colors, no theme classes — must be visible in both modes
     const linkColor = isDark ? '#F5F5F5' : '#1B1713';
-    const linkFont = currentLanguage === 'ar' ? Typography.font.arabic.bold : Typography.font.body.bold;
+    const linkFont = fontFamilyForText(leftLabel, 'bold');
     const Arrow = isRTL ? CaretRight : CaretLeft;
 
     return (

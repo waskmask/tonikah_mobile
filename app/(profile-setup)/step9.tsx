@@ -112,7 +112,7 @@ export default function Step9() {
                                         variant="body"
                                         className="font-body-medium"
                                         style={[
-                                            { fontSize: scale(15), textAlign: isRTL ? 'right' : 'left' },
+                                            { fontSize: scale(15), textAlign: 'left' },
                                             isActive && { color: palette.chrome.primary },
                                         ]}
                                     >
@@ -124,7 +124,7 @@ export default function Step9() {
                                             color: palette.brand.text.muted,
                                             marginTop: scale(2),
                                             fontSize: scale(12),
-                                            textAlign: isRTL ? 'right' : 'left',
+                                            textAlign: 'left',
                                         }}
                                     >
                                         {t(`pm_${value}_desc`)}

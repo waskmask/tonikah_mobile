@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { firstSearchParam, sanitizeAuthReturnPath } from '../lib/authReturn';
 
-assert.equal(sanitizeAuthReturnPath('/messages'), '/(tabs)/messages');
+assert.equal(sanitizeAuthReturnPath('/messages'), '/messages');
+assert.equal(sanitizeAuthReturnPath('/(tabs)/messages'), '/messages');
+assert.equal(sanitizeAuthReturnPath('/(tabs)/profile'), '/profile');
+assert.equal(sanitizeAuthReturnPath('/verifications'), '/verifications');
+assert.equal(sanitizeAuthReturnPath('/phone-verification'), '/phone-verification');
 assert.equal(sanitizeAuthReturnPath('/settings'), '/settings');
 assert.equal(sanitizeAuthReturnPath('/blocked-users'), '/blocked-users');
 assert.equal(sanitizeAuthReturnPath('/edit-profile'), '/edit-profile');
@@ -22,7 +26,7 @@ assert.equal(sanitizeAuthReturnPath('/(tabs)/favourited'), '');
 assert.equal(sanitizeAuthReturnPath('/delete-account'), '');
 assert.equal(sanitizeAuthReturnPath('/conversation/new'), '');
 assert.equal(sanitizeAuthReturnPath('/conversation/id?next=https://example.com'), '');
-assert.equal(sanitizeAuthReturnPath('/unknown', '/(tabs)/search'), '/(tabs)/search');
+assert.equal(sanitizeAuthReturnPath('/unknown', '/search'), '/search');
 
 assert.equal(firstSearchParam(['first', 'second']), 'first');
 assert.equal(firstSearchParam('single'), 'single');

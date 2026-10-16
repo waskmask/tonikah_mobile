@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import EditProfileScreen from '../../edit-profile';
+import EditProfileScreen from './edit-profile';
 import { Text } from '@/components/ui/Text';
 import { UserProfileView } from '@/components/profile/UserProfileView';
 import { useColors } from '@/hooks/useColors';
@@ -192,6 +192,7 @@ function ProfileModeBar({ mode, onChange }: { mode: ProfileMode; onChange: (mode
 
 export default function ProfileScreen() {
     const colors = useColors();
+    const { isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
     const { width: pageWidth } = useWindowDimensions();
     const queryClient = useQueryClient();
@@ -458,14 +459,14 @@ export default function ProfileScreen() {
                             pagerStyle,
                         ]}
                     >
-                        <View style={[styles.page, { width: pageWidth }]}>
+                        <View style={[styles.page, { width: pageWidth, direction: isRTL ? 'rtl' : 'ltr' }]}>
                             <EditProfileScreen
                                 key={editRefreshVersion}
                                 embedded
                                 active={mode === 'edit'}
                             />
                         </View>
-                        <View style={[styles.page, { width: pageWidth }]}>
+                        <View style={[styles.page, { width: pageWidth, direction: isRTL ? 'rtl' : 'ltr' }]}>
                             {previewMounted ? (
                                 <DevRenderProfiler id="ProfilePreview">
                                     <MemoizedUserProfileView
@@ -502,6 +503,7 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     modeRow: {
+        direction: 'ltr',
         width: '100%',
         height: PROFILE_TAB_BAR_HEIGHT,
         flexDirection: 'row',
@@ -539,6 +541,8 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         overflow: 'hidden',
+        direction: 'ltr',
+        alignItems: 'flex-start',
     },
     pageTrack: {
         flex: 1,

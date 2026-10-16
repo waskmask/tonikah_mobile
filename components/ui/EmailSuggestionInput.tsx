@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
     },
     // Email addresses always read LTR, even in RTL locales
     optionText: {
+        direction: 'ltr',
         writingDirection: 'ltr',
         textAlign: 'left',
     },

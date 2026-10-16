@@ -88,7 +88,7 @@ export function MembershipReceiptView({ item, bottomInset }: { item: MembershipH
         }
     }
 
-    const row = { flexDirection: isRTL ? 'row-reverse' as const : 'row' as const };
+    const row = { direction: isRTL ? 'rtl' as const : 'ltr' as const, flexDirection: 'row' as const };
     return <BottomSheetScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + scale(24) }]}>
         {loading ? <ActivityIndicator color={colors.chrome.primary} /> : <>
             <Text variant="body" className="font-body-bold">{item.planName || t('memberships', 'Membership')}</Text>

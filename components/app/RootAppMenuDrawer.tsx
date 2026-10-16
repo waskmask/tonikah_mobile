@@ -23,6 +23,7 @@ export function useRootAppMenu() {
 
 export function RootAppMenuDrawer({ children }: { children: React.ReactNode }) {
     const drawerRef = useRef<DrawerLayoutMethods>(null);
+    const pendingAction = useRef<(() => void) | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const { width } = useWindowDimensions();
     const { isRTL } = useLanguage();
@@ -34,6 +35,17 @@ export function RootAppMenuDrawer({ children }: { children: React.ReactNode }) {
     }, []);
     const closeMenu = useCallback(() => {
         drawerRef.current?.closeDrawer();
+    }, []);
+    const closeThenRun = useCallback((action: () => void) => {
+        if (pendingAction.current) return;
+        pendingAction.current = action;
+        drawerRef.current?.closeDrawer();
+    }, []);
+    const handleClosed = useCallback(() => {
+        setIsOpen(false);
+        const action = pendingAction.current;
+        pendingAction.current = null;
+        action?.();
     }, []);
     const contextValue = useMemo(() => ({ openMenu }), [openMenu]);
 
@@ -48,9 +60,9 @@ export function RootAppMenuDrawer({ children }: { children: React.ReactNode }) {
                 drawerBackgroundColor="transparent"
                 overlayColor={isDark ? 'rgba(0,0,0,0.58)' : 'rgba(16,16,17,0.45)'}
                 onDrawerOpen={() => setIsOpen(true)}
-                onDrawerClose={() => setIsOpen(false)}
+                onDrawerClose={handleClosed}
                 renderNavigationView={() => (
-                    <AppMenuDrawerContent onClose={closeMenu} isOpen={isOpen} />
+                    <AppMenuDrawerContent onClose={closeMenu} onCloseThenRun={closeThenRun} isOpen={isOpen} />
                 )}
             >
                 {children}

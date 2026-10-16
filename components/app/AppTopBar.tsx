@@ -42,7 +42,7 @@ export function AppTopBar() {
             >
                 <View style={[styles.topBar, { flexDirection: 'row' }]}>
                     <Pressable
-                        onPress={() => router.push('/(tabs)/search')}
+                        onPress={() => router.push('/search')}
                         style={[styles.brandBlock, { alignItems: 'flex-start' }]}
                     >
                         <Text variant="h3" style={[styles.brand, { color: chrome.title }]}>
@@ -61,7 +61,7 @@ export function AppTopBar() {
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={textValue(t('my_profile'), 'My Profile')}
-                            onPress={() => router.push('/(tabs)/profile')}
+                            onPress={() => router.push('/profile')}
                             style={[styles.iconButton, { borderColor: chrome.border, backgroundColor: chrome.iconBackground }]}
                         >
                             <User size={19} color={chrome.icon} />

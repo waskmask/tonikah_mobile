@@ -143,6 +143,7 @@ export function ExploreFilterDrawer({ visible, state, onClose, onApply }: Props)
             {/* Measure this full-screen modal, not the underlying tab screen. */}
             <SafeAreaProvider>
             <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.root, {
+                direction: isRTL ? 'rtl' : 'ltr',
                 backgroundColor: colors.chrome.header.background,
             }]}>
                 <View style={[styles.header, { backgroundColor: colors.chrome.header.background, borderBottomColor: colors.brand.bg.border }]}>
@@ -305,12 +306,12 @@ function SelectRow({
                     style={[
                         styles.selectTitle,
                         usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
-                        { color: labelColor, textAlign: isRTL ? 'right' : 'left' },
+                        { color: labelColor, textAlign: 'left' },
                     ]}
                 >
                     {label}
                 </Text>
-                <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? primaryColor : mutedColor, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>{text}</Text>
+                <Text variant="body-sm" numberOfLines={1} style={{ color: values.length ? primaryColor : mutedColor, marginTop: 4, textAlign: 'left' }}>{text}</Text>
             </View>
             <View style={styles.rowActions}>
                 {values.length > 0 ? (

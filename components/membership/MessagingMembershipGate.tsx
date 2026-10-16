@@ -26,7 +26,7 @@ export function MessagingMembershipGate({ visible, trialOffer, onClose }: Props)
 
     const continueToMembership = () => {
         onClose();
-        const returnTo = sanitizeAuthReturnPath(pathname, '/(tabs)/messages');
+        const returnTo = sanitizeAuthReturnPath(pathname, '/messages');
         router.push({ pathname: '/memberships', params: { returnTo, trial: trialOffer?.planSlug || '' } } as any);
     };
 

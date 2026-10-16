@@ -114,7 +114,7 @@ export default function ChangeEmailScreen() {
                                     color: status.type === 'success'
                                         ? colors.chrome.toast.success.text
                                         : colors.chrome.toast.error.text,
-                                    textAlign: isRTL ? 'right' : 'left',
+                                    textAlign: 'left',
                                 }}
                             >
                                 {status.text}
@@ -143,7 +143,7 @@ export default function ChangeEmailScreen() {
 
                     <Text
                         variant="caption"
-                        style={[styles.hint, { color: colors.brand.text.subtitle, textAlign: isRTL ? 'right' : 'left' }]}
+                        style={[styles.hint, { color: colors.brand.text.subtitle, textAlign: 'left' }]}
                     >
                         {t(
                             'change_email_verification_hint',

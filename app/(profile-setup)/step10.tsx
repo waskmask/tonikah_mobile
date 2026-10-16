@@ -66,7 +66,7 @@ export default function Step10() {
         if (response.success) {
             await refreshUser();
             reset();
-            router.replace('/(tabs)/search');
+            router.replace('/search');
         } else {
             toast.show(
                 translated(t, response.message || 'something_went_wrong', 'Something went wrong.'),

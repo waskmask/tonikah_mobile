@@ -21,10 +21,12 @@ const CHAT_KEY_FALLBACKS: Record<string, string> = {
     photo: 'Photo',
     reply: 'Reply',
     request_accepted: 'Request accepted',
+    sent: 'Sent',
     sent_you_a_message: 'sent you a message',
     unsend: 'Unsend',
     unmute_conversation: 'Unmute notifications',
     view_once_photo: 'View once photo',
+    viewed: 'Viewed',
     voice_note: 'Voice note',
 };
 

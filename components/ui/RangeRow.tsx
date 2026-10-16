@@ -142,7 +142,7 @@ export function RangeRow({
             accessibilityLabel={label}
             accessibilityValue={{ text: valueText }}
         >
-            <View style={[styles.rangeHeader, preserveLabelSize && styles.wrappingHeader]}>
+            <View style={[styles.rangeHeader, preserveLabelSize && styles.wrappingHeader, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                 <Text
                     variant="body-sm"
                     className="font-body-bold"
@@ -152,12 +152,12 @@ export function RangeRow({
                     style={[
                         preserveLabelSize ? styles.preservedTitle : styles.rangeTitle,
                         usesLatinLabels ? styles.latinFieldLabel : styles.naturalFieldLabel,
-                        { color: mutedColor, textAlign: isRTL ? 'right' : 'left' },
+                        { color: mutedColor, textAlign: 'left' },
                     ]}
                 >
                     {label}
                 </Text>
-                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, preserveLabelSize && styles.wrappingValue, { color: isAny ? mutedColor : primaryColor, textAlign: isRTL ? 'left' : 'right' }]}>
+                <Text variant="body-sm" className="font-body-semi" style={[styles.rangeValue, preserveLabelSize && styles.wrappingValue, { color: isAny ? mutedColor : primaryColor, textAlign: 'right' }]}>
                     {valueText}
                 </Text>
             </View>

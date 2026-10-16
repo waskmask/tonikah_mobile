@@ -83,7 +83,7 @@ function notificationTarget(data: Record<string, unknown> | undefined) {
         return `/conversation/${conversationId}` as const;
     }
 
-    return '/(tabs)/messages' as const;
+    return '/messages' as const;
 }
 
 export async function registerForPushNotifications() {

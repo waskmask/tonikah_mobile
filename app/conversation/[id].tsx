@@ -83,7 +83,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText, Typography } from '@/constants/typography';
 import { cacheChatMedia, clearChatMediaCache, deleteCachedChatMediaForMessage, getCachedChatMedia, pinCachedChatMedia, storeLocalChatMedia, unpinCachedChatMedia } from '@/lib/chatMediaCache';
 import { claimChatAudioPlayback, createChatAudioPlaybackOwner, isChatAudioPlaybackOwner, releaseChatAudioPlayback, stopChatAudioPlaybackForMessage } from '@/lib/chatAudioPlayback';
 import { mergeChatMessageMedia } from '@/lib/chatMessageMedia';
@@ -183,6 +183,7 @@ function messageText(message: ChatMessage) {
 
 const RTL_STRONG_CHARACTER = /[\u05D0-\u05EA\u05F0-\u05F2\u0620-\u063F\u0641-\u064A\u066E-\u066F\u0671-\u06D3\u06D5\u06EE-\u06EF\u06FA-\u06FC\u06FF\uFB1D-\uFDFD\uFE70-\uFEFC]/;
 const LTR_STRONG_CHARACTER = /[A-Za-z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u02AF\u0370-\u052F]/;
+const ARABIC_SCRIPT_CHARACTER = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFD\uFE70-\uFEFC]/;
 
 function directionalTextStyle(value: string): Pick<TextStyle, 'textAlign' | 'writingDirection'> {
     for (const character of value) {
@@ -194,6 +195,16 @@ function directionalTextStyle(value: string): Pick<TextStyle, 'textAlign' | 'wri
         }
     }
     return { textAlign: 'left', writingDirection: 'ltr' };
+}
+
+function messageContentTextStyle(value: string): TextStyle {
+    const usesArabicFont = ARABIC_SCRIPT_CHARACTER.test(value);
+    return {
+        ...directionalTextStyle(value),
+        fontFamily: usesArabicFont ? Typography.font.arabic.regular : Typography.font.body.regular,
+        fontWeight: undefined,
+        lineHeight: Platform.OS === 'ios' && usesArabicFont ? scale(24) : scale(20),
+    };
 }
 
 function formatMessageTime(value?: string | null) {
@@ -385,7 +396,6 @@ export default function ConversationScreen() {
     const { lightImpact, selection } = useHaptics();
     const insets = useSafeAreaInsets();
     useConversationKeyboardMode();
-    const inputFontFamily = currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular;
     const listRef = useRef<FlatList<ListItem>>(null);
     const { isNearBottomRef } = useChatScrollAnchor<ListItem>();
     const initialPositionPendingRef = useRef(true);
@@ -427,6 +437,8 @@ export default function ConversationScreen() {
     const [items, setItems] = useState<ChatMessage[]>([]);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [content, setContent] = useState('');
+    const composerPlaceholder = t('chat:message_placeholder', 'Type a message...');
+    const inputFontFamily = fontFamilyForText(content || composerPlaceholder);
     const [loading, setLoading] = useState(id !== 'new');
     const [loadingMore, setLoadingMore] = useState(false);
     const [sending, setSending] = useState(false);
@@ -534,7 +546,7 @@ export default function ConversationScreen() {
     // falls back to replace for deep-link / push-notification entries with no history.
     const goBackToMessages = useCallback(() => {
         if (router.canGoBack()) router.back();
-        else router.replace('/(tabs)/messages' as any);
+        else router.replace('/messages' as any);
     }, []);
 
     // Inverted list: the newest message lives at offset 0 (the visual bottom),
@@ -1265,6 +1277,12 @@ export default function ConversationScreen() {
         account_deleted: !!other.account_deleted || accountDeleted === '1',
         recently_active: (other.account_deleted || accountDeleted === '1') ? false : (typeof other.recently_active === 'boolean' ? other.recently_active : online === '1'),
     };
+    const headerName = peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name);
+    const headerStatus = headerOther.account_deleted
+        ? t('chat:account_deleted', 'Account deleted')
+        : headerOther.recently_active
+            ? t('chat:online', 'Online')
+            : t('chat:offline', 'Offline');
     const avatar = profileImage(headerOther);
     const peerId = profileId(headerOther) || String(
         headerOther.id
@@ -2221,7 +2239,7 @@ export default function ConversationScreen() {
                         disabled={headerOther.account_deleted}
                         onPress={openPeerProfile}
                         accessibilityRole="button"
-                        accessibilityLabel={peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
+                        accessibilityLabel={headerName}
                         hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                         style={({ pressed }) => [
                             styles.headerProfileTarget,
@@ -2240,16 +2258,12 @@ export default function ConversationScreen() {
                                 )}
                             </View>
                             <View pointerEvents="none" style={[styles.headerText, { direction: isRTL ? 'rtl' : 'ltr' }]}>
-                                <RNText numberOfLines={2} style={[styles.headerNameText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-                                    {peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
+                                <RNText numberOfLines={2} style={[styles.headerNameText, { color: colors.text, textAlign: 'left', fontFamily: fontFamilyForText(headerName, 'bold'), fontWeight: undefined }]}>
+                                    {headerName}
                                 </RNText>
                                 {(activeConversation || name) && (
-                                    <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
-                                        {headerOther.account_deleted
-                                            ? t('chat:account_deleted', 'Account deleted')
-                                            : headerOther.recently_active
-                                                ? t('chat:online', 'Online')
-                                                : t('chat:offline', 'Offline')}
+                                    <RNText numberOfLines={1} style={[styles.headerStatusText, { color: colors.muted, textAlign: 'left', fontFamily: fontFamilyForText(headerStatus), fontWeight: undefined }]}>
+                                        {headerStatus}
                                     </RNText>
                                 )}
                             </View>
@@ -2259,7 +2273,7 @@ export default function ConversationScreen() {
                     {conversation?.state === 'active' && !headerOther.account_deleted && id && id !== 'new' ? (
                         <GalleryRevealControl
                             conversationId={id}
-                            otherName={peerName({ ...(activeConversation || {}), otherUser: headerOther } as Conversation, name)}
+                            otherName={headerName}
                             status={conversation.galleryReveal}
                             onChanged={refreshCurrentConversation}
                         />
@@ -2418,9 +2432,9 @@ export default function ConversationScreen() {
                                     </View>
                                     <TextInput
                                         editable={false}
-                                        placeholder={t('chat:message_placeholder', 'Type a message...')}
+                                        placeholder={composerPlaceholder}
                                         placeholderTextColor={colors.subtle}
-                                        style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                        style={[styles.input, Platform.OS === 'ios' && currentLanguage === 'ar' && styles.inputArabicIOS, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                     />
                                     <View style={styles.pillIcon}>
                                         <Paperclip size={scale(21)} color={colors.composerIcon} weight="bold" />
@@ -2514,9 +2528,9 @@ export default function ConversationScreen() {
                                     <TextInput
                                         value={content}
                                         onChangeText={handleComposerChange}
-                                        placeholder={t('chat:message_placeholder', 'Type a message...')}
+                                        placeholder={composerPlaceholder}
                                         placeholderTextColor={colors.subtle}
-                                        style={[styles.input, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
+                                        style={[styles.input, Platform.OS === 'ios' && currentLanguage === 'ar' && styles.inputArabicIOS, { color: colors.text, fontFamily: inputFontFamily, textAlign: isRTL ? 'right' : 'left' }]}
                                         multiline
                                     />
                                     {!content.length && (
@@ -2546,7 +2560,7 @@ export default function ConversationScreen() {
                                     {content.length
                                         ? sending
                                             ? <ActivityIndicator color={colors.inverse} />
-                                            : <PaperPlaneTilt size={scale(22)} color={content.trim() ? colors.inverse : colors.muted} weight="fill" />
+                                            : <PaperPlaneTilt size={scale(22)} color={content.trim() ? colors.inverse : colors.muted} weight="fill" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />
                                         : recordingBusy
                                             ? <ActivityIndicator color={colors.inverse} />
                                             : <Mic size={scale(21)} color={colors.inverse} weight="fill" />}
@@ -2587,7 +2601,6 @@ export default function ConversationScreen() {
                 viewOnce={imageViewOnce}
                 uploading={false}
                 colors={colors}
-                inputFontFamily={inputFontFamily}
                 isRTL={isRTL}
                 labels={{
                     captionPlaceholder: translateChatText('caption_placeholder', 'Add a caption (optional)'),
@@ -2651,7 +2664,7 @@ export default function ConversationScreen() {
             )}
 
             <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => !menuBusy && setMenuOpen(false)}>
-                <View style={styles.menuLayer} pointerEvents="box-none">
+                <View style={[styles.menuLayer, { direction: isRTL ? 'rtl' : 'ltr' }]} pointerEvents="box-none">
                     <Pressable style={styles.menuBackdrop} onPress={() => !menuBusy && setMenuOpen(false)} />
                     <View
                         style={[
@@ -2667,7 +2680,7 @@ export default function ConversationScreen() {
                             <Text
                                 variant="body-sm"
                                 className="font-body-bold"
-                                style={[styles.conversationMenuTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+                                style={[styles.conversationMenuTitle, { color: colors.text, textAlign: 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                             >
                                 {translateChatText('more_options', 'More options')}
                             </Text>
@@ -2783,9 +2796,9 @@ function ConversationMenuItem({
                 <View style={styles.conversationMenuIcon}>
                     <Icon size={scale(18)} color={tint} strokeWidth={2.4} />
                 </View>
-                <RNText numberOfLines={1} style={[styles.conversationMenuLabel, { color: tint }]}>
+                <Text variant="body-sm" style={[styles.conversationMenuLabel, { color: tint }]}>
                     {label}
-                </RNText>
+                </Text>
             </View>
         </Pressable>
     );
@@ -2816,6 +2829,7 @@ function VoiceRecorderPanel({
     onSendPreview: () => void;
     onFinalizeForSend: () => void;
 }) {
+    const { isRTL } = useLanguage();
     const playbackOwnerRef = useRef(createChatAudioPlaybackOwner('native-recorder-preview'));
     const previewPlayingRef = useRef(false);
     const recorderRef = useRef<WaveformRecorderViewRef>(null);
@@ -3010,7 +3024,7 @@ function VoiceRecorderPanel({
                     </Pressable>
                 )}
                 <Pressable accessibilityRole="button" accessibilityLabel={sendFailed ? t('chat:voice_retry', 'Retry') : t('chat:send', 'Send')} onPress={handleSend} disabled={disabled || (!previewUri && nativeState === 'idle')} style={[styles.voiceRecorderIconAction, { backgroundColor: colors.primary }]}>
-                    {recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <PaperPlaneTilt size={scale(20)} color={colors.inverse} weight="fill" />}
+                    {recordingBusy ? <ActivityIndicator color={colors.inverse} size="small" /> : <PaperPlaneTilt size={scale(20)} color={colors.inverse} weight="fill" style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }} />}
                 </Pressable>
             </View>
         </View>
@@ -3273,24 +3287,17 @@ function TextMessageWithInlineMeta({
     textColor: string;
     maxTextWidth: number;
 }) {
-    const { currentLanguage } = useLanguage();
     const [multiline, setMultiline] = useState(content.includes('\n'));
     const [contentWidth, setContentWidth] = useState(0);
     const [lastLineWidth, setLastLineWidth] = useState(0);
     const [metaWidth, setMetaWidth] = useState(0);
-    const direction = directionalTextStyle(content);
+    const contentTypography = messageContentTextStyle(content);
     const textStyle = [
-        {
-            fontFamily: currentLanguage === 'ar' ? Typography.font.arabic.regular : Typography.font.body.regular,
-            fontSize: Typography.size.base,
-            lineHeight: Typography.lineHeight.base,
-            letterSpacing: 0,
-        },
         styles.messageText,
         { color: textColor },
-        direction,
+        contentTypography,
     ];
-    const inlineMetaFits = contentWidth > 0 && metaWidth > 0 && lastLineWidth + metaWidth + 5 <= contentWidth;
+    const inlineMetaFits = contentWidth > 0 && metaWidth > 0 && lastLineWidth + metaWidth + scale(8) <= contentWidth;
 
     if (multiline) {
         return (
@@ -3447,7 +3454,7 @@ function MessageBubbleComponent({
                         disabled={!canOpenGalleryOwner}
                         onPress={() => {
                             if (!canOpenGalleryOwner) return;
-                            if (mine) router.push('/(tabs)/profile');
+                            if (mine) router.push('/profile');
                             else router.push(`/user/${message.sender}`);
                         }}
                         style={[styles.systemPillRow, { backgroundColor: colors.surface }]}
@@ -3586,7 +3593,7 @@ function MessageBubbleComponent({
                                         <Text variant="caption" className="font-body-bold" style={{ color: colors.primary }}>
                                             {t('chat:reply', 'Reply')}
                                         </Text>
-                                        <Text variant="caption" numberOfLines={2} style={[{ color: messageMetaColor }, directionalTextStyle(quotedText)]}>
+                                        <Text variant="caption" numberOfLines={2} style={[{ color: messageMetaColor }, messageContentTextStyle(quotedText)]}>
                                             {quotedText}
                                         </Text>
                                     </Pressable>
@@ -3629,7 +3636,7 @@ function MessageBubbleComponent({
                             delayLongPress={280}
                             disabled={viewOnceLoading}
                             pointerEvents={message.failed ? 'none' : 'auto'}
-                            style={[styles.viewOnceButton, { backgroundColor: mine ? colors.bubbleMineInset : colors.surface }]}
+                            style={[styles.viewOnceButton, { direction: uiDirection, backgroundColor: mine ? colors.bubbleMineInset : colors.surface }]}
                         >
                             <View style={styles.viewOnceIconBadge}>
                                 {viewOnceLoading
@@ -3637,10 +3644,10 @@ function MessageBubbleComponent({
                                     : <ViewOnceIcon size={scale(28)} color={colors.primary} active={true} />}
                             </View>
                             <View style={styles.viewOnceTextWrap}>
-                                <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={{ color: messageTextColor }}>
+                                <Text variant="body-sm" className="font-body-bold" numberOfLines={1} style={{ color: messageTextColor, textAlign: 'left' }}>
                                     {translateChatText('view_once_photo', 'View once photo')}
                                 </Text>
-                                <Text variant="caption" numberOfLines={1} style={{ color: messageMetaColor }}>
+                                <Text variant="caption" numberOfLines={1} style={{ color: messageMetaColor, textAlign: 'left' }}>
                                     {mine
                                         ? translateChatText('sent', 'Sent')
                                         : media?.viewedAt
@@ -3675,7 +3682,7 @@ function MessageBubbleComponent({
                                 maxTextWidth={maxTextWidth}
                             />
                         ) : (
-                            <Text variant="body" style={[styles.messageText, { color: messageTextColor }, directionalTextStyle(content)]}>
+                            <Text variant="body" style={[styles.messageText, { color: messageTextColor }, messageContentTextStyle(content)]}>
                                 {content}
                             </Text>
                         )
@@ -4234,10 +4241,10 @@ const styles = StyleSheet.create({
     mineBubble: { borderBottomRightRadius: 0 },
     theirBubble: { borderBottomLeftRadius: 0 },
     messageText: { fontSize: scale(15), lineHeight: scale(20) },
-    textMessageWithMeta: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+    textMessageWithMeta: { flexDirection: 'row', alignItems: 'flex-end', gap: scale(8) },
     multilineTextWithMeta: { width: '100%' },
     textMessageBody: { flexShrink: 1, minWidth: 0 },
-    textInlineMeta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: scale(4), marginTop: 3, marginLeft: 5, minHeight: scale(14) },
+    textInlineMeta: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: scale(4), marginTop: 3, minHeight: scale(14) },
     messageStatusIcon: { flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
     messageRetryHint: { marginTop: scale(3), maxWidth: '100%' },
     messageRetryHintMine: { alignSelf: 'flex-end' },
@@ -4335,7 +4342,7 @@ const styles = StyleSheet.create({
     inputPill: {
         flex: 1,
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         minHeight: scale(40),
         borderRadius: scale(20),
         borderWidth: StyleSheet.hairlineWidth,
@@ -4347,7 +4354,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    pillIconCluster: { flexDirection: 'row', alignItems: 'flex-end' },
+    pillIconCluster: { flexDirection: 'row', alignItems: 'center' },
     replyComposerBar: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -4383,6 +4390,12 @@ const styles = StyleSheet.create({
         paddingBottom: scale(10),
         fontSize: scale(14),
         lineHeight: scale(19),
+    },
+    inputArabicIOS: {
+        // UITextView needs the Arabic font's natural baseline for text and placeholder.
+        lineHeight: undefined,
+        paddingTop: scale(4),
+        paddingBottom: scale(4),
     },
     send: {
         width: scale(40),
@@ -4469,7 +4482,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     conversationMenuItem: {
-        height: scale(52),
+        minHeight: scale(52),
+        paddingVertical: scale(8),
         paddingHorizontal: scale(16),
         justifyContent: 'center',
     },
@@ -4481,12 +4495,13 @@ const styles = StyleSheet.create({
     conversationMenuIcon: {
         width: scale(24),
         height: scale(24),
-        marginRight: scale(12),
+        marginEnd: scale(12),
         alignItems: 'center',
         justifyContent: 'center',
     },
     conversationMenuLabel: {
         flex: 1,
+        textAlign: 'left',
         fontSize: scale(14),
         lineHeight: scale(18),
         fontWeight: '400',

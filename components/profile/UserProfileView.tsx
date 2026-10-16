@@ -105,7 +105,6 @@ import {
     formatProfileLocation,
     imageUrl,
     isMembershipActive,
-    isVerifiedProfile,
     normalizeGallery,
     profileAge,
     profileId,
@@ -113,11 +112,13 @@ import {
 } from '@/lib/exploreProfile';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
 import { countryFlag, nationalityFlag, rawNationality } from '@/lib/nationalityFlag';
-import { Typography } from '@/constants/typography';
+import { fontFamilyForText, Typography } from '@/constants/typography';
 import { AppMenuButton } from '@/components/app/AppMenuButton';
 import { emojiChipItem } from '@/lib/profileEmoji';
 import { formatProfileManagerBadge } from '@/lib/profileManager';
 import { ProfileManagerBadge } from '@/components/profile/ProfileManagerBadge';
+import { ProfileVerificationBadge } from '@/components/profile/ProfileVerificationBadge';
+import { getProfileVerificationFlags, ProfileVerificationFlags } from '@/lib/profileVerification';
 import { getTextDirection, localeTextDirection, localeUsesLatinScript } from '@/lib/textDirection';
 import type { TextDirection } from '@/lib/textDirection';
 import { moderationCandidateForEditing, pendingModerationCandidate } from '@/lib/textModeration';
@@ -433,7 +434,7 @@ export function UserProfileView({
     const secondPhoto = inlinePhotos[0];
     const thirdPhoto = inlinePhotos[1];
     const privateGallery = (!isOwnProfile || publicPreview) && galleryPrivacy === 'private';
-    const verified = isVerifiedProfile(profile);
+    const verification = getProfileVerificationFlags(profile);
     const activeMembership = isMembershipActive(profile);
     const location = formatProfileLocation(profile);
     const countryFlag = flagEmoji(profile);
@@ -859,9 +860,8 @@ export function UserProfileView({
                             styles.headerTitle,
                             {
                                 writingDirection: visibleHeaderTitleDirection,
-                                ...(visibleHeaderTitleDirection === 'rtl'
-                                    ? { fontFamily: Typography.font.arabic.semi, fontWeight: undefined }
-                                    : {}),
+                                fontFamily: fontFamilyForText(visibleHeaderTitle, 'semi'),
+                                fontWeight: undefined,
                             },
                         ]}
                     >
@@ -911,9 +911,9 @@ export function UserProfileView({
                                 <ActivityIndicator size="small" color={headerActionIconColor} />
                             ) : (
                                 <ProfileMessage
-                                    width={scale(20)}
-                                    height={scale(18.2)}
+                                    width={scale(Platform.OS === 'android' ? 16 : 17)}
                                     color={headerActionIconColor}
+                                    mirrored={isRTL}
                                 />
                             )}
                         </View>
@@ -972,9 +972,10 @@ export function UserProfileView({
                     appIsRTL={isRTL}
                     location={location}
                     countryFlag={countryFlag}
-                    verified={verified}
+                    verification={verification}
                     activeMembership={activeMembership}
                     profileManagerLabel={formatProfileManagerBadge(profile?.profile_manager)}
+                    profileManager={profile?.profile_manager}
                     onOpenPhoto={openPhoto}
                     isDark={isDark}
                 />
@@ -1010,11 +1011,10 @@ export function UserProfileView({
                                                 styles.headline,
                                                 styles.moderatedText,
                                                 {
-                                                    textAlign: headlineDirection === 'rtl' ? 'right' : 'left',
+                                                    textAlign: 'left',
                                                     writingDirection: headlineDirection,
-                                                    ...(headlineDirection === 'rtl'
-                                                        ? { fontFamily: Typography.font.arabic.bold, fontWeight: undefined }
-                                                        : {}),
+                                                    fontFamily: fontFamilyForText(headline, 'bold'),
+                                                    fontWeight: undefined,
                                                 },
                                             ]}
                                         >
@@ -1030,11 +1030,10 @@ export function UserProfileView({
                                     style={[
                                         styles.headline,
                                         {
-                                            textAlign: headlineDirection === 'rtl' ? 'right' : 'left',
+                                            textAlign: 'left',
                                             writingDirection: headlineDirection,
-                                            ...(headlineDirection === 'rtl'
-                                                ? { fontFamily: Typography.font.arabic.bold, fontWeight: undefined }
-                                                : {}),
+                                            fontFamily: fontFamilyForText(headline, 'bold'),
+                                            fontWeight: undefined,
                                         },
                                     ]}
                                 >
@@ -1064,7 +1063,7 @@ export function UserProfileView({
                                     styles.bioOnlyTitle,
                                     {
                                         color: colors.chrome.common.textStrong,
-                                        textAlign: isRTL ? 'right' : 'left',
+                                        textAlign: 'left',
                                         writingDirection: isRTL ? 'rtl' : 'ltr',
                                     },
                                 ]}
@@ -1092,11 +1091,9 @@ export function UserProfileView({
                                                         styles.bioText,
                                                         index < bioParagraphs.length - 1 && styles.bioParagraphGap,
                                                         {
-                                                            textAlign: bioDirection === 'rtl' ? 'right' : 'left',
+                                                            textAlign: 'left',
                                                             writingDirection: bioDirection,
-                                                            fontFamily: bioDirection === 'rtl'
-                                                                ? Typography.font.arabic.regular
-                                                                : Typography.font.body.regular,
+                                                            fontFamily: fontFamilyForText(paragraph),
                                                         },
                                                     ]}
                                                 >
@@ -1175,7 +1172,7 @@ export function UserProfileView({
                         label: t('edit', 'Edit'),
                         onPress: () => router.push({
                             pathname: '/hobbies-faith',
-                            params: { section: 'faith', returnTo: '/(tabs)/profile' },
+                            params: { section: 'faith', returnTo: '/profile' },
                         }),
                     } : undefined}
                 />
@@ -1201,7 +1198,7 @@ export function UserProfileView({
                         label: t('edit', 'Edit'),
                         onPress: () => router.push({
                             pathname: '/hobbies-faith',
-                            params: { section: 'hobbies', returnTo: '/(tabs)/profile' },
+                            params: { section: 'hobbies', returnTo: '/profile' },
                         }),
                     } : undefined}
                 />
@@ -1211,7 +1208,7 @@ export function UserProfileView({
                         actionLabel={t('add', 'Add')}
                         onPress={() => router.push({
                             pathname: '/partner-preference',
-                            params: { returnTo: '/(tabs)/profile' },
+                            params: { returnTo: '/profile' },
                         })}
                     />
                 ) : showPartnerPreference ? (
@@ -1225,7 +1222,7 @@ export function UserProfileView({
                             label: t('edit', 'Edit'),
                             onPress: () => router.push({
                                 pathname: '/partner-preference',
-                                params: { returnTo: '/(tabs)/profile' },
+                                params: { returnTo: '/profile' },
                             }),
                         } : undefined}
                     >
@@ -1604,6 +1601,7 @@ function IntroMessageSheet({
                                     backgroundColor: palette.brand.bg.surface,
                                     borderColor: palette.brand.bg.border,
                                     textAlign: isRTL ? 'right' : 'left',
+                                    fontFamily: fontFamilyForText(value || placeholder),
                                 },
                             ]}
                         />
@@ -1636,9 +1634,10 @@ function ProfileGallery({
     appIsRTL,
     location,
     countryFlag,
-    verified,
+    verification,
     activeMembership,
     profileManagerLabel,
+    profileManager,
     onOpenPhoto,
     isDark,
 }: {
@@ -1659,9 +1658,10 @@ function ProfileGallery({
     appIsRTL: boolean;
     location: string;
     countryFlag: string;
-    verified: boolean;
+    verification: ProfileVerificationFlags;
     activeMembership: boolean;
     profileManagerLabel?: string | null;
+    profileManager?: string | null;
     onOpenPhoto: (index: number) => void;
     isDark: boolean;
 }) {
@@ -1762,21 +1762,15 @@ function ProfileGallery({
                 ) : null}
             </View>
             <View style={styles.galleryIdentity} pointerEvents="box-none">
-                {(verified || activeMembership || showPrivateBadge || profileManagerLabel) ? (
+                {(activeMembership || showPrivateBadge || profileManagerLabel) ? (
                     <View style={[styles.trustRow, { flexDirection: 'row' }]} pointerEvents="box-none">
-                        {verified ? (
-                            <TrustChip
-                                icon={<ShieldCheck size={scale(13)} color={palette.chrome.common.inverseText} fill="#3D63F3" />}
-                                label={t('badge_verified', 'Verified')}
-                            />
-                        ) : null}
                         {activeMembership ? (
                             <TrustChip
                                 icon={<Sparkles size={scale(13)} color={palette.chrome.common.inverseText} />}
                                 label={t('badge_member', 'Member')}
                             />
                         ) : null}
-                        {profileManagerLabel ? <ProfileManagerBadge label={profileManagerLabel} onDark /> : null}
+                        {profileManagerLabel ? <ProfileManagerBadge label={profileManagerLabel} profileName={name} manager={profileManager} onDark /> : null}
                         {showPrivateBadge ? (
                             <TrustChip
                                 icon={<Lock size={scale(13)} color={palette.chrome.common.inverseText} />}
@@ -1788,13 +1782,14 @@ function ProfileGallery({
                 ) : null}
                 <View
                     style={{
+                        direction: appIsRTL ? 'rtl' : 'ltr',
                         flexDirection: 'row',
                         alignItems: 'center',
-                        justifyContent: appIsRTL ? 'flex-end' : 'flex-start',
+                        justifyContent: 'flex-start',
                         gap: scale(8),
-                        flexWrap: 'wrap',
+                        flexWrap: 'nowrap',
                     }}
-                    pointerEvents="none"
+                    pointerEvents="box-none"
                 >
                     <Text
                         variant="h2"
@@ -1804,16 +1799,20 @@ function ProfileGallery({
                             fontSize: scale(23),
                             lineHeight: scale(28),
                             flexShrink: 1,
-                            textAlign: appIsRTL ? 'right' : 'left',
+                            textAlign: 'left',
                             writingDirection: nameDirection,
-                            fontFamily: nameDirection === 'rtl'
-                                ? Typography.font.arabic.bold
-                                : Typography.font.heading.bold,
+                            fontFamily: fontFamilyForText(name, 'bold'),
                             includeFontPadding: false,
                         }}
                     >
                         {nameDirection === 'rtl' ? '\u200F' : '\u200E'}{name}{age ? `, ${age}` : ''}
                     </Text>
+                    <ProfileVerificationBadge
+                        verification={verification}
+                        size={scale(26)}
+                        fillColor={palette.chrome.primary}
+                        outlineColor={palette.chrome.common.inverseText}
+                    />
                 </View>
                 {location ? (
                     <View style={[styles.heroLocationRow, { flexDirection: 'row' }]}>
@@ -1917,11 +1916,9 @@ function AtAGlancePills({ facts, hasFollowingContent }: { facts: Fact[]; hasFoll
                                     styles.atAGlanceValue,
                                     {
                                         color: palette.chrome.common.textStrong,
-                                        textAlign: direction === 'rtl' ? 'right' : 'left',
+                                        textAlign: 'left',
                                         writingDirection: direction,
-                                        fontFamily: direction === 'rtl'
-                                            ? Typography.font.arabic.semi
-                                            : Typography.font.body.semi,
+                                        fontFamily: fontFamilyForText(fact.value, 'semi'),
                                     },
                                 ]}
                             >
@@ -1997,8 +1994,7 @@ function FactRows({
                             </Text>
                             {fact.underReview ? <UnderReviewPill interactive={!canEdit} /> : null}
                         </View>
-                            {/* Content-sized value inside a row: the row's main axis mirrors
-                                under native RTL — no textAlign (unreliable on Android in RTL) */}
+                        {/* Native RTL mirrors start alignment; writingDirection only controls bidi. */}
                         <View style={[styles.factValueRow, styles.factValueIndented]}>
                             <FactValueText value={fact.value} relaxedMultiline={relaxedMultiline} />
                             {canEdit ? (
@@ -2046,11 +2042,9 @@ function FactValueText({ value, relaxedMultiline }: { value: string; relaxedMult
                 styles.factValueTextCompact,
                 relaxedMultiline && isMultiline && styles.factValueTextMultiline,
                 {
-                    textAlign: direction === 'rtl' ? 'right' : 'left',
+                    textAlign: 'left',
                     writingDirection: direction,
-                    fontFamily: direction === 'rtl'
-                        ? Typography.font.arabic.semi
-                        : Typography.font.body.semi,
+                    fontFamily: fontFamilyForText(value, 'semi'),
                 },
             ]}
         >
@@ -2072,11 +2066,9 @@ function ExpandableProfileBio({
     const [expanded, setExpanded] = useState(false);
     const [canExpand, setCanExpand] = useState(false);
     const directionalStyle = {
-        textAlign: direction === 'rtl' ? 'right' as const : 'left' as const,
+        textAlign: 'left' as const,
         writingDirection: direction,
-        fontFamily: direction === 'rtl'
-            ? Typography.font.arabic.regular
-            : Typography.font.body.regular,
+        fontFamily: fontFamilyForText(text),
     };
 
     useEffect(() => {
@@ -2134,7 +2126,7 @@ function ExpandableProfileBio({
                     onPress={() => setExpanded(false)}
                     style={styles.bioExpandButton}
                 >
-                    <Text style={[styles.bioExpandLabel, { color: palette.chrome.primary, textAlign: direction === 'rtl' ? 'right' : 'left', writingDirection: direction, fontFamily: direction === 'rtl' ? Typography.font.arabic.bold : Typography.font.body.bold }]}>
+                    <Text style={[styles.bioExpandLabel, { color: palette.chrome.primary, textAlign: 'left', writingDirection: direction, fontFamily: fontFamilyForText(t('read_less', 'Read less'), 'bold') }]}>
                         {t('read_less', 'Read less')}
                     </Text>
                 </Pressable>
@@ -2146,7 +2138,7 @@ function ExpandableProfileBio({
                     onPress={() => setExpanded(true)}
                     style={styles.bioExpandButton}
                 >
-                    <Text style={[styles.bioExpandLabel, { color: palette.chrome.primary, textAlign: direction === 'rtl' ? 'right' : 'left', writingDirection: direction, fontFamily: direction === 'rtl' ? Typography.font.arabic.bold : Typography.font.body.bold }]}>
+                    <Text style={[styles.bioExpandLabel, { color: palette.chrome.primary, textAlign: 'left', writingDirection: direction, fontFamily: fontFamilyForText(t('read_more', 'Read more'), 'bold') }]}>
                         {t('read_more', 'Read more')}
                     </Text>
                 </Pressable>
@@ -2189,9 +2181,7 @@ function ChipSection({
                                 styles.emojiChipLabel,
                                 {
                                     color: palette.chrome.common.textStrong,
-                                    fontFamily: isRTL
-                                        ? Typography.font.arabic.semi
-                                        : Typography.font.body.semi,
+                                    fontFamily: fontFamilyForText(item.label, 'semi'),
                                 },
                             ]}
                         >
@@ -2260,6 +2250,7 @@ function Section({
                 bottomPadding !== undefined && { paddingBottom: scale(bottomPadding) },
                 extraBottomPadding > 0 && { paddingBottom: scale(22 + extraBottomPadding) },
                 {
+                    direction: isRTL ? 'rtl' : 'ltr',
                     backgroundColor: highlight && card
                         ? highlightBackground
                         : palette.brand.bg.surface,
@@ -2947,18 +2938,18 @@ const styles = StyleSheet.create({
         borderRadius: scale(18),
     },
     profileMessageAction: {
-        width: scale(Platform.OS === 'android' ? 38 : 42),
-        height: scale(Platform.OS === 'android' ? 38 : 42),
+        width: scale(Platform.OS === 'android' ? 38 : 40),
+        height: scale(Platform.OS === 'android' ? 38 : 40),
         position: 'relative',
         overflow: 'visible',
     },
     profileMessageSurface: {
         ...StyleSheet.absoluteFill,
-        borderRadius: scale(Platform.OS === 'android' ? 38 : 42) / 2,
+        borderRadius: scale(Platform.OS === 'android' ? 38 : 40) / 2,
     },
     profileMessageGlass: {
         ...StyleSheet.absoluteFill,
-        borderRadius: scale(42) / 2,
+        borderRadius: scale(40) / 2,
         borderCurve: 'continuous',
     },
     profileMessageIconCenter: {
@@ -3238,7 +3229,7 @@ const styles = StyleSheet.create({
     lightboxDotInactive: { width: scale(6), backgroundColor: 'rgba(255,255,255,0.48)' },
     lightboxViewport: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'visible' },
     lightboxGestureCanvas: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-    lightboxCarousel: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row' },
+    lightboxCarousel: { position: 'absolute', left: 0, bottom: 0, flexDirection: 'row', direction: 'ltr' },
     lightboxImageFrame: { height: '100%', overflow: 'hidden' },
     lightboxZoomLayer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     lightboxImage: { width: '100%', height: '100%' },

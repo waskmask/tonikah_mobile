@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { recordApiRequest } from '@/lib/performanceDiagnostics';
 import { connectivity } from '@/lib/connectivity';
 import { getInstallationId } from '@/lib/deviceIdentity';
+import { apiFailureDetails } from '@/lib/apiDiagnostics';
 
 const TOKEN_KEYS = {
     ACCESS: 'tn_access_token',
@@ -287,8 +288,12 @@ const handleResponse = async (response: Response, endpoint: string, options: Fet
 
     try {
         const data = await response.json();
+        if (__DEV__ && (!response.ok || data?.success === false)) {
+            console.warn('[API] Request failed', apiFailureDetails(endpoint, { ...data, status: response.status }, Config.API_URL));
+        }
         return { ...data, status: response.status };
     } catch (e) {
+        if (__DEV__) console.warn('[API] Invalid response', apiFailureDetails(endpoint, { status: response.status, message: 'invalid_json' }, Config.API_URL));
         return {
             success: false,
             message: 'invalid_json',
@@ -302,6 +307,9 @@ const apiRequest = async (endpoint: string, options: FetchOptions = {}): Promise
         const response = await performFetch(endpoint, options);
         return handleResponse(response, endpoint, options);
     } catch (error: any) {
+        if (__DEV__) console.warn('[API] Connection failed', apiFailureDetails(endpoint, {
+            message: error?.message === 'timeout' || error?.name === 'AbortError' ? 'request_timeout' : 'network_error',
+        }, Config.API_URL));
         if (error.message === 'timeout') {
             return {
                 success: false,

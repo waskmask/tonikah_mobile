@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text as RNText, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CrownSimple, GraduationCap, IdentificationBadge, MapPin, SealCheck, Users } from 'phosphor-react-native';
+import { CrownSimple, GraduationCap, IdentificationBadge, MapPin, Users } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { scale } from '@/hooks/useResponsive';
@@ -12,7 +12,6 @@ import {
     formatDistanceKm,
     formatProfileLocation,
     isMembershipActive,
-    isVerifiedProfile,
     profileCoordinates,
     profileAge,
     profileName,
@@ -21,6 +20,7 @@ import {
 import { t } from '@/lib/profileDisplay';
 import { useLanguage } from '@/hooks/useLanguage';
 import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+import { ProfileVerificationBadge } from '@/components/profile/ProfileVerificationBadge';
 
 export function ExploreDeckCard({
     profile,
@@ -41,7 +41,6 @@ export function ExploreDeckCard({
     const flag = flagEmoji(profile);
     const coordinates = profileCoordinates(profile);
     const distance = formatDistanceKm(viewerLat, viewerLng, coordinates?.lat, coordinates?.lng);
-    const verified = isVerifiedProfile(profile);
     const membership = isMembershipActive(profile);
     const tags = profileTags(profile);
 
@@ -72,14 +71,13 @@ export function ExploreDeckCard({
                     <CrownSimple size={scale(22)} color="#201B15" weight="fill" />
                 </View>
             ) : null}
-            {verified ? (
-                <View style={[styles.topBadge, styles.verifiedBadge]}>
-                    <View style={styles.layeredBadgeIcon}>
-                        <SealCheck size={scale(24)} color="#F34B6F" weight="fill" style={styles.layeredBadgeFill} />
-                        <SealCheck size={scale(26)} color="#FFFFFF" weight="light" style={styles.layeredBadgeOutline} />
-                    </View>
-                </View>
-            ) : null}
+            <ProfileVerificationBadge
+                profile={profile}
+                size={scale(26)}
+                fillColor="#F34B6F"
+                outlineColor="#FFFFFF"
+                style={[styles.topBadge, styles.verifiedBadge]}
+            />
             <View style={[styles.info, { alignItems: 'flex-start' }]}>
                 {profile?.recently_active ? (
                     <View style={[styles.activeChip, { flexDirection: 'row' }]}>
@@ -89,13 +87,13 @@ export function ExploreDeckCard({
                         </Text>
                     </View>
                 ) : null}
-                <Text variant="h2" numberOfLines={1} style={[styles.name, { textAlign: isRTL ? 'right' : 'left' }]}>
+                <Text variant="h2" numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.name, { textAlign: 'left' }]}>
                     {name}{age ? `, ${age}` : ''}
                 </Text>
                 {location ? (
                     <View style={[styles.location, { flexDirection: 'row' }]}>
                         {flag ? <RNText style={styles.flag}>{flag}</RNText> : <MapPin size={scale(15)} color="#FFFFFF" />}
-                        <Text variant="body-sm" className="font-body-semi" numberOfLines={1} style={{ color: '#FFFFFF', flexShrink: 1 }}>
+                        <Text variant="body-sm" className="font-body-semi" numberOfLines={2} style={{ color: '#FFFFFF', flexShrink: 1 }}>
                             {location}
                         </Text>
                         {distance ? (
@@ -147,20 +145,6 @@ const styles = StyleSheet.create({
         right: scale(14),
         backgroundColor: 'transparent',
     },
-    layeredBadgeIcon: {
-        width: scale(26),
-        height: scale(26),
-    },
-    layeredBadgeFill: {
-        position: 'absolute',
-        top: scale(1),
-        left: scale(1),
-    },
-    layeredBadgeOutline: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-    },
     info: {
         position: 'absolute',
         left: scale(22),
@@ -185,6 +169,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#34D399',
     },
     name: {
+        width: '100%',
         color: '#FFFFFF',
         fontSize: scale(27),
         lineHeight: scale(34),
@@ -226,8 +211,8 @@ const styles = StyleSheet.create({
     tagText: {
         flexShrink: 1,
         color: '#FFFFFF',
-        includeFontPadding: false,
-        lineHeight: scale(14),
+        includeFontPadding: true,
+        lineHeight: scale(18),
         textAlignVertical: 'center',
     },
 });
