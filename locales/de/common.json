@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "KI-Sicherheitsprüfung von Inhalten",
+  "ai_review_disclosure": "Mit Ihrer Erlaubnis senden wir Profilfotos sowie Texte aus Überschrift, Bio, Unternehmen und Über den Partner je nach Inhalt an OpenAI oder Google Gemini, um die Sicherheit zu prüfen und die manuelle Prüfung zu unterstützen. Anbieter können übermittelte Inhalte und technische Daten gemäß ihren Bedingungen und Einstellungen speichern. Diese Prüfungen bestätigen nicht Ihre Identität.",
+  "ai_review_choice": "KI-Prüfungen helfen normalerweise, genehmigte Inhalte schneller zu veröffentlichen. Bei manueller Prüfung werden hierfür keine Inhalte an KI-Anbieter gesendet; neue Inhalte bleiben bis zur Genehmigung verborgen. Sie können Ihre Wahl unter Daten & Datenschutz ändern. Änderungen gelten für künftige Prüfungen.",
+  "ai_review_allow": "KI-Prüfungen erlauben",
+  "ai_review_decline": "Stattdessen manuell prüfen lassen",
+  "ai_review_allowed": "Aktuelle Wahl: KI-Prüfungen erlaubt",
+  "ai_review_manual": "Aktuelle Wahl: nur manuelle Prüfung",
+  "ai_review_save_error": "Ihre Wahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut. Ohne Erlaubnis bleiben Inhalte in der manuellen Prüfung.",
   "preview": "Vorschau",
   "verifications_page": {
     "title": "Verifizierungen",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Datenschutz-Einwilligung",
   "privacy_consent_desc": "Prufe deinen Einwilligungsnachweis und verwalte optionale Marketing-E-Mails.",
   "terms_version": "Version der Nutzungsbedingungen",
+  "accepted_version": "Akzeptierte Version",
   "privacy_version": "Version der Datenschutzerklarung",
   "consent_date": "Datum der Einwilligung",
   "marketing_emails": "Marketing-E-Mails",

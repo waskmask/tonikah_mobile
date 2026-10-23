@@ -10,6 +10,7 @@ import { scale } from '@/hooks/useResponsive';
 import { t } from '@/lib/profileDisplay';
 import type { TrialOffer } from '@/lib/messagingAccess';
 import { sanitizeAuthReturnPath } from '@/lib/authReturn';
+import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 
 type Props = { visible: boolean; trialOffer?: TrialOffer | null; onClose: () => void };
 
@@ -17,10 +18,10 @@ export function MessagingMembershipGate({ visible, trialOffer, onClose }: Props)
     const colors = useColors();
     const pathname = usePathname();
     const trialAvailable = trialOffer?.available === true;
-    const title = trialAvailable
+    const title = !MEMBERSHIP_PURCHASES_ENABLED ? t('chat:connection_error', 'Connection error. Retrying...') : trialAvailable
         ? t('chat:membership_trial_title', 'Start your free trial')
         : t('chat:membership_required_title', 'Membership required');
-    const description = trialAvailable
+    const description = !MEMBERSHIP_PURCHASES_ENABLED ? t('server_error_default', 'Something went wrong. Please try again later.') : trialAvailable
         ? t('chat:membership_trial_desc', 'Activate your {{days}}-day trial to open conversations.', { days: trialOffer.durationDays })
         : t('chat:membership_required_desc', 'Activate membership to open and use conversations.');
 
@@ -38,11 +39,13 @@ export function MessagingMembershipGate({ visible, trialOffer, onClose }: Props)
                         <X size={scale(20)} color={colors.chrome.header.icon} />
                     </Pressable>
                     <View style={[styles.icon, { backgroundColor: colors.chrome.common.primaryTint }]}> 
-                        <CreditCard size={scale(24)} color={colors.chrome.primary} />
+                        {MEMBERSHIP_PURCHASES_ENABLED ? <CreditCard size={scale(24)} color={colors.chrome.primary} /> : <X size={scale(24)} color={colors.chrome.primary} />}
                     </View>
                     <Text variant="h3" className="font-body-bold" style={{ color: colors.chrome.common.textStrong, textAlign: 'center' }}>{title}</Text>
                     <Text variant="body-sm" style={{ color: colors.chrome.common.textSubtle, textAlign: 'center' }}>{description}</Text>
-                    <GradientButton title={trialAvailable ? t('chat:start_free_trial', 'View free trial') : t('chat:view_memberships', 'View memberships')} onPress={continueToMembership} />
+                    {MEMBERSHIP_PURCHASES_ENABLED
+                        ? <GradientButton title={trialAvailable ? t('chat:start_free_trial', 'View free trial') : t('chat:view_memberships', 'View memberships')} onPress={continueToMembership} />
+                        : <GradientButton title={t('close', 'Close')} onPress={onClose} />}
                 </View>
             </View>
         </Modal>

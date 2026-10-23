@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useTextModerationPresentation } from '@/hooks/useTextModerationPresentation';
 import { ChevronRight } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -97,8 +98,9 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [keyboardVisible, setKeyboardVisible] = useState(false);
-    const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
     const [activeField, setActiveField] = useState<SummaryField | null>(initialActiveField || null);
+    const { moderationWarning, setModerationWarning, editorSuspended, onEditorDismiss, onWarningDismiss } =
+        useTextModerationPresentation(!inline && Boolean(activeField));
     const [bioExpanded, setBioExpanded] = useState(false);
     const [bioCanExpand, setBioCanExpand] = useState(false);
     const pendingSubmissionRef = useRef<{ field: SummaryField; value: string } | null>(null);
@@ -343,6 +345,27 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
             impact: number;
         }>;
         const active = rows.find((row) => row.field === activeField);
+        const moderationModal = (
+            <TextModerationWarningModal
+                onDismiss={onWarningDismiss}
+                warning={moderationWarning}
+                submitting={saving}
+                onEdit={() => {
+                    const field = moderationWarning?.field;
+                    setModerationWarning(null);
+                    focusModeratedField(field);
+                }}
+                onClose={() => setModerationWarning(null)}
+                onSubmitAnyway={() => {
+                    const pending = pendingSubmissionRef.current;
+                    const field = pending?.field || (moderationWarning?.field === 'bio' ? 'bio' : 'headline');
+                    setActiveField(field);
+                    void save(true, pending ? { [field]: pending.value } : {}, field).then((saved) => {
+                        if (saved) setActiveField(null);
+                    });
+                }}
+            />
+        );
 
         return (
             <View>
@@ -465,6 +488,8 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                         multiline={active.field === 'bio'}
                         minInputHeight={scale(active.field === 'bio' ? 150 : 44)}
                         presentation="drawer"
+                        suspended={editorSuspended}
+                        onDismiss={onEditorDismiss}
                         saving={saving}
                         pendingReview={active.pending}
                         errorText={errors[active.field] || undefined}
@@ -486,24 +511,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
                     />
                 ) : null}
 
-                <TextModerationWarningModal
-                    warning={moderationWarning}
-                    submitting={saving}
-                    onEdit={() => {
-                        const field = moderationWarning?.field;
-                        setModerationWarning(null);
-                        focusModeratedField(field);
-                    }}
-                    onClose={() => setModerationWarning(null)}
-                    onSubmitAnyway={() => {
-                        const pending = pendingSubmissionRef.current;
-                        const field = pending?.field || (moderationWarning?.field === 'bio' ? 'bio' : 'headline');
-                        setActiveField(field);
-                        void save(true, pending ? { [field]: pending.value } : {}, field).then((saved) => {
-                            if (saved) setActiveField(null);
-                        });
-                    }}
-                />
+                {moderationModal}
             </View>
         );
     }
@@ -664,6 +672,7 @@ export const ProfileSummaryEditor = React.forwardRef<ProfileSummaryEditorHandle,
             )}
 
             <TextModerationWarningModal
+                onDismiss={onWarningDismiss}
                 warning={moderationWarning}
                 submitting={saving}
                 onEdit={() => {

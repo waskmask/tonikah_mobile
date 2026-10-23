@@ -32,6 +32,9 @@ import { UnderlineTextInput } from './UnderlineTextInput';
 import { ConfirmSheet } from './ConfirmSheet';
 
 type Props = {
+    /** Hide only the native modal during a handoff, retaining the current draft. */
+    suspended?: boolean;
+    onDismiss?: () => void;
     visible: boolean;
     title: string;
     initialValue: string;
@@ -74,6 +77,8 @@ export function TextEditSheet({
     presentation = 'sheet',
     onClose,
     onSave,
+    suspended = false,
+    onDismiss,
 }: Props) {
     const palette = useColors();
     const { currentLanguage, isRTL } = useLanguage();
@@ -85,6 +90,7 @@ export function TextEditSheet({
     const [discardConfirmationVisible, setDiscardConfirmationVisible] = useState(false);
     const drawerInputRef = useRef<TextInput>(null);
     const drawerFocusTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+    const nativeVisible = visible && !suspended;
     const animationConfigs = useBottomSheetTimingConfigs({
         duration: 220,
         easing: Easing.bezier(0.32, 0.72, 0, 1),
@@ -101,6 +107,7 @@ export function TextEditSheet({
 
     const focusDrawerInput = useCallback(() => {
         clearDrawerFocusTimers();
+        if (!nativeVisible) return;
         const focus = () => {
             const input = drawerInputRef.current;
             if (!input) return;
@@ -119,16 +126,17 @@ export function TextEditSheet({
                 drawerFocusTimersRef.current.push(setTimeout(focus, 40));
             }, 320),
         ];
-    }, [clearDrawerFocusTimers]);
+    }, [clearDrawerFocusTimers, nativeVisible]);
 
     useEffect(() => {
-        if (!visible || presentation !== 'drawer') {
+        if (!nativeVisible || presentation !== 'drawer') {
             clearDrawerFocusTimers();
             drawerInputRef.current?.blur();
+            if (suspended) KeyboardController.dismiss();
         }
 
         return clearDrawerFocusTimers;
-    }, [clearDrawerFocusTimers, presentation, visible]);
+    }, [clearDrawerFocusTimers, nativeVisible, presentation, suspended]);
 
     const renderBackdrop = useCallback(
         (props: BottomSheetBackdropProps) => (
@@ -313,13 +321,14 @@ export function TextEditSheet({
 
         return (
             <Modal
-                visible={visible}
+                visible={nativeVisible}
                 transparent={false}
                 animationType="none"
                 statusBarTranslucent
                 navigationBarTranslucent
                 hardwareAccelerated
                 onShow={focusDrawerInput}
+                onDismiss={onDismiss}
                 onRequestClose={handleAndroidBack}
             >
                 <View style={[styles.drawer, { backgroundColor: palette.brand.bg.surface, direction: isRTL ? 'rtl' : 'ltr' }]}>
@@ -364,12 +373,13 @@ export function TextEditSheet({
 
     return (
         <Modal
-            visible={visible}
+            visible={nativeVisible}
             transparent
             animationType="none"
             statusBarTranslucent
             navigationBarTranslucent
             hardwareAccelerated
+            onDismiss={onDismiss}
             onRequestClose={saving ? () => undefined : onClose}
         >
             <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>

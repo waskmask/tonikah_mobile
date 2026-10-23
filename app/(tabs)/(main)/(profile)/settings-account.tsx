@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { CalendarDays, CreditCard, Footprints, LogOut, RefreshCw, ShieldAlert, Smartphone, User, UserCog, VenusAndMars } from '@/components/ui/icons/PhosphorCompat';
@@ -221,14 +222,14 @@ export default function SettingsAccountScreen() {
                     />
                 </SettingsFieldSection>
 
-                <SettingsFieldSection title={t('membership_billing', 'Membership & billing')}>
+                {MEMBERSHIP_PURCHASES_ENABLED && <SettingsFieldSection title={t('membership_billing', 'Membership & billing')}>
                     <SettingsNavRow
                         icon={<CreditCard size={scale(18)} color={fieldIconColor} />}
                         label={t('membership_billing', 'Membership & billing')}
                         description={t('membership_billing_desc', 'Membership details and payment history.')}
                         onPress={() => router.push({ pathname: '/memberships', params: { view: 'details' } })}
                     />
-                </SettingsFieldSection>
+                </SettingsFieldSection>}
 
                 <SettingsFieldSection title={t('active_sessions', 'Active sessions')} contentInset>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(12) }}>

@@ -20,7 +20,7 @@ const ENV = {
         GOOGLE_MAPS_API_KEY: 'AIzaSyADiPz9OKUiTSQJJ1UXyeIYC4hibjxqCK4',
     },
     prod: {
-        API_URL: 'https://api.tonikah.com/api',
+        API_URL: 'https://apis.tonikah.com/api',
         WEB_APP_ORIGIN: 'https://tonikah.com',
         FORGOT_PASSWORD_URL: 'https://tonikah.com/forgot-pass',
         TERMS_URL: 'https://tonikah.com/terms',

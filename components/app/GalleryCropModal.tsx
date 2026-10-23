@@ -14,7 +14,7 @@ import { Image } from 'expo-image';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { RotateCw } from '@/components/ui/icons/PhosphorCompat';
 import { CaretLeft, CaretRight } from 'phosphor-react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -144,7 +144,6 @@ export function GalleryCropModal({
     ratioOptions,
     resetLabel,
 }: Props) {
-    const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
     const dragStart = useRef({ x: 0, y: 0, offsetX: 0, offsetY: 0, pinchDistance: 0, pinchZoom: 1 });
     const sliderOriginXRef = useRef(0);
@@ -359,9 +358,12 @@ export function GalleryCropModal({
     const frameRatio = selectedRatio === 'original' || !selectedRatio
         ? (natural.width && natural.height ? natural.width / natural.height : 3 / 4)
         : selectedRatio;
-    const maxChatFrameWidth = ratioOptions
-        ? Math.min(scale(360), Math.max(0, cropAreaSize.width - scale(44)), Math.max(0, cropAreaSize.height - scale(12)) * frameRatio)
-        : undefined;
+    const cropFrameRatio = ratioOptions ? frameRatio : 3 / 4;
+    const maxFrameWidth = Math.min(
+        scale(360),
+        Math.max(0, cropAreaSize.width - scale(44)),
+        Math.max(0, cropAreaSize.height - scale(12)) * cropFrameRatio,
+    );
 
     function resetCrop() {
         setOffset({ x: 0, y: 0 });
@@ -429,10 +431,11 @@ export function GalleryCropModal({
             navigationBarTranslucent
             onRequestClose={busy ? undefined : onClose}
         >
+            <SafeAreaProvider style={[styles.screen, { backgroundColor }]}>
             <View style={[styles.screen, { backgroundColor }]}>
             <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={backgroundColor} translucent />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <View style={styles.header}>
+            <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+                <View style={[styles.header, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                     <View style={styles.backWrap}>
                         <Pressable
                             onPress={onClose}
@@ -457,9 +460,12 @@ export function GalleryCropModal({
                     <View style={styles.headerSpacer} />
                 </View>
 
-                <View style={styles.cropArea} onLayout={(event) => setCropAreaSize(event.nativeEvent.layout)}>
+                <View style={styles.cropArea} onLayout={(event) => {
+                    const { width, height } = event.nativeEvent.layout;
+                    setCropAreaSize((current) => sameSize(current, { width, height }) ? current : { width, height });
+                }}>
                     <View
-                        style={[styles.cropFrame, { backgroundColor: surface }, ratioOptions && { width: maxChatFrameWidth, aspectRatio: frameRatio }]}
+                        style={[styles.cropFrame, { backgroundColor: surface, width: maxFrameWidth, aspectRatio: cropFrameRatio }]}
                         pointerEvents={busy ? 'none' : 'auto'}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
@@ -573,7 +579,7 @@ export function GalleryCropModal({
                     </View>
                 ) : null}
 
-                <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, scale(14)) }]}>
+                <SafeAreaView style={styles.footer} edges={{ bottom: 'maximum' }}>
                     <GradientButton
                         title={labels.upload}
                         onPress={cropAndUpload}
@@ -583,9 +589,10 @@ export function GalleryCropModal({
                         height={40}
                         textSize={15}
                     />
-                </View>
+                </SafeAreaView>
             </SafeAreaView>
             </View>
+            </SafeAreaProvider>
         </Modal>
     );
 }
@@ -608,9 +615,9 @@ const styles = StyleSheet.create({
     },
     backWrap: {
         position: 'absolute',
-        // 3.5 + 10.5 (chevron inset inside its 44pt button) = 14dp edge→icon;
-        // 'start' flips to the right edge under native RTL
-        start: scale(3.5),
+        // Centering the 23dp icon in its 44dp target adds another 10.5dp inset.
+        // Logical start follows the header's explicit LTR/RTL direction.
+        start: scale(12),
         top: scale(22),
         zIndex: 2,
         alignItems: 'flex-start',
@@ -743,6 +750,7 @@ const styles = StyleSheet.create({
     },
     footer: {
         paddingHorizontal: scale(20),
+        paddingBottom: scale(14),
     },
     errorBox: {
         paddingHorizontal: scale(24),

@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Pressable, StyleSheet, Keyboard } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { View, Pressable, StyleSheet, Keyboard, TextInput, type EmitterSubscription } from 'react-native';
 import { Text } from './Text';
 import { scale } from '@/hooks/useResponsive';
 import { useTheme } from '@/hooks/useTheme';
 import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
+
+type PendingSelectionOpen = { listener?: EmitterSubscription; timer?: ReturnType<typeof setTimeout> };
 
 /** Field label with optional red asterisk */
 export function FieldLabel({ text, required }: { text: string; required?: boolean }) {
@@ -64,24 +66,44 @@ export function SelectField({
     // selected value semibold (600 — Jakarta's 500 reads too close to 400)
     const displayedValue = value || (required ? `${placeholder} *` : placeholder);
     const valueFont = fontFamilyForText(displayedValue, value ? 'semi' : 'regular');
+    const pendingOpen = useRef<PendingSelectionOpen | null>(null);
+    const latestOnPress = useRef(onPress);
+    latestOnPress.current = onPress;
+    const cancelPendingOpen = useCallback(() => {
+        const pending = pendingOpen.current;
+        pendingOpen.current = null;
+        pending?.listener?.remove();
+        if (pending?.timer) clearTimeout(pending.timer);
+    }, []);
+    useEffect(() => cancelPendingOpen, [cancelPendingOpen]);
+
+    const openSelection = () => {
+        if (pendingOpen.current) return;
+        if (!Keyboard.isVisible() && !TextInput.State.currentlyFocusedInput()) {
+            onPress();
+            return;
+        }
+        // Present native modals after keyboard layout settles, with a fallback
+        // for keyboards that don't emit a hide event.
+        const finish = () => {
+            if (!pendingOpen.current) return;
+            cancelPendingOpen();
+            latestOnPress.current();
+        };
+        const pending: PendingSelectionOpen = {};
+        pendingOpen.current = pending;
+        pending.listener = Keyboard.addListener('keyboardDidHide', finish);
+        pending.timer = setTimeout(finish, 500);
+        Keyboard.dismiss();
+    };
 
     return (
         <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${placeholder}: ${value || t('not_set', 'Not set')}`}
             accessibilityHint={t('opens_selection_options', 'Opens selection options')}
-            // Blur any focused TextInput and wait for the keyboard to actually
-            // hide before opening: otherwise Android sizes the modal window to
-            // the keyboard-shrunken screen and the sheet floats mid-air. Also
-            // prevents the input refocus-on-modal-close loop.
-            onPress={() => {
-                if (Keyboard.isVisible()) {
-                    Keyboard.dismiss();
-                    setTimeout(onPress, 150);
-                } else {
-                    onPress();
-                }
-            }}
+            onPress={openSelection}
+            hitSlop={{ top: 8, bottom: 8 }}
             style={[
                 {
                     flexDirection: 'row',
@@ -90,33 +112,36 @@ export function SelectField({
                     borderBottomWidth: 1,
                     paddingHorizontal: scale(6),
                     height: scale(44),
+                    minHeight: 44,
+                    width: '100%',
                     // Labels are gone — fields need their own breathing room
                     // (error text renders absolutely inside this gap)
                     marginTop: scale(22),
-                    gap: scale(10),
                     backgroundColor: 'transparent',
                     borderBottomColor: hasError ? '#EF4444' : isDark ? '#303033' : '#EEEEEE',
                 },
             ]}
         >
-            <Text
-                variant="body"
-                numberOfLines={1}
-                style={[
-                    {
-                        flex: 1,
-                        textAlign: 'left',
-                        fontSize: scale(15),
-                        fontFamily: valueFont,
-                    },
-                    value
-                        ? { color: isDark ? '#E5E5E7' : '#201B15' }
-                        : { color: isDark ? '#B0B0B5' : '#5C5348' },
-                ]}
-            >
-                {displayedValue}
-            </Text>
-            {icon}
+            <View pointerEvents="none" style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center', gap: scale(10) }}>
+                <Text
+                    variant="body"
+                    numberOfLines={1}
+                    style={[
+                        {
+                            flex: 1,
+                            textAlign: 'left',
+                            fontSize: scale(15),
+                            fontFamily: valueFont,
+                        },
+                        value
+                            ? { color: isDark ? '#E5E5E7' : '#201B15' }
+                            : { color: isDark ? '#B0B0B5' : '#5C5348' },
+                    ]}
+                >
+                    {displayedValue}
+                </Text>
+                {icon}
+            </View>
         </Pressable>
     );
 }

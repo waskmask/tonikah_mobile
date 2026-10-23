@@ -1,3 +1,5 @@
+import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
+
 export type MessagingAccess = {
     required: boolean;
     allowed: boolean;
@@ -63,7 +65,7 @@ export function shouldRedactMessagingContent(
 const promoKey = (userId: string) => `membership-message-promo:${userId}`;
 
 export async function shouldShowMembershipPromo(userId: string) {
-    if (!userId) return false;
+    if (!MEMBERSHIP_PURCHASES_ENABLED || !userId) return false;
     const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
     const today = new Date().toLocaleDateString('en-CA');
     const shown = await AsyncStorage.getItem(promoKey(userId));

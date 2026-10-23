@@ -7,6 +7,7 @@ import {
     TextInput,
     StyleSheet,
     KeyboardAvoidingView,
+    Keyboard,
     Platform,
     Dimensions,
     ActivityIndicator,
@@ -27,7 +28,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { CaretLeft, CaretRight, Check, MagnifyingGlass, X } from 'phosphor-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fontFamilyForText } from '@/constants/typography';
 import { t } from '@/lib/profileDisplay';
@@ -84,9 +85,29 @@ export function MultiSelectSheet({
     const [search, setSearch] = useState('');
     const searchFontFamily = fontFamilyForText(search || searchPlaceholder);
     const sheetRef = React.useRef<BottomSheet>(null);
+    const searchRef = React.useRef<TextInput>(null);
+    const sheetSearchRef = React.useRef<React.ElementRef<typeof BottomSheetTextInput>>(null);
     const [localSelected, setLocalSelected] = useState<string[]>(initialSelected);
     const resolvedPresentation = presentation ?? (searchEnabled ? 'drawer' : 'sheet');
     const isDrawer = resolvedPresentation === 'drawer';
+    const isAndroidDrawer = Platform.OS === 'android' && isDrawer;
+    const DrawerPanel = isAndroidDrawer ? View : Animated.View;
+    const DrawerSafeAreaProvider = isAndroidDrawer ? SafeAreaProvider : React.Fragment;
+    const DrawerSafeAreaView = isAndroidDrawer ? SafeAreaView : React.Fragment;
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const hideDrawerDone = Platform.OS === 'ios' && isDrawer && keyboardVisible;
+    React.useEffect(() => {
+        if (!visible || !isDrawer || Platform.OS !== 'ios') {
+            setKeyboardVisible(false);
+            return;
+        }
+        const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+        const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+        return () => {
+            show.remove();
+            hide.remove();
+        };
+    }, [visible, isDrawer]);
     const animationConfigs = useBottomSheetTimingConfigs({
         duration: 220,
         easing: Easing.bezier(0.32, 0.72, 0, 1),
@@ -97,18 +118,23 @@ export function MultiSelectSheet({
         ? SlideInLeft.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1))
         : SlideInRight.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1));
 
-    // Sync when initial changes
-    React.useEffect(() => {
-        setLocalSelected(initialSelected);
-    }, [initialSelected]);
-
     // Snapshot of the confirmed selection, taken when the drawer opens: those
     // options are pinned to the top so users can review/unselect them without
     // hunting through a long list. A snapshot (not the live selection) keeps
     // rows from jumping around while toggling.
     const [pinned, setPinned] = useState<string[]>([]);
+    const selectionSessionRef = React.useRef(false);
     React.useEffect(() => {
-        if (visible) setPinned(initialSelected);
+        if (!visible) {
+            selectionSessionRef.current = false;
+            setLocalSelected(initialSelected);
+            return;
+        }
+        // Parent refreshes must not replace an unconfirmed checkbox draft.
+        if (selectionSessionRef.current) return;
+        selectionSessionRef.current = true;
+        setLocalSelected([...initialSelected]);
+        setPinned([...initialSelected]);
     }, [visible, initialSelected]);
 
     const ordered = useMemo(() => {
@@ -130,6 +156,12 @@ export function MultiSelectSheet({
         );
     }, [ordered, search]);
 
+    const dismissSearchKeyboard = useCallback(() => {
+        searchRef.current?.blur();
+        sheetSearchRef.current?.blur();
+        Keyboard.dismiss();
+    }, []);
+
     const toggleItem = (value: string) => {
         setLocalSelected((prev) => {
             if (prev.includes(value)) {
@@ -140,15 +172,18 @@ export function MultiSelectSheet({
             }
             return [...prev, value];
         });
+        dismissSearchKeyboard();
     };
 
     const handleDone = () => {
+        dismissSearchKeyboard();
         onConfirm(localSelected);
         onClose();
         setSearch('');
     };
 
     const handleClose = () => {
+        dismissSearchKeyboard();
         setLocalSelected(initialSelected); // Reset on cancel
         onClose();
         setSearch('');
@@ -244,8 +279,9 @@ export function MultiSelectSheet({
                         backdropComponent={renderBackdrop}
                         backgroundStyle={{ backgroundColor: palette.chrome.common.card }}
                         handleIndicatorStyle={{ backgroundColor: palette.brand.text.muted }}
-                        keyboardBehavior="extend"
+                        keyboardBehavior="interactive"
                         keyboardBlurBehavior="restore"
+                        enableBlurKeyboardOnGesture
                         android_keyboardInputMode="adjustResize"
                     >
                         <View style={styles.header}>
@@ -261,8 +297,12 @@ export function MultiSelectSheet({
                             <View style={[styles.searchContainer, { borderBottomColor: palette.brand.bg.border }]}>
                                 <MagnifyingGlass size={scale(16)} color={palette.brand.text.muted} weight="regular" />
                                 <BottomSheetTextInput
+                                    ref={sheetSearchRef}
                                     value={search}
                                     onChangeText={setSearch}
+                                    returnKeyType="done"
+                                    submitBehavior="blurAndSubmit"
+                                    onSubmitEditing={dismissSearchKeyboard}
                                     placeholder={searchPlaceholder}
                                     placeholderTextColor={palette.brand.text.muted}
                                     style={[
@@ -287,6 +327,7 @@ export function MultiSelectSheet({
                             keyExtractor={(item: MultiSelectOption) => item.value}
                             showsVerticalScrollIndicator={false}
                             keyboardShouldPersistTaps="always"
+                            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                             initialNumToRender={16}
                             ListEmptyComponent={sheetEmptyState}
                             renderItem={({ item }: { item: MultiSelectOption }) => {
@@ -355,16 +396,21 @@ export function MultiSelectSheet({
     return (
         <Modal
             visible={visible}
-            // transparent always: an opaque modal window flashes white before
-            // the first frame paints
-            transparent
-            animationType="none"
+            transparent={!isAndroidDrawer}
+            backdropColor={palette.chrome.common.card}
+            animationType={isAndroidDrawer ? 'fade' : 'none'}
             statusBarTranslucent
             navigationBarTranslucent
             hardwareAccelerated
             onRequestClose={handleClose}
         >
-            <GestureHandlerRootView style={[isDrawer ? styles.drawerOverlay : styles.modalRoot, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+            <GestureHandlerRootView style={[
+                isDrawer ? styles.drawerOverlay : styles.modalRoot,
+                { direction: isRTL ? 'rtl' : 'ltr' },
+                isAndroidDrawer && { backgroundColor: palette.chrome.common.card },
+            ]}>
+                <DrawerSafeAreaProvider>
+                <DrawerSafeAreaView {...(isAndroidDrawer ? { style: styles.drawerWrapper, edges: ['top', 'bottom', 'left', 'right'] as const } : {})}>
                 {!isDrawer && (
                     <Animated.View entering={FadeIn.duration(140)} style={styles.backdrop}>
                         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
@@ -375,19 +421,20 @@ export function MultiSelectSheet({
                     style={isDrawer ? styles.drawerWrapper : styles.sheetWrapper}
                     pointerEvents="box-none"
                 >
-                    <Animated.View
-                        entering={
-                            isDrawer
+                    <DrawerPanel
+                        {...(isAndroidDrawer ? {} : { entering: isDrawer
                                 ? drawerEntering
-                                : SlideInDown.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1))
-                        }
+                                : SlideInDown.duration(220).easing(Easing.bezier(0.32, 0.72, 0, 1)) })}
                         style={[
                             isDrawer ? styles.drawer : styles.sheet,
                             { backgroundColor: palette.chrome.common.card },
                             // Footer button sits at the same height as the page CTA
                             // Footer already pads scale(10) — matching the page CTA's
                             // safe-bottom + scale(10) exactly
-                            isDrawer && { paddingTop: insets.top + 6, paddingBottom: insets.bottom },
+                            isDrawer && {
+                                paddingTop: isAndroidDrawer ? 6 : insets.top + 6,
+                                paddingBottom: isAndroidDrawer || hideDrawerDone ? 0 : insets.bottom,
+                            },
                             !isDrawer && { paddingBottom: insets.bottom + scale(16) },
                         ]}
                     >
@@ -439,8 +486,12 @@ export function MultiSelectSheet({
                             >
                                 <MagnifyingGlass size={scale(16)} color={palette.brand.text.muted} weight="regular" />
                                 <TextInput
+                                    ref={searchRef}
                                     value={search}
                                     onChangeText={setSearch}
+                                    returnKeyType="done"
+                                    submitBehavior="blurAndSubmit"
+                                    onSubmitEditing={dismissSearchKeyboard}
                                     placeholder={searchPlaceholder}
                                     placeholderTextColor={palette.brand.text.muted}
                                     style={[
@@ -467,6 +518,7 @@ export function MultiSelectSheet({
                             showsVerticalScrollIndicator={false}
                             style={isDrawer ? styles.drawerList : styles.sheetList}
                             keyboardShouldPersistTaps="always"
+                            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                             nestedScrollEnabled
                             initialNumToRender={16}
                             renderItem={({ item }) => {
@@ -554,26 +606,28 @@ export function MultiSelectSheet({
                         />
 
                         {/* Selection count + Done button */}
-                        <View style={styles.footer}>
+                        <View style={[styles.footer, hideDrawerDone && { paddingBottom: 0 }]}>
                             <Text
                                 variant="caption"
                                 align="center"
-                                style={[styles.countText, { color: palette.brand.text.muted }]}
+                                style={[styles.countText, { color: palette.brand.text.muted }, hideDrawerDone && { marginBottom: 0 }]}
                             >
                                 {maxSelections
                                     ? `${localSelected.length}/${maxSelections} ${t('selected', 'selected')}`
                                     : `${localSelected.length} ${t('selected', 'selected')}`}
                             </Text>
-                            <GradientButton
+                            {!hideDrawerDone && <GradientButton
                                 title={t('done', 'Done')}
                                 onPress={handleDone}
                                 disabled={loading || error || (!allowEmptySelection && localSelected.length === 0)}
                                 widthMode="full"
                                 size="compact"
-                            />
+                            />}
                         </View>
-                    </Animated.View>
+                    </DrawerPanel>
                 </KeyboardAvoidingView>
+                </DrawerSafeAreaView>
+                </DrawerSafeAreaProvider>
             </GestureHandlerRootView>
         </Modal>
     );
@@ -632,7 +686,7 @@ const styles = StyleSheet.create({
     },
     drawer: {
         flex: 1,
-        minHeight: Dimensions.get('window').height,
+        minHeight: 0,
         paddingBottom: scale(18),
     },
     handleBar: {

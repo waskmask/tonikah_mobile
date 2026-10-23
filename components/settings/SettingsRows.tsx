@@ -27,6 +27,7 @@ export function SettingsNavRow({
     descriptionColor,
     descriptionContent,
     iconAlign = 'flex-start',
+    animatePress = true,
 }: {
     icon: React.ReactNode;
     label: string;
@@ -43,20 +44,22 @@ export function SettingsNavRow({
     descriptionColor?: string;
     descriptionContent?: React.ReactNode;
     iconAlign?: 'center' | 'flex-start';
+    animatePress?: boolean;
 }) {
     const colors = useColors();
     const { isRTL } = useLanguage();
     const Chevron = isRTL ? ChevronLeft : ChevronRight;
+    const RowPressable = animatePress ? PressableScale : Pressable;
 
     return (
         <View>
             {divider ? (
                 <View style={[styles.divider, { backgroundColor: colors.brand.bg.border }]} />
             ) : null}
-            <PressableScale
+            <RowPressable
                 onPress={onPress}
                 disabled={disabled}
-                activeScale={0.97}
+                {...(animatePress ? { activeScale: 0.97 } : {})}
                 accessibilityRole="button"
                 accessibilityLabel={label}
                 accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(loading), selected }}
@@ -121,7 +124,7 @@ export function SettingsNavRow({
                         style={{ flexShrink: 0 }}
                     />
                 ))}
-            </PressableScale>
+            </RowPressable>
         </View>
     );
 }
@@ -203,6 +206,8 @@ export function SettingsToggleRow({
     disabled,
     onValueChange,
     divider,
+    descriptionContent,
+    busy = false,
 }: {
     icon?: React.ReactNode;
     label: string;
@@ -211,6 +216,8 @@ export function SettingsToggleRow({
     disabled?: boolean;
     onValueChange: (next: boolean) => void;
     divider?: boolean;
+    descriptionContent?: React.ReactNode;
+    busy?: boolean;
 }) {
     const colors = useColors();
     const { isRTL } = useLanguage();
@@ -225,19 +232,29 @@ export function SettingsToggleRow({
                 ) : null}
                 <View style={[styles.fieldContent, { alignItems: 'flex-start' }]}>
                     <Text variant="body-sm" style={[styles.fieldValue, { textAlign: 'left' }]}>{label}</Text>
-                    {description ? (
+                    {descriptionContent ?? (description ? (
                         <Text variant="caption" style={{ color: colors.brand.text.subtitle, textAlign: 'left' }}>
                             {description}
                         </Text>
-                    ) : null}
+                    ) : null)}
                 </View>
-                <Switch
-                    value={value}
-                    disabled={disabled}
-                    onValueChange={onValueChange}
-                    trackColor={{ false: colors.brand.bg.border, true: colors.chrome.common.primaryGlow }}
-                    thumbColor={value ? colors.chrome.primary : colors.chrome.common.inverseText}
-                />
+                <View style={{ position: 'relative', flexShrink: 0 }}>
+                    <Switch
+                        value={value}
+                        disabled={disabled || busy}
+                        accessibilityLabel={label}
+                        accessibilityState={{ disabled: Boolean(disabled || busy), busy }}
+                        accessibilityElementsHidden={busy}
+                        importantForAccessibility={busy ? 'no-hide-descendants' : 'auto'}
+                        style={{ opacity: busy ? 0 : 1 }}
+                        onValueChange={onValueChange}
+                        trackColor={{ false: colors.brand.bg.border, true: colors.chrome.common.primaryGlow }}
+                        thumbColor={value ? colors.chrome.primary : colors.chrome.common.inverseText}
+                    />
+                    {busy ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                        <ActivityIndicator size="small" color={colors.chrome.primary} accessibilityRole="progressbar" accessibilityLabel={`${label}: ${t('please_wait', 'Please wait')}`} />
+                    </View> : null}
+                </View>
             </View>
         </View>
     );

@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "Controlli di sicurezza con IA",
+  "ai_review_disclosure": "Con il tuo consenso, inviamo le foto del profilo e i testi di Titolo, Bio, Azienda e Sul partner a OpenAI o Google Gemini, in base al contenuto, per controlli di sicurezza e per assistere la revisione degli amministratori. I fornitori possono conservare contenuti e dati tecnici secondo le proprie condizioni e impostazioni. Questi controlli non verificano la tua identità.",
+  "ai_review_choice": "I controlli IA aiutano generalmente a pubblicare più rapidamente i contenuti approvati. Se scegli la revisione degli amministratori, nessun contenuto sarà inviato ai fornitori IA per questi controlli e i nuovi contenuti resteranno nascosti fino all’approvazione. Puoi cambiare scelta in Dati e privacy. Le modifiche valgono per i controlli futuri.",
+  "ai_review_allow": "Consenti i controlli IA",
+  "ai_review_decline": "Usa la revisione degli amministratori",
+  "ai_review_allowed": "Scelta attuale: IA consentita",
+  "ai_review_manual": "Scelta attuale: solo revisione degli amministratori",
+  "ai_review_save_error": "Impossibile salvare la scelta. Riprova. Senza consenso, i contenuti restano in revisione.",
   "preview": "Anteprima",
   "verifications_page": {
     "title": "Verifiche",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Consenso privacy",
   "privacy_consent_desc": "Controlla il tuo registro del consenso e gestisci le email di marketing opzionali.",
   "terms_version": "Versione dei termini",
+  "accepted_version": "Versione accettata",
   "privacy_version": "Versione privacy",
   "consent_date": "Data del consenso",
   "marketing_emails": "Email di marketing",

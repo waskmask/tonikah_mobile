@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { AiModerationConsentChoice } from '@/components/app/AiModerationConsentChoice';
 import { Linking, ScrollView, Share, View } from 'react-native';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { SettingsFieldSection } from '@/components/settings/SettingsFieldSection';
@@ -33,6 +35,8 @@ export default function SettingsPrivacyScreen() {
         staleTime: SETTINGS_DATA_STALE_TIME_MS,
     });
     const privacyConsent = privacyQuery.data || null;
+    const { refetch } = privacyQuery;
+    useFocusEffect(useCallback(() => { void refetch(); }, [refetch]));
 
     const toggleMarketingOptIn = async (nextValue: boolean) => {
         if (!privacyConsent || marketingBusy) return;
@@ -108,16 +112,25 @@ export default function SettingsPrivacyScreen() {
                     />
                 </SettingsFieldSection>
 
+                {privacyConsent?.aiModeration ? (
+                    <SettingsFieldSection title={t('ai_review_title', 'AI content safety checks')}>
+                        <AiModerationConsentChoice settings consent={privacyConsent.aiModeration} onSaved={(next) => {
+                            queryClient.setQueryData(queryKeys.settings.privacyConsent, next);
+                        }} />
+                    </SettingsFieldSection>
+                ) : null}
                 <SettingsFieldSection title={t('data_privacy', 'Data & privacy')}>
                     <SettingsInfoRow
                         icon={<Scroll size={scale(19)} color={fieldIconColor} weight="regular" />}
                         label={t('terms_version', 'Terms version')}
-                        value={privacyConsent?.termsVersion || t('not_set', 'Not set')}
+                        value={privacyConsent?.currentTermsVersion || t('not_set', 'Not set')}
+                        note={`${t('accepted_version', 'Accepted version')}: ${privacyConsent?.termsVersion || t('not_set', 'Not set')}`}
                     />
                     <SettingsInfoRow
                         icon={<ShieldCheck size={scale(19)} color={fieldIconColor} weight="regular" />}
                         label={t('privacy_version', 'Privacy version')}
-                        value={privacyConsent?.privacyVersion || t('not_set', 'Not set')}
+                        value={privacyConsent?.currentPrivacyVersion || t('not_set', 'Not set')}
+                        note={`${t('accepted_version', 'Accepted version')}: ${privacyConsent?.privacyVersion || t('not_set', 'Not set')}`}
                         divider
                     />
                     <SettingsInfoRow

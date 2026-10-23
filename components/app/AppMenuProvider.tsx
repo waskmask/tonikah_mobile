@@ -1,6 +1,5 @@
-import React, { createContext, useCallback, useContext, useMemo } from 'react';
-import { useNavigation } from 'expo-router';
-import { markInteraction } from '@/lib/performanceDiagnostics';
+import React, { createContext, useContext } from 'react';
+import { useRootAppMenu } from '@/components/app/RootAppMenuDrawer';
 
 type AppMenuContextValue = {
     openMenu: () => void;
@@ -10,16 +9,8 @@ type AppMenuContextValue = {
 const AppMenuContext = createContext<AppMenuContextValue | null>(null);
 
 export function AppMenuProvider({ children }: { children: React.ReactNode }) {
-    const drawerNavigation = useNavigation('/(tabs)') as unknown as {
-        openDrawer: () => void;
-        closeDrawer: () => void;
-    };
-    const openMenu = useCallback(() => {
-        markInteraction('drawer');
-        drawerNavigation.openDrawer();
-    }, [drawerNavigation]);
-    const closeMenu = useCallback(() => drawerNavigation.closeDrawer(), [drawerNavigation]);
-    const value = useMemo(() => ({ openMenu, closeMenu }), [closeMenu, openMenu]);
+    const value = useRootAppMenu();
+    if (!value) throw new Error('AppMenuProvider must be used inside RootAppMenuDrawer');
 
     return (
         <AppMenuContext.Provider value={value}>

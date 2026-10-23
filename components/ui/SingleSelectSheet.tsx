@@ -43,6 +43,8 @@ export interface SelectOption {
 interface SingleSelectSheetProps {
     visible: boolean;
     onClose: () => void;
+    /** iOS: native dismissal; Android: first frame after the hidden commit (no modal animation). */
+    onDismiss?: () => void;
     onSelect: (value: string) => void;
     options: SelectOption[];
     selected?: string;
@@ -67,6 +69,7 @@ const normalizeSearchText = (value: string) =>
 export function SingleSelectSheet({
     visible,
     onClose,
+    onDismiss,
     onSelect,
     options,
     selected,
@@ -95,6 +98,42 @@ export function SingleSelectSheet({
     if (!visible || isOpening) openPresentationRef.current = nextPresentation;
     const resolvedPresentation = visible ? openPresentationRef.current : nextPresentation;
     const isDrawer = resolvedPresentation === 'drawer';
+    const onDismissRef = useRef(onDismiss);
+    onDismissRef.current = onDismiss;
+    const visibleRef = useRef(visible);
+    visibleRef.current = visible;
+    const dismissalRef = useRef({ mounted: false, pending: false, cycle: 0 });
+    const notifyDismissed = useCallback(() => {
+        const state = dismissalRef.current;
+        if (!state.mounted || !state.pending || visibleRef.current) return;
+        state.pending = false;
+        onDismissRef.current?.();
+    }, []);
+
+    React.useEffect(() => {
+        dismissalRef.current.mounted = true;
+        return () => {
+            dismissalRef.current.mounted = false;
+            dismissalRef.current.pending = false;
+        };
+    }, []);
+
+    React.useEffect(() => {
+        const state = dismissalRef.current;
+        if (visible) {
+            state.pending = true;
+            state.cycle += 1;
+            return;
+        }
+        if (!state.pending || Platform.OS !== 'android') return;
+        const cycle = state.cycle;
+        // Android has no native onDismiss event. With animationType="none", wait
+        // until the hidden Modal commit has been applied before handing off.
+        const frame = requestAnimationFrame(() => {
+            if (dismissalRef.current.cycle === cycle) notifyDismissed();
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [visible, notifyDismissed]);
     const animationConfigs = useBottomSheetTimingConfigs({
         duration: 220,
         easing: Easing.bezier(0.32, 0.72, 0, 1),
@@ -303,8 +342,9 @@ export function SingleSelectSheet({
                 navigationBarTranslucent
                 hardwareAccelerated
                 onRequestClose={onClose}
+                onDismiss={Platform.OS === 'ios' ? notifyDismissed : undefined}
             >
-                <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+                {visible && <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                     <BottomSheet
                         ref={sheetRef}
                         snapPoints={snapPoints}
@@ -377,7 +417,7 @@ export function SingleSelectSheet({
                             }}
                         />
                     </BottomSheet>
-                </GestureHandlerRootView>
+                </GestureHandlerRootView>}
             </Modal>
         );
     }
@@ -398,8 +438,9 @@ export function SingleSelectSheet({
             navigationBarTranslucent
             hardwareAccelerated
             onRequestClose={onClose}
+            onDismiss={Platform.OS === 'ios' ? notifyDismissed : undefined}
         >
-            <GestureHandlerRootView style={[styles.drawerOverlay, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+            {visible && <GestureHandlerRootView style={[styles.drawerOverlay, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={styles.drawerWrapper}
@@ -482,7 +523,7 @@ export function SingleSelectSheet({
                         />
                     </Animated.View>
                 </KeyboardAvoidingView>
-            </GestureHandlerRootView>
+            </GestureHandlerRootView>}
         </Modal>
     );
 }

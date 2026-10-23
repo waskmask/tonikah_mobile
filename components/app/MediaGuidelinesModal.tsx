@@ -12,7 +12,7 @@ import {
     EyeOff,
     ShieldAlert,
 } from '@/components/ui/icons/PhosphorCompat';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useColors } from '@/hooks/useColors';
@@ -54,7 +54,6 @@ export function MediaGuidelinesModal({
 }: Props) {
     const colors = useColors();
     const { isRTL } = useLanguage();
-    const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
     const tablet = width >= 640;
     const rowDirection = 'row';
@@ -69,6 +68,7 @@ export function MediaGuidelinesModal({
             hardwareAccelerated
             onRequestClose={() => undefined}
         >
+            <SafeAreaProvider>
             <View style={[styles.overlay, tablet && styles.overlayCentered]}>
                 <View
                     style={[
@@ -77,11 +77,11 @@ export function MediaGuidelinesModal({
                         {
                             backgroundColor: colors.chrome.common.card,
                             borderColor: colors.brand.bg.border,
-                            paddingBottom: Math.max(insets.bottom, scale(16)),
                         },
                     ]}
                 >
                     <ScrollView
+                        style={styles.scroll}
                         contentContainerStyle={styles.content}
                         showsVerticalScrollIndicator={false}
                         bounces={false}
@@ -203,17 +203,19 @@ export function MediaGuidelinesModal({
                             </View>
                         ) : null}
 
+                    </ScrollView>
+                    <SafeAreaView style={styles.footer} edges={tablet ? [] : ['bottom']}>
                         <GradientButton
                             title={t('media_guidelines_understand', 'I understand')}
                             onPress={onAcknowledge}
                             widthMode="full"
                             height={44}
                             textSize={14}
-                            containerStyle={styles.button}
                         />
-                    </ScrollView>
+                    </SafeAreaView>
                 </View>
             </View>
+            </SafeAreaProvider>
         </Modal>
     );
 }
@@ -245,6 +247,17 @@ const styles = StyleSheet.create({
     content: {
         paddingHorizontal: scale(18),
         paddingTop: scale(20),
+        paddingBottom: scale(18),
+    },
+    scroll: {
+        flexShrink: 1,
+        minHeight: 0,
+    },
+    footer: {
+        flexShrink: 0,
+        paddingHorizontal: scale(18),
+        paddingTop: scale(8),
+        paddingBottom: scale(8),
     },
     headingRow: {
         alignItems: 'flex-start',
@@ -323,8 +336,5 @@ const styles = StyleSheet.create({
     privateMessage: {
         marginTop: scale(3),
         lineHeight: scale(18),
-    },
-    button: {
-        marginTop: scale(18),
     },
 });

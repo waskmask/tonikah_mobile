@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useIsFocused } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -29,6 +29,7 @@ type ProfileMode = 'edit' | 'preview';
 const PROFILE_TAB_BAR_HEIGHT = 48;
 
 const MemoizedUserProfileView = React.memo(UserProfileView);
+const MemoizedEditProfileScreen = React.memo(EditProfileScreen);
 const PROFILE_MODES: Array<{ value: ProfileMode; labelKey: string; fallback: string }> = [
     { value: 'edit', labelKey: 'edit_profile', fallback: 'Edit profile' },
     { value: 'preview', labelKey: 'preview', fallback: 'Preview' },
@@ -191,6 +192,7 @@ function ProfileModeBar({ mode, onChange }: { mode: ProfileMode; onChange: (mode
 }
 
 export default function ProfileScreen() {
+    const isFocused = useIsFocused();
     const colors = useColors();
     const { isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
@@ -211,6 +213,7 @@ export default function ProfileScreen() {
         enabled: false,
     });
     const [mode, setMode] = useState<ProfileMode>('edit');
+    const [editorMounted, setEditorMounted] = useState(isFocused);
     const [previewMounted, setPreviewMounted] = useState(false);
     const [profile, setProfile] = useState<ProfileData | null>(() =>
         initialUserRef.current
@@ -226,6 +229,7 @@ export default function ProfileScreen() {
     const [editRefreshVersion, setEditRefreshVersion] = useState(0);
     const [error, setError] = useState('');
     const hadCachedProfileOnMountRef = useRef(Boolean(profile));
+    const initialProfileLoadStartedRef = useRef(false);
     const pageOffset = useSharedValue(0);
     const gestureStartOffset = useSharedValue(0);
     const selectedPage = useSharedValue(0);
@@ -235,7 +239,9 @@ export default function ProfileScreen() {
         setMode(nextMode);
     }, []);
 
-    useEffect(() => scheduleIdleWork(() => setPreviewMounted(true), 1500), []);
+    useEffect(() => {
+        if (isFocused) setEditorMounted(true);
+    }, [isFocused]);
 
     useEffect(() => {
         const nextPage = mode === 'preview' ? 1 : 0;
@@ -286,7 +292,7 @@ export default function ProfileScreen() {
 
         if (!meRes.success || !meRes.user) {
             setError(meRes.message || 'profile_unavailable');
-            return;
+            return false;
         }
 
         appliedUserRef.current = meRes.user;
@@ -304,6 +310,7 @@ export default function ProfileScreen() {
                 : current?.privacy || 'public';
             return mergeProfile(meRes.user, gallery, privacy);
         });
+        return true;
     }, [queryClient, setUser]);
 
     const refreshProfile = useCallback(async () => {
@@ -374,7 +381,7 @@ export default function ProfileScreen() {
     }, [profile, queryClient]);
 
     useEffect(() => {
-        if (mode !== 'preview') return;
+        if (!isFocused || mode !== 'preview') return;
 
         const cached = queryClient.getQueryData<any>(queryKeys.profile.partnerPreference);
         if (hasPartnerPreference(cached)) {
@@ -407,19 +414,28 @@ export default function ProfileScreen() {
         });
 
         return cancelIdleWork;
-    }, [mode, profile, queryClient]);
+    }, [isFocused, mode, profile, queryClient]);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
+        if (initialProfileLoadStartedRef.current) return;
+        const startLoad = () => {
+            initialProfileLoadStartedRef.current = true;
+            void loadProfile()
+                .then((loaded) => {
+                    if (!loaded) initialProfileLoadStartedRef.current = false;
+                })
+                .catch((cause) => {
+                    initialProfileLoadStartedRef.current = false;
+                    setError(String(cause?.message || 'profile_refresh_failed'));
+                })
+                .finally(() => setLoading(false));
+        };
         if (!hadCachedProfileOnMountRef.current) {
-            void loadProfile().finally(() => setLoading(false));
-            return undefined;
+            startLoad();
+            return;
         }
-
-        const cancelIdleWork = scheduleIdleWork(() => {
-            void loadProfile();
-        });
-        return cancelIdleWork;
-    }, [loadProfile]);
+        return scheduleIdleWork(startLoad);
+    }, [loadProfile]));
 
     if (loading) {
         return (
@@ -460,11 +476,13 @@ export default function ProfileScreen() {
                         ]}
                     >
                         <View style={[styles.page, { width: pageWidth, direction: isRTL ? 'rtl' : 'ltr' }]}>
-                            <EditProfileScreen
-                                key={editRefreshVersion}
-                                embedded
-                                active={mode === 'edit'}
-                            />
+                            {editorMounted || isFocused ? (
+                                <MemoizedEditProfileScreen
+                                    key={editRefreshVersion}
+                                    embedded
+                                    active={isFocused && mode === 'edit'}
+                                />
+                            ) : null}
                         </View>
                         <View style={[styles.page, { width: pageWidth, direction: isRTL ? 'rtl' : 'ltr' }]}>
                             {previewMounted ? (

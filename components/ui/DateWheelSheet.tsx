@@ -6,7 +6,9 @@ import {
     FlatList,
     StyleSheet,
     PixelRatio,
+    Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import BottomSheet, {
     BottomSheetBackdrop,
     BottomSheetBackdropProps,
@@ -26,6 +28,7 @@ import Animated, {
 import { Text } from './Text';
 import { GradientButton } from './GradientButton';
 import { useColors } from '@/hooks/useColors';
+import { useTheme } from '@/hooks/useTheme';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useHaptics } from '@/hooks/useHaptics';
 import { scale } from '@/hooks/useResponsive';
@@ -57,6 +60,7 @@ interface WheelItem {
 const ITEM_HEIGHT = PixelRatio.roundToNearestPixel(scale(40));
 const VISIBLE_ROWS = 5;
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ROWS;
+const IOS_PICKER_HEIGHT = 216;
 // Rows above/below the center row, so first/last items can reach the middle
 const EDGE_PADDING = ITEM_HEIGHT * Math.floor(VISIBLE_ROWS / 2);
 
@@ -204,8 +208,19 @@ export function DateWheelSheet({
     title,
 }: DateWheelSheetProps) {
     const palette = useColors();
+    const { isDark } = useTheme();
     const { currentLanguage, isRTL } = useLanguage();
     const insets = useSafeAreaInsets();
+    const isIOS = Platform.OS === 'ios';
+    const minimumTime = minDate.getTime();
+    const maximumTime = maxDate.getTime();
+    const valueTime = value?.getTime() ?? maximumTime;
+    const clampedTime = clampToRange(Number.isFinite(valueTime) ? valueTime : maximumTime, minimumTime, maximumTime);
+    const [iosDraft, setIOSDraft] = useState(() => new Date(clampedTime));
+
+    useEffect(() => {
+        if (visible && isIOS) setIOSDraft(new Date(clampedTime));
+    }, [visible, isIOS, clampedTime]);
 
     const initial = value ?? maxDate;
     const [year, setYear] = useState(initial.getFullYear());
@@ -279,11 +294,13 @@ export function DateWheelSheet({
     );
 
     const handleConfirm = () => {
-        onConfirm(new Date(year, month, day));
+        onConfirm(isIOS
+            ? new Date(clampToRange(iosDraft.getTime(), minimumTime, maximumTime))
+            : new Date(year, month, day));
         onClose();
     };
 
-    const sheetHeight = scale(48) + WHEEL_HEIGHT + scale(88) + insets.bottom;
+    const sheetHeight = scale(48) + (isIOS ? IOS_PICKER_HEIGHT : WHEEL_HEIGHT) + scale(88) + insets.bottom;
     const card = palette.chrome.common.card;
 
     return (
@@ -296,7 +313,7 @@ export function DateWheelSheet({
             hardwareAccelerated
             onRequestClose={onClose}
         >
-            <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
+            {visible && <GestureHandlerRootView style={{ flex: 1, direction: isRTL ? 'rtl' : 'ltr' }}>
                 <BottomSheet
                     snapPoints={[sheetHeight]}
                     index={0}
@@ -314,12 +331,33 @@ export function DateWheelSheet({
                             <Text variant="body-sm" className="font-body-bold" style={styles.sheetTitle}>
                                 {title}
                             </Text>
-                            <Pressable onPress={onClose} hitSlop={12}>
-                                <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />
+                            <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('cancel', 'Cancel')}>
+                                {isIOS ? (
+                                    <Text variant="body-sm" style={{ color: palette.chrome.primary }}>{t('cancel', 'Cancel')}</Text>
+                                ) : <X size={scale(20)} color={palette.brand.text.subtitle} weight="bold" />}
                             </Pressable>
                         </View>
 
-                        <View style={styles.wheelArea}>
+                        {isIOS ? (
+                            <View style={styles.nativePickerArea}>
+                            <DateTimePicker
+                                value={iosDraft}
+                                mode="date"
+                                display="spinner"
+                                minimumDate={minDate}
+                                maximumDate={maxDate}
+                                locale={currentLanguage}
+                                themeVariant={isDark ? 'dark' : 'light'}
+                                textColor={palette.chrome.common.textStrong}
+                                onValueChange={(_event, date) => {
+                                    if (Number.isFinite(date.getTime())) {
+                                        setIOSDraft(new Date(clampToRange(date.getTime(), minimumTime, maximumTime)));
+                                    }
+                                }}
+                                style={{ height: IOS_PICKER_HEIGHT }}
+                            />
+                            </View>
+                        ) : <View style={styles.wheelArea}>
                             {/* Center highlight band */}
                             <View
                                 pointerEvents="none"
@@ -362,11 +400,11 @@ export function DateWheelSheet({
                                 colors={['transparent', card]}
                                 style={[styles.fade, { bottom: 0 }]}
                             />
-                        </View>
+                        </View>}
 
                         <View style={[styles.footer, { paddingBottom: insets.bottom + scale(12) }]}>
                             <GradientButton
-                                title={t('confirm', 'Confirm')}
+                                title={isIOS ? t('done', 'Done') : t('confirm', 'Confirm')}
                                 onPress={handleConfirm}
                                 widthMode="full"
                                 size="compact"
@@ -374,12 +412,18 @@ export function DateWheelSheet({
                         </View>
                     </BottomSheetView>
                 </BottomSheet>
-            </GestureHandlerRootView>
+            </GestureHandlerRootView>}
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
+    nativePickerArea: {
+        width: '100%',
+        height: IOS_PICKER_HEIGHT,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',

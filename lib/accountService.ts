@@ -1,6 +1,13 @@
 import { api } from './api';
 
 export type PrivacyConsent = {
+    aiModeration?: {
+        allowed: boolean | null;
+        version: string | null;
+        currentVersion: string;
+        decidedAt: string | null;
+        requiresDecision: boolean;
+    };
     agreed: boolean;
     termsVersion?: string | null;
     privacyVersion?: string | null;
@@ -26,6 +33,8 @@ export type AccountDeleteResponse = {
 };
 
 export const accountService = {
+    updateAiModerationConsent: (allowed: boolean, version: string): Promise<PrivacyConsentResponse> =>
+        api.patch('/account/me/ai-moderation-consent', { allowed, version }),
     getPrivacyConsent: (): Promise<PrivacyConsentResponse> =>
         api.get('/account/me/privacy-consent'),
 

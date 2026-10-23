@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { useTextModerationPresentation } from '@/hooks/useTextModerationPresentation';
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -98,7 +99,6 @@ import {
   getTextModerationWarning,
   moderationCandidateForEditing,
   pendingModerationCandidate,
-  type TextModerationWarning,
 } from "@/lib/textModeration";
 import { TextModerationWarningModal } from "@/components/app/TextModerationWarningModal";
 import { UnderReviewPill } from "@/components/app/UnderReviewPill";
@@ -510,7 +510,8 @@ export default function EditProfileScreen({
   const [incomeSheetOpen, setIncomeSheetOpen] = useState(false);
   const [locationConfirmOpen, setLocationConfirmOpen] = useState(false);
   const [locationSettingsOpen, setLocationSettingsOpen] = useState(false);
-  const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
+  const { moderationWarning, setModerationWarning, editorSuspended, onEditorDismiss, onWarningDismiss } =
+    useTextModerationPresentation(companySheetOpen);
   const [loading, setLoading] = useState(!cachedProfile);
   const [profileFetched, setProfileFetched] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -1704,6 +1705,17 @@ export default function EditProfileScreen({
     impact: missingKeySet.has("faith_in_daily_life") ? missingImpacts.faith_in_daily_life || 0 : 0,
   });
 
+  const companyModerationModal = (
+    <TextModerationWarningModal
+      onDismiss={onWarningDismiss}
+      warning={moderationWarning}
+      submitting={saving}
+      onEdit={() => setModerationWarning(null)}
+      onClose={() => setModerationWarning(null)}
+      onSubmitAnyway={() => saveCompany(companyDraft, true)}
+    />
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {!embedded ? (
@@ -1783,13 +1795,7 @@ export default function EditProfileScreen({
         <View style={{ height: 24 }} />
       </KeyboardAwareScrollView>
 
-      <TextModerationWarningModal
-        warning={moderationWarning}
-        submitting={saving}
-        onEdit={() => setModerationWarning(null)}
-        onClose={() => setModerationWarning(null)}
-        onSubmitAnyway={() => saveCompany(companyDraft, true)}
-      />
+      {companyModerationModal}
 
       <SingleSelectSheet
         visible={Boolean(activeSingleField)}
@@ -1824,6 +1830,8 @@ export default function EditProfileScreen({
 
       <TextEditSheet
         visible={companySheetOpen}
+        suspended={editorSuspended}
+        onDismiss={onEditorDismiss}
         title={t("profile.company", "Company")}
         initialValue={company}
         placeholder={t("profile.company", "Company")}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AiModerationConsentChoice } from './AiModerationConsentChoice';
 import { ShieldCheck } from '@/components/ui/icons/PhosphorCompat';
 import { Check } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
@@ -20,43 +21,71 @@ export function LegalConsentGate() {
     const colors = useColors();
     const toast = useToast();
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const userId = useAuthStore((state) => state.user?._id || state.user?.id);
     const [consent, setConsent] = useState<PrivacyConsent | null>(null);
     const [visible, setVisible] = useState(false);
     const [agreed, setAgreed] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [checkedAccount, setCheckedAccount] = useState<string | null>(null);
+    const checking = isAuthenticated && Boolean(userId) && checkedAccount !== userId;
 
     const check = useCallback(async () => {
+        const accountId = useAuthStore.getState().user?._id || useAuthStore.getState().user?.id;
+        try {
         const result = await accountService.getPrivacyConsent();
+        const current = useAuthStore.getState().user;
+        if ((current?._id || current?.id) !== accountId) return;
         if (result.success && result.consent) {
             setConsent(result.consent);
-            setVisible(Boolean(result.consent.requiresReaccept));
+            setVisible(Boolean(result.consent.requiresReaccept || result.consent.aiModeration?.requiresDecision));
+        }
+        } finally {
+            const current = useAuthStore.getState().user;
+            if ((current?._id || current?.id) === accountId) setCheckedAccount(accountId || null);
         }
     }, []);
 
     useEffect(() => {
-        if (isAuthenticated) void check();
+        setVisible(false);
+        setConsent(null);
+        setCheckedAccount(null);
+        setAgreed(false);
+        setSaving(false);
+        if (isAuthenticated) void check().catch(() => undefined);
         else setVisible(false);
-    }, [isAuthenticated, check]);
+    }, [isAuthenticated, userId, check]);
 
     const acceptLatest = async () => {
         if (!agreed || saving) return;
+        const accountId = useAuthStore.getState().user?._id || useAuthStore.getState().user?.id;
         setSaving(true);
         const result = await accountService.acceptLatestConsent();
+        const current = useAuthStore.getState().user;
+        if ((current?._id || current?.id) !== accountId) return;
         setSaving(false);
         if (result.success) {
             toast.show(apiMessage(result.message || 'legal_consent_updated'), 'success', 3000);
-            setVisible(false);
+            if (result.consent) {
+                setConsent(result.consent);
+                setVisible(Boolean(result.consent.aiModeration?.requiresDecision));
+            } else void check().catch(() => undefined);
         } else {
             toast.show(apiMessage(result.message || 'legal_consent_update_failed'), 'error', 3500);
         }
     };
 
-    if (!visible) return null;
+    if (!isAuthenticated || (!visible && !checking)) return null;
 
     return (
         <Modal visible transparent animationType="fade">
             <View style={styles.backdrop}>
-                <View style={[styles.card, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
+                <ScrollView style={{ flexGrow: 0, maxHeight: '85%', width: '100%', maxWidth: scale(440) }} contentContainerStyle={[styles.card, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]} keyboardShouldPersistTaps="handled">
+                    {checking ? <ActivityIndicator accessibilityLabel={t('please_wait', 'Please wait')} color={colors.chrome.primary} /> : !consent?.requiresReaccept && consent?.aiModeration ? (
+                        <AiModerationConsentChoice consent={consent.aiModeration} onSaved={(next) => {
+                            setConsent(next);
+                            setVisible(Boolean(next.requiresReaccept || next.aiModeration?.requiresDecision));
+                        }} />
+                    ) : <>
                     <View style={styles.headerRow}>
                         <View style={[styles.icon, { backgroundColor: colors.chrome.toast.success.bg }]}>
                             <ShieldCheck size={scale(22)} color={colors.chrome.common.successStrong} />
@@ -125,7 +154,8 @@ export function LegalConsentGate() {
                                 </Text>
                             )}
                     </Pressable>
-                </View>
+                    </>}
+                </ScrollView>
             </View>
         </Modal>
     );

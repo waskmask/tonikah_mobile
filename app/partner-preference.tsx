@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useTextModerationPresentation } from '@/hooks/useTextModerationPresentation';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronRight } from '@/components/ui/icons/PhosphorCompat';
@@ -53,7 +54,6 @@ import {
     getTextModerationWarning,
     moderationCandidateForEditing,
     pendingModerationCandidate,
-    TextModerationWarning,
 } from '@/lib/textModeration';
 
 type SheetKey = 'marital' | 'languages' | 'ethnic' | null;
@@ -77,7 +77,8 @@ export default function PartnerPreferenceScreen() {
     const [activeSheet, setActiveSheet] = useState<SheetKey>(null);
     const [aboutSheetOpen, setAboutSheetOpen] = useState(false);
     const [ethnicMaster, setEthnicMaster] = useState<any[]>([]);
-    const [moderationWarning, setModerationWarning] = useState<TextModerationWarning | null>(null);
+    const { moderationWarning, setModerationWarning, editorSuspended, onEditorDismiss, onWarningDismiss } =
+        useTextModerationPresentation(aboutSheetOpen);
     const initialLoadRef = useRef(true);
     const baselineRef = useRef<string | null>(null);
     const baselineStateRef = useRef<PartnerPrefState | null>(null);
@@ -453,6 +454,20 @@ export default function PartnerPreferenceScreen() {
                     }
                     : null;
 
+    const moderationModal = (
+        <TextModerationWarningModal
+            onDismiss={onWarningDismiss}
+            warning={moderationWarning}
+            submitting={saving}
+            onEdit={() => {
+                setModerationWarning(null);
+                setAboutSheetOpen(true);
+            }}
+            onClose={() => setModerationWarning(null)}
+            onSubmitAnyway={() => void saveAbout(pendingAboutSubmissionRef.current ?? state.about, true)}
+        />
+    );
+
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar
@@ -607,6 +622,8 @@ export default function PartnerPreferenceScreen() {
                 multiline
                 minInputHeight={scale(150)}
                 presentation="drawer"
+                suspended={editorSuspended}
+                onDismiss={onEditorDismiss}
                 saving={saving}
                 pendingReview={aboutPendingReview}
                 sanitizeValue={(value) => trimToCharacterLimit(plainTextFromFormattedInput(value), PP_ABOUT_MAX)}
@@ -617,16 +634,7 @@ export default function PartnerPreferenceScreen() {
                 onSave={(value) => void saveAbout(value)}
             />
 
-            <TextModerationWarningModal
-                warning={moderationWarning}
-                submitting={saving}
-                onEdit={() => {
-                    setModerationWarning(null);
-                    setAboutSheetOpen(true);
-                }}
-                onClose={() => setModerationWarning(null)}
-                onSubmitAnyway={() => void saveAbout(pendingAboutSubmissionRef.current ?? state.about, true)}
-            />
+            {moderationModal}
 
             <ConfirmSheet
                 visible={unsavedNavigation.confirmationVisible}

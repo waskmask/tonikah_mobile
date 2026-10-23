@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "AI content safety checks",
+  "ai_review_disclosure": "With your permission, we send profile photos and your Headline, Bio, Company and About Partner text to OpenAI or Google Gemini, depending on the content, for safety checks and to assist admin review. Providers may retain submitted content and technical data under their applicable terms and settings. These checks do not verify your identity.",
+  "ai_review_choice": "AI checks usually help publish approved content faster. If you choose admin review instead, no content will be sent to AI providers for these checks, and new content will stay hidden until approved. You can change your choice in Data & privacy. Changes apply to future checks.",
+  "ai_review_allow": "Allow AI checks",
+  "ai_review_decline": "Use admin review instead",
+  "ai_review_allowed": "Current choice: AI checks allowed",
+  "ai_review_manual": "Current choice: admin review only",
+  "ai_review_save_error": "Could not save your choice. Please try again. Content stays in admin review without permission.",
   "preview": "Preview",
   "verifications_page": {
     "title": "Verifications",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Privacy consent",
   "privacy_consent_desc": "Review your consent record and manage optional marketing emails.",
   "terms_version": "Terms version",
+  "accepted_version": "Accepted version",
   "privacy_version": "Privacy version",
   "consent_date": "Consent date",
   "marketing_emails": "Marketing emails",

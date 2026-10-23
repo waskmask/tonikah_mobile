@@ -13,7 +13,7 @@ function setStatus(next: ConnectivityStatus) {
 }
 
 function pingUrl() {
-    return `${Config.API_URL.replace(/\/api\/?$/, '')}/ping`;
+    return `${Config.API_URL.replace(/\/+$/, '')}/mobile-config`;
 }
 
 export const connectivity = {
@@ -31,13 +31,13 @@ export const connectivity = {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
         try {
-            await fetch(pingUrl(), {
+            const response = await fetch(pingUrl(), {
                 method: 'GET',
                 signal: controller.signal,
                 cache: 'no-store',
             });
-            setStatus('online');
-            return true;
+            setStatus(response.ok ? 'online' : 'offline');
+            return response.ok;
         } catch {
             setStatus('offline');
             return false;

@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 import { Check, Gift, RefreshCw } from '@/components/ui/icons/PhosphorCompat';
 import { CaretDown, CaretUp, Info } from 'phosphor-react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -63,7 +64,7 @@ import { firstSearchParam, sanitizeAuthReturnPath } from '@/lib/authReturn';
 type CheckoutState = 'idle' | 'creating' | 'browser_open' | 'refreshing' | 'pending';
 
 // Opt in to store connections when testing IAP; layout work needs no billing service.
-const NATIVE_BILLING_ENABLED = !__DEV__ || process.env.EXPO_PUBLIC_ENABLE_MEMBERSHIP_IAP === 'true';
+const NATIVE_BILLING_ENABLED = MEMBERSHIP_PURCHASES_ENABLED && (!__DEV__ || process.env.EXPO_PUBLIC_ENABLE_MEMBERSHIP_IAP === 'true');
 
 const EMPTY_OVERVIEW: MembershipOverview = {
     membership: null,
@@ -178,6 +179,10 @@ function giftCardErrorMessage(message?: string) {
 }
 
 export default function MembershipsScreen() {
+    return MEMBERSHIP_PURCHASES_ENABLED ? <PaidMembershipsScreen /> : <Redirect href="/profile" />;
+}
+
+function PaidMembershipsScreen() {
     const colors = useColors();
     const insets = useSafeAreaInsets();
     const params = useLocalSearchParams<{ returnTo?: string | string[]; view?: string | string[] }>();

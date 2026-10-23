@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { TextInput, View, TextInputProps, NativeSyntheticEvent, TextInputFocusEventData } from "react-native";
+import React, { useCallback, useRef, useState } from "react";
+import { Pressable, TextInput, View, TextInputProps, NativeSyntheticEvent, TextInputFocusEventData } from "react-native";
 import { Text } from "./Text";
 import { scale } from "@/hooks/useResponsive";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -32,6 +32,19 @@ export const Input: React.FC<InputProps> = ({
     ...props
 }) => {
     const [isFocused, setIsFocused] = useState(false);
+    const fieldRef = useRef<TextInput | null>(null);
+    const setInputRef = useCallback((node: TextInput | null) => {
+        fieldRef.current = node;
+        if (typeof inputRef === 'function') {
+            const cleanup = inputRef(node);
+            if (typeof cleanup === 'function') {
+                return () => {
+                    fieldRef.current = null;
+                    cleanup();
+                };
+            }
+        } else if (inputRef) inputRef.current = node;
+    }, [inputRef]);
     const { isRTL } = useLanguage();
     const { isDark } = useTheme();
     // Placeholder can't be styled separately in RN, but it only shows while the
@@ -57,7 +70,10 @@ export const Input: React.FC<InputProps> = ({
                     {label}
                 </Text>
             )}
-            <View
+            <Pressable
+                accessible={false}
+                onPress={() => { if (props.editable !== false) fieldRef.current?.focus(); }}
+                hitSlop={{ top: 6, bottom: 6 }}
                 style={[
                     {
                         flexDirection: 'row',
@@ -66,6 +82,7 @@ export const Input: React.FC<InputProps> = ({
                         borderBottomWidth: isFocused ? 1.5 : 1,
                         paddingHorizontal: scale(6),
                         height: scale(44),
+                        minHeight: 44,
                         backgroundColor: 'transparent',
                         borderBottomColor: error
                             ? '#EF4444'
@@ -82,7 +99,7 @@ export const Input: React.FC<InputProps> = ({
                 )}
 
                 <TextInput
-                    ref={inputRef}
+                    ref={setInputRef}
                     accessibilityLabel={props.accessibilityLabel || label || placeholder}
                     // Darker placeholder for readability; weight stays light via the
                     // regular input font (RN can't style placeholder weight separately)
@@ -120,7 +137,7 @@ export const Input: React.FC<InputProps> = ({
                         {rightIcon}
                     </View>
                 )}
-            </View>
+            </Pressable>
 
             {error && (
                 // Absolute inside the gap below — never pushes the layout

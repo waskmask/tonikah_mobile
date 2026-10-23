@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 import {
     ActivityIndicator,
     FlatList,
@@ -499,7 +500,7 @@ export default function MessagesScreen() {
                 </View>
             )}
 
-            {membershipPromoVisible && eligibility.messagingAccess?.allowed === false && (
+            {MEMBERSHIP_PURCHASES_ENABLED && membershipPromoVisible && eligibility.messagingAccess?.allowed === false && (
                 <View style={[styles.notificationBanner, { backgroundColor: palette.chrome.common.primaryTint, borderColor: palette.chrome.common.primaryRing }]}>
                     <View style={[styles.notificationBannerIcon, { backgroundColor: palette.chrome.common.card }]}>
                         <CreditCard size={scale(15)} color={primary} strokeWidth={2.4} />

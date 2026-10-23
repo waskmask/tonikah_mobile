@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
     View,
     ScrollView,
@@ -69,6 +69,14 @@ export default function Step1() {
     const [showNationalitySheet, setShowNationalitySheet] = useState(false);
     const [showCountrySheet, setShowCountrySheet] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const submittingRef = useRef(false);
+
+    const resumeExistingProfile = (profile: Record<string, any>) => {
+        setGender(profile.gender || '');
+        setProfileData(profile);
+        const step = useProfileSetupStore.getState().getIncompleteStep(profile);
+        router.replace(step === 0 ? '/search' : `/(profile-setup)/step${Math.max(2, step)}` as any);
+    };
 
     // Gender options
     const genderOptions: SelectOption[] = [
@@ -123,11 +131,25 @@ export default function Step1() {
     };
 
     const handleSubmit = () => {
+        const existingProfile = useAuthStore.getState().user?.profile;
+        if (existingProfile) {
+            resumeExistingProfile(existingProfile);
+            return;
+        }
         if (!validate()) return;
         setShowConfirm(true);
     };
 
     const submitProfile = async () => {
+        if (submittingRef.current) return;
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser) return;
+        if (currentUser?.profile) {
+            setShowConfirm(false);
+            resumeExistingProfile(currentUser.profile);
+            return;
+        }
+        submittingRef.current = true;
         setShowConfirm(false);
         setLoading(true);
         try {
@@ -141,19 +163,32 @@ export default function Step1() {
             };
 
             const res = await profileService.createProfile(payload);
+            const auth = useAuthStore.getState();
+            if (auth.user?._id !== currentUser._id) return;
             if (res.success) {
+                const savedProfile = res.profile || payload;
                 setGender(gender);
-                setProfileData(payload);
+                setProfileData(savedProfile);
+                auth.setUser({ ...auth.user!, profile: savedProfile });
                 // Refresh the cached /me user so an app reload resumes at the
                 // next incomplete step instead of replaying this one
-                useAuthStore.getState().refreshUser().catch(() => { });
+                auth.refreshUser().catch(() => { });
                 router.replace('/(profile-setup)/step2');
+            } else if (res.message === 'profile_already_exists') {
+                // A previous create may have succeeded before the app was closed.
+                await auth.refreshUser().catch(() => undefined);
+                const recoveredUser = useAuthStore.getState().user;
+                if (recoveredUser?._id === currentUser._id) {
+                    if (recoveredUser.profile) resumeExistingProfile(recoveredUser.profile);
+                    else toast.show(apiMessage('server_error_default'), 'error');
+                }
             } else {
                 toast.show(apiMessage(res.message || 'server_error_default'), 'error');
             }
         } catch (err) {
             toast.show(apiMessage('server_error_default'), 'error');
         } finally {
+            submittingRef.current = false;
             setLoading(false);
         }
     };
@@ -237,7 +272,7 @@ export default function Step1() {
                                 ? nationality.map((n) => getDisplayLabel(n, nationalityOptions)).join(', ')
                                 : ''
                         }
-                        placeholder={t('common:step_1.select_nationality', { defaultValue: 'Nationality' })}
+                        placeholder={t('common:nationality', { defaultValue: 'Nationality' })}
                         onPress={() => setShowNationalitySheet(true)}
                         icon={<Flag size={scale(18)} color={iconColor} />}
                         hasError={!!errors.nationality}
@@ -247,7 +282,7 @@ export default function Step1() {
                     {/* Where Did You Grow Up */}
                     <SelectField required
                         value={grewUpIn ? getDisplayLabel(grewUpIn, countryOptions) : ''}
-                        placeholder={t('common:step_1.select_country', { defaultValue: 'Where Did You Grow Up?' })}
+                        placeholder={t('common:grew_up_in', { defaultValue: 'Grew up in' })}
                         onPress={() => setShowCountrySheet(true)}
                         icon={<Footprints size={scale(18)} color={iconColor} />}
                         hasError={!!errors.grewUpIn}

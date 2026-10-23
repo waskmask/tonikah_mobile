@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "Yapay zekâ ile içerik güvenliği kontrolleri",
+  "ai_review_disclosure": "İzninizle profil fotoğraflarını ve Başlık, Biyografi, Şirket ve Partner Hakkında metinlerini, içeriğe bağlı olarak güvenlik kontrolü ve yönetici incelemesine yardımcı olmak için OpenAI veya Google Gemini’ye göndeririz. Sağlayıcılar içerikleri ve teknik verileri kendi koşul ve ayarlarına göre saklayabilir. Bu kontroller kimliğinizi doğrulamaz.",
+  "ai_review_choice": "Yapay zekâ kontrolleri genellikle onaylanan içeriğin daha hızlı yayımlanmasına yardımcı olur. Yönetici incelemesini seçerseniz bu kontroller için içerik yapay zekâ sağlayıcılarına gönderilmez ve yeni içerik onaylanana kadar gizli kalır. Seçiminizi Veri ve gizlilik bölümünden değiştirebilirsiniz. Değişiklikler gelecekteki kontroller için geçerlidir.",
+  "ai_review_allow": "Yapay zekâ kontrollerine izin ver",
+  "ai_review_decline": "Yönetici incelemesini kullan",
+  "ai_review_allowed": "Mevcut seçim: yapay zekâya izin verildi",
+  "ai_review_manual": "Mevcut seçim: yalnızca yönetici incelemesi",
+  "ai_review_save_error": "Seçiminiz kaydedilemedi. Tekrar deneyin. İzin olmadan içerik yönetici incelemesinde kalır.",
   "preview": "Önizleme",
   "verifications_page": {
     "title": "Doğrulamalar",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Gizlilik onayi",
   "privacy_consent_desc": "Onay kaydinizi inceleyin ve istege bagli pazarlama e-postalarini yonetin.",
   "terms_version": "Sartlar surumu",
+  "accepted_version": "Kabul edilen sürüm",
   "privacy_version": "Gizlilik surumu",
   "consent_date": "Onay tarihi",
   "marketing_emails": "Pazarlama e-postalari",

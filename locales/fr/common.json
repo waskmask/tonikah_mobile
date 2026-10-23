@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "Vérification de sécurité par IA",
+  "ai_review_disclosure": "Avec votre autorisation, nous envoyons les photos du profil et les textes du titre, de la biographie, de l’entreprise et des attentes concernant le partenaire à OpenAI ou Google Gemini, selon le contenu, pour vérifier leur sécurité et aider la modération humaine. Les fournisseurs peuvent conserver le contenu et les données techniques selon leurs conditions et réglages. Ces vérifications ne confirment pas votre identité.",
+  "ai_review_choice": "Les vérifications par IA permettent généralement de publier plus vite le contenu approuvé. Si vous choisissez la modération humaine, aucun contenu ne sera envoyé aux fournisseurs d’IA pour ces vérifications et les nouveaux contenus resteront masqués jusqu’à leur approbation. Vous pouvez modifier votre choix dans Données et confidentialité. Les changements concernent les vérifications futures.",
+  "ai_review_allow": "Autoriser les vérifications par IA",
+  "ai_review_decline": "Choisir la modération humaine",
+  "ai_review_allowed": "Choix actuel : IA autorisée",
+  "ai_review_manual": "Choix actuel : modération humaine uniquement",
+  "ai_review_save_error": "Impossible d’enregistrer votre choix. Réessayez. Sans autorisation, le contenu reste en attente de modération humaine.",
   "preview": "Aperçu",
   "verifications_page": {
     "title": "Vérifications",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Consentement de confidentialite",
   "privacy_consent_desc": "Consultez votre preuve de consentement et gerez les e-mails marketing facultatifs.",
   "terms_version": "Version des conditions",
+  "accepted_version": "Version acceptée",
   "privacy_version": "Version de confidentialite",
   "consent_date": "Date du consentement",
   "marketing_emails": "E-mails marketing",

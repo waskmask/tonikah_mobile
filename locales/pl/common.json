@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "Kontrola bezpieczeństwa treści przez AI",
+  "ai_review_disclosure": "Za Twoją zgodą wysyłamy zdjęcia profilowe oraz teksty Nagłówka, Biografii, Firmy i O partnerze do OpenAI lub Google Gemini, zależnie od treści, w celu kontroli bezpieczeństwa i wsparcia weryfikacji przez administratora. Dostawcy mogą przechowywać treści i dane techniczne zgodnie ze swoimi warunkami i ustawieniami. Kontrole nie potwierdzają Twojej tożsamości.",
+  "ai_review_choice": "Kontrole AI zwykle pomagają szybciej publikować zatwierdzone treści. Jeśli wybierzesz weryfikację przez administratora, treści nie zostaną wysłane do dostawców AI do tych kontroli, a nowe treści pozostaną ukryte do zatwierdzenia. Wybór możesz zmienić w Dane i prywatność. Zmiany dotyczą przyszłych kontroli.",
+  "ai_review_allow": "Zezwól na kontrole AI",
+  "ai_review_decline": "Wybierz weryfikację administratora",
+  "ai_review_allowed": "Obecny wybór: AI dozwolone",
+  "ai_review_manual": "Obecny wybór: tylko weryfikacja administratora",
+  "ai_review_save_error": "Nie udało się zapisać wyboru. Spróbuj ponownie. Bez zgody treści pozostają do weryfikacji administratora.",
   "preview": "Podgląd",
   "verifications_page": {
     "title": "Weryfikacje",
@@ -2540,6 +2548,7 @@
   "privacy_consent": "Zgoda prywatnosci",
   "privacy_consent_desc": "Sprawdz swoj zapis zgody i zarzadzaj opcjonalnymi e-mailami marketingowymi.",
   "terms_version": "Wersja regulaminu",
+  "accepted_version": "Zaakceptowana wersja",
   "privacy_version": "Wersja prywatnosci",
   "consent_date": "Data zgody",
   "marketing_emails": "E-maile marketingowe",

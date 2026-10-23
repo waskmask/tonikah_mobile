@@ -191,8 +191,8 @@ export default function TabsLayout() {
         <AppMenuProvider>
             <MembershipAccessListener />
             <View style={styles.navigatorHost}>
+                {/* Labels update through props; language changes must preserve tab stacks. */}
                 <NativeTabs
-                key={`${Platform.OS}-${currentLanguage}`}
                 backBehavior="history"
                 minimizeBehavior="never"
                 disableTransparentOnScrollEdge

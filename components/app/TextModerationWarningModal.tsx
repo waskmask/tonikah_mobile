@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { AlertCircle, X } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/textModeration';
 
 type Props = {
+    onDismiss?: () => void;
     warning: TextModerationWarning | null;
     submitting: boolean;
     onEdit: () => void;
@@ -24,26 +25,31 @@ type Props = {
 /** Native port of the Next.js TextModerationWarningModal: field-specific
     title, detected-issue pills, and short Edit / Submit actions where Submit
     resends the same payload with submitAnyway. */
-export function TextModerationWarningModal({ warning, submitting, onEdit, onClose, onSubmitAnyway }: Props) {
+export function TextModerationWarningModal({ warning, submitting, onEdit, onClose, onSubmitAnyway, onDismiss }: Props) {
     const palette = useColors();
     const { isRTL } = useLanguage();
 
-    if (!warning) return null;
+    // Keep the Modal mounted while it hides so iOS can deliver onDismiss.
+    const lastWarningRef = useRef(warning);
+    if (warning) lastWarningRef.current = warning;
+    const displayedWarning = warning || lastWarningRef.current;
+    if (!displayedWarning) return null;
 
-    const issueKeys = moderationIssueTranslationKeys(warning);
+    const issueKeys = moderationIssueTranslationKeys(displayedWarning);
     const dismiss = onClose ?? onEdit;
 
     return (
         <Modal
-            visible
+            visible={Boolean(warning)}
             transparent
             animationType="fade"
             statusBarTranslucent
             navigationBarTranslucent
             hardwareAccelerated
+            onDismiss={onDismiss}
             onRequestClose={submitting ? undefined : dismiss}
         >
-            <View style={styles.overlay}>
+            <View accessibilityViewIsModal style={styles.overlay}>
                 <View style={[styles.card, { backgroundColor: palette.chrome.common.card, borderColor: palette.brand.bg.border }]}>
                     <View style={[styles.headerRow, { flexDirection: 'row' }]}>
                         <View style={[styles.titleGroup, { flexDirection: 'row' }]}>
@@ -55,7 +61,7 @@ export function TextModerationWarningModal({ warning, submitting, onEdit, onClos
                                 className="font-body-bold"
                                 style={[styles.title, { textAlign: 'left' }]}
                             >
-                                {t(moderationTitleKeys[warning.field], 'This text needs review')}
+                                {t(moderationTitleKeys[displayedWarning.field], 'This text needs review')}
                             </Text>
                         </View>
                         <Pressable

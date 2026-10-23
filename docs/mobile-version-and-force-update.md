@@ -95,7 +95,7 @@ pm2 restart tonikah-api --update-env
 Confirm the deployed configuration:
 
 ```bash
-curl https://api.tonikah.com/api/mobile-config
+curl https://apis.tonikah.com/api/mobile-config
 ```
 
 ## Safe Release Order

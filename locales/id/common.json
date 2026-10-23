@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "Pemeriksaan keamanan konten dengan AI",
+  "ai_review_disclosure": "Dengan izin Anda, kami mengirim foto profil dan teks Judul, Bio, Perusahaan, serta Tentang Pasangan ke OpenAI atau Google Gemini, sesuai jenis kontennya, untuk pemeriksaan keamanan dan membantu tinjauan admin. Penyedia dapat menyimpan konten dan data teknis sesuai ketentuan dan pengaturannya. Pemeriksaan ini tidak memverifikasi identitas Anda.",
+  "ai_review_choice": "Pemeriksaan AI biasanya membantu menerbitkan konten yang disetujui lebih cepat. Jika memilih tinjauan admin, konten tidak dikirim ke penyedia AI untuk pemeriksaan ini dan konten baru tetap tersembunyi hingga disetujui. Anda dapat mengubah pilihan di Data & privasi. Perubahan berlaku untuk pemeriksaan berikutnya.",
+  "ai_review_allow": "Izinkan pemeriksaan AI",
+  "ai_review_decline": "Gunakan tinjauan admin",
+  "ai_review_allowed": "Pilihan saat ini: AI diizinkan",
+  "ai_review_manual": "Pilihan saat ini: hanya tinjauan admin",
+  "ai_review_save_error": "Pilihan tidak dapat disimpan. Coba lagi. Tanpa izin, konten tetap dalam tinjauan admin.",
   "preview": "Pratinjau",
   "verifications_page": {
     "title": "Verifikasi",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Persetujuan privasi",
   "privacy_consent_desc": "Tinjau catatan persetujuan Anda dan kelola email pemasaran opsional.",
   "terms_version": "Versi ketentuan",
+  "accepted_version": "Versi yang disetujui",
   "privacy_version": "Versi privasi",
   "consent_date": "Tanggal persetujuan",
   "marketing_emails": "Email pemasaran",

@@ -1,4 +1,12 @@
 {
+  "ai_review_title": "Revisión de seguridad con IA",
+  "ai_review_disclosure": "Con tu permiso, enviamos fotos del perfil y textos de Titular, Biografía, Empresa y Sobre tu pareja a OpenAI o Google Gemini, según el contenido, para comprobar su seguridad y ayudar a la revisión administrativa. Los proveedores pueden conservar el contenido y los datos técnicos según sus condiciones y ajustes. Estas comprobaciones no verifican tu identidad.",
+  "ai_review_choice": "Las comprobaciones con IA suelen ayudar a publicar más rápido el contenido aprobado. Si eliges revisión administrativa, no enviaremos contenido a proveedores de IA para estas comprobaciones y el contenido nuevo permanecerá oculto hasta su aprobación. Puedes cambiar tu elección en Datos y privacidad. Los cambios se aplican a futuras comprobaciones.",
+  "ai_review_allow": "Permitir comprobaciones con IA",
+  "ai_review_decline": "Usar revisión administrativa",
+  "ai_review_allowed": "Elección actual: IA permitida",
+  "ai_review_manual": "Elección actual: solo revisión administrativa",
+  "ai_review_save_error": "No se pudo guardar tu elección. Inténtalo de nuevo. Sin permiso, el contenido pasa a revisión administrativa.",
   "preview": "Vista previa",
   "verifications_page": {
     "title": "Verificaciones",
@@ -2532,6 +2540,7 @@
   "privacy_consent": "Consentimiento de privacidad",
   "privacy_consent_desc": "Revisa tu registro de consentimiento y gestiona los correos de marketing opcionales.",
   "terms_version": "Version de los terminos",
+  "accepted_version": "Versión aceptada",
   "privacy_version": "Version de privacidad",
   "consent_date": "Fecha de consentimiento",
   "marketing_emails": "Correos de marketing",

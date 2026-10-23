@@ -65,6 +65,7 @@ import { firstSearchParam, sanitizeAuthReturnPath } from "@/lib/authReturn";
 import { RootAppMenuDrawer } from "@/components/app/RootAppMenuDrawer";
 import { ForceUpdateGate } from "@/components/app/ForceUpdateGate";
 import { markStartup } from "@/lib/performanceDiagnostics";
+import { menuNavigationScreenListeners } from "@/lib/menuNavigationDiagnostics";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -288,6 +289,7 @@ export default function RootLayout() {
                 <EmailVerificationGate />
                 <RootAppMenuDrawer>
                 <Stack
+                    screenListeners={__DEV__ ? menuNavigationScreenListeners : undefined}
                     screenOptions={{
                         headerShown: false,
                         headerBackButtonMenuEnabled: false,

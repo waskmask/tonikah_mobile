@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { usePathname } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { router, type Href, useFocusEffect, useLocalSearchParams, usePathname } from 'expo-router';
+import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, View } from 'react-native';
 import { Check } from '@/components/ui/icons/PhosphorCompat';
 import { Text } from '@/components/ui/Text';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
@@ -10,6 +10,9 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useColors } from '@/hooks/useColors';
 import { scale } from '@/hooks/useResponsive';
 import { SUPPORTED_APP_LANGUAGES } from '@/lib/languageNames';
+import { firstSearchParam, sanitizeAuthReturnPath } from '@/lib/authReturn';
+import { useRootAppMenu } from '@/components/app/RootAppMenuDrawer';
+import { useToast } from '@/hooks/useToast';
 
 const LANGUAGES = SUPPORTED_APP_LANGUAGES;
 
@@ -20,23 +23,88 @@ function textValue(value: unknown, fallback: string) {
 export default function LanguageScreen() {
     const { currentLanguage, changeLanguage, t } = useLanguage();
     const pathname = usePathname();
+    const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+    const candidate = sanitizeAuthReturnPath(firstSearchParam(params.returnTo), '/settings');
+    const returnHref = candidate === '/language' ? '/settings' : candidate;
+    const closeRootMenu = useRootAppMenu()?.closeMenu;
     const colors = useColors();
     const primary = colors.chrome.primary;
+    const toast = useToast();
     const [savingCode, setSavingCode] = useState<string | null>(null);
+    const savingCodeRef = useRef<string | null>(null);
+    const mounted = useRef(true);
+    const focusSession = useRef(0);
+    const pendingFeedback = useRef<{ frame: number; finish: (ready: boolean) => void } | null>(null);
+
+    const cancelFeedback = useCallback(() => {
+        const pending = pendingFeedback.current;
+        if (!pending) return;
+        pendingFeedback.current = null;
+        cancelAnimationFrame(pending.frame);
+        pending.finish(false);
+    }, []);
+
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            cancelFeedback();
+        };
+    }, [cancelFeedback]);
+
+    const handleBack = useCallback(() => {
+        closeRootMenu?.();
+        router.navigate(returnHref as Href);
+    }, [closeRootMenu, returnHref]);
+
+    useFocusEffect(useCallback(() => {
+        focusSession.current += 1;
+        const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+            handleBack();
+            return true;
+        });
+        return () => {
+            focusSession.current += 1;
+            subscription.remove();
+            cancelFeedback();
+        };
+    }, [handleBack, cancelFeedback]));
 
     async function selectLanguage(code: string) {
-        if (code === currentLanguage || savingCode) return;
+        if (!mounted.current || code === currentLanguage || savingCodeRef.current) return;
+        savingCodeRef.current = code;
         setSavingCode(code);
+        const session = focusSession.current;
         try {
-            await changeLanguage(code, pathname);
+            // Let the loading state commit and have a frame to paint before
+            // languageChanged subscribers start their synchronous render work.
+            const ready = await new Promise<boolean>((finish) => {
+                const pending = { frame: 0, finish };
+                pendingFeedback.current = pending;
+                pending.frame = requestAnimationFrame(() => {
+                    if (pendingFeedback.current !== pending) return;
+                    pending.frame = requestAnimationFrame(() => {
+                        if (pendingFeedback.current !== pending) return;
+                        pendingFeedback.current = null;
+                        finish(true);
+                    });
+                });
+            });
+            if (!ready || !mounted.current || session !== focusSession.current) return;
+            await changeLanguage(code, `${pathname}?returnTo=${encodeURIComponent(returnHref)}`);
+        } catch {
+            if (mounted.current) {
+                toast.show(textValue(t('something_went_wrong'), 'Unable to change language. Please try again.'), 'error');
+            }
         } finally {
-            setSavingCode(null);
+            savingCodeRef.current = null;
+            if (mounted.current) setSavingCode(null);
         }
     }
 
     return (
         <View style={[styles.root, { backgroundColor: colors.brand.bg.surface }]}>
-            <AppBackTitleBar title={textValue(t('language'), 'Language')} fallbackHref="/settings" showMenu />
+            <AppBackTitleBar title={textValue(t('language'), 'Language')} fallbackHref={returnHref} onBack={handleBack} showMenu />
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <SettingsFieldSection>
                     {LANGUAGES.map((language, index) => {
@@ -54,16 +122,18 @@ export default function LanguageScreen() {
                                 disabled={Boolean(savingCode)}
                                 divider={index > 0}
                                 selected={active}
+                                animatePress={false}
                                 showChevron={false}
                                 accessory={(
                                     <View style={styles.accessorySlot}>
-                                        {loading ? (
-                                            <ActivityIndicator size="small" color={primary} />
-                                        ) : active ? (
-                                            <View style={[styles.checkCircle, { backgroundColor: primary }]}>
-                                                <Check size={scale(12)} color="#FFFFFF" strokeWidth={3} />
-                                            </View>
-                                        ) : null}
+                                        {/* Keep marker identity stable to avoid stale Android checks after removal. */}
+                                        <View
+                                            pointerEvents="none"
+                                            style={[styles.checkCircle, { backgroundColor: primary, opacity: active && !loading ? 1 : 0 }]}
+                                        >
+                                            <Check size={scale(12)} color="#FFFFFF" strokeWidth={3} />
+                                        </View>
+                                        {loading ? <ActivityIndicator style={StyleSheet.absoluteFill} size="small" color={primary} /> : null}
                                     </View>
                                 )}
                             />

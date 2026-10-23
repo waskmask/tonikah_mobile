@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -33,6 +33,11 @@ type CropDraft = {
     slotIndex: number;
     width?: number;
     height?: number;
+};
+
+type PendingPhotoSource = {
+    source: 'camera' | 'gallery';
+    slotIndex: number;
 };
 
 type Props = {
@@ -93,6 +98,10 @@ export function ProfileMediaEditor({
     const [cropDraft, setCropDraft] = useState<CropDraft | null>(null);
     const [cropError, setCropError] = useState<string | null>(null);
     const [sourceSlot, setSourceSlot] = useState<number | null>(null);
+    const [pickerSlot, setPickerSlot] = useState<number | null>(null);
+    const pendingPhotoSourceRef = useRef<PendingPhotoSource | null>(null);
+    const pickerBusyRef = useRef(false);
+    const mountedRef = useRef(true);
     const [guidelinesVisible, setGuidelinesVisible] = useState(false);
     const onGalleryChangeRef = useRef(onGalleryChange);
     const { data: sharedGalleryResponse } = useQuery<GalleryResponse>({
@@ -114,6 +123,7 @@ export function ProfileMediaEditor({
     const emptySlotBorder = isDark ? colors.brand.text.subtitle : '#8F877D';
     const busy =
         loading ||
+        pickerSlot !== null ||
         busySlot !== null ||
         deletingUuid !== null ||
         primaryUuid !== null ||
@@ -126,6 +136,14 @@ export function ProfileMediaEditor({
     useEffect(() => {
         onBusyChange?.(busy);
     }, [busy, onBusyChange]);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            pendingPhotoSourceRef.current = null;
+        };
+    }, []);
 
     useEffect(() => {
         onGalleryChangeRef.current = onGalleryChange;
@@ -196,6 +214,7 @@ export function ProfileMediaEditor({
     }, [refreshGallery]);
 
     const pickImage = (slotIndex: number) => {
+        if (sourceSlot !== null || pendingPhotoSourceRef.current || pickerBusyRef.current || cropDraft) return;
         if (gallery.length >= GALLERY_MAX_SLOTS && !gallery[slotIndex]) {
             showToast(t('gallery_limit_reached', 'Gallery limit reached.'), 'warning', 2500);
             return;
@@ -213,22 +232,18 @@ export function ProfileMediaEditor({
     };
 
     const pickFromGallery = async (slotIndex: number) => {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (permission.status !== 'granted') {
-            showToast(t('photo_permission_required', 'Photo library permission is required.'), 'error');
-            return;
-        }
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             quality: 1,
             allowsMultipleSelection: false,
         });
-        if (result.canceled || !result.assets?.[0]?.uri) return;
+        if (!mountedRef.current || result.canceled || !result.assets?.[0]?.uri) return;
         startCrop(slotIndex, result.assets[0]);
     };
 
     const captureWithCamera = async (slotIndex: number) => {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!mountedRef.current) return;
         if (permission.status !== 'granted') {
             showToast(t('camera_permission_required', 'Camera permission is required.'), 'error');
             return;
@@ -237,8 +252,30 @@ export function ProfileMediaEditor({
             mediaTypes: ['images'],
             quality: 1,
         });
-        if (result.canceled || !result.assets?.[0]?.uri) return;
+        if (!mountedRef.current || result.canceled || !result.assets?.[0]?.uri) return;
         startCrop(slotIndex, result.assets[0]);
+    };
+
+    const handleSourceDismiss = () => {
+        const pending = pendingPhotoSourceRef.current;
+        pendingPhotoSourceRef.current = null;
+        if (!pending || !mountedRef.current || pickerBusyRef.current) return;
+        pickerBusyRef.current = true;
+        setPickerSlot(pending.slotIndex);
+        // Native pickers must not compete with the source sheet's presentation.
+        void (async () => {
+            try {
+                if (pending.source === 'camera') await captureWithCamera(pending.slotIndex);
+                else await pickFromGallery(pending.slotIndex);
+            } catch {
+                if (mountedRef.current) {
+                    showToast(t('something_went_wrong', 'Something went wrong.'), 'error');
+                }
+            } finally {
+                pickerBusyRef.current = false;
+                if (mountedRef.current) setPickerSlot(null);
+            }
+        })();
     };
 
     const uploadCroppedImage = async (uri: string) => {
@@ -425,6 +462,7 @@ export function ProfileMediaEditor({
                         const underReview = Boolean(item && item.safe === false && !checking);
                         const deleting = deletingUuid === uuid;
                         const busy =
+                            pickerSlot === index ||
                             busySlot === index ||
                             deleting ||
                             primaryUuid === uuid;
@@ -433,7 +471,7 @@ export function ProfileMediaEditor({
                             <Pressable
                                 key={uuid || `slot-${index}`}
                                 onPress={() => pickImage(index)}
-                                disabled={busy}
+                                disabled={busy || pickerSlot !== null}
                                 style={[
                                     styles.slot,
                                     item ? styles.filledSlot : styles.emptySlotFrame,
@@ -715,11 +753,18 @@ export function ProfileMediaEditor({
             <SingleSelectSheet
                 visible={sourceSlot !== null}
                 onClose={() => setSourceSlot(null)}
+                onDismiss={handleSourceDismiss}
                 onSelect={(source) => {
                     const slot = sourceSlot;
-                    const selectedItem = slot === null ? null : gallery[slot];
+                    if (slot === null || pendingPhotoSourceRef.current || pickerBusyRef.current) return;
+                    const selectedItem = gallery[slot];
+                    if (source === 'camera' || source === 'gallery') {
+                        pendingPhotoSourceRef.current = { source, slotIndex: slot };
+                        setPickerSlot(slot);
+                    }
                     setSourceSlot(null);
-                    if (slot === null) return;
+                    // Browsers require the file picker to retain the user activation.
+                    if (Platform.OS === 'web') handleSourceDismiss();
                     if (source === 'primary') {
                         if (selectedItem?.uuid) void makePrimary(selectedItem.uuid);
                         return;
@@ -728,12 +773,6 @@ export function ProfileMediaEditor({
                         if (selectedItem?.uuid) void removeImage(selectedItem.uuid);
                         return;
                     }
-                    // Let the sheet dismiss before presenting the system picker
-                    // or camera; simultaneous presentation fails on iOS.
-                    setTimeout(() => {
-                        if (source === 'camera') void captureWithCamera(slot);
-                        else void pickFromGallery(slot);
-                    }, 400);
                 }}
                 options={[
                     { value: 'camera', label: t('take_photo', 'Take a photo') },

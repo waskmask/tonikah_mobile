@@ -108,7 +108,6 @@ export const useLanguageStore = create<LanguageState>()(
                 if (lng === previousLanguage) return;
 
                 await i18n.changeLanguage(lng);
-                await AsyncStorage.setItem("user-language", lng);
                 const isRTL = lng === "ar";
                 const directionChanged = (previousLanguage === "ar") !== isRTL;
 
@@ -116,9 +115,19 @@ export const useLanguageStore = create<LanguageState>()(
                 // only needed when entering or leaving RTL layout direction.
                 if (!directionChanged) {
                     set({ currentLanguage: lng, isRTL, isReady: true });
+                    try {
+                        await AsyncStorage.setItem("user-language", lng);
+                    } catch (error) {
+                        if (get().currentLanguage === lng) {
+                            await i18n.changeLanguage(previousLanguage);
+                            set({ currentLanguage: previousLanguage, isRTL: previousLanguage === "ar", isReady: true });
+                        }
+                        throw error;
+                    }
                     return;
                 }
 
+                await AsyncStorage.setItem("user-language", lng);
                 if (currentPath) {
                     await AsyncStorage.setItem(POST_LANGUAGE_ROUTE_KEY, currentPath).catch(() => { });
                 }

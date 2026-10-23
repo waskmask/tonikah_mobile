@@ -24,7 +24,7 @@ export function ProgressBar({ currentStep, totalSteps = 10 }: ProgressBarProps) 
 
     return (
         <View style={styles.wrapper}>
-            {currentStep > 1 ? (
+            {currentStep > 2 ? (
                 <Pressable
                     onPress={() => router.replace(`/(profile-setup)/step${currentStep - 1}` as any)}
                     accessibilityRole="button"

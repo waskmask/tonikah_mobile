@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, type Href, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +28,7 @@ import { useWebSupport } from '@/hooks/useWebSupport';
 import { scale } from '@/hooks/useResponsive';
 import { fontFamilyForText } from '@/constants/typography';
 import { NavigationTypeTokens } from '@/constants/uiTokens';
+import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 
 type MenuItemBase = {
     labelKey: string;
@@ -68,25 +69,20 @@ function textValue(value: unknown, fallback: string) {
 export function AppMenuDrawerContent({
     onClose,
     onCloseThenRun,
-    isOpen = true,
+    isNavigating = false,
 }: {
     onClose: () => void;
-    onCloseThenRun: (action: () => void) => void;
-    isOpen?: boolean;
+    onCloseThenRun: (action: () => void, destination?: string) => void;
+    isNavigating?: boolean;
 }) {
     const { t, isRTL } = useLanguage();
     const { isDark } = useTheme();
     const { logout, isLoading } = useAuthStore();
     const openSupport = useWebSupport();
     const pathname = usePathname();
-    const [transitioning, setTransitioning] = useState(false);
     const surfaceColor = isDark ? '#1D1D1F' : '#FFFFFF';
     const borderColor = isDark ? '#303033' : '#EEEEEE';
     const headingColor = isDark ? '#E5E5E7' : '#241E17';
-
-    useEffect(() => {
-        setTransitioning(false);
-    }, [isOpen]);
 
     const openDestination = (href: Href) => {
         if (href === '/hobbies-faith') {
@@ -103,16 +99,22 @@ export function AppMenuDrawerContent({
             });
             return;
         }
+        if (href === '/language') {
+            router.push({
+                pathname: '/language',
+                params: { returnTo: pathname },
+            });
+            return;
+        }
         router.push(href);
     };
 
-    const closeThenRun = (action: () => void) => {
-        if (isLoading || transitioning) return;
-        setTransitioning(true);
-        onCloseThenRun(action);
+    const closeThenRun = (action: () => void, destination?: string) => {
+        if (isLoading || isNavigating) return;
+        onCloseThenRun(action, destination);
     };
 
-    const navigate = (href: Href) => closeThenRun(() => openDestination(href));
+    const navigate = (href: Href) => closeThenRun(() => openDestination(href), typeof href === 'string' ? href : href.pathname);
     const navigateToSupport = () => closeThenRun(() => void openSupport());
 
     const handleLogout = async () => {
@@ -123,7 +125,6 @@ export function AppMenuDrawerContent({
     return (
         <SafeAreaView
             edges={['top', 'bottom']}
-            pointerEvents={transitioning ? 'none' : 'auto'}
             style={[
                 styles.drawer,
                 {
@@ -143,7 +144,7 @@ export function AppMenuDrawerContent({
                 >
                     {textValue(t('menu'), 'Menu')}
                 </Text>
-                <Pressable onPress={onClose} disabled={isLoading} style={styles.closeButton} hitSlop={10}>
+                <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={textValue(t('close_menu'), 'Close menu')} style={styles.closeButton} hitSlop={10}>
                     <X size={24} color={headingColor} strokeWidth={2.1} />
                 </Pressable>
             </View>
@@ -153,7 +154,7 @@ export function AppMenuDrawerContent({
                     icon={User}
                     iconWeight="bold"
                     label={textValue(t('my_profile'), 'My profile')}
-                    disabled={isLoading}
+                    disabled={isLoading || isNavigating}
                     onPress={() => navigate('/profile')}
                 />
 
@@ -163,19 +164,19 @@ export function AppMenuDrawerContent({
                         icon={item.icon}
                         iconWeight={item.iconWeight}
                         label={textValue(t(item.labelKey), item.fallback)}
-                        disabled={isLoading}
+                        disabled={isLoading || isNavigating}
                         onPress={() => item.action === 'support' ? navigateToSupport() : navigate(item.href)}
                     />
                 ))}
 
-                {ACCOUNT_ITEMS.map((item) => (
+                {ACCOUNT_ITEMS.filter((item) => MEMBERSHIP_PURCHASES_ENABLED || item.href !== '/memberships').map((item) => (
                     <MenuRow
                         key={item.labelKey}
                         iconElement={item.iconElement}
                         icon={item.icon}
                         iconWeight={item.iconWeight}
                         label={textValue(t(item.labelKey), item.fallback)}
-                        disabled={isLoading}
+                        disabled={isLoading || isNavigating}
                         onPress={() => item.action === 'support' ? navigateToSupport() : navigate(item.href)}
                     />
                 ))}
@@ -187,7 +188,7 @@ export function AppMenuDrawerContent({
                     iconWeight="bold"
                     label={isLoading ? textValue(t('please_wait'), 'Please wait') : textValue(t('logout'), 'Logout')}
                     danger
-                    disabled={isLoading}
+                    disabled={isLoading || isNavigating}
                     loading={isLoading}
                     onPress={handleLogout}
                 />
