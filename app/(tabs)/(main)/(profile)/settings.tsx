@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
@@ -23,6 +24,7 @@ import {
 export default function SettingsScreen() {
     const { user, refreshUser, setUser } = useAuthStore();
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const iconColor = colors.chrome.common.textStrong;
     const emailVerified = Boolean(user?.email_verified ?? user?.emailVerified);
     const [verificationBannerVisible, setVerificationBannerVisible] = useState(true);
@@ -72,7 +74,7 @@ export default function SettingsScreen() {
             />
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ paddingTop: 0, paddingBottom: scale(120) }}
+                contentContainerStyle={{ paddingTop: 0, paddingBottom: bottomPadding }}
                 showsVerticalScrollIndicator={false}
             >
                 <SettingsFieldSection>

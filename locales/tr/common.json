@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Geri bildirim gönder",
+  "feedback_open_failed": "Geri bildirim sayfası açılamadı. Lütfen tekrar deneyin.",
   "ai_review_title": "Yapay zekâ ile içerik güvenliği kontrolleri",
   "ai_review_disclosure": "İzninizle profil fotoğraflarını ve Başlık, Biyografi, Şirket ve Partner Hakkında metinlerini, içeriğe bağlı olarak güvenlik kontrolü ve yönetici incelemesine yardımcı olmak için OpenAI veya Google Gemini’ye göndeririz. Sağlayıcılar içerikleri ve teknik verileri kendi koşul ve ayarlarına göre saklayabilir. Bu kontroller kimliğinizi doğrulamaz.",
   "ai_review_choice": "Yapay zekâ kontrolleri genellikle onaylanan içeriğin daha hızlı yayımlanmasına yardımcı olur. Yönetici incelemesini seçerseniz bu kontroller için içerik yapay zekâ sağlayıcılarına gönderilmez ve yeni içerik onaylanana kadar gizli kalır. Seçiminizi Veri ve gizlilik bölümünden değiştirebilirsiniz. Değişiklikler gelecekteki kontroller için geçerlidir.",

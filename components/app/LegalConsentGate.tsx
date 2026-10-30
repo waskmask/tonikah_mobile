@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { AiModerationConsentChoice } from './AiModerationConsentChoice';
 import { ShieldCheck } from '@/components/ui/icons/PhosphorCompat';
@@ -11,6 +11,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useColors } from '@/hooks/useColors';
 import { useToast } from '@/hooks/useToast';
 import { scale } from '@/hooks/useResponsive';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { InlineLoadError } from '@/components/ui/InlineLoadError';
 
 /**
  * Blocking modal shown when the accepted terms/privacy versions are older than
@@ -27,21 +29,34 @@ export function LegalConsentGate() {
     const [agreed, setAgreed] = useState(false);
     const [saving, setSaving] = useState(false);
     const [checkedAccount, setCheckedAccount] = useState<string | null>(null);
-    const checking = isAuthenticated && Boolean(userId) && checkedAccount !== userId;
+    const [failedAccount, setFailedAccount] = useState<string | null>(null);
+    const [retrying, setRetrying] = useState(false);
+    const generation = useRef(0);
+    const inFlight = useRef(false);
 
     const check = useCallback(async () => {
         const accountId = useAuthStore.getState().user?._id || useAuthStore.getState().user?.id;
+        if (!accountId || inFlight.current) return;
+        const requestGeneration = generation.current;
+        const isCurrent = () => generation.current === requestGeneration
+            && (useAuthStore.getState().user?._id || useAuthStore.getState().user?.id) === accountId;
+        inFlight.current = true;
+        setRetrying(true);
         try {
-        const result = await accountService.getPrivacyConsent();
-        const current = useAuthStore.getState().user;
-        if ((current?._id || current?.id) !== accountId) return;
-        if (result.success && result.consent) {
+            const result = await accountService.getPrivacyConsent();
+            if (!isCurrent()) return;
+            if (!result.success || !result.consent) throw new Error('Consent lookup failed');
             setConsent(result.consent);
+            setCheckedAccount(accountId);
+            setFailedAccount(null);
             setVisible(Boolean(result.consent.requiresReaccept || result.consent.aiModeration?.requiresDecision));
-        }
+        } catch {
+            if (isCurrent()) setFailedAccount(accountId);
         } finally {
-            const current = useAuthStore.getState().user;
-            if ((current?._id || current?.id) === accountId) setCheckedAccount(accountId || null);
+            if (isCurrent()) {
+                inFlight.current = false;
+                setRetrying(false);
+            }
         }
     }, []);
 
@@ -49,39 +64,66 @@ export function LegalConsentGate() {
         setVisible(false);
         setConsent(null);
         setCheckedAccount(null);
+        setFailedAccount(null);
+        setRetrying(false);
+        inFlight.current = false;
         setAgreed(false);
         setSaving(false);
-        if (isAuthenticated) void check().catch(() => undefined);
+        if (isAuthenticated && userId) void check();
         else setVisible(false);
+        return () => { generation.current += 1; };
     }, [isAuthenticated, userId, check]);
 
     const acceptLatest = async () => {
         if (!agreed || saving) return;
         const accountId = useAuthStore.getState().user?._id || useAuthStore.getState().user?.id;
+        if (!isAuthenticated || accountId !== userId || checkedAccount !== accountId || !consent?.requiresReaccept) return;
+        const requestGeneration = generation.current;
+        const isCurrent = () => generation.current === requestGeneration
+            && (useAuthStore.getState().user?._id || useAuthStore.getState().user?.id) === accountId;
         setSaving(true);
-        const result = await accountService.acceptLatestConsent();
-        const current = useAuthStore.getState().user;
-        if ((current?._id || current?.id) !== accountId) return;
-        setSaving(false);
-        if (result.success) {
-            toast.show(apiMessage(result.message || 'legal_consent_updated'), 'success', 3000);
-            if (result.consent) {
-                setConsent(result.consent);
-                setVisible(Boolean(result.consent.aiModeration?.requiresDecision));
-            } else void check().catch(() => undefined);
-        } else {
-            toast.show(apiMessage(result.message || 'legal_consent_update_failed'), 'error', 3500);
+        try {
+            const result = await accountService.acceptLatestConsent();
+            if (!isCurrent()) return;
+            if (result.success) {
+                toast.show(apiMessage(result.message || 'legal_consent_updated'), 'success', 3000);
+                if (result.consent) {
+                    setConsent(result.consent);
+                    setVisible(Boolean(result.consent.requiresReaccept || result.consent.aiModeration?.requiresDecision));
+                    setAgreed(false);
+                } else await check();
+            } else {
+                toast.show(apiMessage(result.message || 'legal_consent_update_failed'), 'error', 3500);
+            }
+        } catch {
+            if (isCurrent()) toast.show(apiMessage('legal_consent_update_failed'), 'error', 3500);
+        } finally {
+            if (isCurrent()) setSaving(false);
         }
     };
 
-    if (!isAuthenticated || (!visible && !checking)) return null;
+    if (!isAuthenticated || !userId) return null;
+    if (failedAccount === userId && !visible) return (
+        <SafeAreaView edges={['top']} style={[styles.errorNotice, { backgroundColor: colors.chrome.common.card }]}>
+            <InlineLoadError title={t('data_privacy', 'Data & privacy')}
+                description={t('network_error', 'No internet connection. Please check and try again.')}
+                retryLabel={t('btn_try_again', 'Try Again')} retrying={retrying} onRetry={() => void check()} />
+        </SafeAreaView>
+    );
+    if (!visible || checkedAccount !== userId || !consent) return null;
+    const consentGeneration = generation.current;
 
     return (
         <Modal visible transparent animationType="fade">
             <View style={styles.backdrop}>
                 <ScrollView style={{ flexGrow: 0, maxHeight: '85%', width: '100%', maxWidth: scale(440) }} contentContainerStyle={[styles.card, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]} keyboardShouldPersistTaps="handled">
-                    {checking ? <ActivityIndicator accessibilityLabel={t('please_wait', 'Please wait')} color={colors.chrome.primary} /> : !consent?.requiresReaccept && consent?.aiModeration ? (
+                    {failedAccount === userId ? <InlineLoadError title={t('data_privacy', 'Data & privacy')}
+                        description={t('network_error', 'No internet connection. Please check and try again.')}
+                        retryLabel={t('btn_try_again', 'Try Again')} retrying={retrying} onRetry={() => void check()} /> : null}
+                    {!consent.requiresReaccept && consent.aiModeration ? (
                         <AiModerationConsentChoice consent={consent.aiModeration} onSaved={(next) => {
+                            const current = useAuthStore.getState().user;
+                            if (generation.current !== consentGeneration || (current?._id || current?.id) !== userId) return;
                             setConsent(next);
                             setVisible(Boolean(next.requiresReaccept || next.aiModeration?.requiresDecision));
                         }} />
@@ -172,6 +214,7 @@ function VersionPill({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+    errorNotice: { position: 'absolute', top: 0, left: 0, right: 0, paddingBottom: scale(12), zIndex: 1 },
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: scale(18) },
     card: { width: '100%', maxWidth: scale(440), borderRadius: scale(18), borderWidth: StyleSheet.hairlineWidth, padding: scale(18) },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: scale(12) },

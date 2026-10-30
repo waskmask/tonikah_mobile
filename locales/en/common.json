@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Send Feedback",
+  "feedback_open_failed": "Could not open feedback. Please try again.",
   "ai_review_title": "AI content safety checks",
   "ai_review_disclosure": "With your permission, we send profile photos and your Headline, Bio, Company and About Partner text to OpenAI or Google Gemini, depending on the content, for safety checks and to assist admin review. Providers may retain submitted content and technical data under their applicable terms and settings. These checks do not verify your identity.",
   "ai_review_choice": "AI checks usually help publish approved content faster. If you choose admin review instead, no content will be sent to AI providers for these checks, and new content will stay hidden until approved. You can change your choice in Data & privacy. Changes apply to future checks.",

@@ -29,7 +29,7 @@ test('privacy settings: current policy versions and accepted records remain sepa
     }
 });
 
-function harness({ web = false, boundary = false, gate = false, setting = false, toggleRow = false, response, request, theme = 'light' } = {}) {
+function harness({ web = false, boundary = false, gate = false, setting = false, toggleRow = false, response, request, acceptResponse, theme = 'light' } = {}) {
     const slots = [], effects = [], calls = [], saved = [], cached = [];
     let cursor = 0, dirty = false, tree, user = { _id: 'account-1' }, getImpl = response;
     const hooks = {
@@ -72,7 +72,9 @@ function harness({ web = false, boundary = false, gate = false, setting = false,
         if (name === '@/components/ui/Text') return { Text: 'Text' };
         if (name === '@/components/ui/PressableScale') return { PressableScale: 'PressableScale' };
         if (name === '@/hooks/useLanguage') return { useLanguage: () => ({ isRTL: false }) };
-        if (name === '@/lib/accountService') return { accountService: { updateAiModerationConsent: patch, getPrivacyConsent: async () => (await get()).data, acceptLatestConsent: async () => nativeResult(null) } };
+        if (name === '@/lib/accountService') return { accountService: { updateAiModerationConsent: patch, getPrivacyConsent: async () => (await get()).data, acceptLatestConsent: acceptResponse || (async () => nativeResult(null)) } };
+        if (name === 'react-native-safe-area-context') return { SafeAreaView: 'SafeAreaView' };
+        if (name === '@/components/ui/InlineLoadError') return { InlineLoadError: 'InlineLoadError' };
         if (name === '@/lib/apiClient') return { api: { get, patch } };
         if (name === '@/lib/queryClient') return { queryClient: { cancelQueries: async () => {}, setQueryData: (...args) => cached.push(args) } };
         if (name === '@/lib/queryKeys') return { queryKeys: { settings: { privacyConsent: ['settings', 'privacyConsent'] } } };
@@ -373,10 +375,9 @@ test('consent disclosure and choices match across all 11 RN/web locales', () => 
     }
 });
 
-test('native: startup reserves the modal before any editor can open, then asks for AI permission', async () => {
+test('native: startup shows no empty modal, then asks for confirmed required AI permission', async () => {
     const h = harness({ gate: true });
-    assert.ok(nodes(h.tree).some(n => n.type === 'Modal'));
-    assert.ok(nodes(h.tree).some(n => n.type === 'ActivityIndicator'));
+    assert.equal(h.tree, null);
     await h.flush();
     assert.ok(nodes(h.tree).some(n => n.type === 'AiModerationConsentChoice'));
 });
@@ -398,7 +399,94 @@ test('native: a recorded refusal does not prompt again after sign-in', async () 
     await h.flush(); assert.equal(h.tree, null);
 });
 
-test('native: a failed consent lookup releases loading and cannot grant permission', async () => {
+test('native: a failed consent lookup offers recovery without granting permission or opening a modal', async () => {
     const h = harness({ gate: true, response: async () => { throw new Error('offline'); } });
+    await h.flush();
+    assert.ok(nodes(h.tree).some(n => n.type === 'InlineLoadError'));
+    assert.ok(!nodes(h.tree).some(n => n.type === 'Modal'));
+    assert.equal(h.calls.length, 0);
+});
+
+test('native: slow valid consent has no overlay and never writes a decision', async () => {
+    let resolve;
+    const h = harness({ gate: true, response: () => new Promise(done => { resolve = done; }) });
+    await h.flush(); assert.equal(h.tree, null);
+    resolve({ success: true, consent: { requiresReaccept: false, aiModeration: consent(true) } });
     await h.flush(); assert.equal(h.tree, null); assert.equal(h.calls.length, 0);
+});
+
+test('native: unsuccessful and missing consent responses can retry, deduplicating rapid retries', async () => {
+    for (const initial of [{ success: false }, { success: true }]) {
+        let count = 0, resolve;
+        const h = harness({ gate: true, response: () => ++count === 1 ? initial : new Promise(done => { resolve = done; }) });
+        await h.flush();
+        const retry = nodes(h.tree).find(n => n.type === 'InlineLoadError').props.onRetry;
+        retry(); retry(); h.render();
+        assert.equal(count, 2);
+        assert.equal(nodes(h.tree).find(n => n.type === 'InlineLoadError').props.retrying, true);
+        resolve({ success: true, consent: { requiresReaccept: true, aiModeration: consent() } });
+        await h.flush();
+        assert.ok(nodes(h.tree).some(n => n.type === 'Modal'));
+        assert.ok(nodes(h.tree).some(n => n.props?.accessibilityRole === 'checkbox'));
+        assert.equal(h.calls.length, 0);
+    }
+});
+
+test('native: stale lookup responses cannot cross accounts or a logout/login to the same account', async () => {
+    for (const nextUser of [{ _id: 'account-2' }, { _id: 'account-1' }]) {
+        const pending = [];
+        const h = harness({ gate: true, response: () => new Promise(resolve => pending.push(resolve)) });
+        h.setUser(null); h.render();
+        h.setUser(nextUser); h.render();
+        pending[0]({ success: true, consent: { requiresReaccept: true } });
+        await h.flush(); assert.equal(h.tree, null);
+        pending[1]({ success: true, consent: { requiresReaccept: false, aiModeration: consent(false) } });
+        await h.flush(); assert.equal(h.tree, null);
+    }
+});
+
+test('native: thrown acceptance remains recoverable and keeps known required consent visible', async () => {
+    const h = harness({ gate: true, response: async () => ({ success: true, consent: { requiresReaccept: true } }),
+        acceptResponse: async () => { throw new Error('offline'); } });
+    await h.flush();
+    nodes(h.tree).find(n => n.props?.accessibilityRole === 'checkbox').props.onPress(); h.render();
+    await nodes(h.tree).filter(n => n.type === 'Pressable').at(-1).props.onPress();
+    await h.flush();
+    assert.ok(nodes(h.tree).some(n => n.type === 'Modal'));
+    assert.equal(nodes(h.tree).filter(n => n.type === 'Pressable').at(-1).props.disabled, false);
+});
+
+test('native: stale AI save callbacks cannot dismiss another account consent gate', async () => {
+    const h = harness({ gate: true }); await h.flush();
+    const onSaved = nodes(h.tree).find(n => n.type === 'AiModerationConsentChoice').props.onSaved;
+    h.setUser({ _id: 'account-2' }); h.render(); await h.flush();
+    onSaved({ requiresReaccept: false, aiModeration: consent(true) }); h.render();
+    assert.ok(nodes(h.tree).some(n => n.type === 'AiModerationConsentChoice'));
+});
+
+test('native: a late terms acceptance cannot dismiss the next account required gate', async () => {
+    let resolve;
+    const h = harness({ gate: true, response: async () => ({ success: true, consent: { requiresReaccept: true } }),
+        acceptResponse: () => new Promise(done => { resolve = done; }) });
+    await h.flush();
+    nodes(h.tree).find(n => n.props?.accessibilityRole === 'checkbox').props.onPress(); h.render();
+    const saving = nodes(h.tree).filter(n => n.type === 'Pressable').at(-1).props.onPress();
+    h.setUser({ _id: 'account-2' }); h.render(); await h.flush();
+    resolve({ success: true, consent: { requiresReaccept: false, aiModeration: consent(true) } });
+    await saving; await h.flush();
+    assert.ok(nodes(h.tree).some(n => n.props?.accessibilityRole === 'checkbox'));
+    assert.equal(h.calls.length, 0);
+});
+
+test('native: failed confirmation after acceptance retains the required modal and offers lookup retry', async () => {
+    let count = 0;
+    const h = harness({ gate: true,
+        response: async () => ++count === 1 ? { success: true, consent: { requiresReaccept: true } } : { success: false },
+        acceptResponse: async () => ({ success: true }) });
+    await h.flush();
+    nodes(h.tree).find(n => n.props?.accessibilityRole === 'checkbox').props.onPress(); h.render();
+    await nodes(h.tree).filter(n => n.type === 'Pressable').at(-1).props.onPress(); await h.flush();
+    assert.ok(nodes(h.tree).some(n => n.type === 'Modal'));
+    assert.ok(nodes(h.tree).some(n => n.type === 'InlineLoadError'));
+    assert.equal(h.calls.length, 0);
 });

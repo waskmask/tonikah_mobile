@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -24,6 +25,7 @@ export default function SetPasswordScreen() {
     const user = useAuthStore((state) => state.user);
     const refreshUser = useAuthStore((state) => state.refreshUser);
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const { isRTL } = useLanguage();
     const toast = useToast();
 
@@ -103,7 +105,7 @@ export default function SetPasswordScreen() {
             <AppBackTitleBar title={t('set_password', 'Set Login Password')} fallbackHref="/settings-security" showMenu />
             <KeyboardAwareScrollView
                 style={styles.scroll}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
                 keyboardShouldPersistTaps="handled"
                 bottomOffset={scale(24)}
             >

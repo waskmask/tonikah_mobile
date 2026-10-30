@@ -1,8 +1,8 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { getLocales } from 'expo-localization';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { CaretDown, PencilSimple, SealCheck } from 'phosphor-react-native';
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
@@ -32,7 +32,7 @@ function PhoneVerificationForm() {
     const user = useAuthStore((state) => state.user);
     const refreshUser = useAuthStore((state) => state.refreshUser);
     const colors = useColors();
-    const insets = useSafeAreaInsets();
+    const bottomPadding = useSettingsBottomPadding();
     const { isRTL, currentLanguage } = useLanguage();
     const alive = useRef(true);
     const locked = useRef(false);
@@ -127,7 +127,7 @@ function PhoneVerificationForm() {
         <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
             <AppBackTitleBar title="" fallbackHref="/verifications" />
             <KeyboardAwareScrollView keyboardShouldPersistTaps="handled" bottomOffset={scale(16)}
-                contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + scale(16) }]}>
+                contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}>
                 {verified && !editing ? (
                     <View style={styles.formContent}>
                         <View style={styles.badge} accessible={false}>

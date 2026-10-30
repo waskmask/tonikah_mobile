@@ -85,7 +85,7 @@ import { useChatSocket } from '@/hooks/useChatSocket';
 import { scale } from '@/hooks/useResponsive';
 import { fontFamilyForText, Typography } from '@/constants/typography';
 import { cacheChatMedia, clearChatMediaCache, deleteCachedChatMediaForMessage, getCachedChatMedia, pinCachedChatMedia, storeLocalChatMedia, unpinCachedChatMedia } from '@/lib/chatMediaCache';
-import { claimChatAudioPlayback, createChatAudioPlaybackOwner, isChatAudioPlaybackOwner, releaseChatAudioPlayback, stopChatAudioPlaybackForMessage } from '@/lib/chatAudioPlayback';
+import { claimChatAudioPlayback, createChatAudioPlaybackOwner, isChatAudioPlaybackOwner, releaseChatAudioPlayback, stopAllChatAudioPlayback, stopChatAudioPlaybackForMessage } from '@/lib/chatAudioPlayback';
 import { mergeChatMessageMedia } from '@/lib/chatMessageMedia';
 import { chatImageLayout } from '@/lib/chatImageLayout';
 import { waveformPeaks } from '@/lib/chatWaveform';
@@ -343,7 +343,7 @@ function buildItems(messages: ChatMessage[]): ListItem[] {
 }
 
 export default function ConversationScreen() {
-    const params = useLocalSearchParams<{ id: string; recipientId?: string; name?: string; avatar?: string; online?: string; accountDeleted?: string; state?: string; requestRole?: string }>();
+    const params = useLocalSearchParams<{ id: string; recipientId?: string; name?: string; avatar?: string; online?: string; accountDeleted?: string; state?: string; requestRole?: string; notificationEntry?: string }>();
     const id = routeParam(params.id);
     const recipientId = routeParam(params.recipientId);
     const name = routeParam(params.name);
@@ -395,7 +395,7 @@ export default function ConversationScreen() {
     const toast = useToast();
     const { lightImpact, selection } = useHaptics();
     const insets = useSafeAreaInsets();
-    useConversationKeyboardMode();
+    useConversationKeyboardMode(routeParam(params.notificationEntry));
     const listRef = useRef<FlatList<ListItem>>(null);
     const { isNearBottomRef } = useChatScrollAnchor<ListItem>();
     const initialPositionPendingRef = useRef(true);
@@ -423,7 +423,7 @@ export default function ConversationScreen() {
     const socketRef = useRef<{
         markSeen: (id?: string | null) => void;
         sendTyping: (recipientId?: string | null) => void;
-        stopTyping: (recipientId?: string | null) => void;
+        stopTyping: (recipientId?: string | null, conversationId?: string | null) => void;
     } | null>(null);
     // True when messages arrived from the peer while the user was scrolled up;
     // we defer marking them seen until they're actually brought into view.
@@ -498,6 +498,7 @@ export default function ConversationScreen() {
     const [peerTyping, setPeerTyping] = useState(false);
     const peerTypingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const typingActiveRef = useRef(false);
+    const lastTypingSentAtRef = useRef(0);
     const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const previousConnectivityRef = useRef(connectivityStatus);
 
@@ -761,17 +762,25 @@ export default function ConversationScreen() {
             : message));
     }, []);
 
-    const handleSocketTyping = useCallback(() => {
+    const handleSocketTyping = useCallback((payload: { conversationId: string; userId: string }) => {
+        const myId = String(user?._id || user?.id || '');
+        if (!myId || !payload?.userId || String(payload.userId) === myId || String(payload.conversationId) !== id) return;
+        if (!isFocused || AppState.currentState !== 'active') return;
+        if (conversation?.otherUser?.id && String(conversation.otherUser.id) !== String(payload.userId)) return;
         setPeerTyping(true);
         if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
         // Safety net: hide the indicator if the peer's stop event never arrives.
         peerTypingClearRef.current = setTimeout(() => setPeerTyping(false), 6000);
-    }, []);
+    }, [id, user?._id, user?.id, isFocused, conversation?.otherUser?.id]);
 
-    const handleSocketStopTyping = useCallback(() => {
+    const handleSocketStopTyping = useCallback((payload: { conversationId: string; userId: string }) => {
+        const myId = String(user?._id || user?.id || '');
+        if (!myId || !payload?.userId || String(payload.userId) === myId || String(payload.conversationId) !== id) return;
+        if (conversation?.otherUser?.id && String(conversation.otherUser.id) !== String(payload.userId)) return;
         if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
+        peerTypingClearRef.current = null;
         setPeerTyping(false);
-    }, []);
+    }, [id, user?._id, user?.id, conversation?.otherUser?.id]);
 
     const socket = useChatSocket({
         conversationId: id !== 'new' ? id : null,
@@ -1034,6 +1043,7 @@ export default function ConversationScreen() {
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (state) => {
             if (state === 'active') requestAnimationFrame(() => tryMarkVisibleUnreadRef.current());
+            else stopAllChatAudioPlayback();
         });
         return () => subscription.remove();
     }, []);
@@ -1342,33 +1352,53 @@ export default function ConversationScreen() {
         }
         if (typingActiveRef.current) {
             typingActiveRef.current = false;
-            socketRef.current?.stopTyping(peerId);
+            socketRef.current?.stopTyping(peerId, id);
         }
-    }, [peerId]);
+        lastTypingSentAtRef.current = 0;
+    }, [peerId, id]);
 
     const handleComposerChange = (value: string) => {
         setContent(value.slice(0, 5000));
-        if (!peerId || id === 'new') return;
-        if (!typingActiveRef.current) {
+        if (!value.trim()) {
+            emitStopTyping();
+            return;
+        }
+        if (!peerId || id === 'new' || !socket.connected || !isFocused || AppState.currentState !== 'active') return;
+        const now = Date.now();
+        if (!typingActiveRef.current || now - lastTypingSentAtRef.current >= 1500) {
             typingActiveRef.current = true;
+            lastTypingSentAtRef.current = now;
             socketRef.current?.sendTyping(peerId);
         }
         if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
-        typingStopTimerRef.current = setTimeout(() => {
-            typingActiveRef.current = false;
-            socketRef.current?.stopTyping(peerId);
-        }, 2500);
+        typingStopTimerRef.current = setTimeout(emitStopTyping, 2500);
     };
 
     // Reset typing state when leaving or switching conversations.
     useEffect(() => {
-        return () => {
-            if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+        const clearTyping = () => {
+            emitStopTyping();
             if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
-            typingActiveRef.current = false;
+            peerTypingClearRef.current = null;
             setPeerTyping(false);
         };
-    }, [id]);
+        const subscription = AppState.addEventListener('change', (state) => {
+            if (state !== 'active') clearTyping();
+        });
+        return () => {
+            subscription.remove();
+            clearTyping();
+        };
+    }, [emitStopTyping, user?._id, user?.id]);
+
+    useEffect(() => {
+        if (!isFocused || !socket.connected) {
+            emitStopTyping();
+            if (peerTypingClearRef.current) clearTimeout(peerTypingClearRef.current);
+            peerTypingClearRef.current = null;
+            setPeerTyping(false);
+        }
+    }, [isFocused, socket.connected, emitStopTyping]);
 
     const send = async () => {
         if (!requireVerified('chat')) return;
@@ -2351,7 +2381,6 @@ export default function ConversationScreen() {
                             });
                         }}
                         ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ paddingVertical: scale(10) }} /> : null}
-                        ListHeaderComponent={peerTyping ? <TypingIndicatorBubble colors={colors} /> : null}
                         ListEmptyComponent={
                             <View style={styles.empty}>
                                 {loading || !messagesReady ? (
@@ -2385,6 +2414,11 @@ export default function ConversationScreen() {
                         setComposerHeight((current) => Math.abs(current - height) < 1 ? current : height);
                     }}
                 >
+                {peerTyping ? (
+                    <View pointerEvents="none" style={styles.typingSlot}>
+                        <TypingIndicatorBubble colors={colors} />
+                    </View>
+                ) : null}
                 {isRequest && activeConversation && !peerDeleted && (
                     <View style={[styles.requestBar, { backgroundColor: colors.card }]}>
                         <Text variant="caption" className="font-body-semi" align="center" style={[styles.requestHint, { color: colors.muted }]}>
@@ -2963,6 +2997,7 @@ function VoiceRecorderPanel({
                             <View style={styles.voiceRecorderNativeWaveHost} onLayout={(event) => setWaveWidth(event.nativeEvent.layout.width)}>
                             <WaveformRecorderView
                                 ref={recorderRef}
+                                backgroundRecording={false}
                                 style={styles.voiceRecorderNativeWave}
                                 output={{ format: 'm4a', channels: 1, bitrate: 128000 }}
                                 maxDurationMs={MAX_VOICE_RECORDING_SECONDS * 1000}
@@ -3169,7 +3204,7 @@ function TypingIndicatorBubble({ colors }: { colors: Record<string, string> }) {
         return () => { progress.value = 0; };
     }, [progress]);
     return (
-        <Reanimated.View entering={ZoomIn.duration(140)} exiting={ZoomOut.duration(120)} style={styles.typingRow}>
+        <Reanimated.View entering={ZoomIn.duration(140)} style={styles.typingRow}>
             <View style={[styles.typingBubble, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {[0, 1, 2].map((index) => (
                     <TypingDot key={index} progress={progress} index={index} color={colors.muted} />
@@ -4325,6 +4360,7 @@ const styles = StyleSheet.create({
     disabledButton: { opacity: 0.62 },
     endedBar: { padding: scale(13) },
     composer: {},
+    typingSlot: { paddingHorizontal: scale(12) },
     typingRow: { paddingVertical: scale(4), alignItems: 'flex-start' },
     typingBubble: {
         flexDirection: 'row',

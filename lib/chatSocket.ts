@@ -34,11 +34,19 @@ export type ChatSocketHandlers = {
     onSeen?: (payload: any) => void;
     onDelivered?: (payload: any) => void;
     onViewOnceViewed?: (payload: any) => void;
-    onTyping?: (payload: any) => void;
-    onStopTyping?: (payload: any) => void;
+    onTyping?: (payload: ChatTypingPayload) => void;
+    onStopTyping?: (payload: ChatTypingPayload) => void;
     onGalleryAccessChanged?: (payload: any) => void;
     onGalleryModerationUpdated?: (payload: GalleryModerationUpdateEvent) => void;
 };
+
+export type ChatTypingPayload = { conversationId: string; userId: string };
+
+function isIncomingTyping(payload: ChatTypingPayload | null | undefined) {
+    const user = useAuthStore.getState().user;
+    const userId = String(user?._id || user?.id || '');
+    return Boolean(payload?.conversationId && payload.userId && userId && String(payload.userId) !== userId);
+}
 
 type Subscriber = { handlers: () => ChatSocketHandlers };
 
@@ -68,6 +76,16 @@ let refreshingAuth = false;
 let connected = false;
 let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let appStateSubscription: NativeEventSubscription | null = null;
+const outgoingTyping = new Map<string, string>();
+
+function stopOutgoingTyping() {
+    if (socket?.connected) {
+        outgoingTyping.forEach((recipientId, conversationId) => {
+            socket?.emit('chat:stop-typing', { conversationId, recipientId });
+        });
+    }
+    outgoingTyping.clear();
+}
 
 const subscribers = new Set<Subscriber>();
 const connectionListeners = new Set<(value: boolean) => void>();
@@ -119,7 +137,10 @@ async function ensureSocket() {
             refreshingAuth = false;
             setConnected(true);
         });
-        nextSocket.on('disconnect', () => setConnected(false));
+        nextSocket.on('disconnect', () => {
+            outgoingTyping.clear();
+            setConnected(false);
+        });
         nextSocket.on('session:revoked', () => {
             teardownSocket();
             void api.handleUnauthorized();
@@ -269,11 +290,13 @@ async function ensureSocket() {
         nextSocket.on('chat:unread', (payload) => broadcast((handlers) => handlers.onUnread?.(payload)));
 
         nextSocket.on('chat:typing', (payload) => {
+            if (!isIncomingTyping(payload)) return;
             broadcast((handlers) => {
                 if (matchesConversation(handlers, payload)) handlers.onTyping?.(payload);
             });
         });
         nextSocket.on('chat:stop-typing', (payload) => {
+            if (!isIncomingTyping(payload)) return;
             broadcast((handlers) => {
                 if (matchesConversation(handlers, payload)) handlers.onStopTyping?.(payload);
             });
@@ -285,6 +308,7 @@ async function ensureSocket() {
 
 function teardownSocket() {
     if (!socket) return;
+    stopOutgoingTyping();
     socket.removeAllListeners();
     socket.disconnect();
     socket = null;
@@ -298,6 +322,8 @@ export const chatSocket = {
         if (!appStateSubscription) {
             appStateSubscription = AppState.addEventListener('change', (state) => {
                 if (state === 'background') {
+                    // Screen cleanup may run after this listener has disconnected the socket.
+                    stopOutgoingTyping();
                     socket?.disconnect();
                     setConnected(false);
                 } else if (state === 'active' && subscribers.size > 0) {
@@ -343,13 +369,15 @@ export const chatSocket = {
     },
 
     sendTyping(conversationId?: string | null, recipientId?: string | null) {
-        if (conversationId && recipientId) {
+        if (socket?.connected && conversationId && recipientId) {
+            outgoingTyping.set(conversationId, recipientId);
             socket?.emit('chat:typing', { conversationId, recipientId });
         }
     },
 
     stopTyping(conversationId?: string | null, recipientId?: string | null) {
-        if (conversationId && recipientId) {
+        if (conversationId) outgoingTyping.delete(conversationId);
+        if (socket?.connected && conversationId) {
             socket?.emit('chat:stop-typing', { conversationId, recipientId });
         }
     },

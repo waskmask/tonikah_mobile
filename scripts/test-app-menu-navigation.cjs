@@ -105,6 +105,7 @@ function setup(file = 'components/app/RootAppMenuDrawer.tsx', exported = 'RootAp
             if (name === '@/hooks/useLanguage') return { useLanguage: () => ({ isRTL: state.isRTL, currentLanguage: state.currentLanguage, t: key => key }) };
             if (name === '@/hooks/useTheme') return { useTheme: () => ({ isDark: state.isDark }) };
             if (name === '@/hooks/useWebSupport') return { useWebSupport: () => () => state.calls.push('support') };
+            if (name === '@/hooks/useWebFeedback') return { useWebFeedback: () => () => state.calls.push('feedback') };
             if (name === '@/hooks/useResponsive') return { scale: value => value };
             if (name === '@/store/authStore') return { useAuthStore: authStore };
             if (name === '@/lib/performanceDiagnostics') return {
@@ -125,7 +126,7 @@ function setup(file = 'components/app/RootAppMenuDrawer.tsx', exported = 'RootAp
             if (name === 'react-native-safe-area-context') return { SafeAreaView: 'SafeAreaView', SafeAreaProvider: 'SafeAreaProvider' };
             if (name === '@/components/ui/Text') return { Text: 'Text' };
             if (name === '@/components/ui/icons/PhosphorCompat') return { PencilLine: 'PencilLine', X: 'X' };
-            if (name === 'phosphor-react-native') return Object.fromEntries(['CreditCard', 'GearSix', 'HandHeart', 'Plant', 'Prohibit', 'SealCheck', 'ShieldWarning', 'SignOut', 'Translate', 'User'].map(icon => [icon, icon]));
+            if (name === 'phosphor-react-native') return Object.fromEntries(['ChatText', 'CreditCard', 'GearSix', 'HandHeart', 'Plant', 'Prohibit', 'SealCheck', 'ShieldWarning', 'SignOut', 'Translate', 'User'].map(icon => [icon, icon]));
             if (name === '@/constants/typography') return { fontFamilyForText: () => 'existing-font' };
             if (name === '@/constants/uiTokens') return { NavigationTypeTokens: { drawerTitle: {}, drawerLabel: {} } };
             if (name === '@/constants/releaseFeatures') return { MEMBERSHIP_PURCHASES_ENABLED: false };
@@ -573,7 +574,7 @@ test('menu destinations preserve current returnTo and support/logout remain defe
 test('every internal menu row forwards its actual route as the diagnostic destination', () => {
     const f = setup('components/app/AppMenuDrawer.tsx', 'AppMenuDrawerContent');
     const rows = f.nodes().filter(node => typeof node.type === 'function' && node.type.name === 'MenuRow');
-    for (const row of rows.filter(row => !['report_issue', 'logout'].includes(row.props.label))) {
+    for (const row of rows.filter(row => !['report_issue', 'send_feedback', 'logout'].includes(row.props.label))) {
         row.props.onPress();
         assert.equal(f.state.queued.length, 1, row.props.label + ' must remain deferred');
         assert.equal(f.state.routes.length, 0);

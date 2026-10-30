@@ -1,7 +1,7 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackTitleBar } from '@/components/app/AppBackTitleBar';
 import { SettingsFieldSection } from '@/components/settings/SettingsFieldSection';
 import { SettingsInfoRow, SettingsNavRow } from '@/components/settings/SettingsRows';
@@ -18,7 +18,7 @@ export default function VerificationsScreen() {
     const refreshUser = useAuthStore((state) => state.refreshUser);
     useFocusEffect(React.useCallback(() => { void refreshUser(); }, [refreshUser]));
     const colors = useColors();
-    const insets = useSafeAreaInsets();
+    const bottomPadding = useSettingsBottomPadding();
     const { isRTL } = useLanguage();
     const sections = [
         ['phone', 'Phone number', 'Confirm that your phone number belongs to you.', Phone],
@@ -29,7 +29,7 @@ export default function VerificationsScreen() {
     return (
         <View style={[styles.screen, { backgroundColor: colors.brand.bg.surface }]}>
             <AppBackTitleBar title={t('verifications_page.title', 'Verifications')} fallbackHref="/settings" showMenu />
-            <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + scale(24) }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: bottomPadding }}>
                 <SettingsFieldSection>
                     {sections.map(([key, title, description, Icon], index) => key === 'phone' ? (
                         <SettingsNavRow key={key} icon={<Icon size={scale(19)} color={colors.chrome.common.textStrong} />}

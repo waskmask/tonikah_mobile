@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback } from 'react';
 import { ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -13,6 +14,7 @@ import { scale } from '@/hooks/useResponsive';
 
 export default function SettingsSecurityScreen() {
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const fieldIconColor = colors.chrome.common.textStrong;
     const user = useAuthStore((state) => state.user);
     const refreshUser = useAuthStore((state) => state.refreshUser);
@@ -31,7 +33,7 @@ export default function SettingsSecurityScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('security_privacy', 'Security & privacy')} fallbackHref="/settings" showMenu />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: scale(60) }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: bottomPadding }}>
                 {showSetPassword ? (
                     <SettingsFieldSection title={t('set_password', 'Set Login Password')}>
                         <SettingsNavRow

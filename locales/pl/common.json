@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Wyślij opinię",
+  "feedback_open_failed": "Nie udało się otworzyć strony opinii. Spróbuj ponownie.",
   "ai_review_title": "Kontrola bezpieczeństwa treści przez AI",
   "ai_review_disclosure": "Za Twoją zgodą wysyłamy zdjęcia profilowe oraz teksty Nagłówka, Biografii, Firmy i O partnerze do OpenAI lub Google Gemini, zależnie od treści, w celu kontroli bezpieczeństwa i wsparcia weryfikacji przez administratora. Dostawcy mogą przechowywać treści i dane techniczne zgodnie ze swoimi warunkami i ustawieniami. Kontrole nie potwierdzają Twojej tożsamości.",
   "ai_review_choice": "Kontrole AI zwykle pomagają szybciej publikować zatwierdzone treści. Jeśli wybierzesz weryfikację przez administratora, treści nie zostaną wysłane do dostawców AI do tych kontroli, a nowe treści pozostaną ukryte do zatwierdzenia. Wybór możesz zmienić w Dane i prywatność. Zmiany dotyczą przyszłych kontroli.",

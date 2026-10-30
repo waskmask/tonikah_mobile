@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
@@ -25,6 +26,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function ChangeEmailScreen() {
     const user = useAuthStore((state) => state.user);
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const { currentLanguage, isRTL } = useLanguage();
     const toast = useToast();
     const [email, setEmail] = useState('');
@@ -74,7 +76,7 @@ export default function ChangeEmailScreen() {
             <AppBackTitleBar title={t('change_email_short', 'Change Email')} fallbackHref="/settings-account" showMenu />
             <KeyboardAwareScrollView
                 style={styles.scroll}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
                 keyboardShouldPersistTaps="handled"
                 bottomOffset={scale(24)}
             >

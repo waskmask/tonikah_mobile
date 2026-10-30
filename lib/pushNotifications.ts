@@ -2,10 +2,11 @@ import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Linking, Platform } from 'react-native';
+import { AppState, Keyboard, Linking, Platform } from 'react-native';
 import { api } from '@/lib/api';
 
 type NotificationsModule = typeof import('expo-notifications');
+type NotificationResponse = import('expo-notifications').NotificationResponse;
 
 declare const require: (moduleName: string) => NotificationsModule;
 
@@ -15,6 +16,7 @@ const PUSH_BANNER_DATE_KEY = 'tn_push_banner_last_shown';
 
 let notificationsModule: NotificationsModule | null | undefined;
 let notificationHandlerConfigured = false;
+const handledResponses = new Set<string>();
 
 function getNotifications() {
     if (Platform.OS === 'web') return null;
@@ -221,18 +223,47 @@ export function addPushNotificationListeners(onForegroundMessage?: (message: str
         if (message) onForegroundMessage?.(message);
     });
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    let disposed = false;
+    let receivedLiveResponse = false;
+    let pendingResponse: NotificationResponse | null = null;
+    const openResponse = (response: NotificationResponse) => {
+        if (disposed) return;
+        const key = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+        if (handledResponses.has(key)) return;
+        if (AppState.currentState !== 'active') {
+            pendingResponse = response;
+            return;
+        }
+        handledResponses.add(key);
+        if (handledResponses.size > 100) handledResponses.delete(handledResponses.values().next().value!);
+        pendingResponse = null;
         const data = response.notification.request.content.data as Record<string, unknown> | undefined;
-        router.push(notificationTarget(data) as any);
+        const target = notificationTarget(data);
+        // A notification is navigation, not a request to restore another input's focus.
+        Keyboard.dismiss();
+        if (target.startsWith('/conversation/')) {
+            router.navigate({ pathname: '/conversation/[id]', params: { id: target.slice('/conversation/'.length), notificationEntry: key } });
+        } else {
+            router.navigate(target as any);
+        }
+        void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+    };
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active' && pendingResponse) openResponse(pendingResponse);
+    });
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        receivedLiveResponse = true;
+        openResponse(response);
     });
 
     Notifications.getLastNotificationResponseAsync().then((response) => {
-        if (!response) return;
-        const data = response.notification.request.content.data as Record<string, unknown> | undefined;
-        router.push(notificationTarget(data) as any);
+        if (response && !receivedLiveResponse) openResponse(response);
     }).catch(() => { });
 
     return () => {
+        disposed = true;
+        pendingResponse = null;
+        appStateSubscription.remove();
         receivedSubscription.remove();
         responseSubscription.remove();
     };

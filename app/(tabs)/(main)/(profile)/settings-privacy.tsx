@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { AiModerationConsentChoice } from '@/components/app/AiModerationConsentChoice';
@@ -22,6 +23,7 @@ import { fetchPrivacyConsent, SETTINGS_DATA_STALE_TIME_MS } from '@/lib/settings
 
 export default function SettingsPrivacyScreen() {
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const fieldIconColor = colors.chrome.common.textStrong;
     const toast = useToast();
     const user = useAuthStore((state) => state.user);
@@ -90,7 +92,7 @@ export default function SettingsPrivacyScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('data_privacy', 'Data & privacy')} fallbackHref="/settings" showMenu />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: scale(60) }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: bottomPadding }}>
                 <SettingsFieldSection title={t('account_visibility', 'Account visibility')}>
                     <SettingsInfoRow
                         icon={<Eye size={scale(19)} color={fieldIconColor} weight="regular" />}

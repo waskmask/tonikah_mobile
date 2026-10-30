@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Trash2, X } from '@/components/ui/icons/PhosphorCompat';
@@ -30,6 +31,7 @@ const REASONS = [
 
 export default function DeleteAccountScreen() {
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const toast = useToast();
     const { currentLanguage, isRTL } = useLanguage();
     const logout = useAuthStore((state) => state.logout);
@@ -72,7 +74,7 @@ export default function DeleteAccountScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('delete_account', 'Delete account')} fallbackHref="/settings-security" showMenu />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: scale(14), paddingBottom: scale(120) }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: scale(14), paddingBottom: bottomPadding }}>
                 <View style={[styles.reasonsCard, { backgroundColor: colors.chrome.common.card, borderColor: colors.brand.bg.border }]}>
                     {REASONS.map((key, index) => {
                         const active = reason === key;

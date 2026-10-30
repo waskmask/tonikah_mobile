@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Envoyer un avis",
+  "feedback_open_failed": "Impossible d'ouvrir la page de commentaires. Veuillez réessayer.",
   "ai_review_title": "Vérification de sécurité par IA",
   "ai_review_disclosure": "Avec votre autorisation, nous envoyons les photos du profil et les textes du titre, de la biographie, de l’entreprise et des attentes concernant le partenaire à OpenAI ou Google Gemini, selon le contenu, pour vérifier leur sécurité et aider la modération humaine. Les fournisseurs peuvent conserver le contenu et les données techniques selon leurs conditions et réglages. Ces vérifications ne confirment pas votre identité.",
   "ai_review_choice": "Les vérifications par IA permettent généralement de publier plus vite le contenu approuvé. Si vous choisissez la modération humaine, aucun contenu ne sera envoyé aux fournisseurs d’IA pour ces vérifications et les nouveaux contenus resteront masqués jusqu’à leur approbation. Vous pouvez modifier votre choix dans Données et confidentialité. Les changements concernent les vérifications futures.",

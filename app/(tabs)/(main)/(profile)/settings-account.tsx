@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useState } from 'react';
 import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
@@ -48,6 +49,7 @@ function formatDob(value: string | undefined, locale: string) {
 export default function SettingsAccountScreen() {
     const { user, logoutOtherDevices, logoutAllDevices, isLoading, refreshUser, patchUserProfile } = useAuthStore();
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const primary = colors.chrome.primary;
     const fieldIconColor = colors.chrome.common.textStrong;
     const toast = useToast();
@@ -156,7 +158,7 @@ export default function SettingsAccountScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.brand.bg.surface }}>
             <AppBackTitleBar title={t('account', 'Account')} fallbackHref="/settings" showMenu />
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: scale(60) }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 0, paddingBottom: bottomPadding }}>
                 <SettingsFieldSection title={t('personal_info', 'Personal Information')}>
                     <SettingsInfoRow
                         icon={<User size={scale(19)} color={fieldIconColor} />}

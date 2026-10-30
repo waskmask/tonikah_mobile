@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Invia feedback",
+  "feedback_open_failed": "Impossibile aprire la pagina dei feedback. Riprova.",
   "ai_review_title": "Controlli di sicurezza con IA",
   "ai_review_disclosure": "Con il tuo consenso, inviamo le foto del profilo e i testi di Titolo, Bio, Azienda e Sul partner a OpenAI o Google Gemini, in base al contenuto, per controlli di sicurezza e per assistere la revisione degli amministratori. I fornitori possono conservare contenuti e dati tecnici secondo le proprie condizioni e impostazioni. Questi controlli non verificano la tua identità.",
   "ai_review_choice": "I controlli IA aiutano generalmente a pubblicare più rapidamente i contenuti approvati. Se scegli la revisione degli amministratori, nessun contenuto sarà inviato ai fornitori IA per questi controlli e i nuovi contenuti resteranno nascosti fino all’approvazione. Puoi cambiare scelta in Dati e privacy. Le modifiche valgono per i controlli futuri.",

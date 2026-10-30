@@ -34,8 +34,9 @@ export function useChatSocket({ enabled = true, ...handlers }: UseChatSocketOpti
         chatSocket.sendTyping(handlersRef.current.conversationId, recipientId);
     };
 
-    const stopTyping = (recipientId?: string | null) => {
-        chatSocket.stopTyping(handlersRef.current.conversationId, recipientId);
+    const stopTyping = (recipientId?: string | null, conversationId = handlersRef.current.conversationId) => {
+        // Disposal must target the old conversation even after handlersRef advances.
+        chatSocket.stopTyping(conversationId, recipientId);
     };
 
     return { connected, markSeen, sendTyping, stopTyping };

@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Feedback senden",
+  "feedback_open_failed": "Feedback konnte nicht geöffnet werden. Bitte versuche es erneut.",
   "ai_review_title": "KI-Sicherheitsprüfung von Inhalten",
   "ai_review_disclosure": "Mit Ihrer Erlaubnis senden wir Profilfotos sowie Texte aus Überschrift, Bio, Unternehmen und Über den Partner je nach Inhalt an OpenAI oder Google Gemini, um die Sicherheit zu prüfen und die manuelle Prüfung zu unterstützen. Anbieter können übermittelte Inhalte und technische Daten gemäß ihren Bedingungen und Einstellungen speichern. Diese Prüfungen bestätigen nicht Ihre Identität.",
   "ai_review_choice": "KI-Prüfungen helfen normalerweise, genehmigte Inhalte schneller zu veröffentlichen. Bei manueller Prüfung werden hierfür keine Inhalte an KI-Anbieter gesendet; neue Inhalte bleiben bis zur Genehmigung verborgen. Sie können Ihre Wahl unter Daten & Datenschutz ändern. Änderungen gelten für künftige Prüfungen.",

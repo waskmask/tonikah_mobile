@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
@@ -19,6 +20,7 @@ type CachedProfileList = {
 
 export default function BlockedUsersScreen() {
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const primary = colors.chrome.primary;
     const toast = useToast();
     const cachedList = queryClient.getQueryData<CachedProfileList>(queryKeys.activities.list('blocked'));
@@ -104,7 +106,7 @@ export default function BlockedUsersScreen() {
                 numColumns={2}
                 columnWrapperStyle={{ gap: scale(10) }}
                 style={{ flex: 1 }}
-                contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: scale(110), flexGrow: 1 }}
+                contentContainerStyle={{ paddingHorizontal: scale(14), paddingTop: scale(18), paddingBottom: bottomPadding, flexGrow: 1 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={primary} />}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.35}

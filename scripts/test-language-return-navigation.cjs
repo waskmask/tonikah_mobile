@@ -136,8 +136,10 @@ function setup({ params = {}, pathname = '/language', currentLanguage = 'en', ro
         if (name === '@/hooks/useToast') return { useToast: () => ({ show: (...args) => actions.push(['toast', ...args]) }) };
         if (name === '@/hooks/useColors') return { useColors: () => ({ chrome: { primary: 'primary' }, brand: { bg: { surface: 'surface' } } }) };
         if (name === '@/hooks/useResponsive') return { scale: value => value };
+        if (name === '@/components/settings/useSettingsBottomPadding') return { useSettingsBottomPadding: () => 120 };
         if (name === '@/hooks/useTheme') return { useTheme: () => ({ isDark: false }) };
         if (name === '@/hooks/useWebSupport') return { useWebSupport: () => () => {} };
+        if (name === '@/hooks/useWebFeedback') return { useWebFeedback: () => () => {} };
         if (name === '@/store/authStore') return { useAuthStore: () => ({ logout: () => {}, isLoading: false }) };
         if (name === '@/constants/typography') return { fontFamilyForText: () => 'existing-font' };
         if (name === '@/constants/uiTokens') return { NavigationTypeTokens: { drawerTitle: {}, drawerLabel: {} } };

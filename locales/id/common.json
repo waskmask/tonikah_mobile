@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Kirim masukan",
+  "feedback_open_failed": "Tidak dapat membuka halaman masukan. Silakan coba lagi.",
   "ai_review_title": "Pemeriksaan keamanan konten dengan AI",
   "ai_review_disclosure": "Dengan izin Anda, kami mengirim foto profil dan teks Judul, Bio, Perusahaan, serta Tentang Pasangan ke OpenAI atau Google Gemini, sesuai jenis kontennya, untuk pemeriksaan keamanan dan membantu tinjauan admin. Penyedia dapat menyimpan konten dan data teknis sesuai ketentuan dan pengaturannya. Pemeriksaan ini tidak memverifikasi identitas Anda.",
   "ai_review_choice": "Pemeriksaan AI biasanya membantu menerbitkan konten yang disetujui lebih cepat. Jika memilih tinjauan admin, konten tidak dikirim ke penyedia AI untuk pemeriksaan ini dan konten baru tetap tersembunyi hingga disetujui. Anda dapat mengubah pilihan di Data & privasi. Perubahan berlaku untuk pemeriksaan berikutnya.",

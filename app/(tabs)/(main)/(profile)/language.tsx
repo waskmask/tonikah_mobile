@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router, type Href, useFocusEffect, useLocalSearchParams, usePathname } from 'expo-router';
 import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, View } from 'react-native';
@@ -28,6 +29,7 @@ export default function LanguageScreen() {
     const returnHref = candidate === '/language' ? '/settings' : candidate;
     const closeRootMenu = useRootAppMenu()?.closeMenu;
     const colors = useColors();
+    const bottomPadding = useSettingsBottomPadding();
     const primary = colors.chrome.primary;
     const toast = useToast();
     const [savingCode, setSavingCode] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function LanguageScreen() {
     return (
         <View style={[styles.root, { backgroundColor: colors.brand.bg.surface }]}>
             <AppBackTitleBar title={textValue(t('language'), 'Language')} fallbackHref={returnHref} onBack={handleBack} showMenu />
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]} showsVerticalScrollIndicator={false}>
                 <SettingsFieldSection>
                     {LANGUAGES.map((language, index) => {
                         const active = language.code === currentLanguage;

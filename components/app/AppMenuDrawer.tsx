@@ -10,6 +10,7 @@ import {
     CreditCard,
     GearSix,
     HandHeart,
+    ChatText,
     Plant,
     Prohibit,
     SealCheck,
@@ -25,6 +26,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
 import { useWebSupport } from '@/hooks/useWebSupport';
+import { useWebFeedback } from '@/hooks/useWebFeedback';
 import { scale } from '@/hooks/useResponsive';
 import { fontFamilyForText } from '@/constants/typography';
 import { NavigationTypeTokens } from '@/constants/uiTokens';
@@ -40,7 +42,7 @@ type MenuItemBase = {
 
 type MenuItem = MenuItemBase & (
     | { href: Href; action?: never }
-    | { action: 'support'; href?: never }
+    | { action: 'support' | 'feedback'; href?: never }
 );
 
 const QUICK_ITEMS: MenuItem[] = [
@@ -59,6 +61,7 @@ const ACCOUNT_ITEMS: MenuItem[] = [
         </View> },
     { href: '/blocked-users', labelKey: 'blocked_users', fallback: 'Blocked users', icon: Prohibit, iconWeight: 'bold' },
     { action: 'support', labelKey: 'report_issue', fallback: 'Report an issue', icon: ShieldWarning, iconWeight: 'bold' },
+    { action: 'feedback', labelKey: 'send_feedback', fallback: 'Send Feedback', icon: ChatText, iconWeight: 'bold' },
     { href: '/settings', labelKey: 'settings', fallback: 'Settings', icon: GearSix, iconWeight: 'bold' },
 ];
 
@@ -79,6 +82,7 @@ export function AppMenuDrawerContent({
     const { isDark } = useTheme();
     const { logout, isLoading } = useAuthStore();
     const openSupport = useWebSupport();
+    const openFeedback = useWebFeedback();
     const pathname = usePathname();
     const surfaceColor = isDark ? '#1D1D1F' : '#FFFFFF';
     const borderColor = isDark ? '#303033' : '#EEEEEE';
@@ -116,6 +120,11 @@ export function AppMenuDrawerContent({
 
     const navigate = (href: Href) => closeThenRun(() => openDestination(href), typeof href === 'string' ? href : href.pathname);
     const navigateToSupport = () => closeThenRun(() => void openSupport());
+    const activateItem = (item: MenuItem) => {
+        if (item.action === 'support') navigateToSupport();
+        else if (item.action === 'feedback') closeThenRun(() => void openFeedback());
+        else if (item.href !== undefined) navigate(item.href);
+    };
 
     const handleLogout = async () => {
         if (isLoading) return;
@@ -165,7 +174,7 @@ export function AppMenuDrawerContent({
                         iconWeight={item.iconWeight}
                         label={textValue(t(item.labelKey), item.fallback)}
                         disabled={isLoading || isNavigating}
-                        onPress={() => item.action === 'support' ? navigateToSupport() : navigate(item.href)}
+                        onPress={() => activateItem(item)}
                     />
                 ))}
 
@@ -177,7 +186,7 @@ export function AppMenuDrawerContent({
                         iconWeight={item.iconWeight}
                         label={textValue(t(item.labelKey), item.fallback)}
                         disabled={isLoading || isNavigating}
-                        onPress={() => item.action === 'support' ? navigateToSupport() : navigate(item.href)}
+                        onPress={() => activateItem(item)}
                     />
                 ))}
             </ScrollView>

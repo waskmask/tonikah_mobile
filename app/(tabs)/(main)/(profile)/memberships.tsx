@@ -1,3 +1,4 @@
+import { useSettingsBottomPadding } from '@/components/settings/useSettingsBottomPadding';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -9,7 +10,6 @@ import {
     StyleSheet,
     View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
@@ -184,7 +184,7 @@ export default function MembershipsScreen() {
 
 function PaidMembershipsScreen() {
     const colors = useColors();
-    const insets = useSafeAreaInsets();
+    const bottomPadding = useSettingsBottomPadding();
     const params = useLocalSearchParams<{ returnTo?: string | string[]; view?: string | string[] }>();
     const { currentLanguage, isRTL } = useLanguage();
     const { requireVerified } = useEmailVerificationGuard();
@@ -695,7 +695,7 @@ function PaidMembershipsScreen() {
             <AppBackTitleBar title="" fallbackHref="/settings" showMenu />
             <ScrollView
                 style={styles.scroll}
-                contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 24 }]}
+                contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={(
                     <RefreshControl

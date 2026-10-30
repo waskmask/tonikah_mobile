@@ -1,4 +1,6 @@
 {
+  "send_feedback": "Enviar comentarios",
+  "feedback_open_failed": "No se pudieron abrir los comentarios. Inténtalo de nuevo.",
   "ai_review_title": "Revisión de seguridad con IA",
   "ai_review_disclosure": "Con tu permiso, enviamos fotos del perfil y textos de Titular, Biografía, Empresa y Sobre tu pareja a OpenAI o Google Gemini, según el contenido, para comprobar su seguridad y ayudar a la revisión administrativa. Los proveedores pueden conservar el contenido y los datos técnicos según sus condiciones y ajustes. Estas comprobaciones no verifican tu identidad.",
   "ai_review_choice": "Las comprobaciones con IA suelen ayudar a publicar más rápido el contenido aprobado. Si eliges revisión administrativa, no enviaremos contenido a proveedores de IA para estas comprobaciones y el contenido nuevo permanecerá oculto hasta su aprobación. Puedes cambiar tu elección en Datos y privacidad. Los cambios se aplican a futuras comprobaciones.",

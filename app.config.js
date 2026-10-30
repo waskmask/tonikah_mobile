@@ -50,9 +50,16 @@ module.exports = ({ config }) => {
             ],
             'expo-asset',
             'expo-image',
-            'expo-audio',
+            ['expo-audio', {
+                recordAudioAndroid: true,
+                enableBackgroundRecording: false,
+                enableBackgroundPlayback: false,
+            }],
             ['react-native-waveform-recorder', { microphonePermission: false, backgroundRecording: false }],
-            'expo-notifications',
+            ['expo-notifications', {
+                icon: './assets/icon/heart-white.png',
+                color: '#F34B6F',
+            }],
             'expo-status-bar',
             'expo-web-browser',
             'expo-sharing',
@@ -76,6 +83,21 @@ module.exports = ({ config }) => {
             ...config.android,
             ...(hasGoogleServicesFile ? { googleServicesFile: googleServicesPath } : {}),
             softwareKeyboardLayoutMode: 'resize',
+            permissions: [...new Set([
+                ...(config.android?.permissions || []),
+                'android.permission.CAMERA',
+                'android.permission.RECORD_AUDIO',
+            ])],
+            // Libraries can merge these permissions even when their background features are disabled.
+            blockedPermissions: [...new Set([
+                ...(config.android?.blockedPermissions || []),
+                'android.permission.FOREGROUND_SERVICE',
+                'android.permission.FOREGROUND_SERVICE_MICROPHONE',
+                'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+                'android.permission.READ_MEDIA_IMAGES',
+                'android.permission.READ_MEDIA_VIDEO',
+                'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+            ])],
         },
     };
 };
