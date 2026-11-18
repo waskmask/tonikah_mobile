@@ -64,7 +64,7 @@ import {
     Banknote,
     Footprints,
 } from '@/components/ui/icons/PhosphorCompat';
-import { CaretLeft, CaretRight, IdentificationBadge, SketchLogo } from 'phosphor-react-native';
+import { CaretLeft, CaretRight, IdentificationBadge, PaperPlaneTilt, SketchLogo } from 'phosphor-react-native';
 import { Text } from '@/components/ui/Text';
 import { SmallDarkOutlinedButton } from '@/components/ui/SmallDarkOutlinedButton';
 import { Divider } from '@/components/ui/Divider';
@@ -90,6 +90,7 @@ import { chatService } from '@/lib/chatService';
 import { applyOutgoingRequest } from '@/lib/chatInboxCache';
 import {
     apiMessage,
+    profileAvatarImage,
     cleanProfileMultilineText,
     cleanProfileText,
     displayText,
@@ -184,6 +185,8 @@ export type UserProfileViewProps = {
     onBlocked?: (userId: string) => void;
     onUnblocked?: (userId: string) => void;
     onFavoriteChanged?: (userId: string, favorited: boolean) => void;
+    onIntroSent?: (userId: string) => void;
+    enableEdgeDismiss?: boolean;
     refreshing?: boolean;
     onRefresh?: () => void | Promise<void>;
     onReconcile?: () => void | Promise<void>;
@@ -215,6 +218,8 @@ export function UserProfileView({
     onBlocked,
     onUnblocked,
     onFavoriteChanged,
+    onIntroSent,
+    enableEdgeDismiss = false,
     refreshing = false,
     onRefresh,
     onReconcile,
@@ -565,6 +570,15 @@ export function UserProfileView({
     const modalSheetStyle = useAnimatedStyle(() => ({
         transform: [{ translateY: mode === 'modal' ? dragY.value : 0 }],
     }));
+    const edgeDismissGesture = useMemo(() => Gesture.Pan()
+        .enabled(Platform.OS === 'ios' && mode === 'modal' && enableEdgeDismiss && Boolean(onClose)
+            && !messageSheetOpen && !messageSending && lightboxIndex === null && !reportTarget && !blockConfirmOpen)
+        .hitSlop({ left: 0, width: 24 })
+        .activeOffsetX(16)
+        .failOffsetY([-12, 12])
+        .onEnd((event) => {
+            if (event.translationX > 64 || (event.translationX > 24 && event.velocityX > 650)) runOnJS(close)();
+        }), [blockConfirmOpen, close, enableEdgeDismiss, lightboxIndex, messageSending, messageSheetOpen, mode, onClose, reportTarget]);
     const ProfileScrollView = mode === 'screen' ? ScrollView : GHScrollView;
 
     const startMessage = async () => {
@@ -636,6 +650,7 @@ export function UserProfileView({
             return;
         }
         setMessageSending(true);
+        const recipient = { id, profileName: name, avatar: profileAvatarImage(profile) || photos[0] || null };
         try {
             const res = await chatService.send({ recipientId: id, content: body, type: 'text' });
             if (!res.success) {
@@ -646,7 +661,8 @@ export function UserProfileView({
                     return;
                 }
                 if (res.errorMessage === 'request_already_pending') {
-                    if (res.conversationId) applyOutgoingRequest(res.conversationId, id, name);
+                    if (res.conversationId) applyOutgoingRequest(res.conversationId, id, name, recipient);
+                    onIntroSent?.(id);
                     setMessageDraft('');
                     setPendingProfileToast({
                         key: 'chat:request_already_sent',
@@ -665,7 +681,8 @@ export function UserProfileView({
                 return;
             }
             setMessageDraft('');
-            if (res.conversationId) applyOutgoingRequest(res.conversationId, id, name);
+            if (res.conversationId) applyOutgoingRequest(res.conversationId, id, name, recipient);
+            onIntroSent?.(id);
             setPendingProfileToast({
                 key: 'chat:msg_request_sent',
                 fallback: 'Message request sent!',
@@ -843,8 +860,12 @@ export function UserProfileView({
                             styles.headerBackButton,
                         ]}
                         hitSlop={11}
+                        accessibilityRole="button"
+                        accessibilityLabel={mode === 'modal' ? t('close', 'Close') : t('back', 'Back')}
                     >
-                        {isRTL
+                        {mode === 'modal'
+                            ? <X size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} />
+                            : isRTL
                             ? <CaretRight size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} weight="bold" />
                             : <CaretLeft size={scale(23)} color={isDark ? '#E5E5E7' : '#201B15'} weight="bold" />}
                     </Pressable>
@@ -909,6 +930,13 @@ export function UserProfileView({
                         <View pointerEvents="none" style={styles.profileMessageIconCenter}>
                             {messageChecking ? (
                                 <ActivityIndicator size="small" color={headerActionIconColor} />
+                            ) : mode === 'modal' ? (
+                                <PaperPlaneTilt
+                                    size={scale(20)}
+                                    color={headerActionIconColor}
+                                    weight="bold"
+                                    mirrored={isRTL}
+                                />
                             ) : (
                                 <ProfileMessage
                                     width={scale(Platform.OS === 'android' ? 16 : 17)}
@@ -981,7 +1009,9 @@ export function UserProfileView({
                 />
                 {/* Per-photo "Under review" pills on the gallery images carry the
                     moderation state — no separate banner below the gallery */}
-
+                {/* Only content below the gallery participates in edge-close. */}
+                <GestureDetector gesture={edgeDismissGesture}>
+                <View collapsable={false}>
                 {!previewOnly && detailReady ? (<>
                 {(facts.atAGlance.length > 0 || headline || bio || missingSummaryFields.length > 0) ? (
                     <Section
@@ -1354,6 +1384,8 @@ export function UserProfileView({
                         <View style={[styles.profileSkeletonBar, { width: '63%', backgroundColor: commonColors.skeleton }]} />
                     </View>
                 )}
+                </View>
+                </GestureDetector>
             </ProfileScrollView>
 
             {lightboxIndex !== null ? (

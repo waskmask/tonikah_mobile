@@ -17,7 +17,7 @@ type ToastHandle = {
 let globalToastRef: ToastHandle | null = null;
 const toastStack: ToastHandle[] = [];
 
-export function ToastProvider() {
+export function ToastProvider({ topOffset = 0 }: { topOffset?: number } = {}) {
     const [state, setState] = useState<ToastState>({
         visible: false,
         message: '',
@@ -49,6 +49,7 @@ export function ToastProvider() {
 
     return (
         <Toast
+            topOffset={topOffset}
             visible={state.visible}
             message={state.message}
             type={state.type}

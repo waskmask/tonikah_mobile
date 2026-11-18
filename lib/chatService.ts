@@ -40,6 +40,7 @@ export type Conversation = {
     requestRole?: 'incoming' | 'sent' | null;
     lastMessageAt: string | null;
     lastMessagePreview: string;
+    historyCleared?: boolean;
     lastMessageSender: string | null;
     unreadCount: number;
     muted?: boolean;
@@ -160,6 +161,7 @@ export function normalizeConversation(raw: any, requestRole?: 'incoming' | 'sent
         requestRole: requestRole ?? raw?.requestRole ?? null,
         lastMessageAt: raw?.lastMessageAt || raw?.createdAt || null,
         lastMessagePreview: raw?.lastMessagePreview || '',
+        historyCleared: Boolean(raw?.historyCleared),
         lastMessageSender: raw?.lastMessageSender || null,
         unreadCount: Number(raw?.unreadCount || 0),
         muted: Boolean(raw?.muted),

@@ -1,4 +1,4 @@
-import type { Conversation, ConversationState } from '@/lib/chatService';
+import type { Conversation, ConversationOtherUser, ConversationState } from '@/lib/chatService';
 import { storage } from '@/lib/storage';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
@@ -41,10 +41,10 @@ export function applyAcceptedConversationById(conversationId: string): boolean {
     return true;
 }
 
-export function applyOutgoingRequest(conversationId: string, otherUserId: string, name: string) {
+export function applyOutgoingRequest(conversationId: string, otherUserId: string, name: string, recipient?: ConversationOtherUser) {
     queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (current) => {
-        if (!current) return undefined;
-        const previous = [...current.sent, ...current.conversations].find((item) => item.id === conversationId);
+        const inbox = current || { conversations: [], requests: [], sent: [], nextCursor: null, slots: null };
+        const previous = [...inbox.sent, ...inbox.conversations].find((item) => item.id === conversationId);
         const pending: Conversation = {
             id: conversationId,
             state: 'request_pending',
@@ -53,13 +53,13 @@ export function applyOutgoingRequest(conversationId: string, otherUserId: string
             lastMessagePreview: previous?.lastMessagePreview || '',
             lastMessageSender: previous?.lastMessageSender || null,
             unreadCount: 0,
-            otherUser: previous?.otherUser || { id: otherUserId, profileName: name },
+            otherUser: { ...previous?.otherUser, ...recipient, id: otherUserId, profileName: name },
         };
         return {
-            ...current,
-            conversations: current.conversations.filter((item) => item.id !== conversationId),
-            requests: current.requests.filter((item) => item.id !== conversationId),
-            sent: [pending, ...current.sent.filter((item) => item.id !== conversationId)],
+            ...inbox,
+            conversations: inbox.conversations.filter((item) => item.id !== conversationId),
+            requests: inbox.requests.filter((item) => item.id !== conversationId),
+            sent: [pending, ...inbox.sent.filter((item) => item.id !== conversationId)],
         };
     });
 }
@@ -95,6 +95,16 @@ export function markCachedConversationRead(conversationId: string, unreadHint = 
         if (userId) void saveCachedInbox(userId, updated).catch(() => undefined);
     }
     return clearedCount;
+}
+
+export function applyClearedConversation(conversationId: string) {
+    queryClient.setQueryData<CachedInbox>(queryKeys.chat.inbox, (current) => {
+        if (!current) return undefined;
+        const clear = (items: Conversation[]) => items.map((item) => item.id === conversationId
+            ? { ...item, historyCleared: true, lastMessagePreview: '', lastMessageAt: null, lastMessageSender: null, unreadCount: 0 }
+            : item);
+        return { ...current, conversations: clear(current.conversations), requests: clear(current.requests), sent: clear(current.sent) };
+    });
 }
 
 const keyFor = (userId: string) => `chat:inbox:${userId}`;

@@ -26,6 +26,7 @@ export interface ToastProps {
     onDismiss: () => void;
     duration?: number;
     icon?: ToastIcon;
+    topOffset?: number;
 }
 
 const TOAST_ICONS = {
@@ -40,7 +41,7 @@ const CUSTOM_TOAST_ICONS = {
     unlock: LockOpen,
 };
 
-export function Toast({ visible, message, type = 'info', onDismiss, duration = 4000, icon }: ToastProps) {
+export function Toast({ visible, message, type = 'info', onDismiss, duration = 4000, icon, topOffset = 0 }: ToastProps) {
     const insets = useSafeAreaInsets();
     const { isRTL } = useLanguage();
     const colors = useColors();
@@ -65,6 +66,7 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
     }, [completeDismiss, translateY]);
 
     const pan = useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_, gesture) => !dismissingRef.current
             && gesture.dy < -8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
         onPanResponderMove: (_, gesture) => {
@@ -109,10 +111,11 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
 
     return (
         <Animated.View
+            pointerEvents="box-none"
             onLayout={(event) => { heightRef.current = Math.max(150, event.nativeEvent.layout.height + 20); }}
             style={[
                 styles.container,
-                { paddingTop: insets.top + scale(10) },
+                { paddingTop: insets.top + scale(10) + topOffset },
                 animatedStyle
             ]}
         >
@@ -134,7 +137,7 @@ export function Toast({ visible, message, type = 'info', onDismiss, duration = 4
                         },
                     ]}
                 >
-                    <View style={[styles.cardInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View pointerEvents="none" style={[styles.cardInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View pointerEvents="none" style={[styles.accent, { backgroundColor: toastStyle.border }]} />
                         <View style={[styles.content, {
                             flexDirection: isRTL ? 'row-reverse' : 'row',

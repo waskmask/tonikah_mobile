@@ -17,6 +17,7 @@ import {
     Text as RNText,
     type TextStyle,
     TextInput,
+    useWindowDimensions,
     View,
     type ViewToken,
     ViewStyle,
@@ -36,7 +37,7 @@ import { WaveformRecorderView, type WaveformRecorderCompleteEvent, type Waveform
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { Bell, BellOff, Camera, Check, CheckCheck, Clock3, Download, Mic, MoreVertical, Pause, Play, RefreshCw, Reply, Trash2, X, XCircle } from '@/components/ui/icons/PhosphorCompat';
 import { CaretDoubleDown, CaretLeft, CaretRight, Paperclip, PaperPlaneTilt } from 'phosphor-react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import {
     chatService,
@@ -46,8 +47,8 @@ import {
     MessageMedia,
     normalizeConversation,
 } from '@/lib/chatService';
-import { apiMessage, profileImage, t } from '@/lib/profileDisplay';
-import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+import { apiMessage, profileAvatarImage, t } from '@/lib/profileDisplay';
+import { ConversationAvatar } from '@/components/chat/ConversationAvatar';
 import { useAuthStore } from '@/store/authStore';
 import { useEmailVerificationGuard } from '@/hooks/useEmailVerificationGuard';
 import { useTheme } from '@/hooks/useTheme';
@@ -56,8 +57,10 @@ import { useLanguage } from '@/hooks/useLanguage';
 import { useToast } from '@/hooks/useToast';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useChatScrollAnchor } from '@/hooks/useChatScrollAnchor';
-import { clearAllCachedMessages, loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
+import { clearAllCachedMessages, clearCachedMessages, loadCachedMessages, saveCachedMessages } from '@/lib/chatCache';
 import { useConversationKeyboardMode } from '@/hooks/useConversationKeyboardMode';
+import { useMessageContextOpening } from '@/hooks/useMessageContextOpening';
+import type { MeasureMessageAnchor } from '@/lib/messageContextOpening';
 import { BRAND_PRIMARY } from '@/constants/Colors';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
@@ -95,7 +98,7 @@ import { GalleryRevealControl } from '@/components/chat/GalleryRevealControl';
 import { ChatKeyboardAvoider, ChatKeyboardViewport, ChatStickyComposer, ChatComposerBar } from '@/components/chat/ChatKeyboardFooter';
 import { ViewOnceIcon } from '@/components/chat/ViewOnceIcon';
 import { UnreadBadge } from '@/components/ui/UnreadBadge';
-import { ConfirmSheet } from '@/components/ui/ConfirmSheet';
+import { ConversationOptionsSheet } from '@/components/chat/ConversationOptionsSheet';
 import { UserProfileSheet } from '@/components/profile/UserProfileSheet';
 import { ReportSheet, type ReportTarget } from '@/components/profile/ReportSheet';
 import { profileId } from '@/lib/exploreProfile';
@@ -109,7 +112,7 @@ import { MessagingMembershipGate } from '@/components/membership/MessagingMember
 import { canOpenMessaging } from '@/lib/messagingAccess';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
-import { applyAcceptedConversation, applyConversationStateById, loadCachedInbox, markCachedConversationRead, type CachedInbox } from '@/lib/chatInboxCache';
+import { applyAcceptedConversation, applyClearedConversation, applyConversationStateById, loadCachedInbox, markCachedConversationRead, type CachedInbox } from '@/lib/chatInboxCache';
 import { CURRENT_USER_STATUS_QUERY_KEY, type CurrentUserStatus } from '@/hooks/useCurrentUserStatus';
 import {
     enqueueOfflineTextMessage,
@@ -434,6 +437,7 @@ export default function ConversationScreen() {
     const acceptedConversationRef = useRef<string | null>(null);
     const acceptedRefConversationId = useRef<string | null>(null);
     const [metadataUnavailable, setMetadataUnavailable] = useState(false);
+    const historyVersionRef = useRef(0);
     const [items, setItems] = useState<ChatMessage[]>([]);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [content, setContent] = useState('');
@@ -471,6 +475,16 @@ export default function ConversationScreen() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuBusy, setMenuBusy] = useState(false);
     const [conversationConfirmation, setConversationConfirmation] = useState<'end' | 'delete' | null>(null);
+    const menuRequestRef = useRef<symbol | null>(null);
+    const menuScopeRef = useRef({ id, focused: isFocused });
+    menuScopeRef.current = { id, focused: isFocused };
+
+    useEffect(() => {
+        setMenuOpen(false);
+        setConversationConfirmation(null);
+        setMenuBusy(false);
+        return () => { menuRequestRef.current = null; };
+    }, [id, isFocused]);
     const [messagesReady, setMessagesReady] = useState(false);
     const [showScrollDown, setShowScrollDown] = useState(false);
     const [unseenWhileAway, setUnseenWhileAway] = useState(0);
@@ -608,10 +622,12 @@ export default function ConversationScreen() {
     const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
         if (!id || id === 'new' || emailBlocked || membershipBlocked || membershipAccessUnavailable) return;
         const cursor = mode === 'append' ? nextCursor : null;
+        const historyVersion = historyVersionRef.current;
         const [metaRes, messageRes] = await Promise.all([
             mode === 'replace' ? chatService.conversation(id) : Promise.resolve(null),
             chatService.messages(id, { cursor }),
         ]);
+        if (historyVersion !== historyVersionRef.current) return;
         if (metaRes?.success) {
             const latest = normalizeConversation(metaRes.data || metaRes);
             if (mode === 'replace' && latest.unreadCount > 0) pendingSeenRef.current = true;
@@ -984,6 +1000,9 @@ export default function ConversationScreen() {
 
     const listItems = useMemo(() => buildItems(items), [items]);
     const messagesById = useMemo(() => new Map(items.map((message) => [message.id, message])), [items]);
+    const contextOpening = useMessageContextOpening(id, isFocused);
+    const contextOpeningState = useRef({ messagesById, isFocused, menuOpen, messageActionBusy });
+    contextOpeningState.current = { messagesById, isFocused, menuOpen, messageActionBusy };
     // Inverted FlatList renders index 0 at the visual bottom, so the newest
     // message must come first. buildItems keeps date headers above each group;
     // reversing preserves that ordering once the list is flipped.
@@ -1242,23 +1261,42 @@ export default function ConversationScreen() {
                 onOpenImage={setImagePreview}
                 onOpenViewOnce={openViewOnce}
                 viewOnceLoading={viewOnceLoadingId === message.id}
-                onOpenMenu={(target, windowAnchor) => {
+                onOpenMenu={(target, measureAnchor) => {
                     void lightImpact();
-                    const root = screenOriginRef.current;
-                    setSelectedAnchor({
-                        x: windowAnchor.x - root.x,
-                        y: windowAnchor.y - root.y,
-                        width: windowAnchor.width,
-                        height: windowAnchor.height,
-                    });
-                    setSelectedMessage(target);
+                    const valid = () => {
+                        const latest = contextOpeningState.current;
+                        const message = latest.messagesById.get(target.id);
+                        return latest.isFocused && screenFocusedRef.current && AppState.currentState === 'active'
+                            && !latest.menuOpen && !latest.messageActionBusy
+                            && !!message && !message.pending && !message.failed && !message.unsent;
+                    };
+                    const measureCurrentAnchor: MeasureMessageAnchor = (ready) => {
+                        if (!valid()) return;
+                        if (Platform.OS !== 'ios') { measureAnchor(ready); return; }
+                        screenContentRef.current?.measureInWindow((x, y) => {
+                            if (!valid()) return;
+                            screenOriginRef.current = { x, y };
+                            measureAnchor(ready);
+                        });
+                    };
+                    contextOpening.open(measureCurrentAnchor, (windowAnchor) => {
+                        if (!valid()) return;
+                        const root = screenOriginRef.current;
+                        setSelectedAnchor({
+                            x: windowAnchor.x - root.x,
+                            y: windowAnchor.y - root.y,
+                            width: windowAnchor.width,
+                            height: windowAnchor.height,
+                        });
+                        setSelectedMessage(contextOpeningState.current.messagesById.get(target.id) || null);
+                    }, valid);
                 }}
                 onRetry={retryFailedMessage}
                 onSwipeReply={beginReply}
                 onReplyClick={handleReplyJump}
             />
         );
-    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage, lightImpact, invertedItems, messageAreaWidth, messagesById]);
+    }, [colors, user?._id, user?.id, isRTL, openViewOnce, viewOnceLoadingId, beginReply, handleReplyJump, retryFailedMessage, lightImpact, invertedItems, messageAreaWidth, messagesById, contextOpening]);
     const routeConversation = useMemo(() => {
         if (!id || id === 'new' || !routeState) return null;
         return {
@@ -1283,7 +1321,7 @@ export default function ConversationScreen() {
     const headerOther: ConversationOtherUser = {
         ...other,
         profileName: other.profileName || name || null,
-        avatar: other.avatar || routeAvatar || null,
+        avatar: other.avatar || (!conversation ? routeAvatar : null) || null,
         account_deleted: !!other.account_deleted || accountDeleted === '1',
         recently_active: (other.account_deleted || accountDeleted === '1') ? false : (typeof other.recently_active === 'boolean' ? other.recently_active : online === '1'),
     };
@@ -1293,7 +1331,7 @@ export default function ConversationScreen() {
         : headerOther.recently_active
             ? t('chat:online', 'Online')
             : t('chat:offline', 'Offline');
-    const avatar = profileImage(headerOther);
+    const avatar = headerOther.account_deleted ? '' : profileAvatarImage(headerOther);
     const peerId = profileId(headerOther) || String(
         headerOther.id
         || headerOther._id
@@ -1997,57 +2035,73 @@ export default function ConversationScreen() {
         }
     };
 
-    const toggleMute = async () => {
-        if (!conversation || menuBusy) return;
+    const runConversationMenuAction = async (action: 'mute' | 'end' | 'delete') => {
+        if (!conversation || menuBusy || menuRequestRef.current
+            || !menuScopeRef.current.focused || menuScopeRef.current.id !== id) return;
+        const requestId = id;
+        const token = Symbol('conversation-menu-request');
+        menuRequestRef.current = token;
+        const currentRequest = () => menuRequestRef.current === token
+            && menuScopeRef.current.id === requestId && menuScopeRef.current.focused;
         const nextMuted = !conversation.muted;
         setMenuBusy(true);
-        const res = await chatService.mute(conversation.id, nextMuted);
-        setMenuBusy(false);
-        if (!res.success) {
-            toast.show(apiMessage(res.message), 'error', 3500);
-            return;
+        try {
+            const res = action === 'mute'
+                ? await chatService.mute(conversation.id, nextMuted)
+                : action === 'end'
+                    ? await chatService.end(conversation.id)
+                    : await chatService.deleteConversation(conversation.id);
+            if (!currentRequest()) return;
+            if (!res.success) {
+                toast.show(apiMessage(res.message), 'error', 3500);
+                return;
+            }
+            setConversationConfirmation(null);
+            setMenuOpen(false);
+            if (action === 'mute') {
+                setConversation((current) => current ? { ...current, muted: nextMuted } : current);
+                toast.show(nextMuted
+                    ? translateChatText('conversation_muted', 'Conversation muted')
+                    : translateChatText('conversation_unmuted', 'Conversation unmuted'), 'success');
+            } else if (action === 'end') {
+                await load('replace');
+            } else {
+                historyVersionRef.current += 1;
+                applyClearedConversation(conversation.id);
+                setItems([]);
+                await clearCachedMessages(String(user?._id || user?.id || ''), conversation.id);
+                if (!currentRequest()) return;
+                toast.show(translateChatText('history_cleared', 'Chat history cleared'), 'success');
+                goBackToMessages();
+            }
+        } catch {
+            if (currentRequest()) toast.show(apiMessage('connection_error'), 'error', 3500);
+        } finally {
+            if (menuRequestRef.current === token) {
+                menuRequestRef.current = null;
+                if (menuScopeRef.current.id === requestId && menuScopeRef.current.focused) setMenuBusy(false);
+            }
         }
-        setConversation((current) => current ? { ...current, muted: nextMuted } : current);
-        setMenuOpen(false);
-        toast.show(
-            nextMuted
-                ? translateChatText('conversation_muted', 'Conversation muted')
-                : translateChatText('conversation_unmuted', 'Conversation unmuted'),
-            'success',
-        );
     };
 
     const endConversation = () => {
-        if (!conversation || menuBusy) return;
+        if (!conversation || menuBusy || menuRequestRef.current) return;
         setConversationConfirmation('end');
     };
 
     const deleteConversation = () => {
-        if (!conversation || menuBusy) return;
+        if (!conversation || menuBusy || menuRequestRef.current) return;
         setConversationConfirmation('delete');
     };
 
     const confirmConversationAction = async () => {
-        if (!conversation || !conversationConfirmation || menuBusy) return;
-        const action = conversationConfirmation;
-        setMenuBusy(true);
-        const res = action === 'end'
-            ? await chatService.end(conversation.id)
-            : await chatService.deleteConversation(conversation.id);
-        setMenuBusy(false);
-        if (!res.success) {
-            toast.show(apiMessage(res.message), 'error', 3500);
-            return;
-        }
+        if (conversationConfirmation) await runConversationMenuAction(conversationConfirmation);
+    };
 
-        setConversationConfirmation(null);
+    const closeConversationMenu = () => {
+        if (menuBusy || menuRequestRef.current) return;
         setMenuOpen(false);
-        if (action === 'end') {
-            await load('replace');
-            return;
-        }
-        toast.show(translateChatText('chat_hidden', 'Chat hidden'), 'success');
-        goBackToMessages();
+        setConversationConfirmation(null);
     };
 
     const markViewOnceLoaded = async () => {
@@ -2180,19 +2234,22 @@ export default function ConversationScreen() {
             : translateChatText('delete_for_me', 'Delete for me'), onPress: () => openMessageDelete(selectedMessage), danger: true },
     ] : [];
 
+    // Keep top padding in the same React layout as the header and its measurements.
+    const screenStyle = [styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }];
+
     if (eligibility.isLoading) {
         return (
-            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+            <View style={screenStyle}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.primary} />
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (emailBlocked) {
         return (
-            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+            <View style={screenStyle}>
                 <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
                         {isRTL ? <CaretRight size={24} color={colors.text} weight="bold" /> : <CaretLeft size={24} color={colors.text} weight="bold" />}
@@ -2205,13 +2262,13 @@ export default function ConversationScreen() {
                     title={t('verify_email_full_chat_title', 'Verify your email to use full chat')}
                     message={t('verify_email_full_chat_message', 'Please verify your email before opening conversations or sending messages.')}
                 />
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (membershipAccessUnavailable) {
         return (
-            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+            <View style={screenStyle}>
                 <View style={[styles.header, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
                     <Pressable onPress={goBackToMessages} style={styles.headerIcon}>
                         {isRTL ? <CaretRight size={24} color={colors.text} weight="bold" /> : <CaretLeft size={24} color={colors.text} weight="bold" />}
@@ -2222,24 +2279,24 @@ export default function ConversationScreen() {
                         {t('chat:connection_error', 'Connection error. Retrying...')}
                     </Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (membershipBlocked) {
         return (
-            <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+            <View style={screenStyle}>
                 <MessagingMembershipGate
                     visible
                     trialOffer={eligibility.trialOffer}
                     onClose={goBackToMessages}
                 />
-            </SafeAreaView>
+            </View>
         );
     }
 
     return (
-        <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]} edges={['top']}>
+        <View style={screenStyle}>
             <View
                 ref={screenContentRef}
                 style={[styles.screen, { backgroundColor: colors.body }]}
@@ -2281,11 +2338,7 @@ export default function ConversationScreen() {
                             style={[styles.headerProfileContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                         >
                             <View pointerEvents="none" style={[styles.headerAvatar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                {avatar ? (
-                                    <Image source={{ uri: avatar }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                                ) : (
-                                    <Image source={PROFILE_PLACEHOLDER_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" />
-                                )}
+                                <ConversationAvatar identity={String(headerOther.id || headerOther._id || recipientId || id)} uri={avatar} />
                             </View>
                             <View pointerEvents="none" style={[styles.headerText, { direction: isRTL ? 'rtl' : 'ltr' }]}>
                                 <RNText numberOfLines={2} style={[styles.headerNameText, { color: colors.text, textAlign: 'left', fontFamily: fontFamilyForText(headerName, 'bold'), fontWeight: undefined }]}>
@@ -2309,7 +2362,14 @@ export default function ConversationScreen() {
                         />
                     ) : null}
                     <Pressable
-                        onPress={() => setMenuOpen(true)}
+                        onPress={() => {
+                            if (!conversation || menuBusy || menuRequestRef.current || messageActionBusy) return;
+                            contextOpening.cancel();
+                            setSelectedMessage(null);
+                            Keyboard.dismiss();
+                            setConversationConfirmation(null);
+                            setMenuOpen(true);
+                        }}
                         style={styles.headerIcon}
                     >
                         <MoreVertical size={scale(21)} color={colors.text} strokeWidth={2.7} />
@@ -2387,7 +2447,10 @@ export default function ConversationScreen() {
                                     <ActivityIndicator color={colors.primary} />
                                 ) : (
                                     <Text variant="body" className="font-body-bold" align="center" style={{ color: colors.text }}>
-                                        {t('no_messages_yet', 'No messages yet')}
+                                        {peerDeleted ? t('chat:account_deleted', 'Account deleted')
+                                            : activeConversation?.historyCleared
+                                                ? t('chat:history_cleared', 'Chat history cleared')
+                                                : t('no_messages_yet', 'No messages yet')}
                                     </Text>
                                 )}
                             </View>
@@ -2697,61 +2760,58 @@ export default function ConversationScreen() {
                 />
             )}
 
-            <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => !menuBusy && setMenuOpen(false)}>
-                <View style={[styles.menuLayer, { direction: isRTL ? 'rtl' : 'ltr' }]} pointerEvents="box-none">
-                    <Pressable style={styles.menuBackdrop} onPress={() => !menuBusy && setMenuOpen(false)} />
-                    <View
-                        style={[
-                            styles.conversationMenu,
-                            {
-                                top: insets.top + scale(58),
-                                backgroundColor: colors.card,
-                                borderColor: colors.border,
-                            },
-                        ]}
-                    >
-                        <View style={[styles.conversationMenuHeader, { borderBottomColor: colors.border }]}>
-                            <Text
-                                variant="body-sm"
-                                className="font-body-bold"
-                                style={[styles.conversationMenuTitle, { color: colors.text, textAlign: 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
-                            >
-                                {translateChatText('more_options', 'More options')}
-                            </Text>
-                            <Pressable onPress={() => !menuBusy && setMenuOpen(false)} style={styles.menuClose}>
-                                <X size={scale(18)} color={colors.text} strokeWidth={2.6} />
-                            </Pressable>
-                        </View>
-                        <View style={styles.conversationMenuLinks}>
-                            <ConversationMenuItem
-                                icon={conversation?.muted ? Bell : BellOff}
-                                label={conversation?.muted
-                                    ? translateChatText('unmute_conversation', 'Unmute notifications')
-                                    : translateChatText('mute_conversation', 'Mute notifications')}
-                                color={colors.text}
-                                disabled={menuBusy}
-                                onPress={toggleMute}
-                            />
-                            <ConversationMenuItem
-                                icon={XCircle}
-                                label={translateChatText('end_conversation', 'End conversation')}
-                                color={colors.danger}
-                                danger
-                                disabled={menuBusy}
-                                onPress={endConversation}
-                            />
-                            <ConversationMenuItem
-                                icon={Trash2}
-                                label={translateChatText('delete_chat', 'Delete chat')}
-                                color={colors.danger}
-                                danger
-                                disabled={menuBusy}
-                                onPress={deleteConversation}
-                            />
-                        </View>
-                    </View>
+            <ConversationOptionsSheet
+                visible={menuOpen && isFocused}
+                busy={menuBusy}
+                confirming={conversationConfirmation !== null}
+                title={conversationConfirmation === 'delete'
+                    ? translateChatText('delete_chat', 'Delete chat')
+                    : conversationConfirmation === 'end'
+                        ? translateChatText('end_conversation', 'End conversation')
+                        : translateChatText('more_options', 'More options')}
+                message={conversationConfirmation === 'delete'
+                    ? translateChatText('delete_chat_confirm', 'Delete this chat for me?')
+                    : translateChatText('end_conversation_confirm', 'End this conversation?')}
+                confirmLabel={conversationConfirmation === 'delete'
+                    ? translateChatText('delete_chat', 'Delete chat')
+                    : translateChatText('end_conversation', 'End conversation')}
+                cancelLabel={t('cancel', 'Cancel')}
+                closeLabel={t('close', 'Close')}
+                colors={colors}
+                onClose={closeConversationMenu}
+                onCancel={() => {
+                    if (!menuBusy && !menuRequestRef.current) setConversationConfirmation(null);
+                }}
+                onConfirm={() => void confirmConversationAction()}
+            >
+                <View style={styles.conversationMenuLinks}>
+                    <ConversationMenuItem
+                        icon={conversation?.muted ? Bell : BellOff}
+                        label={conversation?.muted
+                            ? translateChatText('unmute_conversation', 'Unmute notifications')
+                            : translateChatText('mute_conversation', 'Mute notifications')}
+                        color={colors.text}
+                        disabled={menuBusy}
+                        onPress={() => void runConversationMenuAction('mute')}
+                    />
+                    <ConversationMenuItem
+                        icon={XCircle}
+                        label={translateChatText('end_conversation', 'End conversation')}
+                        color={colors.danger}
+                        danger
+                        disabled={menuBusy}
+                        onPress={endConversation}
+                    />
+                    <ConversationMenuItem
+                        icon={Trash2}
+                        label={translateChatText('delete_chat', 'Delete chat')}
+                        color={colors.danger}
+                        danger
+                        disabled={menuBusy}
+                        onPress={deleteConversation}
+                    />
                 </View>
-            </Modal>
+            </ConversationOptionsSheet>
 
             <UserProfileSheet
                 visible={profileSheetOpen && Boolean(peerId)}
@@ -2766,22 +2826,6 @@ export default function ConversationScreen() {
                     setReportTarget(null);
                     goBackToMessages();
                 }}
-            />
-            <ConfirmSheet
-                visible={conversationConfirmation !== null}
-                onClose={() => setConversationConfirmation(null)}
-                onConfirm={() => void confirmConversationAction()}
-                title={conversationConfirmation === 'delete'
-                    ? translateChatText('delete_chat', 'Delete chat')
-                    : translateChatText('end_conversation', 'End conversation')}
-                message={conversationConfirmation === 'delete'
-                    ? translateChatText('delete_chat_confirm', 'Delete this chat for me?')
-                    : translateChatText('end_conversation_confirm', 'End this conversation?')}
-                confirmLabel={conversationConfirmation === 'delete'
-                    ? translateChatText('delete_chat', 'Delete chat')
-                    : translateChatText('end_conversation', 'End conversation')}
-                cancelLabel={t('cancel', 'Cancel')}
-                confirmLoading={menuBusy}
             />
             <MessageDeleteDialog
                 visible={deleteTarget !== null}
@@ -2804,7 +2848,7 @@ export default function ConversationScreen() {
                     setDeleteError('');
                 }}
             />
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -3415,11 +3459,14 @@ function MessageBubbleComponent({
     onOpenImage: (preview: ChatImagePreview) => void;
     onOpenViewOnce: (message: ChatMessage) => void;
     viewOnceLoading: boolean;
-    onOpenMenu: (message: ChatMessage, anchor: MessageAnchor) => void;
+    onOpenMenu: (message: ChatMessage, measureAnchor: MeasureMessageAnchor) => void;
     onRetry: (message: ChatMessage) => void;
     onSwipeReply: (message: ChatMessage) => void;
     onReplyClick: (messageId: string) => void;
 }) {
+    const { fontScale } = useWindowDimensions();
+    // Scale the iOS circle with its emoji so accessibility text cannot outgrow it.
+    const reactionBadgeSize = Math.ceil(scale(24) * fontScale);
     const content = messageText(message);
 
     const media = message.media as MessageMedia | null | undefined;
@@ -3442,10 +3489,15 @@ function MessageBubbleComponent({
     const messageMetaColor = mine ? colors.bubbleMineMuted : colors.muted;
     const useInlineTextMeta = message.type === 'text' && !!content;
     const bubblePressRef = useRef<View>(null);
+    const bubbleMessageIdRef = useRef(message.id);
+    bubbleMessageIdRef.current = message.id;
     const openContext = () => {
         if (message.failed || message.pending) return;
-        bubblePressRef.current?.measureInWindow((x, y, width, height) => {
-            onOpenMenu(message, { x, y, width, height });
+        onOpenMenu(message, (ready) => {
+            if (bubbleMessageIdRef.current !== message.id) return;
+            bubblePressRef.current?.measureInWindow((x, y, width, height) => {
+                if (bubbleMessageIdRef.current === message.id) ready({ x, y, width, height });
+            });
         });
     };
     const swipeX = useSharedValue(0);
@@ -3753,9 +3805,29 @@ function MessageBubbleComponent({
                                     key={`${reaction.user || 'reaction'}-${emoji}-${index}`}
                                     entering={ZoomIn.springify().damping(14)}
                                     exiting={ZoomOut.duration(150)}
-                                    style={[styles.reactionPill, { backgroundColor: colors.card, borderColor: colors.border }]}
+                                    style={[
+                                        styles.reactionPill,
+                                        Platform.OS === 'ios' && {
+                                            width: reactionBadgeSize,
+                                            minWidth: reactionBadgeSize,
+                                            height: reactionBadgeSize,
+                                            borderRadius: reactionBadgeSize / 2,
+                                            paddingHorizontal: 0,
+                                            paddingVertical: 0,
+                                        },
+                                        { backgroundColor: colors.card, borderColor: colors.border },
+                                    ]}
                                 >
-                                    <Text style={styles.reactionText}>{emoji}</Text>
+                                    {Platform.OS === 'ios' ? (
+                                        <RNText
+                                            allowFontScaling={false}
+                                            style={{ fontSize: scale(12) * fontScale, textAlign: 'center' }}
+                                        >
+                                            {emoji}
+                                        </RNText>
+                                    ) : (
+                                        <Text style={styles.reactionText}>{emoji}</Text>
+                                    )}
                                 </Reanimated.View>
                             );
                         })}
@@ -4469,54 +4541,6 @@ const styles = StyleSheet.create({
     modalClose: { position: 'absolute', right: scale(16), zIndex: 5, width: scale(42), height: scale(42), borderRadius: scale(21), backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
     countdown: { position: 'absolute', left: scale(16), zIndex: 5, paddingHorizontal: scale(12), paddingVertical: scale(5), borderRadius: scale(14), backgroundColor: 'rgba(255,255,255,0.12)' },
     previewImage: { width: '92%', height: '82%' },
-    menuLayer: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-        justifyContent: 'flex-start',
-    },
-    menuBackdrop: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        left: 0,
-        backgroundColor: 'rgba(16, 16, 17,0.28)',
-    },
-    conversationMenu: {
-        position: 'absolute',
-        right: scale(12),
-        width: scale(286),
-        borderRadius: scale(14),
-        borderWidth: StyleSheet.hairlineWidth,
-        overflow: 'hidden',
-        shadowColor: '#000000',
-        shadowOpacity: 0.16,
-        shadowRadius: scale(18),
-        shadowOffset: { width: 0, height: scale(10) },
-        elevation: 12,
-    },
-    conversationMenuHeader: {
-        height: scale(48),
-        paddingStart: scale(16),
-        paddingEnd: scale(52),
-        justifyContent: 'center',
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    conversationMenuTitle: {
-        alignSelf: 'stretch',
-    },
-    menuClose: {
-        position: 'absolute',
-        end: scale(8),
-        width: scale(36),
-        height: scale(36),
-        borderRadius: scale(18),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     conversationMenuItem: {
         minHeight: scale(52),
         paddingVertical: scale(8),

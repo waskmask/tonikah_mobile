@@ -4,6 +4,7 @@ const CHAT_KEY_FALLBACKS: Record<string, string> = {
     account_deleted: 'Account deleted',
     already_viewed: 'Already viewed',
     chat_hidden: 'Chat hidden',
+    history_cleared: 'Chat history cleared',
     conversation_ended: 'Conversation ended',
     conversation_muted: 'Conversation muted',
     conversation_unmuted: 'Conversation unmuted',

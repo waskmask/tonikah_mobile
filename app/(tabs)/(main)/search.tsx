@@ -180,6 +180,7 @@ export default function ExploreScreen() {
     const hasCachedDeckRef = useRef(false);
     const cacheWriteEnabledRef = useRef(false);
     const interactedProfileIdsRef = useRef<Set<string>>(new Set());
+    const contactedProfileRef = useRef<string | null>(null);
     const startupResponseRef = useRef<{ response: UserListResponse; filterKey: string } | null>(null);
 
     useEffect(() => {
@@ -537,6 +538,12 @@ export default function ExploreScreen() {
 
     const closeProfileSheet = () => {
         setDetailOpen(false);
+        const contactedId = contactedProfileRef.current;
+        contactedProfileRef.current = null;
+        if (contactedId) {
+            interactedProfileIdsRef.current.add(contactedId);
+            setProfiles((items) => items.filter((item) => profileId(item) !== contactedId));
+        }
         // Block deck taps until the modal slide animation finishes (prevents accidental skip).
         setProfileSheetClosing(true);
         setTimeout(() => setProfileSheetClosing(false), 450);
@@ -680,7 +687,6 @@ export default function ExploreScreen() {
                                 viewerLng={viewerCoordinates?.lng}
                                 onPressCard={viewProfile}
                                 onSwiped={handleSwiped}
-                                canSwipe={canSwipe}
                             />
                         </DevRenderProfiler>
                     </View>
@@ -734,10 +740,12 @@ export default function ExploreScreen() {
             />
             <ExploreTourModal visible={tourOpen} onClose={() => setTourOpen(false)} />
             <UserProfileSheet
+                enableEdgeDismiss
                 visible={detailOpen && Boolean(currentId)}
                 userId={currentId}
                 initialProfile={current}
                 onClose={closeProfileSheet}
+                onIntroSent={(id) => { contactedProfileRef.current = id; }}
                 onBlocked={(id) => {
                     setProfiles((items) => items.filter((item) => profileId(item) !== id));
                 }}

@@ -46,7 +46,7 @@ export default function Index() {
 
     useEffect(() => {
         if (isRestoringSession || !isFirstLaunchHydrated) return;
-        const destination = isFirstLaunch
+        const destination = isFirstLaunch && !isAuthenticated
             ? 'onboarding'
             : isAuthenticated
                 ? incompleteStep > 0
@@ -61,7 +61,7 @@ export default function Index() {
         return <AppLoadingScreen />;
     }
 
-    if (isFirstLaunch) {
+    if (isFirstLaunch && !isAuthenticated) {
         return <LoadingRedirect href="/(onboarding)" />;
     }
 

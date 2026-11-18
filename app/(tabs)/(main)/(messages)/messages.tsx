@@ -3,13 +3,13 @@ import { MEMBERSHIP_PURCHASES_ENABLED } from '@/constants/releaseFeatures';
 import {
     ActivityIndicator,
     FlatList,
+    Platform,
     Pressable,
     RefreshControl,
     StyleSheet,
     TextInput,
     View,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { Archive, Bell, BellOff, Check, CreditCard, MessageCircle, Search, Send, UserRoundPlus, X } from '@/components/ui/icons/PhosphorCompat';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ import {
     normalizeConversation,
 } from '@/lib/chatService';
 import { apiMessage, profileAvatarImage, t } from '@/lib/profileDisplay';
-import { PROFILE_PLACEHOLDER_IMAGE } from '@/lib/profileAssets';
+import { ConversationAvatar } from '@/components/chat/ConversationAvatar';
 import { translateChatText } from '@/lib/chatDisplay';
 import { useTheme } from '@/hooks/useTheme';
 import { useColors } from '@/hooks/useColors';
@@ -116,6 +116,11 @@ export default function MessagesScreen() {
     const [nextCursor, setNextCursor] = useState<string | null>(() => cachedInbox?.nextCursor || null);
     const [slots, setSlots] = useState<{ used?: number; total?: number } | null>(() => cachedInbox?.slots || null);
     const [search, setSearch] = useState('');
+    const searchInputRef = useRef<TextInput>(null);
+    const selectTab = useCallback((tab: ConversationTab) => {
+        if (tab !== activeTab && Platform.OS === 'ios') searchInputRef.current?.blur();
+        setActiveTab(tab);
+    }, [activeTab]);
     const searchPlaceholder = t('chat:search_placeholder', 'Search messages...');
     const inputFontFamily = fontFamilyForText(search || searchPlaceholder);
     const [loading, setLoading] = useState(!cachedInbox);
@@ -126,6 +131,9 @@ export default function MessagesScreen() {
     const [membershipGateVisible, setMembershipGateVisible] = useState(false);
     const [membershipPromoVisible, setMembershipPromoVisible] = useState(false);
     const inboxCacheReadyRef = useRef(false);
+    const initialLoadFinishedRef = useRef(false);
+    const requestActionIdsRef = useRef(new Set<string>());
+    const [busyRequestIds, setBusyRequestIds] = useState<ReadonlySet<string>>(() => new Set());
     const previousConnectivityRef = useRef(connectivityStatus);
     const lastAcceptedIdRef = useRef<string | null>(null);
 
@@ -160,16 +168,19 @@ export default function MessagesScreen() {
         primary,
     };
 
-    const load = useCallback(async (mode: 'replace' | 'append' = 'replace') => {
+    const load = useCallback(async (mode: 'replace' | 'append' | 'pending' = 'replace') => {
         const cursor = mode === 'append' ? nextCursor : null;
+        const snapshot = queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox);
+        const requestsAtStart = snapshot?.requests || requests;
+        const sentAtStart = snapshot?.sent || sent;
         const [conversationRes, requestRes, sentRes, slotsRes] = await Promise.all([
-            chatService.conversations({ cursor, limit: 30 }),
-            mode === 'replace' ? chatService.incomingRequests() : Promise.resolve(null),
-            mode === 'replace' ? chatService.sentRequests() : Promise.resolve(null),
+            mode !== 'pending' ? chatService.conversations({ cursor, limit: 30 }) : Promise.resolve(null),
+            mode !== 'append' ? chatService.incomingRequests() : Promise.resolve(null),
+            mode !== 'append' ? chatService.sentRequests() : Promise.resolve(null),
             mode === 'replace' ? chatService.slots() : Promise.resolve(null),
         ]);
 
-        if (conversationRes.success) {
+        if (conversationRes?.success) {
             const nextItems = (conversationRes.items || []).map((item) => normalizeConversation(item));
             const cached = queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox);
             const accepted = cached?.conversations.find((item) => item.id === cached.recentlyAcceptedId && item.state === 'active');
@@ -189,7 +200,7 @@ export default function MessagesScreen() {
             }));
             setNextCursor(responseCursor);
         }
-        if (requestRes?.success) {
+        if (requestRes?.success && (queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox)?.requests || requests) === requestsAtStart) {
             const acceptedId = queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox)?.recentlyAcceptedId;
             const nextRequests = (requestRes.items || []).map((item) => normalizeConversation(item, 'incoming'))
                 .filter((item) => item.id !== acceptedId);
@@ -203,7 +214,7 @@ export default function MessagesScreen() {
                 slots: cached ? cached.slots : slots,
             }));
         }
-        if (sentRes?.success) {
+        if (sentRes?.success && (queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox)?.sent || sent) === sentAtStart) {
             const acceptedId = queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox)?.recentlyAcceptedId;
             const nextSent = (sentRes.items || []).map((item) => normalizeConversation(item, 'sent'))
                 .filter((item) => item.id !== acceptedId);
@@ -230,6 +241,12 @@ export default function MessagesScreen() {
             }));
         }
     }, [conversations, nextCursor, requests, sent, slots]);
+
+    const loadRef = useRef(load);
+    useEffect(() => { loadRef.current = load; }, [load]);
+    useFocusEffect(useCallback(() => {
+        if (initialLoadFinishedRef.current) void loadRef.current('pending').catch(() => undefined);
+    }, []));
 
     const refreshConversationList = useCallback(async () => {
         const response = await chatService.conversations({ cursor: null, limit: 30 });
@@ -279,7 +296,7 @@ export default function MessagesScreen() {
         (async () => {
             const persisted = !cachedInbox ? await loadCachedInbox(userId) : null;
             if (!active) return;
-            if (persisted) {
+            if (persisted && !queryClient.getQueryData<CachedInbox>(queryKeys.chat.inbox)) {
                 setConversations(persisted.conversations);
                 setRequests(persisted.requests);
                 setSent(persisted.sent);
@@ -290,6 +307,7 @@ export default function MessagesScreen() {
             }
             inboxCacheReadyRef.current = true;
             await load('replace');
+            initialLoadFinishedRef.current = true;
             if (active) setLoading(false);
         })();
         return () => {
@@ -311,6 +329,13 @@ export default function MessagesScreen() {
             void load('replace');
         }
     }, [connectivityStatus, load]);
+
+    useFocusEffect(useCallback(() => {
+        // Native tabs keep search mounted; do not restore its responder on return.
+        return () => {
+            if (Platform.OS === 'ios') searchInputRef.current?.blur();
+        };
+    }, []));
 
     useFocusEffect(
         useCallback(() => {
@@ -389,27 +414,38 @@ export default function MessagesScreen() {
     }, [activeTab, conversations, requests, search, sent]);
 
     const runRequestAction = async (conversation: Conversation, action: 'accept' | 'decline' | 'withdraw') => {
-        if (conversation.otherUser?.account_deleted) {
-            toast.show(t('chat:account_deleted_request_removed', 'This request is no longer available because the account was deleted.'), 'info');
-            await load('replace');
-            return;
-        }
-        if (action === 'accept' && !(await requireConversationAccess())) return;
-        const res = action === 'accept'
-            ? await chatService.accept(conversation.id)
-            : action === 'decline'
-                ? await chatService.decline(conversation.id)
-                : await chatService.withdraw(conversation.id);
-        if (!res.success) {
-            toast.show(apiMessage(res.message), 'error', 3500);
-            return;
-        }
-        if (action === 'accept') {
-            applyAcceptedConversation(conversation);
-            setActiveTab('chats');
-            openConversation({ ...conversation, state: 'active', requestRole: null });
-        } else {
-            applyConversationStateById(conversation.id, 'declined');
+        if (requestActionIdsRef.current.has(conversation.id)) return;
+        requestActionIdsRef.current.add(conversation.id);
+        setBusyRequestIds(new Set(requestActionIdsRef.current));
+        try {
+            if (conversation.otherUser?.account_deleted) {
+                toast.show(t('chat:account_deleted_request_removed', 'This request is no longer available because the account was deleted.'), 'info');
+                await load('replace');
+                return;
+            }
+            if (action === 'accept' && !(await requireConversationAccess())) return;
+            const res = action === 'accept'
+                ? await chatService.accept(conversation.id)
+                : action === 'decline'
+                    ? await chatService.decline(conversation.id)
+                    : await chatService.withdraw(conversation.id);
+            if (!res.success) {
+                toast.show(apiMessage(res.message), 'error', 3500);
+                if (res.message === 'request_not_found') await load('pending');
+                return;
+            }
+            if (action === 'accept') {
+                applyAcceptedConversation(conversation);
+                setActiveTab('chats');
+                openConversation({ ...conversation, state: 'active', requestRole: null });
+            } else {
+                applyConversationStateById(conversation.id, 'declined');
+            }
+        } catch {
+            toast.show(apiMessage('connection_error'), 'error', 3500);
+        } finally {
+            requestActionIdsRef.current.delete(conversation.id);
+            setBusyRequestIds(new Set(requestActionIdsRef.current));
         }
     };
 
@@ -438,7 +474,7 @@ export default function MessagesScreen() {
                     const active = key === activeTab;
                     const badge = key === 'requests' ? requests.length : key === 'sent' ? sent.length : 0;
                     return (
-                        <Pressable key={key} onPress={() => setActiveTab(key)} style={styles.tab}>
+                        <Pressable key={key} onPress={() => selectTab(key)} style={styles.tab}>
                             <View style={styles.tabIconWrap}>
                                 <Icon size={scale(17)} color={active ? primary : colors.text} strokeWidth={active ? 2.5 : 2.1} fill={active && key === 'chats' ? primary : 'transparent'} />
                                 <UnreadBadge
@@ -467,6 +503,7 @@ export default function MessagesScreen() {
                 <View style={[styles.searchBox, { backgroundColor: colors.input, borderWidth: 1, borderColor: colors.border }]}>
                     <Search size={scale(16)} color={colors.muted} />
                     <TextInput
+                        ref={searchInputRef}
                         value={search}
                         onChangeText={setSearch}
                         placeholder={searchPlaceholder}
@@ -531,6 +568,7 @@ export default function MessagesScreen() {
             ) : null}
 
             <FlatList
+                keyboardShouldPersistTaps="handled"
                 data={filteredItems}
                 keyExtractor={(item) => item.id}
                 style={{ flex: 1 }}
@@ -579,6 +617,7 @@ export default function MessagesScreen() {
                         variant={activeTab}
                         colors={colors}
                         previewLocked={previewsLocked}
+                        busy={busyRequestIds.has(item.id)}
                         onPress={() => void handleOpenConversation(item)}
                         onAccept={() => runRequestAction(item, 'accept')}
                         onDecline={() => runRequestAction(item, 'decline')}
@@ -601,6 +640,7 @@ function ConversationRow({
     variant,
     colors,
     previewLocked,
+    busy,
     onPress,
     onAccept,
     onDecline,
@@ -610,6 +650,7 @@ function ConversationRow({
     variant: ConversationTab;
     colors: Record<string, string>;
     previewLocked: boolean;
+    busy: boolean;
     onPress: () => void;
     onAccept: () => void;
     onDecline: () => void;
@@ -617,11 +658,14 @@ function ConversationRow({
 }) {
     const primary = useColors().chrome.primary;
     const other = (conversation.otherUser || {}) as ConversationOtherUser;
-    const avatar = profileAvatarImage(other);
-    const initial = otherName(conversation).trim().charAt(0).toUpperCase() || '?';
+    const avatar = other.account_deleted ? '' : profileAvatarImage(other);
     const isRequest = variant === 'requests' || variant === 'sent';
     const isDeleted = !!other.account_deleted;
-    const preview = previewLocked
+    const preview = isDeleted
+        ? t('chat:account_deleted', 'Account deleted')
+        : conversation.historyCleared && !conversation.lastMessagePreview
+            ? t('chat:history_cleared', 'Chat history cleared')
+            : previewLocked
         ? t('chat:membership_required_title', 'Membership required')
         : translateChatText(conversation.lastMessagePreview || (variant === 'requests' ? 'sent_you_a_message' : ''));
 
@@ -629,19 +673,7 @@ function ConversationRow({
         <View style={[styles.rowWrap, { borderBottomColor: colors.divider }]}>
             <Pressable onPress={onPress} style={styles.row}>
                 <View style={[styles.avatar, { backgroundColor: colors.avatarBg }]}>
-                    {avatar ? (
-                        <Image
-                            source={{ uri: avatar }}
-                            recyclingKey={conversation.id}
-                            style={StyleSheet.absoluteFill}
-                            contentFit="cover"
-                        />
-                    ) : (
-                        <Text variant="body" className="font-body-bold" style={{ color: colors.muted }}>
-                            {initial}
-                        </Text>
-                    )}
-                    {!avatar && <Image source={PROFILE_PLACEHOLDER_IMAGE} style={[StyleSheet.absoluteFill, { opacity: 0 }]} />}
+                    <ConversationAvatar identity={String(other.id || other._id || conversation.id)} uri={avatar} />
                 </View>
 
                 <View style={styles.rowBody}>
@@ -683,25 +715,28 @@ function ConversationRow({
             </Pressable>
             {variant === 'requests' && !isDeleted && (
                 <View style={styles.actions}>
-                    <ActionPill label={t('chat:accept', 'Accept')} icon={Check} tone="primary" onPress={onAccept} />
-                    <ActionPill label={t('chat:decline', 'Decline')} icon={X} tone="neutral" onPress={onDecline} />
+                    <ActionPill busy={busy} label={t('chat:accept', 'Accept')} icon={Check} tone="primary" onPress={onAccept} />
+                    <ActionPill busy={busy} label={t('chat:decline', 'Decline')} icon={X} tone="neutral" onPress={onDecline} />
                 </View>
             )}
             {variant === 'sent' && !isDeleted && (
                 <View style={styles.actions}>
-                    <ActionPill label={t('chat:withdraw', 'Withdraw')} icon={X} tone="neutral" onPress={onWithdraw} />
+                    <ActionPill busy={busy} label={t('chat:withdraw', 'Withdraw')} icon={X} tone="neutral" onPress={onWithdraw} />
                 </View>
             )}
         </View>
     );
 }
 
-function ActionPill({ label, icon: Icon, tone, onPress }: { label: string; icon: any; tone: 'primary' | 'neutral'; onPress: () => void }) {
+function ActionPill({ label, icon: Icon, tone, onPress, busy }: { label: string; icon: any; tone: 'primary' | 'neutral'; onPress: () => void; busy: boolean }) {
     const palette = useColors();
     const isPrimary = tone === 'primary';
     return (
         <Pressable
             onPress={onPress}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy, busy }}
             style={[
                 styles.actionPill,
                 isPrimary
@@ -709,7 +744,8 @@ function ActionPill({ label, icon: Icon, tone, onPress }: { label: string; icon:
                     : { backgroundColor: palette.chrome.common.card, borderWidth: StyleSheet.hairlineWidth, borderColor: palette.brand.bg.border },
             ]}
         >
-            <Icon size={scale(12)} color={isPrimary ? palette.chrome.common.inverseText : palette.chrome.header.icon} strokeWidth={2.8} />
+            {busy ? <ActivityIndicator size={scale(12)} color={isPrimary ? palette.chrome.common.inverseText : palette.chrome.header.icon} />
+                : <Icon size={scale(12)} color={isPrimary ? palette.chrome.common.inverseText : palette.chrome.header.icon} strokeWidth={2.8} />}
             <Text variant="caption" className="font-body-bold" style={{ color: isPrimary ? palette.chrome.common.inverseText : palette.chrome.header.icon }}>
                 {label}
             </Text>

@@ -10,12 +10,17 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
+      "environment": "preview",
       "env": {
+        "EXPO_PUBLIC_APP_ENV": "dev",
         "EXPO_PUBLIC_STARTUP_DIAGNOSTICS": "1"
       }
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "prod"
       }

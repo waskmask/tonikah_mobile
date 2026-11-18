@@ -2,7 +2,17 @@
   "expo": {
     "name": "toNikah",
     "slug": "tonikah",
-    "version": "1.1.1",
+    "version": "1.1.2",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/731d412f-a6af-4208-a2e3-78da74e0ea97",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "useEmbeddedUpdate": true
+    },
     "orientation": "portrait",
     "icon": "./assets/icon/icon.png",
     "scheme": "tonikah",

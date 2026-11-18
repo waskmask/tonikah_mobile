@@ -6,6 +6,7 @@ import { ToastProvider } from '@/hooks/useToast';
 import { useColors } from '@/hooks/useColors';
 import { PUBLIC_PROFILE_DETAIL_STALE_TIME_MS, queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
+import { scale } from '@/hooks/useResponsive';
 
 type UserProfileSheetProps = Omit<UserProfileViewProps, 'mode' | 'showClose'> & {
     visible: boolean;
@@ -57,7 +58,7 @@ export function UserProfileSheet({
                         previewOnly={!contentReady}
                         onClose={onClose}
                     />
-                    {contentReady ? <ToastProvider /> : null}
+                    {contentReady ? <ToastProvider topOffset={scale(52)} /> : null}
                 </GestureHandlerRootView>
             ) : null}
         </Modal>
