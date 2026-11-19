@@ -129,6 +129,7 @@ function Circle({
     const colors = useColors();
     const { isDark } = useTheme();
     const common = colors.chrome.common;
+    const [pressed, setPressed] = useState(false);
     const active = activeKey === buttonKey;
     const dimmed = activeKey !== null && !active;
     const hasDarkShine = isDark && tone !== 'view';
@@ -199,11 +200,13 @@ function Circle({
                 >
                     <Pressable
                         onPress={onPress}
+                        onPressIn={() => setPressed(true)}
+                        onPressOut={() => setPressed(false)}
                         disabled={disabled}
                         accessibilityRole="button"
                         accessibilityLabel={accessibilityLabel}
                         accessibilityState={{ disabled: Boolean(disabled) }}
-                        style={({ pressed }) => [
+                        style={[
                             styles.buttonContent,
                             pressed && !disabled && styles.contentPressed,
                         ]}
@@ -236,11 +239,13 @@ function Circle({
                     <View style={styles.darkShineContent}>
                         <Pressable
                             onPress={onPress}
+                            onPressIn={() => setPressed(true)}
+                            onPressOut={() => setPressed(false)}
                             disabled={disabled}
                             accessibilityRole="button"
                             accessibilityLabel={accessibilityLabel}
                             accessibilityState={{ disabled: Boolean(disabled) }}
-                            style={({ pressed }) => [
+                            style={[
                                 styles.buttonContent,
                                 pressed && !disabled && styles.contentPressed,
                             ]}
@@ -252,11 +257,13 @@ function Circle({
             ) : (
                 <Pressable
                     onPress={onPress}
+                    onPressIn={() => setPressed(true)}
+                    onPressOut={() => setPressed(false)}
                     disabled={disabled}
                     accessibilityRole="button"
                     accessibilityLabel={accessibilityLabel}
                     accessibilityState={{ disabled: Boolean(disabled) }}
-                    style={({ pressed }) => [
+                    style={[
                         styles.circle,
                         {
                             backgroundColor: buttonBackground,
@@ -325,6 +332,7 @@ const styles = StyleSheet.create({
     buttonContent: {
         flex: 1,
         width: '100%',
+        height: '100%',
         borderRadius: scale(999),
         alignItems: 'center',
         justifyContent: 'center',
